@@ -1,0 +1,102 @@
+<p>Đếm sản phẩm đi qua băng tải là dự án Machine Vision "nhập môn" kinh điển: bài toán rõ ràng, chạy được chỉ với webcam và OpenCV, nhưng đủ các vấn đề thật như ánh sáng, vật dính nhau, đếm trùng. Dự án này dùng hoàn toàn thuật toán cổ điển, không cần GPU.</p>
+
+<h2>Yêu cầu bài toán</h2>
+<ul>
+  <li>Camera đặt phía trên băng tải, nhìn thẳng xuống.</li>
+  <li>Sản phẩm (ví dụ hộp, chai, linh kiện) đi từ trái sang phải.</li>
+  <li>Đếm mỗi sản phẩm <strong>đúng một lần</strong> khi nó đi qua một vạch ảo.</li>
+</ul>
+
+<h2>Thiết kế phần cứng trước, phần mềm sau</h2>
+<ul>
+  <li><strong>Nền tương phản</strong>: băng tải đen với sản phẩm sáng (hoặc ngược lại) giúp phân ngưỡng ổn định.</li>
+  <li><strong>Đèn khuếch tán</strong> cố định, che ánh sáng ngoài: ánh nắng qua cửa sổ là "kẻ thù" số 1.</li>
+  <li><strong>Thời gian phơi sáng ngắn</strong> để ảnh không nhòe khi băng tải chạy nhanh.</li>
+</ul>
+
+<h2>Thuật toán</h2>
+<ol>
+  <li>Cắt ROI là dải băng tải.</li>
+  <li>Phân ngưỡng + hình thái học để tách sản phẩm.</li>
+  <li>Tìm contour, lấy tâm từng sản phẩm.</li>
+  <li>Theo dõi tâm qua các khung hình bằng "tracker" đơn giản (ghép tâm gần nhất).</li>
+  <li>Khi một tâm đi từ trái sang phải vạch đếm thì tăng bộ đếm.</li>
+</ol>
+
+<h2>Mã nguồn</h2>
+<pre><code>import cv2
+import numpy as np
+
+VIDEO = "bang-tai.mp4"         # hoặc 0 để dùng webcam
+ROI = (0, 120, 640, 240)       # x, y, w, h của dải băng tải
+LINE_X = 320                   # vạch đếm (tọa độ trong ROI)
+MIN_AREA = 800                 # diện tích tối thiểu của một sản phẩm
+MAX_DIST = 60                  # khoảng cách tối đa để ghép cùng một vật
+
+cap = cv2.VideoCapture(VIDEO)
+kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))
+tracks = {}                    # id -&gt; (cx, cy)
+next_id, count = 0, 0
+
+while True:
+    ok, frame = cap.read()
+    if not ok:
+        break
+    x, y, w, h = ROI
+    roi = frame[y:y + h, x:x + w]
+    gray = cv2.GaussianBlur(cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY), (5, 5), 0)
+    _, th = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    th = cv2.morphologyEx(th, cv2.MORPH_OPEN, kernel)
+
+    contours, _ = cv2.findContours(th, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    centers = []
+    for c in contours:
+        if cv2.contourArea(c) &lt; MIN_AREA:
+            continue
+        M = cv2.moments(c)
+        centers.append((int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"])))
+
+    # Ghép tâm mới với track cũ gần nhất
+    new_tracks = {}
+    for cx, cy in centers:
+        best, best_d = None, MAX_DIST
+        for tid, (px, py) in tracks.items():
+            d = np.hypot(cx - px, cy - py)
+            if d &lt; best_d and tid not in new_tracks:
+                best, best_d = tid, d
+        if best is None:
+            best, next_id = next_id, next_id + 1
+        else:
+            px, _ = tracks[best]
+            if px &lt; LINE_X &lt;= cx:        # vừa vượt vạch từ trái sang phải
+                count += 1
+        new_tracks[best] = (cx, cy)
+        cv2.circle(roi, (cx, cy), 5, (0, 0, 255), -1)
+    tracks = new_tracks
+
+    cv2.line(roi, (LINE_X, 0), (LINE_X, h), (0, 255, 255), 2)
+    cv2.putText(frame, f"Count: {count}", (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 3)
+    cv2.imshow("Dem san pham", frame)
+    if cv2.waitKey(1) &amp; 0xFF == ord("q"):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
+print("Tổng:", count)</code></pre>
+
+<h2>Những lỗi thường gặp và cách sửa</h2>
+<table>
+  <tr><th>Hiện tượng</th><th>Nguyên nhân</th><th>Cách sửa</th></tr>
+  <tr><td>Đếm 2 lần một vật</td><td>Contour bị tách đôi do phản xạ</td><td>Tăng kernel morphology, dùng đèn khuếch tán</td></tr>
+  <tr><td>Hai vật đếm thành một</td><td>Vật sát nhau, dính contour</td><td>Chia theo diện tích chuẩn, hoặc tách hàng bằng cơ khí</td></tr>
+  <tr><td>Mất đếm khi băng tải nhanh</td><td>Vật di chuyển quá xa giữa 2 khung</td><td>Tăng FPS, tăng <code>MAX_DIST</code>, giảm phơi sáng</td></tr>
+  <tr><td>Đếm sai khi trời nắng</td><td>Ánh sáng ngoài làm ngưỡng thay đổi</td><td>Che chắn, dùng Otsu hoặc ngưỡng thích nghi</td></tr>
+</table>
+
+<h2>Nâng cấp lên mức "nhà máy"</h2>
+<ul>
+  <li>Dùng cảm biến quang (photo sensor) để <strong>trigger</strong> camera chụp đúng lúc sản phẩm vào vị trí, thay vì xử lý video liên tục.</li>
+  <li>Gửi số đếm và tín hiệu OK/NG sang PLC qua I/O hoặc Modbus TCP (xem bài <a href="../kien-thuc/giao-tiep-camera-vision-voi-plc.html">giao tiếp vision với PLC</a>).</li>
+  <li>Lưu log theo ca, ảnh các trường hợp bất thường để phân tích.</li>
+</ul>
+<p>Khi sản phẩm đa dạng hình dạng hoặc nền phức tạp, thay bước phân ngưỡng bằng mô hình YOLO và tracker có sẵn, xem dự án <a href="dem-nguoi-qua-cua-yolo-tracking.html">đếm người qua cửa bằng YOLO + tracking</a>.</p>

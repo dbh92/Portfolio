@@ -1,0 +1,83 @@
+<p>Kỹ sư mới vào nhà máy thường mất hàng tuần để tìm thông tin trong hàng trăm trang hướng dẫn vận hành, quy trình xử lý sự cố và datasheet. Dự án này xây một <strong>chatbot hỏi đáp tài liệu nội bộ</strong> theo kiến trúc <strong>RAG</strong> (Retrieval-Augmented Generation): mô hình ngôn ngữ chỉ trả lời dựa trên đoạn tài liệu liên quan nhất mà hệ thống tìm được.</p>
+
+<h2>Vì sao không hỏi thẳng LLM?</h2>
+<ul>
+  <li>LLM không biết tài liệu nội bộ của bạn.</li>
+  <li>Khi không biết, LLM có thể "bịa" câu trả lời nghe rất thuyết phục.</li>
+  <li>RAG buộc câu trả lời bám vào nguồn và <strong>trích dẫn được</strong>: người dùng kiểm tra lại ngay.</li>
+</ul>
+
+<h2>Kiến trúc</h2>
+<ol>
+  <li><strong>Nạp tài liệu</strong>: đọc PDF, Word, trang wiki thành văn bản.</li>
+  <li><strong>Chia nhỏ (chunking)</strong>: cắt thành đoạn khoảng 300–800 từ, có chồng lấn.</li>
+  <li><strong>Nhúng (embedding)</strong>: biến mỗi đoạn thành một vector số biểu diễn ý nghĩa.</li>
+  <li><strong>Tìm kiếm</strong>: nhúng câu hỏi, lấy các đoạn có vector gần nhất.</li>
+  <li><strong>Sinh câu trả lời</strong>: gửi câu hỏi + các đoạn tìm được cho LLM, yêu cầu chỉ trả lời dựa trên đó.</li>
+</ol>
+
+<h2>Bước 1–3: nạp, chia nhỏ và nhúng tài liệu</h2>
+<pre><code>pip install pypdf sentence-transformers numpy</code></pre>
+<pre><code>import numpy as np
+from pypdf import PdfReader
+from sentence_transformers import SentenceTransformer
+
+def load_pdf(path):
+    reader = PdfReader(path)
+    return [(i + 1, page.extract_text() or "") for i, page in enumerate(reader.pages)]
+
+def chunk(text, size=600, overlap=100):
+    words = text.split()
+    step = size - overlap
+    return [" ".join(words[i:i + size]) for i in range(0, max(len(words), 1), step)]
+
+docs = []                                   # (nguồn, nội dung)
+for page_no, text in load_pdf("huong-dan-van-hanh.pdf"):
+    for part in chunk(text):
+        if part.strip():
+            docs.append((f"huong-dan-van-hanh.pdf, trang {page_no}", part))
+
+# Mô hình embedding đa ngôn ngữ, hỗ trợ tiếng Việt
+embedder = SentenceTransformer("intfloat/multilingual-e5-small")
+doc_vecs = embedder.encode([f"passage: {d[1]}" for d in docs], normalize_embeddings=True)
+np.save("doc_vecs.npy", doc_vecs)</code></pre>
+<p>Họ mô hình E5 yêu cầu thêm tiền tố <code>passage:</code> cho tài liệu và <code>query:</code> cho câu hỏi. Mỗi mô hình embedding có quy ước riêng, hãy đọc model card trước khi dùng.</p>
+
+<h2>Bước 4: tìm đoạn liên quan</h2>
+<pre><code>def search(question, k=4):
+    q = embedder.encode([f"query: {question}"], normalize_embeddings=True)[0]
+    scores = doc_vecs @ q                  # vector đã chuẩn hóa: tích vô hướng = cosine
+    top = np.argsort(-scores)[:k]
+    return [(docs[i][0], docs[i][1], float(scores[i])) for i in top]</code></pre>
+<p>Với vài nghìn đoạn, tìm kiếm bằng NumPy là đủ nhanh. Khi lên hàng triệu đoạn, chuyển sang thư viện vector chuyên dụng như FAISS hoặc một vector database.</p>
+
+<h2>Bước 5: sinh câu trả lời có trích dẫn</h2>
+<pre><code>def build_prompt(question, hits):
+    context = "\n\n".join(f"[{i + 1}] ({src})\n{text}" for i, (src, text, _) in enumerate(hits))
+    return (
+        "Bạn là trợ lý kỹ thuật của nhà máy. Chỉ trả lời dựa trên các đoạn tài liệu dưới đây. "
+        "Ghi số trích dẫn [1], [2]... sau mỗi ý. Nếu tài liệu không có thông tin, "
+        "hãy nói rõ là không tìm thấy, không được đoán.\n\n"
+        f"TÀI LIỆU:\n{context}\n\nCÂU HỎI: {question}"
+    )
+
+question = "Máy báo lỗi E-205 thì xử lý thế nào?"
+hits = search(question)
+prompt = build_prompt(question, hits)
+answer = ask_llm(prompt)     # gọi API LLM bạn dùng (dịch vụ đám mây hoặc mô hình chạy cục bộ)
+print(answer)</code></pre>
+<p><code>ask_llm</code> là chỗ bạn kết nối tới nhà cung cấp LLM. Với tài liệu mật của công ty, cân nhắc mô hình chạy cục bộ hoặc dịch vụ cam kết không dùng dữ liệu để huấn luyện.</p>
+
+<h2>Đánh giá chất lượng</h2>
+<ul>
+  <li>Lập bộ 30–50 câu hỏi thật kèm đáp án đúng do kỹ sư lâu năm viết.</li>
+  <li>Đo riêng hai phần: <strong>tìm đúng đoạn</strong> (đoạn chứa đáp án có nằm trong top-k không) và <strong>trả lời đúng</strong>.</li>
+  <li>Phần lớn lỗi RAG đến từ khâu tìm kiếm: chia đoạn quá dài/ngắn, PDF scan không trích được chữ (cần OCR), bảng biểu bị vỡ.</li>
+</ul>
+
+<h2>Hướng phát triển</h2>
+<ul>
+  <li>Kết hợp tìm kiếm từ khóa (BM25) với tìm kiếm vector để bắt chính xác mã lỗi như "E-205".</li>
+  <li>Thêm giao diện web, đăng nhập và phân quyền tài liệu.</li>
+  <li>Ghi log câu hỏi không trả lời được để bổ sung tài liệu.</li>
+</ul>

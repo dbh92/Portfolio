@@ -16,7 +16,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(ROOT, "assets", "images", "posts")
 W, H = 1200, 675
-FONT_DIRS = [r"C:\Windows\Fonts", "/usr/share/fonts/truetype/dejavu", "/Library/Fonts"]
+FONT_DIRS = [r"C:\Windows\Fonts", "/usr/share/fonts/truetype/dejavu", "/usr/share/fonts/truetype/wqy", "/Library/Fonts"]
 
 
 def font(names, size):
@@ -104,7 +104,7 @@ def deco_note(d, rnd):
         y += 32
 
 
-DECOS = {"kien-thuc-lap-trinh": deco_code, "ngoai-ngu": deco_chat, "blog": deco_note}
+DECOS = {"hoc": deco_code, "projects": deco_code, "ngoai-ngu": deco_chat}  # còn lại: deco_note
 
 
 def fit_font(draw, text, names, max_w, max_h, start=300):
@@ -142,7 +142,7 @@ def make(post, cat_name, path):
     # Chữ lớn (glyph)
     glyph = post["thumb"]["glyph"]
     is_cjk = any(ord(ch) > 0x3000 for ch in glyph)
-    names = ["malgunbd.ttf"] if is_cjk else ["seguibl.ttf", "segoeuib.ttf", "arialbd.ttf", "DejaVuSans-Bold.ttf"]
+    names = ["msyhbd.ttc", "malgunbd.ttf", "wqy-zenhei.ttc"] if is_cjk else ["seguibl.ttf", "segoeuib.ttf", "arialbd.ttf", "DejaVuSans-Bold.ttf"]
     tmp = ImageDraw.Draw(img)
     f, b = fit_font(tmp, glyph, names, 560, 300)
     gw, gh = b[2] - b[0], b[3] - b[1]
@@ -167,7 +167,7 @@ def make(post, cat_name, path):
 
 
 def make_default(path):
-    post = {"slug": "default", "category": "kien-thuc-lap-trinh",
+    post = {"slug": "default", "category": "hoc",
             "thumb": {"glyph": "HọcFree", "colors": ["#f04e23", "#7a1d0c"]}}
     make(post, "Chia sẻ kiến thức miễn phí", path)
 
@@ -176,7 +176,8 @@ def main():
     force = "--all" in sys.argv
     with open(os.path.join(ROOT, "src", "posts.json"), encoding="utf-8") as fh:
         data = json.load(fh)
-    cats = {c["slug"]: c["name"] for c in data["categories"]}
+    with open(os.path.join(ROOT, "src", "nav.json"), encoding="utf-8") as fh:
+        cats = {s["slug"]: s["label"] for s in json.load(fh)["sections"] if s.get("groups")}
     os.makedirs(OUT_DIR, exist_ok=True)
     for p in data["posts"]:
         out = os.path.join(OUT_DIR, p["slug"] + ".jpg")

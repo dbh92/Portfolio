@@ -1,0 +1,44 @@
+<p>"Bài toán này có nên dùng AI không?" là câu hỏi mà mọi Vision Engineer phải trả lời ở đầu mỗi dự án. Câu trả lời đúng hiếm khi là "luôn luôn AI" hay "không bao giờ AI". Bài này đưa ra một cách nghĩ thực tế để lựa chọn giữa <strong>thuật toán rule-based</strong> (xử lý ảnh cổ điển) và <strong>Deep Learning</strong>.</p>
+
+<h2>Hai cách tiếp cận</h2>
+<p><strong>Rule-based</strong>: kỹ sư tự thiết kế chuỗi xử lý (phân ngưỡng, contour, đo cạnh, so khớp mẫu) và đặt luật rõ ràng, ví dụ "diện tích vết đen &gt; 50 pixel thì NG".</p>
+<p><strong>Deep Learning</strong>: mô hình tự học đặc trưng từ dữ liệu ảnh đã gán nhãn (phân loại, phát hiện, phân đoạn) hoặc chỉ từ ảnh tốt (anomaly detection).</p>
+
+<h2>So sánh</h2>
+<table>
+  <tr><th>Tiêu chí</th><th>Rule-based</th><th>Deep Learning</th></tr>
+  <tr><td>Dữ liệu cần có</td><td>Vài ảnh mẫu</td><td>Hàng trăm đến hàng nghìn ảnh, cần gán nhãn (trừ anomaly detection)</td></tr>
+  <tr><td>Đo lường chính xác (mm, µm)</td><td><strong>Rất mạnh</strong>, subpixel, truy xuất được</td><td>Yếu, không phải thế mạnh</td></tr>
+  <tr><td>Lỗi hình dạng đa dạng, khó mô tả</td><td>Khó, luật phức tạp dần</td><td><strong>Rất mạnh</strong></td></tr>
+  <tr><td>Nền, kết cấu tự nhiên (gỗ, vải, da)</td><td>Rất khó</td><td><strong>Mạnh</strong></td></tr>
+  <tr><td>Giải thích vì sao NG</td><td>Rõ ràng</td><td>Khó hơn, cần heatmap</td></tr>
+  <tr><td>Phần cứng</td><td>CPU thường là đủ</td><td>Thường cần GPU hoặc bộ tăng tốc khi yêu cầu tốc độ cao</td></tr>
+  <tr><td>Thay đổi sản phẩm</td><td>Chỉnh tham số</td><td>Thu thập thêm dữ liệu, huấn luyện lại</td></tr>
+</table>
+
+<h2>Câu hỏi để quyết định</h2>
+<ol>
+  <li><strong>Có mô tả được lỗi bằng con số không?</strong> "Đường kính 10,00 ± 0,05 mm", "có đủ 12 chân", "nhãn lệch không quá 2 mm" → rule-based.</li>
+  <li><strong>Lỗi có hình dạng ngẫu nhiên, nền có hoa văn tự nhiên không?</strong> Vết nứt trên gỗ, lỗi dệt trên vải, vết bẩn trên bề mặt có vân → Deep Learning.</li>
+  <li><strong>Có đủ ảnh lỗi không?</strong> Nếu lỗi hiếm, bắt đầu bằng <a href="../projects/phat-hien-loi-be-mat-anomaly-detection.html">anomaly detection</a> (chỉ cần ảnh tốt) trước khi tính đến mô hình có giám sát.</li>
+  <li><strong>Yêu cầu giải thích và truy xuất có chặt không?</strong> Ngành ô tô, y tế, hàng không thường yêu cầu giải thích rõ từng quyết định, rule-based hoặc kết hợp sẽ dễ thuyết phục hơn.</li>
+  <li><strong>Cycle time bao nhiêu?</strong> Tính cả thời gian chạy mô hình trên phần cứng thực tế.</li>
+</ol>
+
+<h2>Thực tế: kết hợp cả hai</h2>
+<p>Hệ thống hiệu quả nhất thường là <strong>hybrid</strong>:</p>
+<ul>
+  <li>Rule-based <strong>định vị và căn chỉnh</strong> sản phẩm (template matching), cắt đúng ROI.</li>
+  <li>Deep Learning <strong>phân loại lỗi bề mặt</strong> trong ROI đó.</li>
+  <li>Rule-based <strong>đo kích thước</strong> và áp dụng dung sai trên bản vẽ.</li>
+  <li>Một lớp luật cuối cùng tổng hợp kết quả, ghi log, gửi OK/NG cho PLC.</li>
+</ul>
+<p>Cách chia nhỏ này giúp mô hình AI chỉ phải học một việc đơn giản trên ảnh đã chuẩn hóa, cần ít dữ liệu hơn và ổn định hơn.</p>
+
+<h2>Sai lầm thường gặp</h2>
+<ul>
+  <li>Dùng AI để bù cho ánh sáng kém. Hãy sửa ánh sáng trước; mô hình huấn luyện trên ảnh xấu sẽ kém ổn định.</li>
+  <li>Đánh giá mô hình bằng "accuracy" chung chung. Nhà máy quan tâm <strong>tỷ lệ lọt lỗi</strong> (escape) và <strong>tỷ lệ loại nhầm</strong> (overkill), cần đo riêng từng chỉ số.</li>
+  <li>Tập test lấy từ cùng đợt chụp với tập train, cho kết quả đẹp trên giấy nhưng thất bại khi chạy ca đêm hoặc đổi lô vật liệu.</li>
+</ul>
+<p>Nắm chắc cả hai trường phái chính là điểm khác biệt giữa một "người biết train YOLO" và một <a href="../lo-trinh/vision-engineer.html">Vision Engineer</a>.</p>

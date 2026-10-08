@@ -1,0 +1,85 @@
+<p>Trang tra cứu nhanh các hàm OpenCV-Python dùng nhiều nhất trong xử lý ảnh và Machine Vision. Lưu lại để dùng khi viết code. Mọi ví dụ giả định đã có <code>import cv2</code> và <code>import numpy as np</code>.</p>
+
+<h2>Đọc, ghi, hiển thị</h2>
+<table>
+  <tr><th>Việc cần làm</th><th>Code</th></tr>
+  <tr><td>Đọc ảnh màu / xám</td><td><code>cv2.imread(p)</code> / <code>cv2.imread(p, cv2.IMREAD_GRAYSCALE)</code></td></tr>
+  <tr><td>Đọc đường dẫn có dấu (Windows)</td><td><code>cv2.imdecode(np.fromfile(p, np.uint8), cv2.IMREAD_COLOR)</code></td></tr>
+  <tr><td>Ghi ảnh</td><td><code>cv2.imwrite("out.png", img)</code></td></tr>
+  <tr><td>Hiển thị</td><td><code>cv2.imshow("win", img); cv2.waitKey(0)</code></td></tr>
+  <tr><td>Mở camera / video</td><td><code>cap = cv2.VideoCapture(0)</code>; <code>ok, frame = cap.read()</code></td></tr>
+</table>
+
+<h2>Màu sắc và kích thước</h2>
+<table>
+  <tr><th>Việc cần làm</th><th>Code</th></tr>
+  <tr><td>BGR → xám / HSV / RGB</td><td><code>cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)</code> (…<code>2HSV</code>, …<code>2RGB</code>)</td></tr>
+  <tr><td>Lọc dải màu</td><td><code>cv2.inRange(hsv, lower, upper)</code></td></tr>
+  <tr><td>Đổi kích thước</td><td><code>cv2.resize(img, (w, h), interpolation=cv2.INTER_AREA)</code></td></tr>
+  <tr><td>Cắt ROI</td><td><code>roi = img[y:y+h, x:x+w]</code></td></tr>
+  <tr><td>Xoay 90°</td><td><code>cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)</code></td></tr>
+  <tr><td>Lật</td><td><code>cv2.flip(img, 1)</code> (1 ngang, 0 dọc)</td></tr>
+</table>
+
+<h2>Lọc và làm mờ</h2>
+<table>
+  <tr><th>Việc cần làm</th><th>Code</th></tr>
+  <tr><td>Gaussian blur</td><td><code>cv2.GaussianBlur(img, (5, 5), 0)</code></td></tr>
+  <tr><td>Median (nhiễu muối tiêu)</td><td><code>cv2.medianBlur(img, 5)</code></td></tr>
+  <tr><td>Giữ biên khi làm mịn</td><td><code>cv2.bilateralFilter(img, 9, 75, 75)</code></td></tr>
+  <tr><td>Cân bằng histogram cục bộ</td><td><code>cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray)</code></td></tr>
+</table>
+
+<h2>Phân ngưỡng và hình thái học</h2>
+<table>
+  <tr><th>Việc cần làm</th><th>Code</th></tr>
+  <tr><td>Ngưỡng cố định</td><td><code>_, th = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)</code></td></tr>
+  <tr><td>Otsu</td><td><code>t, th = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)</code></td></tr>
+  <tr><td>Thích nghi</td><td><code>cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 5)</code></td></tr>
+  <tr><td>Kernel</td><td><code>k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))</code></td></tr>
+  <tr><td>Co / giãn</td><td><code>cv2.erode(th, k)</code> / <code>cv2.dilate(th, k)</code></td></tr>
+  <tr><td>Mở (xóa đốm) / đóng (lấp lỗ)</td><td><code>cv2.morphologyEx(th, cv2.MORPH_OPEN, k)</code> / <code>cv2.MORPH_CLOSE</code></td></tr>
+</table>
+
+<h2>Cạnh, contour và đo đạc</h2>
+<table>
+  <tr><th>Việc cần làm</th><th>Code</th></tr>
+  <tr><td>Phát hiện cạnh Canny</td><td><code>cv2.Canny(gray, 50, 150)</code></td></tr>
+  <tr><td>Tìm contour</td><td><code>cnts, hier = cv2.findContours(th, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)</code></td></tr>
+  <tr><td>Diện tích / chu vi</td><td><code>cv2.contourArea(c)</code> / <code>cv2.arcLength(c, True)</code></td></tr>
+  <tr><td>Khung bao thẳng / xoay</td><td><code>cv2.boundingRect(c)</code> / <code>cv2.minAreaRect(c)</code></td></tr>
+  <tr><td>Đường tròn bao nhỏ nhất</td><td><code>(x, y), r = cv2.minEnclosingCircle(c)</code></td></tr>
+  <tr><td>Tâm</td><td><code>M = cv2.moments(c)</code>; <code>cx = M["m10"] / M["m00"]</code></td></tr>
+  <tr><td>Bao lồi</td><td><code>cv2.convexHull(c)</code></td></tr>
+  <tr><td>Xấp xỉ đa giác</td><td><code>cv2.approxPolyDP(c, 0.02 * cv2.arcLength(c, True), True)</code></td></tr>
+  <tr><td>Đánh nhãn vùng liền khối</td><td><code>n, labels, stats, cents = cv2.connectedComponentsWithStats(th)</code></td></tr>
+  <tr><td>Tìm đường tròn</td><td><code>cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, 1.2, 20, param1=100, param2=30)</code></td></tr>
+</table>
+
+<h2>So khớp mẫu và hình học</h2>
+<table>
+  <tr><th>Việc cần làm</th><th>Code</th></tr>
+  <tr><td>Template matching</td><td><code>res = cv2.matchTemplate(gray, tpl, cv2.TM_CCOEFF_NORMED)</code>; <code>_, score, _, loc = cv2.minMaxLoc(res)</code></td></tr>
+  <tr><td>Xoay/dịch ảnh</td><td><code>M = cv2.getRotationMatrix2D(center, angle, 1.0)</code>; <code>cv2.warpAffine(img, M, (w, h))</code></td></tr>
+  <tr><td>Biến đổi phối cảnh</td><td><code>H = cv2.getPerspectiveTransform(src4, dst4)</code>; <code>cv2.warpPerspective(img, H, (w, h))</code></td></tr>
+  <tr><td>Khử méo ống kính</td><td><code>cv2.undistort(img, K, dist)</code></td></tr>
+  <tr><td>Đọc mã QR</td><td><code>text, pts, _ = cv2.QRCodeDetector().detectAndDecode(img)</code></td></tr>
+</table>
+
+<h2>Vẽ kết quả</h2>
+<table>
+  <tr><th>Việc cần làm</th><th>Code</th></tr>
+  <tr><td>Hình chữ nhật / tròn / đường</td><td><code>cv2.rectangle(img, p1, p2, (0, 255, 0), 2)</code>, <code>cv2.circle</code>, <code>cv2.line</code></td></tr>
+  <tr><td>Vẽ contour</td><td><code>cv2.drawContours(img, cnts, -1, (0, 0, 255), 2)</code></td></tr>
+  <tr><td>Chữ</td><td><code>cv2.putText(img, "OK", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)</code></td></tr>
+</table>
+
+<h2>5 lỗi hay gặp</h2>
+<ol>
+  <li><code>imread</code> trả về <code>None</code> mà không báo lỗi: luôn kiểm tra.</li>
+  <li>Nhầm thứ tự BGR và RGB khi hiển thị bằng matplotlib.</li>
+  <li>Nhầm <code>img[y, x]</code> với <code>(x, y)</code> trong hàm vẽ.</li>
+  <li>Cộng trừ ảnh <code>uint8</code> bị tràn số: dùng <code>cv2.add</code>/<code>cv2.subtract</code> hoặc đổi kiểu dữ liệu.</li>
+  <li><code>findContours</code> cần ảnh nhị phân 8 bit một kênh, vật màu trắng trên nền đen.</li>
+</ol>
+<p>Tài liệu đầy đủ: <a href="https://docs.opencv.org/4.x/" rel="noopener" target="_blank">docs.opencv.org</a>. Xem thêm bài <a href="cach-tra-cuu-tai-lieu-opencv-pytorch-ultralytics.html">cách tra cứu tài liệu hiệu quả</a>.</p>

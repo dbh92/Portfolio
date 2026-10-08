@@ -1,0 +1,69 @@
+<p>Một trạm vision chỉ có giá trị khi kết quả của nó <strong>điều khiển được dây chuyền</strong>: đẩy sản phẩm lỗi ra, dừng máy, báo đèn. Phần lớn việc đó đi qua <strong>PLC</strong>. Bài này giải thích các cách giao tiếp phổ biến giữa camera/PC vision và PLC, cùng quy trình bắt tay (handshake) chuẩn.</p>
+
+<h2>1. I/O số: đơn giản và tin cậy nhất</h2>
+<p>Camera thông minh và card I/O trên PC đều có ngõ vào/ra số (thường 24 V). Bộ tín hiệu tối thiểu:</p>
+<table>
+  <tr><th>Tín hiệu</th><th>Chiều</th><th>Ý nghĩa</th></tr>
+  <tr><td>TRIGGER</td><td>PLC → Vision</td><td>Yêu cầu chụp và kiểm tra</td></tr>
+  <tr><td>READY</td><td>Vision → PLC</td><td>Sẵn sàng nhận trigger</td></tr>
+  <tr><td>BUSY</td><td>Vision → PLC</td><td>Đang xử lý</td></tr>
+  <tr><td>DONE</td><td>Vision → PLC</td><td>Kết quả đã sẵn sàng</td></tr>
+  <tr><td>OK / NG</td><td>Vision → PLC</td><td>Kết quả kiểm tra</td></tr>
+  <tr><td>ERROR</td><td>Vision → PLC</td><td>Lỗi camera, mất kết nối…</td></tr>
+</table>
+<p>Ưu điểm: nhanh, độ trễ thấp, dễ chẩn đoán bằng đèn LED. Nhược điểm: chỉ truyền được vài bit, không gửi được số liệu đo hay tọa độ.</p>
+
+<h2>2. Mạng công nghiệp (fieldbus trên Ethernet)</h2>
+<ul>
+  <li><strong>EtherNet/IP</strong>: phổ biến với PLC Rockwell/Allen-Bradley và nhiều hãng khác. Dữ liệu trao đổi theo chu kỳ dưới dạng các khối "assembly".</li>
+  <li><strong>PROFINET</strong>: phổ biến với PLC Siemens. Camera được khai báo trong phần mềm cấu hình bằng file mô tả thiết bị (GSDML).</li>
+  <li><strong>Modbus TCP</strong>: đơn giản, mở, hầu hết PLC đều hỗ trợ; dữ liệu là các thanh ghi 16 bit, cổng TCP mặc định 502.</li>
+  <li><strong>Giao thức riêng của hãng PLC</strong> (ví dụ MC protocol của Mitsubishi, FINS của Omron) cho phép đọc/ghi trực tiếp vùng nhớ PLC.</li>
+  <li><strong>OPC UA</strong>: chuẩn mở hướng tới tích hợp lên MES/SCADA, mô hình dữ liệu phong phú.</li>
+</ul>
+<p>Camera thông minh của các hãng lớn thường hỗ trợ sẵn EtherNet/IP, PROFINET và Modbus TCP. Với PC vision tự viết, Modbus TCP hoặc TCP socket là dễ bắt đầu nhất.</p>
+
+<h2>3. Thiết kế bảng dữ liệu (ví dụ với Modbus TCP)</h2>
+<table>
+  <tr><th>Thanh ghi</th><th>Chiều</th><th>Nội dung</th></tr>
+  <tr><td>40001</td><td>PLC → Vision</td><td>Lệnh: 1 = trigger, 2 = đổi chương trình</td></tr>
+  <tr><td>40002</td><td>PLC → Vision</td><td>Mã sản phẩm / số chương trình</td></tr>
+  <tr><td>40011</td><td>Vision → PLC</td><td>Trạng thái: bit0 READY, bit1 BUSY, bit2 DONE, bit3 ERROR</td></tr>
+  <tr><td>40012</td><td>Vision → PLC</td><td>Kết quả: 1 = OK, 2 = NG</td></tr>
+  <tr><td>40013–40014</td><td>Vision → PLC</td><td>Giá trị đo (số thực 32 bit, chiếm 2 thanh ghi)</td></tr>
+  <tr><td>40015</td><td>Vision → PLC</td><td>Bộ đếm kết quả (tăng sau mỗi lần kiểm tra)</td></tr>
+</table>
+<p>Hai chi tiết hay gây lỗi: thứ tự byte/word của số thực 32 bit (mỗi hãng mỗi kiểu) và việc đánh số thanh ghi bắt đầu từ 0 hay 1. Thống nhất bằng văn bản với kỹ sư PLC trước khi viết mã.</p>
+
+<h2>4. Quy trình bắt tay chuẩn</h2>
+<ol>
+  <li>Vision bật READY.</li>
+  <li>PLC thấy READY, đưa sản phẩm vào vị trí, bật TRIGGER.</li>
+  <li>Vision tắt READY, bật BUSY, chụp và xử lý.</li>
+  <li>Vision ghi kết quả, tăng bộ đếm, bật DONE, tắt BUSY.</li>
+  <li>PLC đọc kết quả, tắt TRIGGER.</li>
+  <li>Vision thấy TRIGGER tắt, tắt DONE, bật lại READY.</li>
+</ol>
+<p>Thêm <strong>timeout</strong> ở cả hai phía: nếu quá thời gian không có DONE, PLC phải xử lý như NG hoặc báo lỗi, tuyệt đối không cho sản phẩm đi tiếp như OK.</p>
+
+<h2>5. TCP socket: linh hoạt cho dữ liệu phức tạp</h2>
+<p>Khi cần gửi chuỗi dữ liệu (tọa độ cho robot, mã đọc được), nhiều hệ thống dùng TCP socket với định dạng văn bản tự định nghĩa. Ví dụ phía PC vision bằng Python:</p>
+<pre><code>import socket
+
+def send_result(host, port, ok, x_mm, y_mm, angle_deg):
+    msg = f"{'OK' if ok else 'NG'},{x_mm:.3f},{y_mm:.3f},{angle_deg:.2f}\r\n"
+    with socket.create_connection((host, port), timeout=2.0) as s:
+        s.sendall(msg.encode("ascii"))
+        reply = s.recv(64).decode("ascii").strip()   # chờ PLC/robot xác nhận
+    return reply == "ACK"
+
+send_result("192.168.0.10", 9000, True, 125.402, 87.115, -1.35)</code></pre>
+<p>Luôn có ký tự kết thúc gói (ví dụ <code>\r\n</code>), có phản hồi xác nhận và xử lý mất kết nối, tự kết nối lại.</p>
+
+<h2>Lời khuyên khi chạy thử (commissioning)</h2>
+<ul>
+  <li>Dùng phần mềm giả lập (Modbus simulator, công cụ TCP client) để kiểm tra phía vision trước khi ra hiện trường.</li>
+  <li>Ghi log mọi tín hiệu kèm thời gian đến từng mili giây, đây là bằng chứng quan trọng khi có tranh cãi "lỗi do vision hay do PLC".</li>
+  <li>Đặt IP tĩnh, tách mạng camera và mạng điều khiển nếu băng thông lớn.</li>
+</ul>
+<p>Đây là kiến thức của chặng <a href="../lo-trinh/vision-engineer.html#step-plc-robot-mes">PLC / Robot / MES</a> trong lộ trình Vision Engineer.</p>

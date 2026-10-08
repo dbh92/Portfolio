@@ -1,0 +1,87 @@
+<p>Đo kích thước không tiếp xúc là một trong những ứng dụng mang lại giá trị nhất của Machine Vision: thay thế thước kẹp, đo 100% sản phẩm thay vì lấy mẫu, lưu lại dữ liệu từng chi tiết. Dự án này đo chiều dài, chiều rộng và đường kính lỗ của một chi tiết cơ khí phẳng.</p>
+
+<h2>Ba yếu tố quyết định độ chính xác</h2>
+<ol>
+  <li><strong>Độ phân giải trên vật</strong> (mm/pixel): FOV 100 mm trên cảm biến 2448 pixel cho khoảng 0,041 mm/pixel. Quy tắc kinh nghiệm: sai số đo mong muốn nên lớn hơn vài lần kích thước một pixel.</li>
+  <li><strong>Ánh sáng</strong>: dùng <strong>đèn nền (backlight)</strong>, vật thành bóng đen sắc nét trên nền trắng, biên cạnh rõ nhất có thể.</li>
+  <li><strong>Ống kính</strong>: ống kính thường bị méo và phóng đại thay đổi theo khoảng cách. Với yêu cầu cao, dùng <strong>ống kính telecentric</strong>; với yêu cầu vừa phải, hiệu chuẩn méo bằng bàn cờ.</li>
+</ol>
+
+<h2>Bước 1: hiệu chuẩn camera bằng bàn cờ</h2>
+<pre><code>import cv2
+import glob
+import numpy as np
+
+PATTERN = (9, 6)          # số góc trong của bàn cờ (cột, hàng)
+SQUARE = 5.0              # cạnh ô vuông thật, đơn vị mm
+
+objp = np.zeros((PATTERN[0] * PATTERN[1], 3), np.float32)
+objp[:, :2] = np.mgrid[0:PATTERN[0], 0:PATTERN[1]].T.reshape(-1, 2) * SQUARE
+
+obj_pts, img_pts = [], []
+for f in glob.glob("calib/*.png"):
+    gray = cv2.imread(f, cv2.IMREAD_GRAYSCALE)
+    ok, corners = cv2.findChessboardCorners(gray, PATTERN)
+    if not ok:
+        continue
+    corners = cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1),
+        (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001))
+    obj_pts.append(objp)
+    img_pts.append(corners)
+
+rms, K, dist, _, _ = cv2.calibrateCamera(obj_pts, img_pts, gray.shape[::-1], None, None)
+print("Sai số reprojection (pixel):", rms)    # tốt khi dưới khoảng 0.3–0.5
+np.savez("calib.npz", K=K, dist=dist)</code></pre>
+<p>Chụp 15–25 ảnh bàn cờ ở nhiều vị trí, nhiều góc nghiêng, phủ kín cả khung hình. Bàn cờ phải in phẳng, chính xác (tốt nhất là tấm hiệu chuẩn bằng kính hoặc nhôm).</p>
+
+<h2>Bước 2: tính tỷ lệ mm/pixel trên mặt phẳng đo</h2>
+<p>Đặt bàn cờ nằm phẳng đúng tại mặt phẳng của chi tiết, khử méo ảnh rồi tính khoảng cách trung bình giữa các góc kề nhau:</p>
+<pre><code>data = np.load("calib.npz")
+K, dist = data["K"], data["dist"]
+
+ref = cv2.undistort(cv2.imread("ref-plane.png", cv2.IMREAD_GRAYSCALE), K, dist)
+ok, c = cv2.findChessboardCorners(ref, PATTERN)
+c = c.reshape(PATTERN[1], PATTERN[0], 2)
+px = np.mean(np.linalg.norm(np.diff(c, axis=1), axis=2))   # khoảng cách theo hàng
+MM_PER_PX = SQUARE / px
+print(f"{MM_PER_PX:.5f} mm/pixel")</code></pre>
+<p>Cách này đúng khi camera nhìn vuông góc với mặt phẳng đo và chi tiết mỏng. Nếu camera nghiêng, cần dùng phép biến đổi phối cảnh (homography) để đưa về mặt phẳng.</p>
+
+<h2>Bước 3: đo chi tiết</h2>
+<pre><code>img = cv2.undistort(cv2.imread("chi-tiet.png"), K, dist)
+gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+_, th = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)  # vật tối trên nền sáng
+
+contours, hier = cv2.findContours(th, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE)
+outer = max(contours, key=cv2.contourArea)
+
+(cx, cy), (w, h), angle = cv2.minAreaRect(outer)
+L, W = max(w, h) * MM_PER_PX, min(w, h) * MM_PER_PX
+print(f"Dài {L:.3f} mm, rộng {W:.3f} mm, góc {angle:.1f}°")
+
+# Lỗ bên trong: contour con (hierarchy[i][3] != -1)
+for i, c in enumerate(contours):
+    if hier[0][i][3] != -1 and cv2.contourArea(c) &gt; 50:
+        (hx, hy), r = cv2.minEnclosingCircle(c)
+        if len(c) &gt;= 5:
+            (ex, ey), (ma, mi), _ = cv2.fitEllipse(c)
+            d = (ma + mi) / 2 * MM_PER_PX
+        else:
+            d = 2 * r * MM_PER_PX
+        print(f"Lỗ tại ({hx:.0f},{hy:.0f}): Ø {d:.3f} mm")</code></pre>
+
+<h2>Bước 4: kiểm chứng như một kỹ sư</h2>
+<ul>
+  <li>Đo một <strong>mẫu chuẩn</strong> (căn mẫu, chi tiết đã đo bằng máy CMM) và so sánh.</li>
+  <li>Đo cùng một chi tiết 30 lần, tính độ lệch chuẩn để biết <strong>độ lặp lại</strong>.</li>
+  <li>Xoay, dịch chi tiết khắp khung hình: kết quả phải ổn định, nếu không thì hiệu chuẩn méo chưa tốt.</li>
+  <li>Muốn đánh giá đầy đủ hệ thống đo, tìm hiểu phương pháp <strong>Gage R&amp;R</strong>.</li>
+</ul>
+
+<h2>Hướng nâng cấp</h2>
+<ul>
+  <li>Đo biên subpixel bằng cách nội suy gradient dọc theo đường quét (caliper) thay vì dùng contour pixel nguyên.</li>
+  <li>Fitting đường thẳng (<code>cv2.fitLine</code>) cho từng cạnh để đo khoảng cách giữa hai cạnh song song.</li>
+  <li>So sánh với dung sai trên bản vẽ để kết luận OK/NG và gửi kết quả cho PLC.</li>
+</ul>
+<p>Kiến thức nền cho dự án này nằm ở các chặng <a href="../lo-trinh/vision-engineer.html#step-camera-lens-lighting">Camera / Lens / Lighting</a> và <a href="../lo-trinh/vision-engineer.html#step-calibration">Calibration</a> của lộ trình Vision Engineer.</p>
