@@ -263,9 +263,12 @@
     var summary = $("#search-summary");
     input.value = q;
     var list = q ? search(q) : POSTS;
+    var topicCount = q ? searchTopics(q).length : 0;
     summary.textContent = q
-      ? (list.length ? "Tìm thấy " + list.length + " bài viết cho “" + q + "”" : "Không có kết quả cho “" + q + "”. Hãy thử từ khóa khác.")
-      : "Tất cả " + POSTS.length + " bài viết";
+      ? (list.length ? "Tìm thấy " + list.length + " bài viết cho “" + q + "”"
+        : topicCount ? "Chưa có bài viết cho “" + q + "”, nhưng có các chủ đề liên quan:"
+        : "Không có kết quả cho “" + q + "”. Hãy thử từ khóa khác.")
+      : (POSTS.length ? "Tất cả " + POSTS.length + " bài viết" : "Chưa có bài viết nào. Hãy bắt đầu từ các chủ đề trong menu hoặc Learning Paths.");
     if (q) document.title = "Tìm: " + q + " | HọcFree";
     var topicHits = q ? searchTopics(q).slice(0, 8) : [];
     if (topicHits.length) {
