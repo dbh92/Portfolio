@@ -16,6 +16,8 @@ assets/js/search-data.js   Chỉ mục tìm kiếm (tự sinh)
 assets/images/posts/       Ảnh đại diện bài viết (1200x675)
 src/posts.json             Danh sách bài viết, chuyên mục, bài "đọc nhiều"
 src/posts/<slug>.html      Nội dung từng bài
+src/nav.json               Menu chính: mục → nhóm → chủ đề
+src/learning-paths.json    Learning Paths (lộ trình Vision Engineer…)
 tools/build.py             Sinh toàn bộ trang HTML từ src/
 tools/make_thumbs.py       Vẽ ảnh đại diện tự động
 CNAME                      Tên miền riêng: hocfree.vn
@@ -31,6 +33,27 @@ CNAME                      Tên miền riêng: hocfree.vn
    `python tools/make_thumbs.py` để vẽ tự động.
 4. `python tools/build.py`
 5. `git add . && git commit -m "Thêm bài ..." && git push`
+
+## Menu & kiến trúc thông tin
+
+Menu được sinh từ `src/nav.json`, theo hành trình **Học → Thực hành → Trở thành kỹ sư**:
+
+| Mục menu             | Vai trò                  | Trang                     |
+|----------------------|--------------------------|---------------------------|
+| Học AI & Lập trình   | Bước 1 · kiến thức, kỹ năng (mega menu) | `hoc/`     |
+| Projects             | Bước 2 · thực hành       | `projects/`               |
+| Learning Paths       | Bước 3 · định hướng nghề | `lo-trinh/`               |
+| Kiến thức, Tin tức AI, Ngoại ngữ, Tài nguyên | khám phá | `kien-thuc/`, `tin-tuc-ai/`, `ngoai-ngu/`, `tai-nguyen/` |
+
+- Menu chỉ chứa **chủ đề**, không chứa bài học. Mỗi chủ đề có trang riêng
+  `<mục>/<chủ-đề>.html` tự liệt kê các bài có tag khớp với `tags` của chủ đề
+  (có thể giới hạn thêm bằng `categories`). Viết thêm hàng nghìn bài thì menu vẫn giữ nguyên.
+- Thêm chủ đề: thêm một `item` vào nhóm trong `src/nav.json` rồi build. Chủ đề chưa có bài
+  hiển thị "Đang biên soạn" và được đặt `noindex`, không đưa vào sitemap.
+- Ô tìm kiếm (`Ctrl K` hoặc `/`) tìm cả chủ đề, lộ trình và bài viết.
+- Lộ trình **Vision Engineer** (`lo-trinh/vision-engineer.html`): 14 chặng, 5 giai đoạn; người học
+  đánh dấu chặng đã xong, tiến độ lưu trên trình duyệt (localStorage).
+- "Đăng nhập" hiện là trang giới thiệu (`dang-nhap.html`) vì website tĩnh chưa có tài khoản.
 
 ## Xem thử trên máy
 
