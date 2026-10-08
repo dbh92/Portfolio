@@ -1,0 +1,54 @@
+<p>Robot công nghiệp lặp lại chính xác tới phần mười milimét, nhưng chỉ khi vật luôn nằm đúng chỗ. Thêm camera, robot có thể <strong>gắp vật đặt ngẫu nhiên</strong> trên băng tải hoặc khay: đó là bài toán <strong>vision guided robotics</strong>, một trong những ứng dụng có giá trị nhất của Machine Vision.</p>
+
+<h2>Kiến trúc hệ thống</h2>
+<ol>
+  <li><strong>Camera</strong> chụp vùng làm việc khi nhận trigger.</li>
+  <li><strong>Phần mềm vision</strong> tìm vật, tính vị trí (x, y) và góc xoay θ trong tọa độ ảnh.</li>
+  <li><strong>Chuyển đổi tọa độ</strong> từ ảnh sang hệ tọa độ robot nhờ kết quả <a href="hand-eye-calibration-camera-robot.html">hand-eye calibration</a>.</li>
+  <li><strong>Gửi tọa độ</strong> cho bộ điều khiển robot (TCP socket, giao thức của hãng robot, hoặc qua PLC).</li>
+  <li><strong>Robot</strong> di chuyển tới, gắp, đặt vật vào vị trí đích.</li>
+</ol>
+
+<h2>Bước định vị: tìm vị trí và góc</h2>
+<pre><code>import cv2
+import numpy as np
+
+def locate(gray, min_area=2000):
+    _, th = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    cnts, _ = cv2.findContours(th, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    results = []
+    for c in cnts:
+        if cv2.contourArea(c) &lt; min_area:
+            continue
+        (cx, cy), (w, h), angle = cv2.minAreaRect(c)
+        if w &lt; h:                       # chuẩn hóa góc theo cạnh dài
+            angle += 90
+        results.append((cx, cy, angle))
+    return results</code></pre>
+<p>Với vật có hình dạng phức tạp hoặc cần phân biệt mặt trên/mặt dưới, dùng so khớp hình dạng (shape-based matching) hoặc mô hình Deep Learning có đầu ra khung xoay (OBB) như YOLO-OBB.</p>
+
+<h2>Chuyển sang tọa độ robot và gửi đi</h2>
+<pre><code>import socket
+
+def send_pick(host, port, x_mm, y_mm, angle_deg):
+    msg = f"PICK,{x_mm:.2f},{y_mm:.2f},{angle_deg:.2f}\r\n"
+    with socket.create_connection((host, port), timeout=2) as s:
+        s.sendall(msg.encode())
+        return s.recv(32).decode().strip() == "OK"
+
+for cx, cy, ang in locate(gray):
+    X, Y = pixel_to_robot(cx, cy)          # hàm từ bài hand-eye calibration
+    send_pick("192.168.1.20", 5000, X, Y, ang)</code></pre>
+<p>Định dạng thông điệp, chiều dương của góc xoay và gốc tọa độ phải được thống nhất với lập trình viên robot; mỗi hãng robot có quy ước riêng.</p>
+
+<h2>Vật trên băng tải đang chạy</h2>
+<p>Khi băng tải không dừng, vật đã di chuyển trong khoảng thời gian từ lúc chụp tới lúc robot tới nơi. Giải pháp là <strong>conveyor tracking</strong>: dùng encoder băng tải để biết quãng đường vật đã đi, bộ điều khiển robot tự bù vị trí. Phần vision cần gửi kèm giá trị encoder tại thời điểm chụp.</p>
+
+<h2>Những điểm quyết định thành công</h2>
+<ul>
+  <li><strong>Độ chính xác hiệu chuẩn</strong>: kiểm tra định kỳ bằng cách cho robot chạm vào các vị trí đã biết.</li>
+  <li><strong>Chiều cao vật</strong>: với hiệu chuẩn 2D, vật cao khác mặt phẳng hiệu chuẩn sẽ bị lệch vị trí.</li>
+  <li><strong>Vùng an toàn</strong>: kiểm tra tọa độ nằm trong vùng làm việc hợp lệ trước khi gửi, tránh robot va chạm.</li>
+  <li><strong>Xử lý trường hợp không tìm thấy vật</strong> hoặc vật chồng lên nhau: báo PLC thay vì gửi tọa độ sai.</li>
+</ul>
+<p>Bước nâng cao là <strong>bin picking 3D</strong>: gắp vật xếp lộn xộn trong thùng, cần camera 3D và lập kế hoạch đường đi tránh va chạm (ví dụ với MoveIt, xem tin <a href="../tin-tuc-ai/qualcomm-mua-picknik-moveit.html">Qualcomm mua PickNik</a>).</p>

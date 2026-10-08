@@ -1,0 +1,54 @@
+<p>Dataset công khai giúp học tập, nhưng mô hình chạy trên dây chuyền của bạn cần <strong>dữ liệu từ chính dây chuyền đó</strong>. Bài này hướng dẫn quy trình xây dựng một dataset ảnh công nghiệp chất lượng, từ lên kế hoạch thu thập đến quản lý phiên bản.</p>
+
+<h2>1. Xác định yêu cầu trước khi chụp</h2>
+<ul>
+  <li><strong>Danh sách lớp / loại lỗi</strong> với định nghĩa rõ ràng và ảnh ví dụ, thống nhất với bộ phận chất lượng.</li>
+  <li><strong>Điều kiện thực tế cần bao phủ</strong>: các mã sản phẩm, màu sắc, lô nguyên liệu, ca ngày/đêm, mức độ bẩn của ống kính.</li>
+  <li><strong>Mục tiêu số lượng</strong>: ví dụ tối thiểu 200 ảnh mỗi loại lỗi, 2.000 ảnh tốt.</li>
+</ul>
+
+<h2>2. Thu thập đúng cách</h2>
+<ul>
+  <li>Chụp bằng <strong>đúng phần cứng và cấu hình</strong> sẽ dùng khi chạy thật (camera, ống kính, đèn, phơi sáng). Ảnh chụp bằng điện thoại để "tạm" thường làm mô hình kém khi triển khai.</li>
+  <li><strong>Lưu ảnh gốc không nén mất dữ liệu</strong> (PNG, BMP, TIFF), giữ độ sâu bit gốc nếu camera là 10/12 bit.</li>
+  <li><strong>Lưu metadata</strong> cùng mỗi ảnh: thời gian, trạm, mã sản phẩm, lô, tham số camera.</li>
+  <li><strong>Thu thập mẫu lỗi chủ động</strong>: phối hợp với bộ phận chất lượng giữ lại hàng NG, chụp ở nhiều vị trí và hướng.</li>
+</ul>
+
+<h2>3. Tổ chức thư mục và đặt tên</h2>
+<pre><code>dataset-nap-chai/
+  raw/2026-09-15_line2_shiftA/IMG_000123.png
+  raw/...
+  labels/            # nhãn theo định dạng công cụ gán nhãn
+  splits/train.txt   # danh sách file theo từng tập
+  splits/val.txt
+  splits/test.txt
+  metadata.csv       # một dòng cho mỗi ảnh
+  README.md          # mô tả, định nghĩa lớp, lịch sử phiên bản</code></pre>
+
+<h2>4. Gán nhãn nhất quán</h2>
+<ul>
+  <li>Viết <strong>hướng dẫn gán nhãn</strong> có ảnh minh họa cho các trường hợp khó: lỗi rất nhỏ, lỗi nằm ở mép, hai lỗi chồng nhau.</li>
+  <li>Cho hai người gán cùng một tập nhỏ, đo mức độ thống nhất; bàn bạc và cập nhật hướng dẫn ở các điểm bất đồng.</li>
+  <li>Dùng công cụ hỗ trợ AI để tăng tốc (xem <a href="cong-cu-gan-nhan-du-lieu-anh-mien-phi.html">công cụ gán nhãn miễn phí</a>, <a href="sam-gan-nhan-phan-doan-nhanh.html">SAM</a>).</li>
+</ul>
+
+<h2>5. Chia tập đúng cách</h2>
+<ul>
+  <li>Chia theo <strong>lô, ngày hoặc mã sản phẩm</strong>, không chia ngẫu nhiên từng ảnh, để tránh ảnh gần giống nhau nằm ở cả train và test.</li>
+  <li>Tập test nên chứa dữ liệu từ <strong>khoảng thời gian khác</strong> với tập train.</li>
+  <li>Đảm bảo mỗi loại lỗi có mặt trong cả ba tập.</li>
+</ul>
+
+<h2>6. Quản lý phiên bản</h2>
+<ul>
+  <li>Đánh số phiên bản dataset (v1, v2...), ghi rõ thay đổi: thêm ảnh lô nào, sửa nhãn nào.</li>
+  <li>Mỗi mô hình ghi rõ được huấn luyện từ phiên bản dataset nào.</li>
+  <li>Công cụ như DVC giúp quản lý phiên bản dataset lớn cùng với Git (xem <a href="../kien-thuc/git-cho-du-an-ai-vision.html">Git cho dự án AI Vision</a>).</li>
+</ul>
+
+<h2>7. Cải thiện liên tục sau triển khai</h2>
+<p>Lưu lại các ảnh mô hình không chắc chắn hoặc bị người vận hành đánh giá lại, gán nhãn và bổ sung vào dataset. Đây là cách hiệu quả nhất để mô hình tốt dần theo thời gian.</p>
+
+<h2>Lưu ý pháp lý và bảo mật</h2>
+<p>Ảnh sản phẩm của khách hàng thường là thông tin mật. Thỏa thuận rõ quyền sử dụng dữ liệu trong hợp đồng, lưu trữ an toàn, không tải lên dịch vụ công cộng khi chưa được phép.</p>

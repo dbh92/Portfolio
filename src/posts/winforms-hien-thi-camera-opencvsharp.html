@@ -1,0 +1,84 @@
+<p>Một trạm kiểm tra cần giao diện cho người vận hành: thấy hình camera trực tiếp, kết quả OK/NG to rõ, bộ đếm và nút điều khiển. Bài này xây ứng dụng <strong>WinForms</strong> đơn giản hiển thị camera bằng <strong>OpenCvSharp</strong> mà không làm treo giao diện.</p>
+
+<h2>Tạo dự án</h2>
+<pre><code>dotnet new winforms -n TramVision
+cd TramVision
+dotnet add package OpenCvSharp4
+dotnet add package OpenCvSharp4.runtime.win
+dotnet add package OpenCvSharp4.Extensions</code></pre>
+<p>Gói <code>Extensions</code> cung cấp hàm chuyển <code>Mat</code> sang <code>Bitmap</code> để hiển thị trong <code>PictureBox</code>.</p>
+
+<h2>Giao diện</h2>
+<ul>
+  <li><code>PictureBox picCamera</code> với <code>SizeMode = Zoom</code>.</li>
+  <li><code>Label lblKetQua</code> chữ lớn, nền xanh/đỏ.</li>
+  <li><code>Label lblDem</code> hiển thị số OK/NG.</li>
+  <li>Nút <code>btnStart</code>, <code>btnStop</code>.</li>
+</ul>
+
+<h2>Vòng lặp camera trên luồng nền</h2>
+<pre><code>using OpenCvSharp;
+using OpenCvSharp.Extensions;
+
+public partial class Form1 : Form
+{
+    private CancellationTokenSource? _cts;
+    private int _ok, _ng;
+
+    private async void btnStart_Click(object sender, EventArgs e)
+    {
+        _cts = new CancellationTokenSource();
+        btnStart.Enabled = false;
+        await Task.Run(() =&gt; CameraLoop(_cts.Token));
+        btnStart.Enabled = true;
+    }
+
+    private void btnStop_Click(object sender, EventArgs e) =&gt; _cts?.Cancel();
+
+    private void CameraLoop(CancellationToken token)
+    {
+        using var cap = new VideoCapture(0);
+        using var frame = new Mat();
+        using var gray = new Mat();
+        using var bin = new Mat();
+
+        while (!token.IsCancellationRequested &amp;&amp; cap.Read(frame) &amp;&amp; !frame.Empty())
+        {
+            Cv2.CvtColor(frame, gray, ColorConversionCodes.BGR2GRAY);
+            Cv2.Threshold(gray, bin, 0, 255, ThresholdTypes.Binary | ThresholdTypes.Otsu);
+            double tiLeSang = Cv2.CountNonZero(bin) * 100.0 / bin.Total();
+            bool ok = tiLeSang &gt; 20;                    // luật kiểm tra ví dụ
+
+            var bmp = frame.ToBitmap();                  // tạo Bitmap mới cho mỗi khung
+            BeginInvoke(() =&gt; CapNhatGiaoDien(bmp, ok, tiLeSang));
+        }
+    }
+
+    private void CapNhatGiaoDien(Bitmap bmp, bool ok, double tiLe)
+    {
+        var cu = picCamera.Image;
+        picCamera.Image = bmp;
+        cu?.Dispose();                                   // giải phóng ảnh cũ, tránh rò rỉ GDI
+
+        if (ok) _ok++; else _ng++;
+        lblKetQua.Text = ok ? "OK" : "NG";
+        lblKetQua.BackColor = ok ? Color.SeaGreen : Color.Firebrick;
+        lblDem.Text = $"OK: {_ok}   NG: {_ng}   ({tiLe:F1}%)";
+    }
+}</code></pre>
+
+<h2>Những điểm quan trọng</h2>
+<ul>
+  <li><strong>Không truy cập control từ luồng nền.</strong> Mọi cập nhật giao diện phải qua <code>BeginInvoke</code> (hoặc <code>Invoke</code>).</li>
+  <li><strong>Giải phóng Bitmap cũ</strong> mỗi khung hình, nếu không bộ nhớ GDI tăng dần đến khi ứng dụng sập.</li>
+  <li><strong>Dừng sạch</strong>: dùng <code>CancellationToken</code>, giải phóng camera khi đóng form (xử lý sự kiện <code>FormClosing</code>).</li>
+  <li>Giao diện chỉ cần cập nhật khoảng 15–30 lần/giây; nếu camera nhanh hơn, có thể bỏ bớt khung hiển thị nhưng vẫn kiểm tra đầy đủ.</li>
+</ul>
+
+<h2>Nâng cấp cho môi trường nhà máy</h2>
+<ul>
+  <li>Thay <code>VideoCapture</code> bằng SDK camera công nghiệp, chụp theo trigger phần cứng.</li>
+  <li>Thêm màn hình cài đặt tham số có mật khẩu, lưu cấu hình ra file JSON.</li>
+  <li>Lưu ảnh NG kèm thời gian vào thư mục theo ngày.</li>
+  <li>Gửi kết quả cho PLC, xem <a href="csharp-modbus-tcp-socket-plc.html">Modbus TCP từ C#</a>.</li>
+</ul>

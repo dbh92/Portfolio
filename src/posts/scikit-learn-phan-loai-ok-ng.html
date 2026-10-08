@@ -1,0 +1,71 @@
+<p>Trước khi nghĩ tới Deep Learning, hãy thử cách đơn giản hơn: <strong>trích đặc trưng hình học bằng OpenCV, rồi phân loại bằng scikit-learn</strong>. Cách này cần ít dữ liệu, chạy cực nhanh trên CPU và dễ giải thích. Bài này phân loại chi tiết OK/NG từ các đặc trưng contour.</p>
+
+<h2>Bước 1: trích đặc trưng từ ảnh</h2>
+<pre><code>import cv2
+import math
+import numpy as np
+from pathlib import Path
+
+def features(path):
+    gray = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
+    _, th = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    cnts, _ = cv2.findContours(th, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    c = max(cnts, key=cv2.contourArea)
+    area = cv2.contourArea(c)
+    perim = cv2.arcLength(c, True)
+    (_, _), (w, h), _ = cv2.minAreaRect(c)
+    hull = cv2.contourArea(cv2.convexHull(c))
+    return [
+        area,
+        perim,
+        4 * math.pi * area / perim ** 2,          # độ tròn
+        max(w, h) / max(min(w, h), 1),            # tỷ lệ dài/rộng
+        area / hull if hull else 0,               # độ đặc
+    ]
+
+X, y = [], []
+for label, folder in [(0, "data/ok"), (1, "data/ng")]:
+    for p in Path(folder).glob("*.png"):
+        X.append(features(p))
+        y.append(label)
+X, y = np.array(X), np.array(y)</code></pre>
+
+<h2>Bước 2: chia dữ liệu và huấn luyện</h2>
+<pre><code>from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report, confusion_matrix
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.25, stratify=y, random_state=42)
+
+clf = RandomForestClassifier(n_estimators=200, random_state=42)
+clf.fit(X_train, y_train)
+
+pred = clf.predict(X_test)
+print(confusion_matrix(y_test, pred))
+print(classification_report(y_test, pred, target_names=["OK", "NG"]))</code></pre>
+<p><code>stratify=y</code> giữ tỷ lệ OK/NG giống nhau giữa tập train và test, quan trọng khi hàng NG ít.</p>
+
+<h2>Bước 3: đặc trưng nào quan trọng?</h2>
+<pre><code>names = ["dien_tich", "chu_vi", "do_tron", "ti_le_dai_rong", "do_dac"]
+for n, imp in sorted(zip(names, clf.feature_importances_), key=lambda t: -t[1]):
+    print(f"{n:16s} {imp:.3f}")</code></pre>
+<p>Đây là lợi thế lớn so với Deep Learning: bạn giải thích được với khách hàng "mô hình chủ yếu dựa vào độ đặc, tức là phát hiện vết mẻ".</p>
+
+<h2>Bước 4: điều chỉnh ngưỡng theo yêu cầu nhà máy</h2>
+<pre><code>proba_ng = clf.predict_proba(X_test)[:, 1]
+for t in (0.5, 0.3, 0.2):
+    pred_t = (proba_ng &gt;= t).astype(int)
+    escape = ((pred_t == 0) &amp; (y_test == 1)).sum()     # NG bị cho là OK
+    overkill = ((pred_t == 1) &amp; (y_test == 0)).sum()   # OK bị loại
+    print(f"ngưỡng {t}: lọt lỗi {escape}, loại nhầm {overkill}")</code></pre>
+<p>Hạ ngưỡng giúp giảm lọt lỗi, đổi lại loại nhầm nhiều hơn. Chọn ngưỡng là quyết định kỹ thuật kết hợp với yêu cầu chất lượng, không phải mặc định 0,5.</p>
+
+<h2>Lưu và dùng lại mô hình</h2>
+<pre><code>import joblib
+joblib.dump(clf, "ok_ng_rf.joblib")
+clf = joblib.load("ok_ng_rf.joblib")
+print(clf.predict([features("anh-moi.png")]))</code></pre>
+
+<h2>Khi nào chuyển sang Deep Learning?</h2>
+<p>Khi lỗi không thể hiện qua hình dạng tổng thể (vết xước mảnh, vết bẩn trên nền có vân) thì đặc trưng hình học không đủ, hãy chuyển sang <a href="phan-loai-anh-ok-ng-transfer-learning-pytorch.html">transfer learning với PyTorch</a>.</p>

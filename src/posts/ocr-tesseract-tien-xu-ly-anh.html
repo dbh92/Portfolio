@@ -1,0 +1,57 @@
+<p><strong>Tesseract</strong> là bộ OCR mã nguồn mở lâu đời và phổ biến, hỗ trợ hơn 100 ngôn ngữ kể cả tiếng Việt. Nó đọc rất tốt văn bản in rõ ràng, nhưng nếu đưa thẳng ảnh chụp thực tế vào thì kết quả thường tệ. Bí quyết nằm ở <strong>tiền xử lý ảnh</strong>.</p>
+
+<h2>Cài đặt</h2>
+<ul>
+  <li>Cài chương trình Tesseract cho hệ điều hành (Windows có bộ cài sẵn; Ubuntu: <code>sudo apt install tesseract-ocr tesseract-ocr-vie</code>).</li>
+  <li>Cài thư viện Python: <code>pip install pytesseract opencv-python</code>.</li>
+</ul>
+<pre><code>import pytesseract
+# Windows: chỉ đường dẫn nếu chưa có trong PATH
+# pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+print(pytesseract.get_tesseract_version())</code></pre>
+
+<h2>Thử nghiệm ban đầu</h2>
+<pre><code>import cv2
+img = cv2.imread("nhan-san-pham.png")
+text = pytesseract.image_to_string(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), lang="eng")
+print(text)</code></pre>
+
+<h2>Tiền xử lý: biến ảnh thực tế thành "trang sách"</h2>
+<p>Tesseract hoạt động tốt nhất với chữ đen trên nền trắng, nét rõ, chiều cao chữ khoảng 20–40 pixel, dòng thẳng.</p>
+<pre><code>import numpy as np
+
+def preprocess(bgr):
+    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+    # 1. phóng to nếu chữ nhỏ
+    gray = cv2.resize(gray, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+    # 2. tăng tương phản cục bộ
+    gray = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray)
+    # 3. giảm nhiễu nhưng giữ biên
+    gray = cv2.bilateralFilter(gray, 9, 50, 50)
+    # 4. nhị phân, đảm bảo chữ đen nền trắng
+    _, th = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    if np.mean(th) &lt; 127:          # nền đen -&gt; đảo
+        th = 255 - th
+    return th
+
+clean = preprocess(img)</code></pre>
+<p>Với chữ in phun dạng chấm, thêm bước <strong>giãn (dilate)</strong> nhẹ để nối các chấm thành nét liền trước khi đọc (chú ý: trên ảnh chữ đen nền trắng, cần đảo ảnh, giãn, rồi đảo lại).</p>
+
+<h2>Chế độ phân đoạn trang (PSM) và giới hạn ký tự</h2>
+<pre><code>config = "--psm 7 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-/"
+code = pytesseract.image_to_string(clean, lang="eng", config=config).strip()</code></pre>
+<ul>
+  <li><code>--psm 7</code>: ảnh là một dòng chữ. <code>--psm 8</code>: một từ. <code>--psm 6</code>: một khối văn bản.</li>
+  <li><strong>Whitelist</strong> chỉ cho phép các ký tự có thể xuất hiện, giảm mạnh nhầm lẫn.</li>
+</ul>
+
+<h2>Lấy vị trí và độ tin cậy từng từ</h2>
+<pre><code>data = pytesseract.image_to_data(clean, config="--psm 6", output_type=pytesseract.Output.DICT)
+for word, conf, x, y, w, h in zip(data["text"], data["conf"], data["left"],
+                                  data["top"], data["width"], data["height"]):
+    if word.strip():
+        print(word, conf, (x, y, w, h))</code></pre>
+<p>Dùng độ tin cậy để quyết định: dưới ngưỡng thì báo người vận hành kiểm tra, không tự đoán.</p>
+
+<h2>Khi Tesseract không đủ</h2>
+<p>Chữ trên nền phức tạp, cong, nghiêng nhiều, ánh sáng không đều: hãy thử OCR dựa trên Deep Learning, xem <a href="ocr-deep-learning-paddleocr-easyocr.html">PaddleOCR và EasyOCR</a>.</p>

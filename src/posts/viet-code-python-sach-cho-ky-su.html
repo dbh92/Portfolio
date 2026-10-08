@@ -1,0 +1,74 @@
+<p>Script xử lý ảnh viết vội để thử nghiệm thường "chạy được là xong". Nhưng khi đưa vào sản xuất, chạy 24/7, được người khác bảo trì, code lộn xộn trở thành gánh nặng. Bài này tổng hợp các thói quen giúp <strong>code Python sạch, dễ đọc, dễ bảo trì</strong> cho kỹ sư.</p>
+
+<h2>1. Đặt tên có ý nghĩa</h2>
+<pre><code># Khó hiểu
+t = 127
+r = f(img, t)
+
+# Dễ hiểu
+NGUONG_NHI_PHAN = 127
+mat_na_vat = phan_nguong(anh_xam, NGUONG_NHI_PHAN)</code></pre>
+<p>Tiếng Anh hay tiếng Việt không dấu đều được, quan trọng là <strong>nhất quán</strong> trong cả dự án.</p>
+
+<h2>2. Không dùng "con số ma thuật"</h2>
+<p>Gom tham số vào một chỗ (hằng số hoặc file cấu hình), không rải rác trong code:</p>
+<pre><code>from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class CauHinhKiemTra:
+    roi: tuple = (100, 80, 640, 480)
+    dien_tich_toi_thieu: int = 500
+    duong_kinh_min_mm: float = 9.95
+    duong_kinh_max_mm: float = 10.05
+
+CFG = CauHinhKiemTra()</code></pre>
+
+<h2>3. Hàm nhỏ, làm một việc</h2>
+<pre><code>def doc_anh(path) -&gt; np.ndarray: ...
+def tien_xu_ly(anh: np.ndarray) -&gt; np.ndarray: ...
+def tim_vat(anh_nhi_phan: np.ndarray) -&gt; list[np.ndarray]: ...
+def do_duong_kinh(contour: np.ndarray, mm_per_px: float) -&gt; float: ...
+def ket_luan(duong_kinh: float, cfg: CauHinhKiemTra) -&gt; bool: ...</code></pre>
+<p>Hàm nhỏ dễ kiểm thử riêng, dễ thay thế (ví dụ đổi cách tiền xử lý mà không đụng phần đo).</p>
+
+<h2>4. Gợi ý kiểu dữ liệu (type hints)</h2>
+<pre><code>def do_duong_kinh(contour: np.ndarray, mm_per_px: float) -&gt; float:
+    (_, _), r = cv2.minEnclosingCircle(contour)
+    return 2 * r * mm_per_px</code></pre>
+<p>Type hints giúp VS Code gợi ý chính xác hơn và công cụ kiểm tra tĩnh phát hiện lỗi trước khi chạy.</p>
+
+<h2>5. Xử lý lỗi rõ ràng, không "nuốt" lỗi</h2>
+<pre><code># Tệ: lỗi biến mất, không ai biết
+try:
+    ket_qua = kiem_tra(anh)
+except:
+    pass
+
+# Tốt: ghi log, trả kết quả an toàn
+try:
+    ket_qua = kiem_tra(anh)
+except Exception:
+    log.exception("Lỗi khi kiểm tra ảnh %s", ten_anh)
+    ket_qua = KetQua(ok=False, ly_do="LOI_XU_LY")   # coi như NG, không cho hàng lỗi đi qua</code></pre>
+
+<h2>6. Kiểm thử những phần quan trọng</h2>
+<pre><code># test_do_luong.py, chạy bằng: pytest
+import numpy as np, cv2
+from do_luong import do_duong_kinh
+
+def test_hinh_tron_10mm():
+    anh = np.zeros((200, 200), np.uint8)
+    cv2.circle(anh, (100, 100), 50, 255, -1)          # bán kính 50 px
+    cnts, _ = cv2.findContours(anh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    assert abs(do_duong_kinh(cnts[0], 0.1) - 10.0) &lt; 0.2</code></pre>
+<p>Ảnh tổng hợp với đáp án biết trước là cách tuyệt vời để kiểm thử thuật toán đo.</p>
+
+<h2>7. Dùng công cụ tự động</h2>
+<ul>
+  <li><strong>Ruff</strong>: kiểm tra lỗi phổ biến và định dạng code rất nhanh.</li>
+  <li><strong>pytest</strong>: chạy kiểm thử.</li>
+  <li>Cấu hình để chạy tự động khi lưu file trong VS Code hoặc trước mỗi commit.</li>
+</ul>
+
+<h2>8. Tách thử nghiệm khỏi sản xuất</h2>
+<p>Notebook để khám phá; khi thuật toán ổn định, chuyển sang module <code>.py</code> có hàm, kiểm thử và cấu hình rõ ràng. Phần mềm chạy trên dây chuyền không bao giờ nên là một notebook.</p>

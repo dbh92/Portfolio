@@ -542,7 +542,10 @@ def build_post(p):
     body, toc = add_heading_ids(p["body"])
     toc_html = ""
     if len(toc) >= 3:
-        toc_html = ('<details class="toc" open><summary>Nội dung bài viết</summary><ol>'
+        # Tiêu đề đã tự đánh số ("1. …") thì bỏ số của danh sách để không bị "1. 1."
+        numbered = any(re.match(r"\d+[.)]\s", t) for _, t in toc)
+        toc_html = ('<details class="toc" open><summary>Nội dung bài viết</summary>'
+                    + ('<ol class="toc-plain">' if numbered else "<ol>")
                     + "".join(f'<li><a href="#{h}">{e(t)}</a></li>' for h, t in toc) + "</ol></details>")
     same = [x for x in POSTS if x["category"] == p["category"] and x["slug"] != p["slug"]]
     others = [x for x in POSTS if x["category"] != p["category"]]

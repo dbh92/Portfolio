@@ -1,0 +1,58 @@
+<p>Đếm hạt, viên thuốc, đồng xu, tế bào... bài toán sẽ rất dễ nếu chúng không chạm nhau. Khi các vật dính thành cụm, phân ngưỡng + contour chỉ thấy một khối lớn. Thuật toán <strong>watershed</strong> kết hợp với <strong>distance transform</strong> giúp tách chúng ra mà không cần Deep Learning.</p>
+
+<h2>Ý tưởng</h2>
+<p>Hình dung ảnh như một địa hình: tâm mỗi vật là một "đáy thung lũng". Đổ nước từ các đáy, nước dâng lên; nơi nước từ hai thung lũng gặp nhau chính là đường ranh giới giữa hai vật. Distance transform tạo ra địa hình đó: mỗi điểm thuộc vật có giá trị bằng khoảng cách tới nền gần nhất, nên tâm vật có giá trị lớn nhất.</p>
+
+<h2>Cài đặt với OpenCV</h2>
+<pre><code>import cv2
+import numpy as np
+
+img = cv2.imread("vien-thuoc.png")
+gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+_, th = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+kernel = np.ones((3, 3), np.uint8)
+th = cv2.morphologyEx(th, cv2.MORPH_OPEN, kernel, iterations=2)
+
+# 1. Vùng chắc chắn là nền
+sure_bg = cv2.dilate(th, kernel, iterations=3)
+
+# 2. Vùng chắc chắn là tâm vật: đỉnh của distance transform
+dist = cv2.distanceTransform(th, cv2.DIST_L2, 5)
+_, sure_fg = cv2.threshold(dist, 0.5 * dist.max(), 255, cv2.THRESH_BINARY)
+sure_fg = sure_fg.astype(np.uint8)
+
+# 3. Vùng chưa biết (giữa nền và tâm)
+unknown = cv2.subtract(sure_bg, sure_fg)
+
+# 4. Đánh số các "hạt giống" (markers)
+n, markers = cv2.connectedComponents(sure_fg)
+markers = markers + 1          # nền chắc chắn = 1, không phải 0
+markers[unknown == 255] = 0    # 0 = vùng để watershed quyết định
+
+# 5. Chạy watershed
+markers = cv2.watershed(img, markers)
+img[markers == -1] = (0, 0, 255)          # đường biên được đánh dấu -1
+
+count = len(np.unique(markers)) - 2       # trừ nhãn nền (1) và biên (-1)
+print("Số vật:", count)</code></pre>
+
+<h2>Tinh chỉnh</h2>
+<ul>
+  <li><strong>Hệ số 0.5 × dist.max()</strong> quyết định độ "chắc chắn" của tâm. Vật kích thước khác nhau nhiều thì một ngưỡng toàn cục dễ bỏ sót vật nhỏ; khi đó tìm cực đại cục bộ của distance transform thay vì ngưỡng chung.</li>
+  <li><strong>Phân ngưỡng ban đầu</strong> phải sạch: lỗ bên trong vật tạo ra nhiều tâm giả. Dùng <code>MORPH_CLOSE</code> để lấp lỗ.</li>
+  <li><strong>Vật bị dính nhiều tầng, chồng lên nhau</strong> thì watershed cũng bó tay; cần giải pháp cơ khí (rung, dàn đều) hoặc mô hình instance segmentation.</li>
+</ul>
+
+<h2>Kiểm tra kết quả</h2>
+<pre><code>for label in np.unique(markers):
+    if label &lt;= 1:
+        continue
+    mask = np.uint8(markers == label) * 255
+    area = cv2.countNonZero(mask)
+    cnts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    x, y, w, h = cv2.boundingRect(cnts[0])
+    cv2.putText(img, str(area), (x, y - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)</code></pre>
+<p>In diện tích từng vật giúp phát hiện trường hợp tách sai: một vùng có diện tích gấp đôi bình thường thường là hai vật chưa được tách.</p>
+
+<h2>Khi nào chuyển sang Deep Learning?</h2>
+<p>Nền phức tạp, vật có kết cấu không đồng nhất, hoặc vật dính chồng lên nhau: hãy dùng instance segmentation như <a href="yolo26-seg-phan-doan-vet-loi.html">YOLO26-seg</a>.</p>

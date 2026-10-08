@@ -1,0 +1,55 @@
+<p>Nhận diện biển số xe là bài toán kết hợp hai kỹ thuật: <strong>phát hiện đối tượng</strong> để tìm biển số trong ảnh, và <strong>OCR</strong> để đọc ký tự. Dự án này xây hệ thống cho cổng ra vào bãi xe, nơi xe đi chậm và góc camera cố định.</p>
+
+<h2>Kiến trúc hai tầng</h2>
+<ol>
+  <li><strong>Phát hiện biển số</strong>: mô hình YOLO huấn luyện với một lớp <code>bien_so</code>.</li>
+  <li><strong>Đọc ký tự</strong>: cắt vùng biển số, nắn thẳng, đọc bằng OCR.</li>
+  <li><strong>Hậu xử lý</strong>: kiểm tra định dạng, chọn kết quả tốt nhất qua nhiều khung hình.</li>
+</ol>
+
+<h2>Tầng 1: phát hiện biển số</h2>
+<pre><code>from ultralytics import YOLO
+
+det = YOLO("yolo26n.pt")
+det.train(data="bien-so.yaml", epochs=100, imgsz=640)   # names: {0: bien_so}</code></pre>
+<p>Dữ liệu cần đa dạng: biển một dòng và hai dòng, biển xe máy và ô tô, ngày và đêm, biển bẩn, nghiêng. Vài nghìn ảnh gán nhãn khung là mức khởi đầu hợp lý.</p>
+
+<h2>Tầng 2: đọc biển số</h2>
+<pre><code>import cv2
+import re
+from paddleocr import PaddleOCR
+
+ocr = PaddleOCR(use_doc_orientation_classify=False, use_doc_unwarping=False,
+                use_textline_orientation=False)
+
+def read_plate(frame, box):
+    x1, y1, x2, y2 = map(int, box)
+    crop = frame[max(0, y1 - 5):y2 + 5, max(0, x1 - 5):x2 + 5]
+    crop = cv2.resize(crop, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+    texts = []
+    for res in ocr.predict(crop):
+        texts += list(res["rec_texts"])
+    raw = "".join(texts).upper()
+    return re.sub(r"[^A-Z0-9]", "", raw)          # bỏ dấu gạch, chấm, khoảng trắng</code></pre>
+<p>Biển hai dòng (thường gặp ở xe máy) được OCR đọc thành hai đoạn văn bản; ghép theo thứ tự từ trên xuống. Tên trường kết quả của PaddleOCR có thể khác giữa các phiên bản, hãy in thử kết quả trả về trước khi dùng.</p>
+
+<h2>Tầng 3: bỏ phiếu qua nhiều khung hình</h2>
+<pre><code>from collections import Counter
+
+def best_reading(readings, min_votes=3):
+    valid = [r for r in readings if 7 &lt;= len(r) &lt;= 10]   # độ dài hợp lý sau khi bỏ ký tự phân cách
+    if not valid:
+        return None
+    text, votes = Counter(valid).most_common(1)[0]
+    return text if votes &gt;= min_votes else None</code></pre>
+<p>Xe đi qua cổng xuất hiện trong nhiều khung hình. Đọc ở mỗi khung rồi chọn kết quả xuất hiện nhiều nhất giúp độ chính xác tăng rõ rệt so với đọc một lần.</p>
+
+<h2>Lưu ý triển khai</h2>
+<ul>
+  <li><strong>Ban đêm</strong>: dùng camera có đèn hồng ngoại; biển số phản quang hiện rất rõ dưới IR.</li>
+  <li><strong>Tốc độ màn trập nhanh</strong> để chữ không nhòe khi xe chạy.</li>
+  <li>Khi kết quả không chắc chắn, chuyển ảnh cho bảo vệ xác nhận thay vì tự quyết định.</li>
+</ul>
+
+<h2>Dữ liệu cá nhân</h2>
+<p>Biển số xe gắn với danh tính chủ xe, là dữ liệu cần được bảo vệ. Chỉ thu thập cho mục đích rõ ràng (quản lý ra vào), thông báo cho người sử dụng bãi xe, giới hạn quyền truy cập và thời gian lưu trữ, tuân thủ quy định pháp luật hiện hành về bảo vệ dữ liệu cá nhân.</p>

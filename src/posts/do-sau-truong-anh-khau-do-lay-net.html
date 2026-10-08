@@ -1,0 +1,45 @@
+<p>Ảnh mờ là một trong những lỗi phổ biến nhất của hệ thống Machine Vision mới lắp đặt. Nguyên nhân thường nằm ở ba khái niệm liên quan chặt chẽ: <strong>khẩu độ, độ sâu trường ảnh (DOF) và lấy nét</strong>.</p>
+
+<h2>Khẩu độ và số f</h2>
+<p>Khẩu độ là lỗ mở cho ánh sáng đi qua ống kính, ký hiệu bằng <strong>số f</strong> (f/1.4, f/2.8, f/8...). Số f <em>càng lớn</em> thì lỗ <em>càng nhỏ</em>:</p>
+<ul>
+  <li>Ít ánh sáng vào hơn: cần đèn mạnh hơn hoặc phơi sáng lâu hơn.</li>
+  <li>Độ sâu trường ảnh lớn hơn: vùng nét trước và sau mặt phẳng lấy nét rộng hơn.</li>
+</ul>
+<p>Mỗi nấc f tiêu chuẩn (2.8 → 4 → 5.6 → 8) giảm một nửa lượng ánh sáng.</p>
+
+<h2>Độ sâu trường ảnh (DOF)</h2>
+<p>DOF là khoảng cách dọc trục quang học mà trong đó vật vẫn đủ nét. DOF tăng khi:</p>
+<ul>
+  <li>Đóng khẩu độ (tăng số f).</li>
+  <li>Tăng khoảng cách làm việc hoặc giảm độ phóng đại (trường nhìn lớn hơn).</li>
+  <li>Chấp nhận kích thước "điểm mờ" lớn hơn (yêu cầu độ nét thấp hơn).</li>
+</ul>
+<p>Khi nào DOF quan trọng: vật có chiều cao thay đổi (linh kiện cao thấp trên PCB), vị trí vật dao động theo phương đứng trên băng tải, bề mặt nghiêng.</p>
+
+<h2>Giới hạn khi đóng khẩu quá nhỏ: nhiễu xạ</h2>
+<p>Đóng khẩu độ không phải "càng nhiều càng tốt". Ở số f quá lớn, hiện tượng <strong>nhiễu xạ</strong> làm ảnh mềm đi, đặc biệt với cảm biến pixel nhỏ (vài µm). Thực tế thường chọn khoảng f/4 đến f/8 cho cân bằng giữa DOF và độ sắc; hãy chụp thử ở nhiều mức để chọn.</p>
+
+<h2>Quy trình lấy nét tại hiện trường</h2>
+<ol>
+  <li>Đặt vật mẫu đúng vị trí làm việc thật, bật đèn thật.</li>
+  <li><strong>Mở khẩu độ lớn nhất</strong> (số f nhỏ nhất) để DOF hẹp nhất, dễ thấy điểm nét chính xác.</li>
+  <li>Xoay vòng lấy nét đến khi chi tiết sắc nhất. Dùng chỉ số độ nét bằng phần mềm thay vì nhìn bằng mắt:</li>
+</ol>
+<pre><code>import cv2
+
+def sharpness(gray_roi):
+    return cv2.Laplacian(gray_roi, cv2.CV_64F).var()   # càng lớn càng nét
+
+# trong vòng lặp camera: in sharpness(roi) và chỉnh vòng nét tới khi đạt cực đại</code></pre>
+<ol start="4">
+  <li>Đóng khẩu độ về giá trị làm việc đã chọn.</li>
+  <li>Điều chỉnh phơi sáng/đèn bù lượng sáng đã mất.</li>
+  <li><strong>Khóa vít</strong> vòng nét và vòng khẩu độ. Rung động nhà máy làm vòng xoay lệch dần theo thời gian.</li>
+</ol>
+
+<h2>Ống kính thay đổi tiêu cự (zoom) và ống kính cố định</h2>
+<p>Trong Machine Vision, ưu tiên <strong>ống kính tiêu cự cố định</strong>: chất lượng quang học tốt hơn, chắc chắn hơn, không bị lệch khi rung. Ống kính zoom chỉ nên dùng ở giai đoạn thử nghiệm để tìm tiêu cự phù hợp.</p>
+
+<h2>Theo dõi độ nét trong sản xuất</h2>
+<p>Lưu chỉ số độ nét của ROI chuẩn trong mỗi ca. Khi chỉ số giảm dần, có thể ống kính bị bám bụi, dầu hoặc vòng nét bị xoay: cảnh báo sớm trước khi tỷ lệ lỗi tăng.</p>

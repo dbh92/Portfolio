@@ -1,0 +1,42 @@
+<p>Kết quả kiểm tra của trạm vision không chỉ dùng để loại sản phẩm lỗi ngay tại chỗ. Khi được đưa lên <strong>MES</strong>, nó trở thành dữ liệu truy xuất nguồn gốc, thống kê chất lượng và cải tiến quy trình. Bài này giải thích MES là gì và trạm vision nên gửi gì lên đó.</p>
+
+<h2>MES là gì?</h2>
+<p><strong>MES</strong> (Manufacturing Execution System, hệ thống điều hành sản xuất) là tầng phần mềm nằm giữa:</p>
+<ul>
+  <li><strong>ERP</strong> ở trên: kế hoạch, đơn hàng, kho, tài chính.</li>
+  <li><strong>Tự động hóa</strong> ở dưới: PLC, robot, máy móc, trạm vision.</li>
+</ul>
+<p>MES theo dõi lệnh sản xuất, sản phẩm nào đi qua công đoạn nào, khi nào, với kết quả gì, dùng nguyên vật liệu lô nào, ai vận hành.</p>
+
+<h2>Truy xuất nguồn gốc (traceability)</h2>
+<p>Khi khách hàng phát hiện lỗi trên một sản phẩm, nhà máy cần trả lời trong vài phút: sản phẩm này sản xuất lúc nào, trên dây chuyền nào, kết quả kiểm tra từng công đoạn ra sao, những sản phẩm nào khác cùng lô có nguy cơ? Trạm vision là nguồn dữ liệu quan trọng nhất cho câu trả lời đó.</p>
+
+<h2>Trạm vision nên gửi gì?</h2>
+<table>
+  <tr><th>Dữ liệu</th><th>Ví dụ</th></tr>
+  <tr><td>Định danh sản phẩm</td><td>Số seri đọc từ mã DataMatrix</td></tr>
+  <tr><td>Thời điểm, trạm, dây chuyền</td><td>2026-10-08T09:15:32, VIS-03, Line-2</td></tr>
+  <tr><td>Kết quả tổng</td><td>OK / NG, mã lỗi</td></tr>
+  <tr><td>Giá trị đo</td><td>Chiều dài 25,012 mm, đường kính lỗ 6,003 mm</td></tr>
+  <tr><td>Phiên bản</td><td>Công thức (recipe) kiểm tra, phiên bản phần mềm, phiên bản mô hình AI</td></tr>
+  <tr><td>Liên kết ảnh</td><td>Đường dẫn tới ảnh lưu trữ (thường chỉ lưu ảnh NG hoặc mẫu ngẫu nhiên)</td></tr>
+</table>
+
+<h2>Cách tích hợp phổ biến</h2>
+<ul>
+  <li><strong>Qua PLC</strong>: vision gửi kết quả cho PLC, PLC gửi lên MES. Đơn giản cho trạm vision nhưng giới hạn lượng dữ liệu.</li>
+  <li><strong>Ghi trực tiếp vào cơ sở dữ liệu</strong> hoặc gọi <strong>API (REST)</strong> của MES.</li>
+  <li><strong>OPC UA</strong>: chuẩn mở, mô hình dữ liệu rõ ràng, ngày càng phổ biến (xem <a href="opc-ua-cho-ky-su-vision.html">OPC UA cho kỹ sư vision</a>).</li>
+  <li><strong>Hàng đợi thông điệp</strong> (ví dụ MQTT): phù hợp kiến trúc nhà máy thông minh nhiều hệ thống cùng nhận dữ liệu.</li>
+</ul>
+
+<h2>Thiết kế để không mất dữ liệu</h2>
+<ul>
+  <li><strong>Bộ đệm cục bộ</strong>: khi mạng hoặc MES gián đoạn, lưu kết quả vào file/CSDL cục bộ và gửi lại khi có kết nối.</li>
+  <li><strong>Định danh duy nhất</strong> cho mỗi lần kiểm tra để tránh ghi trùng khi gửi lại.</li>
+  <li><strong>Đồng bộ thời gian</strong> (NTP) giữa máy vision, PLC và MES; lệch giờ làm việc truy xuất rất khó khăn.</li>
+  <li><strong>Chính sách lưu ảnh</strong>: ảnh chiếm dung lượng lớn; quyết định rõ lưu ảnh nào, bao lâu, nén thế nào.</li>
+</ul>
+
+<h2>Giá trị mang lại</h2>
+<p>Khi dữ liệu kiểm tra được tập trung, nhà máy có thể phân tích tỷ lệ lỗi theo ca, theo máy, theo lô nguyên liệu, phát hiện xu hướng trước khi thành sự cố, và cung cấp bằng chứng chất lượng cho khách hàng. Đó là lý do kỹ sư Vision giỏi luôn hiểu cả tầng tích hợp hệ thống, không chỉ thuật toán xử lý ảnh.</p>

@@ -1,0 +1,42 @@
+<p>Mô hình đạt 99% trên máy của bạn, mang xuống nhà máy chỉ còn 80%. Thủ phạm thường là <strong>overfitting</strong> hoặc <strong>cách chia dữ liệu sai</strong>. Bài này giải thích hai khái niệm quan trọng nhất để mô hình hoạt động được ngoài đời thật.</p>
+
+<h2>Overfitting và underfitting</h2>
+<ul>
+  <li><strong>Underfitting</strong> (chưa khớp): mô hình quá đơn giản, sai nhiều cả trên dữ liệu huấn luyện.</li>
+  <li><strong>Overfitting</strong> (quá khớp): mô hình "học thuộc" dữ liệu huấn luyện, kể cả nhiễu, nên đúng gần tuyệt đối trên train nhưng sai nhiều trên dữ liệu mới.</li>
+</ul>
+<p>Dấu hiệu nhận biết khi huấn luyện mạng nơ-ron: loss trên tập train tiếp tục giảm, còn loss trên tập validation bắt đầu <strong>tăng</strong> trở lại.</p>
+
+<h2>Ba tập dữ liệu và vai trò của từng tập</h2>
+<table>
+  <tr><th>Tập</th><th>Dùng để</th><th>Tỷ lệ gợi ý</th></tr>
+  <tr><td>Train</td><td>Huấn luyện mô hình</td><td>70%</td></tr>
+  <tr><td>Validation</td><td>Chọn mô hình, chỉnh tham số, chọn ngưỡng, dừng sớm</td><td>15%</td></tr>
+  <tr><td>Test</td><td>Đánh giá cuối cùng, <strong>chỉ dùng một lần</strong></td><td>15%</td></tr>
+</table>
+<p>Nếu bạn nhìn kết quả tập test rồi quay lại chỉnh mô hình, tập test đã "bị rò rỉ" và không còn khách quan.</p>
+
+<h2>Rò rỉ dữ liệu: lỗi phổ biến nhất</h2>
+<ul>
+  <li><strong>Ảnh gần như trùng nhau</strong> ở cả train và test: chụp liên tiếp cùng một sản phẩm, cắt từ cùng một video.</li>
+  <li><strong>Chia ngẫu nhiên theo ảnh</strong> khi một sản phẩm có nhiều ảnh: hãy chia theo <em>mã sản phẩm</em>.</li>
+  <li><strong>Dữ liệu tương lai</strong>: dự đoán hỏng máy mà tập train chứa dữ liệu sau thời điểm tập test. Với chuỗi thời gian, chia theo thời gian.</li>
+  <li><strong>Chuẩn hóa trên toàn bộ dữ liệu</strong> trước khi chia: tính mean/std chỉ trên tập train.</li>
+</ul>
+<pre><code>from sklearn.model_selection import GroupShuffleSplit
+
+# groups: mã sản phẩm hoặc mã lô của từng ảnh
+gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
+train_idx, test_idx = next(gss.split(X, y, groups=groups))</code></pre>
+
+<h2>Chống overfitting</h2>
+<ul>
+  <li><strong>Thêm dữ liệu đa dạng</strong>: cách hiệu quả nhất.</li>
+  <li><strong>Data augmentation</strong>: xoay, lật, đổi độ sáng, nhiễu nhẹ, nhưng chỉ những biến đổi có thể xảy ra thật.</li>
+  <li><strong>Mô hình nhỏ hơn</strong> hoặc dùng transfer learning thay vì huấn luyện từ đầu.</li>
+  <li><strong>Regularization</strong>: weight decay, dropout.</li>
+  <li><strong>Dừng sớm (early stopping)</strong> khi loss validation không cải thiện.</li>
+</ul>
+
+<h2>Kiểm tra "ngoài phòng thí nghiệm"</h2>
+<p>Trước khi triển khai, hãy có một tập test được chụp <strong>vào ngày khác, ca khác, lô vật liệu khác</strong> so với dữ liệu huấn luyện. Đó mới là thước đo gần nhất với hiệu năng thật trên dây chuyền.</p>

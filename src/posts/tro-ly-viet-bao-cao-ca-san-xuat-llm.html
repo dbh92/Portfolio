@@ -1,0 +1,68 @@
+<p>Cuối mỗi ca, trưởng ca phải tổng hợp sản lượng, tỷ lệ lỗi, sự cố, việc cần bàn giao. Việc này tốn 20–30 phút và dễ sót thông tin. Dự án này dùng <strong>LLM</strong> để tự động soạn bản nháp báo cáo ca từ dữ liệu có sẵn, người trưởng ca chỉ cần đọc lại và xác nhận.</p>
+
+<h2>Nguyên tắc thiết kế</h2>
+<ul>
+  <li><strong>Số liệu tính bằng code, không để LLM tính.</strong> LLM chỉ diễn đạt và tóm tắt những gì đã được tính chính xác.</li>
+  <li><strong>Con người duyệt cuối cùng</strong> trước khi gửi.</li>
+  <li><strong>Không gửi dữ liệu nhạy cảm</strong> ra ngoài nếu chưa được phép; cân nhắc mô hình chạy nội bộ.</li>
+</ul>
+
+<h2>Bước 1: tổng hợp dữ liệu bằng code</h2>
+<pre><code>import pandas as pd
+
+kq = pd.read_csv("ket-qua-kiem-tra.csv", parse_dates=["thoi_gian"])
+su_co = pd.read_csv("log-su-co.csv", parse_dates=["bat_dau", "ket_thuc"])
+
+ca = kq[(kq.thoi_gian &gt;= "2026-10-07 22:00") &amp; (kq.thoi_gian &lt; "2026-10-08 06:00")]
+tong = len(ca)
+ng = int((ca.ket_qua == "NG").sum())
+top_loi = ca[ca.ket_qua == "NG"].ma_loi.value_counts().head(3).to_dict()
+dung_may = su_co.assign(phut=(su_co.ket_thuc - su_co.bat_dau).dt.total_seconds() / 60)
+
+facts = {
+    "ca": "Đêm 07/10/2026 (22:00–06:00)",
+    "san_luong": tong,
+    "so_ng": ng,
+    "ti_le_ng_phan_tram": round(100 * ng / tong, 2) if tong else 0,
+    "loi_nhieu_nhat": top_loi,
+    "su_co": dung_may[["may", "mo_ta", "phut"]].to_dict("records"),
+}</code></pre>
+
+<h2>Bước 2: prompt có cấu trúc</h2>
+<pre><code>import json
+
+prompt = f"""Bạn là trợ lý soạn báo cáo ca sản xuất.
+Chỉ dùng dữ liệu trong JSON dưới đây, không thêm số liệu nào khác.
+Viết bằng tiếng Việt, giọng văn ngắn gọn, gồm các mục:
+1. Tóm tắt (2 câu)
+2. Sản lượng và chất lượng
+3. Sự cố và thời gian dừng máy
+4. Việc cần bàn giao cho ca sau (chỉ dựa trên sự cố chưa xử lý xong)
+Nếu dữ liệu thiếu cho một mục, ghi "Không có dữ liệu".
+
+DỮ LIỆU:
+{json.dumps(facts, ensure_ascii=False, default=str, indent=2)}"""
+
+ban_nhap = ask_llm(prompt)    # kết nối API LLM của bạn hoặc mô hình chạy nội bộ</code></pre>
+
+<h2>Bước 3: kiểm tra tự động trước khi đưa người duyệt</h2>
+<pre><code>import re
+
+def kiem_tra(ban_nhap, facts):
+    so_trong_bao_cao = set(re.findall(r"\d+(?:[.,]\d+)?", ban_nhap))
+    so_hop_le = {str(facts["san_luong"]), str(facts["so_ng"]),
+                 str(facts["ti_le_ng_phan_tram"]).replace(".", ",")}
+    # cảnh báo nếu báo cáo nhắc đến con số lớn không có trong dữ liệu
+    nghi_van = [s for s in so_trong_bao_cao if len(s) &gt;= 3 and s not in so_hop_le]
+    return nghi_van</code></pre>
+<p>Kiểm tra này đơn giản nhưng bắt được trường hợp LLM "bịa" số liệu. Mọi con số nghi vấn được tô đỏ trên giao diện duyệt.</p>
+
+<h2>Bước 4: giao diện duyệt và gửi</h2>
+<ul>
+  <li>Hiển thị bản nháp cạnh bảng số liệu gốc.</li>
+  <li>Trưởng ca chỉnh sửa, bổ sung nhận xét, bấm xác nhận.</li>
+  <li>Lưu cả bản nháp và bản cuối để đánh giá chất lượng trợ lý theo thời gian.</li>
+</ul>
+
+<h2>Đo hiệu quả</h2>
+<p>Thời gian trung bình để hoàn thành báo cáo, số lần trưởng ca phải sửa nội dung, mức độ hài lòng. Một trợ lý tốt tiết kiệm thời gian mà không làm giảm độ chính xác của báo cáo.</p>

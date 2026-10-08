@@ -1,0 +1,71 @@
+<p>Trang tra cứu nhanh các thao tác NumPy dùng nhiều nhất khi xử lý ảnh và dữ liệu cho AI. Ảnh OpenCV là mảng NumPy, nên thành thạo các lệnh dưới đây giúp bạn viết code ngắn gọn và nhanh hơn nhiều so với vòng lặp. Giả định đã có <code>import numpy as np</code>.</p>
+
+<h2>Tạo mảng</h2>
+<table>
+  <tr><th>Việc cần làm</th><th>Code</th></tr>
+  <tr><td>Ảnh đen 480×640 xám / màu</td><td><code>np.zeros((480, 640), np.uint8)</code> / <code>np.zeros((480, 640, 3), np.uint8)</code></td></tr>
+  <tr><td>Ảnh trắng</td><td><code>np.full((480, 640), 255, np.uint8)</code></td></tr>
+  <tr><td>Mảng giống kích thước ảnh khác</td><td><code>np.zeros_like(img)</code></td></tr>
+  <tr><td>Dãy số</td><td><code>np.arange(0, 10, 2)</code>, <code>np.linspace(0, 1, 5)</code></td></tr>
+  <tr><td>Số ngẫu nhiên tái lập được</td><td><code>rng = np.random.default_rng(0)</code>; <code>rng.normal(0, 5, img.shape)</code></td></tr>
+</table>
+
+<h2>Thông tin mảng</h2>
+<table>
+  <tr><th>Việc cần làm</th><th>Code</th></tr>
+  <tr><td>Kích thước, số chiều, kiểu</td><td><code>a.shape</code>, <code>a.ndim</code>, <code>a.dtype</code></td></tr>
+  <tr><td>Số phần tử, dung lượng</td><td><code>a.size</code>, <code>a.nbytes</code></td></tr>
+  <tr><td>Thống kê</td><td><code>a.min()</code>, <code>a.max()</code>, <code>a.mean()</code>, <code>a.std()</code>, <code>np.median(a)</code></td></tr>
+  <tr><td>Thống kê theo kênh màu</td><td><code>img.mean(axis=(0, 1))</code> → 3 giá trị B, G, R</td></tr>
+  <tr><td>Phân vị</td><td><code>np.percentile(a, [1, 99])</code></td></tr>
+</table>
+
+<h2>Cắt, chọn và sửa</h2>
+<table>
+  <tr><th>Việc cần làm</th><th>Code</th></tr>
+  <tr><td>Cắt ROI</td><td><code>roi = img[y:y+h, x:x+w]</code> (là view, dùng <code>.copy()</code> nếu cần độc lập)</td></tr>
+  <tr><td>Một kênh màu</td><td><code>img[:, :, 2]</code> (kênh R trong BGR)</td></tr>
+  <tr><td>Đảo BGR → RGB</td><td><code>img[:, :, ::-1]</code></td></tr>
+  <tr><td>Lật ngang / dọc</td><td><code>img[:, ::-1]</code> / <code>img[::-1]</code></td></tr>
+  <tr><td>Lấy mẫu thưa (giảm 2 lần)</td><td><code>img[::2, ::2]</code></td></tr>
+  <tr><td>Gán theo mặt nạ</td><td><code>img[mask &gt; 0] = (0, 0, 255)</code></td></tr>
+</table>
+
+<h2>Mặt nạ và điều kiện</h2>
+<table>
+  <tr><th>Việc cần làm</th><th>Code</th></tr>
+  <tr><td>Mặt nạ điểm sáng</td><td><code>mask = gray &gt; 200</code></td></tr>
+  <tr><td>Kết hợp điều kiện</td><td><code>(gray &gt; 50) &amp; (gray &lt; 200)</code>, dùng <code>|</code> cho "hoặc", <code>~</code> cho "không"</td></tr>
+  <tr><td>Đếm / tỷ lệ</td><td><code>mask.sum()</code>, <code>mask.mean()</code></td></tr>
+  <tr><td>Tọa độ các điểm thỏa mãn</td><td><code>ys, xs = np.nonzero(mask)</code></td></tr>
+  <tr><td>Chọn giá trị theo điều kiện</td><td><code>np.where(mask, 255, 0).astype(np.uint8)</code></td></tr>
+  <tr><td>Cắt về khoảng</td><td><code>np.clip(a, 0, 255)</code></td></tr>
+</table>
+
+<h2>Đổi hình dạng và kiểu</h2>
+<table>
+  <tr><th>Việc cần làm</th><th>Code</th></tr>
+  <tr><td>Đổi kiểu tránh tràn số</td><td><code>img.astype(np.int16)</code>, <code>img.astype(np.float32) / 255</code></td></tr>
+  <tr><td>Làm phẳng</td><td><code>a.ravel()</code> (view nếu được), <code>a.flatten()</code> (luôn copy)</td></tr>
+  <tr><td>HWC → CHW (cho PyTorch)</td><td><code>img.transpose(2, 0, 1)</code></td></tr>
+  <tr><td>Thêm chiều batch</td><td><code>x[None]</code> hoặc <code>np.expand_dims(x, 0)</code></td></tr>
+  <tr><td>Ghép ảnh cạnh nhau</td><td><code>np.hstack([a, b])</code>, <code>np.vstack([a, b])</code></td></tr>
+  <tr><td>Xếp chồng thành batch</td><td><code>np.stack(list_anh)</code></td></tr>
+</table>
+
+<h2>Tính toán vector hóa</h2>
+<table>
+  <tr><th>Việc cần làm</th><th>Code</th></tr>
+  <tr><td>Khoảng cách giữa nhiều điểm và một điểm</td><td><code>np.linalg.norm(pts - p0, axis=1)</code></td></tr>
+  <tr><td>Histogram 256 mức</td><td><code>np.bincount(gray.ravel(), minlength=256)</code></td></tr>
+  <tr><td>Chỉ số giá trị lớn nhất</td><td><code>np.argmax(a)</code>; trong ảnh 2D: <code>np.unravel_index(np.argmax(a), a.shape)</code></td></tr>
+  <tr><td>Sắp xếp giảm dần</td><td><code>np.argsort(-scores)</code></td></tr>
+  <tr><td>Fitting đường thẳng</td><td><code>k, b = np.polyfit(xs, ys, 1)</code></td></tr>
+</table>
+
+<h2>Lưu và đọc</h2>
+<ul>
+  <li><code>np.save("a.npy", a)</code> / <code>np.load("a.npy")</code></li>
+  <li>Nhiều mảng: <code>np.savez("calib.npz", K=K, dist=dist)</code></li>
+</ul>
+<p>Xem thêm bài giải thích chi tiết <a href="../hoc/numpy-anh-la-mang-so.html">NumPy cho xử lý ảnh</a> và <a href="cheat-sheet-opencv-python.html">cheat sheet OpenCV-Python</a>.</p>

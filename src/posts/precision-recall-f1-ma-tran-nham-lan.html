@@ -1,0 +1,55 @@
+<p>"Mô hình đạt độ chính xác 99%" nghe rất ấn tượng, cho đến khi bạn biết dây chuyền chỉ có 1% hàng lỗi: một mô hình luôn trả lời "OK" cũng đạt 99%. Bài này giải thích các chỉ số đánh giá thật sự quan trọng cho bài toán kiểm tra lỗi.</p>
+
+<h2>Ma trận nhầm lẫn</h2>
+<p>Coi "NG" là lớp dương (positive), vì đó là thứ ta cần tìm:</p>
+<table>
+  <tr><th></th><th>Dự đoán NG</th><th>Dự đoán OK</th></tr>
+  <tr><th>Thực tế NG</th><td><strong>TP</strong> (bắt đúng lỗi)</td><td><strong>FN</strong> (lọt lỗi, escape)</td></tr>
+  <tr><th>Thực tế OK</th><td><strong>FP</strong> (loại nhầm, overkill)</td><td><strong>TN</strong> (cho qua đúng)</td></tr>
+</table>
+
+<h2>Các chỉ số</h2>
+<ul>
+  <li><strong>Accuracy</strong> = (TP + TN) / tổng. Dễ gây hiểu lầm khi dữ liệu mất cân bằng.</li>
+  <li><strong>Precision</strong> = TP / (TP + FP): trong số bị báo NG, bao nhiêu là NG thật? Precision thấp = loại nhầm nhiều.</li>
+  <li><strong>Recall</strong> (độ nhạy) = TP / (TP + FN): trong số NG thật, bắt được bao nhiêu? Recall thấp = lọt lỗi nhiều.</li>
+  <li><strong>F1</strong> = 2 × Precision × Recall / (Precision + Recall): cân bằng hai chỉ số trên.</li>
+</ul>
+
+<h2>Ví dụ bằng con số</h2>
+<p>10.000 sản phẩm, trong đó 100 NG. Mô hình bắt được 95 NG, lọt 5, và báo nhầm 200 hàng OK:</p>
+<pre><code>TP = 95, FN = 5, FP = 200, TN = 9700
+Accuracy  = (95 + 9700) / 10000 = 97,95%
+Precision = 95 / 295  ≈ 32,2%
+Recall    = 95 / 100  = 95%
+F1        ≈ 48,1%</code></pre>
+<p>Accuracy gần 98%, nhưng cứ 3 sản phẩm bị loại thì 2 sản phẩm thực ra tốt. Tùy nhà máy, như vậy có thể chấp nhận được (người kiểm tra lại hàng bị loại) hoặc không (tốn quá nhiều công).</p>
+
+<h2>Tính bằng scikit-learn</h2>
+<pre><code>from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score
+
+y_true = [1, 1, 0, 0, 0, 1, 0, 0]   # 1 = NG
+y_pred = [1, 0, 0, 1, 0, 1, 0, 0]
+print(confusion_matrix(y_true, y_pred, labels=[1, 0]))
+print(precision_score(y_true, y_pred), recall_score(y_true, y_pred), f1_score(y_true, y_pred))</code></pre>
+
+<h2>Ngôn ngữ của nhà máy</h2>
+<table>
+  <tr><th>Chỉ số ML</th><th>Cách nhà máy gọi</th></tr>
+  <tr><td>1 − Recall</td><td>Tỷ lệ lọt lỗi (escape rate, slip rate)</td></tr>
+  <tr><td>FP / (FP + TN)</td><td>Tỷ lệ loại nhầm (overkill, false reject rate)</td></tr>
+</table>
+<p>Khi báo cáo cho quản lý sản xuất, hãy dùng hai con số này thay vì F1: chúng gắn trực tiếp với chi phí (khiếu nại khách hàng và công kiểm tra lại).</p>
+
+<h2>Đường cong Precision–Recall và chọn ngưỡng</h2>
+<p>Mô hình cho điểm số; ngưỡng quyết định OK/NG. Vẽ đường cong để thấy đánh đổi:</p>
+<pre><code>from sklearn.metrics import precision_recall_curve
+precision, recall, thresholds = precision_recall_curve(y_true_all, scores_all)
+# chọn ngưỡng nhỏ nhất đạt recall &gt;= 0.999 rồi xem precision tương ứng</code></pre>
+
+<h2>Lời khuyên</h2>
+<ul>
+  <li>Đánh giá trên tập test <strong>chưa từng dùng</strong> để chọn ngưỡng hay chỉnh tham số.</li>
+  <li>Báo cáo kèm số lượng tuyệt đối, không chỉ phần trăm: "lọt 2/500 mẫu lỗi" rõ ràng hơn "recall 99,6%".</li>
+  <li>Với object detection, dùng thêm IoU và mAP, xem bài <a href="../hoc/iou-map-danh-gia-object-detection.html">IoU và mAP</a>.</li>
+</ul>

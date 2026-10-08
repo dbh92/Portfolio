@@ -1,0 +1,45 @@
+<p>Ảnh quá tối, quá chói hay độ tương phản thấp làm mọi thuật toán phía sau kém ổn định. <strong>Histogram</strong> cho bạn "chẩn đoán" ảnh bằng một biểu đồ, và các kỹ thuật cân bằng giúp cải thiện ảnh trước khi xử lý.</p>
+
+<h2>Histogram là gì?</h2>
+<p>Histogram đếm số điểm ảnh ở mỗi mức xám 0–255.</p>
+<pre><code>import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+
+gray = cv2.imread("nhan.png", cv2.IMREAD_GRAYSCALE)
+hist = cv2.calcHist([gray], [0], None, [256], [0, 256]).ravel()
+plt.plot(hist); plt.xlabel("Mức xám"); plt.ylabel("Số điểm ảnh"); plt.show()</code></pre>
+<ul>
+  <li>Dồn về bên trái: ảnh tối, cần tăng phơi sáng hoặc đèn.</li>
+  <li>Dồn về bên phải, có cột cao ở 255: ảnh cháy sáng, <strong>mất thông tin không khôi phục được</strong>.</li>
+  <li>Hẹp, tập trung một vùng: độ tương phản thấp.</li>
+  <li>Hai đỉnh tách biệt: rất hợp để phân ngưỡng Otsu (vật và nền).</li>
+</ul>
+
+<h2>Kéo giãn độ tương phản</h2>
+<pre><code>stretched = cv2.normalize(gray, None, 0, 255, cv2.NORM_MINMAX)
+
+# Bền vững hơn với điểm nhiễu: dùng phân vị 1% và 99%
+lo, hi = np.percentile(gray, (1, 99))
+stretched = np.clip((gray - lo) * 255.0 / (hi - lo), 0, 255).astype(np.uint8)</code></pre>
+
+<h2>Cân bằng histogram toàn cục</h2>
+<pre><code>eq = cv2.equalizeHist(gray)</code></pre>
+<p>Trải đều histogram trên toàn dải 0–255. Hiệu quả với ảnh tương phản thấp đồng đều, nhưng có thể làm nhiễu nổi lên và làm vùng sáng bị chói.</p>
+
+<h2>CLAHE: cân bằng thích nghi cục bộ</h2>
+<pre><code>clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+out = clahe.apply(gray)</code></pre>
+<p>CLAHE chia ảnh thành các ô nhỏ, cân bằng từng ô và giới hạn mức khuếch đại (<code>clipLimit</code>) để tránh nhiễu. Rất hữu ích khi ánh sáng không đều, ví dụ đọc chữ khắc trên bề mặt kim loại hoặc ảnh X-quang.</p>
+
+<h2>Ảnh màu: cân bằng trên kênh độ sáng</h2>
+<pre><code>img = cv2.imread("san-pham.jpg")
+lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+l, a, b = cv2.split(lab)
+lab = cv2.merge((clahe.apply(l), a, b))
+out = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)</code></pre>
+<p>Không cân bằng riêng từng kênh B, G, R, vì sẽ làm sai lệch màu.</p>
+
+<h2>Dùng histogram để giám sát hệ thống</h2>
+<p>Trong sản xuất, theo dõi <strong>độ sáng trung bình và độ lệch chuẩn</strong> của ROI theo thời gian là cách đơn giản để phát hiện sớm: đèn yếu dần, ống kính bám bụi, camera bị xê dịch. Đặt ngưỡng cảnh báo khi các giá trị này trôi khỏi dải bình thường.</p>
+<p class="note">Lưu ý: cân bằng histogram là "chữa cháy". Giải pháp gốc vẫn là <a href="../kien-thuc/7-kieu-chieu-sang-machine-vision.html">chiếu sáng đúng</a> và cài đặt phơi sáng phù hợp.</p>

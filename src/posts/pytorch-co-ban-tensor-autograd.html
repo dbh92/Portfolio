@@ -1,0 +1,73 @@
+<p>PyTorch là framework Deep Learning được dùng nhiều nhất trong nghiên cứu và ngày càng phổ biến trong sản xuất. Ultralytics YOLO, Anomalib, phần lớn mô hình trên Hugging Face đều chạy trên PyTorch. Bài này giới thiệu ba khái niệm nền tảng: <strong>tensor, autograd và vòng lặp huấn luyện</strong>.</p>
+
+<h2>Tensor: mảng số chạy được trên GPU</h2>
+<pre><code>import torch
+
+a = torch.tensor([[1.0, 2.0], [3.0, 4.0]])
+b = torch.rand(2, 2)
+print(a @ b, a.shape, a.dtype)
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+x = torch.randn(64, 3, 224, 224, device=device)   # 64 ảnh RGB 224x224
+print(x.device)</code></pre>
+<p>Tensor giống mảng NumPy, thêm hai năng lực: chạy trên GPU và tự tính đạo hàm. Quy ước ảnh trong PyTorch là <strong>N, C, H, W</strong> (số ảnh, kênh, cao, rộng), khác OpenCV là H, W, C.</p>
+
+<h2>Autograd: tự động tính đạo hàm</h2>
+<pre><code>w = torch.tensor(2.0, requires_grad=True)
+x = torch.tensor(3.0)
+loss = (w * x - 10) ** 2
+loss.backward()            # tính dloss/dw
+print(w.grad)              # 2·(w·x − 10)·x = 2·(6 − 10)·3 = -24</code></pre>
+<p>Đây chính là thứ bạn phải tự tính bằng tay trong bài <a href="hoi-quy-tuyen-tinh-gradient-descent-numpy.html">gradient descent với NumPy</a>. Với mạng hàng triệu tham số, autograd làm việc đó tự động.</p>
+
+<h2>Định nghĩa mạng nơ-ron</h2>
+<pre><code>from torch import nn
+
+class SmallCNN(nn.Module):
+    def __init__(self, num_classes=2):
+        super().__init__()
+        self.features = nn.Sequential(
+            nn.Conv2d(1, 16, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+            nn.Conv2d(16, 32, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+        )
+        self.head = nn.Linear(32 * 16 * 16, num_classes)   # đầu vào ảnh xám 64x64
+
+    def forward(self, x):
+        x = self.features(x)
+        return self.head(x.flatten(1))
+
+model = SmallCNN().to(device)
+print(model(torch.randn(8, 1, 64, 64, device=device)).shape)   # [8, 2]</code></pre>
+
+<h2>Vòng lặp huấn luyện chuẩn</h2>
+<pre><code>from torch.utils.data import DataLoader, TensorDataset
+
+X = torch.randn(512, 1, 64, 64)
+y = torch.randint(0, 2, (512,))
+loader = DataLoader(TensorDataset(X, y), batch_size=32, shuffle=True)
+
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+criterion = nn.CrossEntropyLoss()
+
+for epoch in range(5):
+    model.train()
+    total = 0.0
+    for xb, yb in loader:
+        xb, yb = xb.to(device), yb.to(device)
+        optimizer.zero_grad()           # 1. xóa gradient cũ
+        loss = criterion(model(xb), yb) # 2. lan truyền xuôi, tính loss
+        loss.backward()                 # 3. lan truyền ngược
+        optimizer.step()                # 4. cập nhật trọng số
+        total += loss.item() * len(xb)
+    print(f"epoch {epoch}: loss {total / len(loader.dataset):.4f}")</code></pre>
+<p>Bốn bước này lặp lại trong mọi chương trình huấn luyện, từ ví dụ nhỏ đến mô hình hàng tỷ tham số.</p>
+
+<h2>Đánh giá và lưu mô hình</h2>
+<pre><code>model.eval()
+with torch.no_grad():                   # không tính gradient khi suy luận: nhanh, ít bộ nhớ
+    pred = model(X[:8].to(device)).argmax(1)
+
+torch.save(model.state_dict(), "small_cnn.pt")
+model.load_state_dict(torch.load("small_cnn.pt", map_location=device))</code></pre>
+<p>Quên <code>model.eval()</code> là lỗi rất phổ biến: các lớp như Dropout, BatchNorm hoạt động khác nhau giữa lúc huấn luyện và lúc suy luận.</p>
+<p>Áp dụng vào bài toán thật: <a href="phan-loai-anh-ok-ng-transfer-learning-pytorch.html">phân loại ảnh OK/NG bằng transfer learning</a>.</p>

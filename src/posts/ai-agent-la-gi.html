@@ -1,0 +1,45 @@
+<p>Năm 2026, các hãng AI lớn cạnh tranh không chỉ ở mô hình trả lời câu hỏi, mà ở <strong>AI Agent</strong>: hệ thống tự lên kế hoạch, dùng công cụ và thực hiện chuỗi hành động để hoàn thành một mục tiêu. Bài này giải thích agent hoạt động thế nào và những rủi ro cần kiểm soát.</p>
+
+<h2>Chatbot và agent khác nhau ra sao?</h2>
+<ul>
+  <li><strong>Chatbot</strong>: nhận câu hỏi, trả lời bằng văn bản. Người dùng tự làm phần còn lại.</li>
+  <li><strong>Agent</strong>: nhận mục tiêu, tự quyết định cần làm gì, gọi công cụ (tìm kiếm, chạy code, đọc file, gọi API), xem kết quả, rồi quyết định bước tiếp theo cho đến khi xong.</li>
+</ul>
+
+<h2>Vòng lặp của một agent</h2>
+<ol>
+  <li><strong>Suy nghĩ</strong>: dựa trên mục tiêu và những gì đã biết, chọn hành động tiếp theo.</li>
+  <li><strong>Hành động</strong>: gọi một công cụ với tham số cụ thể.</li>
+  <li><strong>Quan sát</strong>: nhận kết quả của công cụ, đưa vào ngữ cảnh.</li>
+  <li><strong>Lặp lại</strong> cho tới khi đạt mục tiêu hoặc cần hỏi con người.</li>
+</ol>
+<pre><code># Mã giả minh họa vòng lặp agent
+tools = {"tim_tai_lieu": tim_tai_lieu, "doc_log_may": doc_log_may, "tao_phieu": tao_phieu_sua_chua}
+history = [muc_tieu]
+for buoc in range(10):                      # luôn giới hạn số bước
+    quyet_dinh = llm(history, tools)        # mô hình chọn công cụ hoặc kết thúc
+    if quyet_dinh.ket_thuc:
+        break
+    ket_qua = tools[quyet_dinh.cong_cu](**quyet_dinh.tham_so)
+    history.append((quyet_dinh, ket_qua))</code></pre>
+
+<h2>Ví dụ trong nhà máy</h2>
+<p>Mục tiêu: <em>"Máy dán nhãn số 3 báo lỗi E-205 nhiều lần trong ca đêm, hãy tìm nguyên nhân và đề xuất xử lý."</em> Agent có thể:</p>
+<ol>
+  <li>Đọc log máy trong ca đêm, đếm số lần lỗi và thời điểm.</li>
+  <li>Tra tài liệu hướng dẫn tìm ý nghĩa mã E-205.</li>
+  <li>Đối chiếu với lịch bảo trì gần nhất.</li>
+  <li>Soạn phiếu sửa chữa nháp, <strong>chờ kỹ sư duyệt</strong> trước khi gửi.</li>
+</ol>
+
+<h2>Giao thức kết nối công cụ</h2>
+<p>Để agent dùng được công cụ của doanh nghiệp, ngành công nghiệp đang chuẩn hóa cách kết nối, ví dụ Model Context Protocol (MCP) cho việc cung cấp công cụ, dữ liệu cho mô hình, hay các đề xuất chuẩn mới cho việc agent tương tác với doanh nghiệp (xem tin <a href="../tin-tuc-ai/sierra-meta-personal-agent-protocol.html">Personal Agent Protocol</a>).</p>
+
+<h2>Rủi ro và cách kiểm soát</h2>
+<ul>
+  <li><strong>Hành động sai có hậu quả thật</strong>: xóa file, gửi email, thay đổi tham số máy. Hãy giới hạn quyền tối thiểu và yêu cầu con người phê duyệt cho mọi hành động không thể hoàn tác.</li>
+  <li><strong>Prompt injection</strong>: nội dung độc hại trong tài liệu hoặc trang web có thể "ra lệnh" cho agent. Không cho agent đọc nguồn không tin cậy rồi tự hành động trên hệ thống quan trọng.</li>
+  <li><strong>Vòng lặp vô hạn, chi phí tăng vọt</strong>: luôn giới hạn số bước, thời gian và ngân sách.</li>
+  <li><strong>Lưu vết</strong>: ghi lại mọi bước suy nghĩ, công cụ đã gọi và kết quả để kiểm tra lại.</li>
+</ul>
+<p>Agent không bao giờ được trực tiếp điều khiển máy móc nguy hiểm mà không qua hệ thống an toàn và con người. Ở nhà máy, vai trò phù hợp nhất hiện nay là <strong>trợ lý tra cứu, phân tích và soạn thảo</strong>, còn quyết định cuối cùng thuộc về kỹ sư.</p>

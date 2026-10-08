@@ -1,0 +1,51 @@
+<p>Sản phẩm trên băng tải hiếm khi nằm đúng vị trí và góc. Trước khi kiểm tra, ta thường <strong>căn chỉnh ảnh</strong>: xoay thẳng, dịch về vị trí chuẩn, hoặc "nắn" ảnh chụp nghiêng về góc nhìn thẳng. Đó là các phép biến đổi hình học.</p>
+
+<h2>Biến đổi affine: dịch, xoay, co giãn</h2>
+<pre><code>import cv2
+import numpy as np
+
+img = cv2.imread("nhan-lech.png")
+h, w = img.shape[:2]
+
+M = cv2.getRotationMatrix2D(center=(w / 2, h / 2), angle=12.5, scale=1.0)
+rotated = cv2.warpAffine(img, M, (w, h), flags=cv2.INTER_LINEAR,
+                         borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0))
+
+T = np.float32([[1, 0, 40], [0, 1, -15]])      # dịch 40 px sang phải, 15 px lên trên
+shifted = cv2.warpAffine(img, T, (w, h))</code></pre>
+<p>Ma trận affine 2×3 giữ nguyên tính song song của các đường thẳng. Ba cặp điểm tương ứng là đủ để xác định nó: <code>cv2.getAffineTransform(src3, dst3)</code>.</p>
+
+<h2>Căn thẳng sản phẩm theo contour</h2>
+<pre><code>gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+_, th = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+cnts, _ = cv2.findContours(th, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+c = max(cnts, key=cv2.contourArea)
+(cx, cy), (rw, rh), angle = cv2.minAreaRect(c)
+
+M = cv2.getRotationMatrix2D((cx, cy), angle, 1.0)
+aligned = cv2.warpAffine(img, M, (w, h))</code></pre>
+<p>Quy ước góc của <code>minAreaRect</code> đã thay đổi giữa các phiên bản OpenCV. Hãy vẽ kết quả ra để kiểm tra chiều xoay trước khi dùng trong sản xuất.</p>
+
+<h2>Biến đổi phối cảnh (homography)</h2>
+<p>Khi camera nhìn nghiêng, hình chữ nhật trên vật thành hình thang. Biến đổi phối cảnh dùng 4 cặp điểm để "nắn" về góc nhìn thẳng:</p>
+<pre><code>src = np.float32([[112, 85], [538, 70], [565, 410], [95, 430]])   # 4 góc tấm nhãn trên ảnh
+W, H = 400, 300                                                    # kích thước muốn có
+dst = np.float32([[0, 0], [W, 0], [W, H], [0, H]])
+
+P = cv2.getPerspectiveTransform(src, dst)
+flat = cv2.warpPerspective(img, P, (W, H))</code></pre>
+<p>Ứng dụng: đọc nhãn, đồng hồ, màn hình thiết bị chụp từ góc nghiêng; đưa ảnh về hệ tọa độ mặt phẳng để đo (xem bài <a href="../kien-thuc/homography-do-tren-mat-phang.html">homography đo trên mặt phẳng</a>).</p>
+
+<h2>Biến đổi tọa độ điểm</h2>
+<p>Thường bạn không cần biến đổi cả ảnh, chỉ cần biến đổi các điểm đo được:</p>
+<pre><code>pts = np.float32([[[200, 150]], [[300, 220]]])
+pts_flat = cv2.perspectiveTransform(pts, P)      # với homography
+pts_rot = cv2.transform(pts, M)                  # với ma trận affine 2x3</code></pre>
+<p>Biến đổi điểm nhanh hơn rất nhiều và tránh sai số nội suy khi warp ảnh.</p>
+
+<h2>Lưu ý chất lượng</h2>
+<ul>
+  <li>Mỗi lần warp đều nội suy, làm ảnh mềm đi. Tránh warp nhiều lần liên tiếp; gộp các ma trận lại thành một.</li>
+  <li><code>INTER_NEAREST</code> cho mặt nạ nhị phân, <code>INTER_LINEAR</code> hoặc <code>INTER_CUBIC</code> cho ảnh thường.</li>
+  <li>Đo kích thước nên làm trên tọa độ điểm đã biến đổi, không đo trên ảnh đã warp.</li>
+</ul>

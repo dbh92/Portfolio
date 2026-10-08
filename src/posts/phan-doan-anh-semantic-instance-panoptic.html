@@ -1,0 +1,43 @@
+<p>Phát hiện đối tượng (object detection) cho biết vật nằm trong khung nào. <strong>Phân đoạn (segmentation)</strong> đi xa hơn: xác định chính xác từng điểm ảnh thuộc về vật gì. Bài này phân biệt các loại phân đoạn và khi nào cần dùng chúng.</p>
+
+<h2>Ba loại phân đoạn</h2>
+<h3>Semantic segmentation (phân đoạn ngữ nghĩa)</h3>
+<p>Gán mỗi điểm ảnh một <strong>lớp</strong>: nền, vết xước, vết bẩn... Không phân biệt các vật khác nhau cùng lớp: ba vết xước gần nhau là một vùng "vết xước".</p>
+<h3>Instance segmentation (phân đoạn từng đối tượng)</h3>
+<p>Mỗi <strong>đối tượng</strong> có mặt nạ riêng: vết xước số 1, số 2, số 3. Đếm được số lượng, đo được kích thước từng cái.</p>
+<h3>Panoptic segmentation</h3>
+<p>Kết hợp cả hai: các vật đếm được (người, xe) được tách riêng từng cái, còn vùng nền không đếm được (đường, trời) được phân lớp chung.</p>
+
+<h2>So sánh với các bài toán khác</h2>
+<table>
+  <tr><th>Bài toán</th><th>Đầu ra</th><th>Chi phí gán nhãn</th></tr>
+  <tr><td>Phân loại</td><td>Một nhãn cho cả ảnh</td><td>Thấp</td></tr>
+  <tr><td>Phát hiện đối tượng</td><td>Khung chữ nhật + lớp</td><td>Trung bình</td></tr>
+  <tr><td>Phân đoạn</td><td>Mặt nạ từng điểm ảnh</td><td>Cao (vẽ đa giác hoặc tô mặt nạ)</td></tr>
+</table>
+
+<h2>Khi nào cần phân đoạn?</h2>
+<ul>
+  <li><strong>Đo diện tích, chiều dài lỗi</strong>: tiêu chuẩn chất lượng thường quy định "vết xước dài quá 2 mm thì loại", khung chữ nhật không đo chính xác được vết xước chéo.</li>
+  <li><strong>Vật có hình dạng bất thường</strong>: vết dầu loang, vùng thiếu keo, vết nứt dài.</li>
+  <li><strong>Gắp vật chính xác</strong>: robot cần biết đường bao thực tế, không chỉ khung bao.</li>
+  <li><strong>Y tế, nông nghiệp, viễn thám</strong>: khối u, lá bệnh, vùng đất canh tác.</li>
+</ul>
+
+<h2>Các mô hình phổ biến</h2>
+<ul>
+  <li><strong>U-Net</strong>: kiến trúc kinh điển cho phân đoạn ngữ nghĩa, hiệu quả với ít dữ liệu, xem <a href="../hoc/unet-phan-doan-anh.html">bài U-Net</a>.</li>
+  <li><strong>YOLO-seg</strong>: phân đoạn từng đối tượng thời gian thực, xem <a href="../hoc/yolo26-seg-phan-doan-vet-loi.html">YOLO26-seg</a>.</li>
+  <li><strong>Mask R-CNN</strong>: kiến trúc hai giai đoạn nổi tiếng cho instance segmentation.</li>
+  <li><strong>SAM</strong> (Segment Anything): mô hình nền tảng phân đoạn theo gợi ý, rất mạnh để <a href="../tai-nguyen/sam-gan-nhan-phan-doan-nhanh.html">gán nhãn nhanh</a>.</li>
+</ul>
+
+<h2>Chỉ số đánh giá</h2>
+<ul>
+  <li><strong>IoU / Dice</strong> trên mặt nạ: mức trùng khớp giữa mặt nạ dự đoán và mặt nạ thật.</li>
+  <li><strong>mAP mask</strong>: tương tự mAP của detection nhưng tính IoU trên mặt nạ.</li>
+  <li>Với lỗi nhỏ, chú ý: vài điểm ảnh sai ở biên có thể làm IoU giảm mạnh dù kết quả vẫn dùng được.</li>
+</ul>
+
+<h2>Không phải lúc nào cũng cần Deep Learning</h2>
+<p>Nếu vật tương phản rõ với nền, phân ngưỡng + contour hay watershed đã là phân đoạn (xem <a href="../hoc/watershed-tach-vat-dinh-nhau.html">watershed</a>). Deep Learning cần thiết khi ranh giới vật phụ thuộc vào kết cấu, ngữ cảnh mà luật đơn giản không mô tả được.</p>

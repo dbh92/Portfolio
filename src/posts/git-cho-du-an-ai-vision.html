@@ -1,0 +1,55 @@
+<p>Dự án AI Vision gồm nhiều thứ hơn code: dữ liệu ảnh, nhãn, file cấu hình, trọng số mô hình, kết quả thí nghiệm. Quản lý không tốt, bạn sẽ gặp cảnh "mô hình tốt nhất tuần trước là file nào?". Bài này hướng dẫn dùng <strong>Git</strong> đúng cách cho dự án AI và Vision.</p>
+
+<h2>Git quản lý gì, không quản lý gì?</h2>
+<table>
+  <tr><th>Nên commit vào Git</th><th>Không nên commit</th></tr>
+  <tr><td>Mã nguồn, notebook đã dọn kết quả</td><td>Thư mục môi trường ảo <code>.venv/</code></td></tr>
+  <tr><td>File cấu hình (data.yaml, tham số huấn luyện)</td><td>Dataset ảnh hàng GB</td></tr>
+  <tr><td>Danh sách thư viện (requirements, lock file)</td><td>Trọng số mô hình lớn (.pt, .onnx)</td></tr>
+  <tr><td>README, tài liệu, script tiện ích</td><td>Thư mục kết quả huấn luyện <code>runs/</code></td></tr>
+  <tr><td>Bảng chia tập train/val (danh sách tên file)</td><td>Mật khẩu, khóa API, địa chỉ IP nội bộ nhạy cảm</td></tr>
+</table>
+
+<h2>File .gitignore mẫu</h2>
+<pre><code>.venv/
+__pycache__/
+*.pyc
+data/
+runs/
+models/*.pt
+models/*.onnx
+*.engine
+.env</code></pre>
+
+<h2>Quy trình làm việc cơ bản</h2>
+<pre><code>git init
+git add .
+git commit -m "Khởi tạo dự án kiểm tra nắp chai"
+
+git switch -c thu-nghiem-clahe          # nhánh cho một thử nghiệm
+# ... sửa code ...
+git add -p                              # chọn từng phần thay đổi để commit
+git commit -m "Thêm CLAHE trước phân ngưỡng, giảm overkill ca đêm"
+git switch main
+git merge thu-nghiem-clahe</code></pre>
+<p>Thông điệp commit nên ghi <strong>vì sao</strong> thay đổi, không chỉ thay đổi gì. Nửa năm sau, "giảm overkill ca đêm" có giá trị hơn nhiều so với "sửa code".</p>
+
+<h2>Quản lý dữ liệu và mô hình</h2>
+<ul>
+  <li><strong>Git LFS</strong>: lưu file lớn (trọng số mô hình) ngoài kho Git chính nhưng vẫn theo phiên bản. Phù hợp khi số lượng file lớn không quá nhiều.</li>
+  <li><strong>DVC</strong> (Data Version Control): quản lý phiên bản dataset và pipeline, dữ liệu lưu trên ổ mạng hoặc cloud, Git chỉ lưu file mô tả nhỏ.</li>
+  <li>Cách tối thiểu: đặt tên thư mục dữ liệu và mô hình theo phiên bản (<code>dataset-v3/</code>, <code>model-2026-10-01-map0.91.onnx</code>) và ghi rõ trong README mô hình nào được huấn luyện từ dữ liệu nào, commit nào.</li>
+</ul>
+
+<h2>Gắn mô hình với mã nguồn</h2>
+<pre><code>git tag -a v1.2.0 -m "Mô hình triển khai Line 2: escape 0/500, overkill 1.8%"
+git push origin v1.2.0</code></pre>
+<p>Mỗi lần triển khai lên máy sản xuất, gắn tag tương ứng. Khi có sự cố, bạn biết chính xác code, cấu hình và mô hình nào đang chạy, và quay lại phiên bản trước nhanh chóng.</p>
+
+<h2>Làm việc nhóm</h2>
+<ul>
+  <li>Dùng GitHub/GitLab với pull request để người khác review trước khi gộp vào nhánh chính.</li>
+  <li>Không commit thẳng lên <code>main</code> của phần mềm đang chạy sản xuất.</li>
+  <li>Đưa kiểm tra tự động (lint, test nhỏ) vào quy trình để phát hiện lỗi sớm.</li>
+</ul>
+<p>Mới bắt đầu? Xem thêm <a href="../tai-nguyen/cheat-sheet-git-cho-ky-su.html">cheat sheet Git</a> trong mục Tài nguyên.</p>

@@ -1,0 +1,71 @@
+<p>Huấn luyện mô hình bằng Python nhưng phần mềm trạm kiểm tra viết bằng C#? Cầu nối phổ biến nhất là <strong>ONNX</strong>: xuất mô hình sang định dạng chuẩn, rồi chạy bằng <strong>ONNX Runtime</strong> ngay trong ứng dụng .NET, không cần cài Python trên máy công nghiệp.</p>
+
+<h2>Bước 1: xuất mô hình sang ONNX (Python)</h2>
+<pre><code>from ultralytics import YOLO
+YOLO("best.pt").export(format="onnx", imgsz=640)     # tạo best.onnx
+
+# Với mô hình PyTorch tự viết:
+# torch.onnx.export(model, torch.randn(1, 3, 224, 224), "model.onnx",
+#                   input_names=["input"], output_names=["output"])</code></pre>
+
+<h2>Bước 2: cài ONNX Runtime cho .NET</h2>
+<pre><code>dotnet add package Microsoft.ML.OnnxRuntime          # CPU
+# GPU NVIDIA: Microsoft.ML.OnnxRuntime.Gpu ; Windows mọi GPU: Microsoft.ML.OnnxRuntime.DirectML</code></pre>
+
+<h2>Bước 3: xem đầu vào/đầu ra của mô hình</h2>
+<pre><code>using Microsoft.ML.OnnxRuntime;
+using Microsoft.ML.OnnxRuntime.Tensors;
+
+using var session = new InferenceSession("best.onnx");
+foreach (var (name, meta) in session.InputMetadata)
+    Console.WriteLine($"Input  {name}: [{string.Join(",", meta.Dimensions)}]");
+foreach (var (name, meta) in session.OutputMetadata)
+    Console.WriteLine($"Output {name}: [{string.Join(",", meta.Dimensions)}]");</code></pre>
+<p>Luôn in ra kích thước thực tế trước khi viết code giải mã: mỗi họ mô hình (và mỗi phiên bản YOLO) có định dạng đầu ra khác nhau. Ví dụ YOLOv8/YOLO11 xuất mảng dạng <code>[1, 4 + số lớp, số anchor]</code> và cần NMS; YOLO26 thiết kế end-to-end nên đầu ra đã là các khung cuối cùng.</p>
+
+<h2>Bước 4: tiền xử lý ảnh đúng như lúc huấn luyện</h2>
+<pre><code>using OpenCvSharp;
+
+static DenseTensor&lt;float&gt; ToTensor(Mat bgr, int size)
+{
+    using var resized = new Mat();
+    Cv2.Resize(bgr, resized, new Size(size, size));      // đơn giản; chuẩn hơn là letterbox giữ tỷ lệ
+    using var rgb = new Mat();
+    Cv2.CvtColor(resized, rgb, ColorConversionCodes.BGR2RGB);
+
+    var tensor = new DenseTensor&lt;float&gt;(new[] { 1, 3, size, size });
+    var idx = rgb.GetGenericIndexer&lt;Vec3b&gt;();
+    for (int y = 0; y &lt; size; y++)
+        for (int x = 0; x &lt; size; x++)
+        {
+            var px = idx[y, x];
+            tensor[0, 0, y, x] = px.Item0 / 255f;   // R
+            tensor[0, 1, y, x] = px.Item1 / 255f;   // G
+            tensor[0, 2, y, x] = px.Item2 / 255f;   // B
+        }
+    return tensor;
+}</code></pre>
+<p>Sai một chi tiết tiền xử lý (thứ tự kênh RGB/BGR, chia 255, chuẩn hóa mean/std, letterbox) là nguyên nhân số 1 khiến mô hình chạy trong C# cho kết quả khác Python. Hãy so sánh đầu ra của cùng một ảnh trên cả hai phía.</p>
+
+<h2>Bước 5: chạy suy luận</h2>
+<pre><code>using var img = Cv2.ImRead("test.png");
+var input = ToTensor(img, 640);
+string inputName = session.InputMetadata.Keys.First();
+
+using var results = session.Run(new List&lt;NamedOnnxValue&gt;
+{
+    NamedOnnxValue.CreateFromTensor(inputName, input)
+});
+var output = results.First().AsTensor&lt;float&gt;();
+Console.WriteLine($"Output shape: [{string.Join(",", output.Dimensions.ToArray())}]");
+// Giải mã theo định dạng đầu ra của mô hình: khung, lớp, điểm tin cậy...</code></pre>
+
+<h2>Hiệu năng</h2>
+<ul>
+  <li>Tạo <code>InferenceSession</code> <strong>một lần</strong> khi khởi động, dùng lại cho mọi ảnh.</li>
+  <li>Chạy "khởi động nóng" vài ảnh trước khi đo tốc độ: lần chạy đầu luôn chậm.</li>
+  <li>Truy cập <code>DenseTensor</code> theo chỉ số nhiều chiều khá chậm; với đầu ra lớn, làm việc trên mảng phẳng sẽ nhanh hơn.</li>
+  <li>Với GPU NVIDIA, cân nhắc TensorRT; với CPU Intel, cân nhắc OpenVINO Execution Provider.</li>
+</ul>
+<p>Đây là kỹ năng cốt lõi của chặng <a href="../lo-trinh/vision-engineer.html#step-deployment">Deployment</a> trong lộ trình Vision Engineer.</p>
+<p class="note">Tham khảo: <a href="https://onnxruntime.ai/docs/get-started/with-csharp" rel="noopener" target="_blank">ONNX Runtime: Get started with C#</a>.</p>

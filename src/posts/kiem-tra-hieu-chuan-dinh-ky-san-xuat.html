@@ -1,0 +1,48 @@
+<p>Hiệu chuẩn một lần khi nghiệm thu là chưa đủ. Trong môi trường nhà máy, rung động, nhiệt độ, va chạm khi bảo trì đều làm camera và ống kính xê dịch dần. Hệ thống đo lường cần <strong>quy trình kiểm tra hiệu chuẩn định kỳ</strong> để kết quả luôn đáng tin.</p>
+
+<h2>Những gì có thể thay đổi theo thời gian</h2>
+<ul>
+  <li><strong>Vị trí và góc camera</strong>: giá đỡ lỏng, bị va chạm.</li>
+  <li><strong>Lấy nét và khẩu độ</strong>: vòng ống kính xoay do rung nếu không khóa vít.</li>
+  <li><strong>Giãn nở nhiệt</strong>: khung cơ khí dài ra vài phần trăm milimét khi nhiệt độ xưởng thay đổi, đủ để ảnh hưởng phép đo độ chính xác cao.</li>
+  <li><strong>Ánh sáng</strong>: đèn suy giảm làm vị trí biên đo được thay đổi nhẹ.</li>
+</ul>
+
+<h2>Mẫu chuẩn (golden sample)</h2>
+<p>Chuẩn bị một hoặc vài <strong>chi tiết mẫu đã được đo bằng thiết bị chính xác hơn</strong> (máy đo tọa độ CMM, máy đo quang học), dán nhãn, cất giữ cẩn thận. Đây là "thước chuẩn" của hệ thống vision.</p>
+
+<h2>Quy trình kiểm tra hằng ca</h2>
+<ol>
+  <li>Đầu ca, đưa mẫu chuẩn vào trạm, đo 5–10 lần.</li>
+  <li>So sánh giá trị trung bình với giá trị chuẩn; so sánh độ lệch chuẩn với giới hạn lặp lại cho phép.</li>
+  <li>Nếu nằm trong giới hạn: ghi nhận, bắt đầu sản xuất.</li>
+  <li>Nếu vượt giới hạn: <strong>không chạy sản xuất</strong>, báo kỹ thuật kiểm tra và hiệu chuẩn lại.</li>
+</ol>
+<pre><code>import statistics
+
+def verify(measurements, nominal, max_bias=0.02, max_std=0.01):
+    bias = statistics.mean(measurements) - nominal
+    std = statistics.stdev(measurements)
+    ok = abs(bias) &lt;= max_bias and std &lt;= max_std
+    return ok, round(bias, 4), round(std, 4)
+
+print(verify([25.012, 25.009, 25.015, 25.011, 25.010], nominal=25.000))</code></pre>
+<p>Ghi kết quả mỗi lần vào cơ sở dữ liệu. Vẽ biểu đồ theo thời gian giúp phát hiện xu hướng trôi trước khi vượt giới hạn.</p>
+
+<h2>Kiểm tra nhanh tự động</h2>
+<ul>
+  <li><strong>Dấu chuẩn trong khung hình</strong>: gắn vài điểm đánh dấu cố định trên đồ gá; mỗi lần chụp, kiểm tra vị trí của chúng. Lệch quá vài pixel nghĩa là camera đã xê dịch.</li>
+  <li><strong>Chỉ số độ nét</strong> của một vùng cố định: giảm dần là dấu hiệu ống kính bẩn hoặc mất nét.</li>
+  <li><strong>Độ sáng vùng tham chiếu</strong>: phát hiện đèn suy giảm.</li>
+</ul>
+
+<h2>Khi nào cần hiệu chuẩn lại hoàn toàn?</h2>
+<ul>
+  <li>Thay camera, ống kính, hoặc thay đổi lấy nét, khẩu độ.</li>
+  <li>Sau bảo trì cơ khí liên quan đến giá đỡ camera hoặc đồ gá.</li>
+  <li>Kiểm tra mẫu chuẩn thất bại.</li>
+  <li>Theo chu kỳ cố định do hệ thống quản lý chất lượng quy định.</li>
+</ul>
+
+<h2>Tài liệu hóa</h2>
+<p>Hệ thống quản lý chất lượng thường yêu cầu hồ sơ hiệu chuẩn có thể truy xuất: ngày, người thực hiện, mẫu chuẩn sử dụng, kết quả, phiên bản phần mềm. Thiết kế phần mềm lưu những thông tin này ngay từ đầu sẽ giúp vượt qua các đợt đánh giá dễ dàng hơn nhiều.</p>

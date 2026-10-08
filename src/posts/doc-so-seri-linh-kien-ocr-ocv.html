@@ -1,0 +1,76 @@
+<p>Dự án này xây trạm đọc và xác minh <strong>số seri in trên linh kiện</strong>: chụp ảnh, định vị vùng chữ, đọc bằng OCR, rồi xác minh (OCV) với dữ liệu từ hệ thống. Mã nguồn hoàn chỉnh dùng OpenCV và Tesseract, có thể thay bộ đọc bằng PaddleOCR khi cần.</p>
+
+<h2>Yêu cầu</h2>
+<ul>
+  <li>Số seri dạng <code>AB-123456</code> (2 chữ cái, gạch ngang, 6 chữ số), in laser trên nhãn trắng.</li>
+  <li>Linh kiện đặt trên đồ gá, vị trí lệch tối đa vài milimét.</li>
+  <li>Kết quả: đọc được / không đọc được, khớp / không khớp với lệnh sản xuất.</li>
+</ul>
+
+<h2>Bước 1: định vị vùng chữ bằng template matching</h2>
+<pre><code>import cv2
+import re
+import numpy as np
+import pytesseract
+
+TEMPLATE = cv2.imread("mau-goc-nhan.png", cv2.IMREAD_GRAYSCALE)   # góc nhãn có logo
+OFFSET = (140, 10, 320, 60)    # vị trí dòng seri so với logo: dx, dy, w, h
+
+def locate_text(gray):
+    res = cv2.matchTemplate(gray, TEMPLATE, cv2.TM_CCOEFF_NORMED)
+    _, score, _, (x, y) = cv2.minMaxLoc(res)
+    if score &lt; 0.7:
+        return None, score
+    dx, dy, w, h = OFFSET
+    return gray[y + dy:y + dy + h, x + dx:x + dx + w], score</code></pre>
+<p>Định vị theo một đặc điểm cố định (logo, góc nhãn) ổn định hơn nhiều so với tìm chữ trực tiếp.</p>
+
+<h2>Bước 2: tiền xử lý và đọc</h2>
+<pre><code>WHITELIST = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-"
+CONFIG = f"--psm 7 -c tessedit_char_whitelist={WHITELIST}"
+
+def read_serial(roi):
+    roi = cv2.resize(roi, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+    _, th = cv2.threshold(roi, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    if th.mean() &lt; 127:
+        th = 255 - th
+    return pytesseract.image_to_string(th, config=CONFIG).strip().replace(" ", "")</code></pre>
+
+<h2>Bước 3: sửa nhầm lẫn theo định dạng</h2>
+<p>Biết trước vị trí nào là chữ, vị trí nào là số, ta sửa được các nhầm lẫn phổ biến:</p>
+<pre><code>TO_DIGIT = str.maketrans({"O": "0", "D": "0", "I": "1", "L": "1", "S": "5", "B": "8", "Z": "2"})
+TO_ALPHA = str.maketrans({"0": "O", "1": "I", "5": "S", "8": "B", "2": "Z"})
+SERIAL_RE = re.compile(r"^[A-Z]{2}-\d{6}$")
+
+def normalize(text):
+    if len(text) != 9 or text[2] != "-":
+        return None
+    fixed = text[:2].translate(TO_ALPHA) + "-" + text[3:].translate(TO_DIGIT)
+    return fixed if SERIAL_RE.match(fixed) else None</code></pre>
+
+<h2>Bước 4: xác minh và kết luận</h2>
+<pre><code>def inspect(bgr, expected_prefix, used_serials):
+    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+    roi, score = locate_text(gray)
+    if roi is None:
+        return "NG", f"không tìm thấy nhãn (score {score:.2f})"
+    serial = normalize(read_serial(roi))
+    if serial is None:
+        return "NG", "không đọc được số seri"
+    if not serial.startswith(expected_prefix):
+        return "NG", f"{serial} không thuộc lệnh sản xuất {expected_prefix}"
+    if serial in used_serials:
+        return "NG", f"{serial} bị trùng"
+    used_serials.add(serial)
+    return "OK", serial
+
+used = set()
+print(inspect(cv2.imread("linh-kien-001.png"), "AB-12", used))</code></pre>
+
+<h2>Đánh giá trước khi đưa vào sản xuất</h2>
+<ul>
+  <li>Thu thập ít nhất vài trăm ảnh thật, ghi đáp án đúng bằng tay.</li>
+  <li>Đo <strong>tỷ lệ đọc đúng hoàn toàn</strong> và <strong>tỷ lệ đọc sai mà không phát hiện</strong> (nguy hiểm nhất). Mục tiêu: đọc sai được nhận nhầm là đúng phải gần như bằng 0; khi không chắc, hệ thống phải báo "không đọc được".</li>
+  <li>Thử với nhãn nhăn, mờ, lệch, bóng để biết giới hạn.</li>
+  <li>Nếu Tesseract chưa đạt, thay hàm <code>read_serial</code> bằng <a href="../hoc/ocr-deep-learning-paddleocr-easyocr.html">PaddleOCR</a>; các bước còn lại giữ nguyên.</li>
+</ul>

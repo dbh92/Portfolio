@@ -1,0 +1,54 @@
+<p>Camera tìm thấy vật ở tọa độ pixel (812, 440). Robot cần biết phải di chuyển tới đâu theo milimét trong hệ tọa độ của nó. Bài toán nối hai hệ tọa độ này gọi là <strong>hand-eye calibration</strong> (hiệu chuẩn tay – mắt), nền tảng của mọi ứng dụng robot gắp vật dùng vision.</p>
+
+<h2>Hai cấu hình lắp camera</h2>
+<ul>
+  <li><strong>Eye-to-hand</strong> (camera cố định): camera gắn trên khung, nhìn xuống vùng làm việc. Cần tìm phép biến đổi từ hệ camera sang hệ gốc robot.</li>
+  <li><strong>Eye-in-hand</strong> (camera trên tay robot): camera di chuyển theo tay robot. Cần tìm phép biến đổi từ hệ camera sang hệ mặt bích (flange) của robot.</li>
+</ul>
+
+<h2>Trường hợp đơn giản nhất: mặt phẳng 2D, camera cố định</h2>
+<p>Khi vật luôn nằm trên một mặt phẳng (băng tải, bàn), chỉ cần ánh xạ 2D từ pixel sang mm robot bằng các điểm tương ứng:</p>
+<ol>
+  <li>Đặt một vật đánh dấu (hoặc tấm hiệu chuẩn) trên mặt phẳng làm việc.</li>
+  <li>Ghi tọa độ pixel của dấu trên ảnh.</li>
+  <li>Điều khiển robot chạm đầu công cụ vào đúng dấu đó, ghi tọa độ robot (X, Y).</li>
+  <li>Lặp lại với ít nhất 4 điểm (khuyến nghị 9 điểm trải đều vùng làm việc).</li>
+</ol>
+<pre><code>import cv2
+import numpy as np
+
+pixel = np.float32([[102, 95], [640, 88], [1180, 101], [110, 520], [645, 515],
+                    [1175, 530], [98, 940], [650, 945], [1185, 950]])
+robot = np.float32([[250.1, -180.3], [250.4, 0.2], [249.8, 180.6], [390.2, -179.9],
+                    [390.0, 0.1], [389.7, 180.2], [530.3, -180.1], [530.1, 0.4], [529.9, 180.0]])
+
+H, _ = cv2.findHomography(pixel, robot)          # ánh xạ mặt phẳng ảnh -&gt; mặt phẳng robot
+
+def pixel_to_robot(u, v):
+    p = cv2.perspectiveTransform(np.float32([[[u, v]]]), H)
+    return p[0, 0]                                 # (X, Y) theo mm
+
+print(pixel_to_robot(812, 440))</code></pre>
+<p>Kiểm tra lại: đặt vật ở các vị trí mới, cho robot chạy tới, đo sai lệch thực tế. Nhớ khử méo ống kính trước (xem <a href="hieu-chuan-camera-intrinsic-meo-ong-kinh.html">hiệu chuẩn camera</a>).</p>
+
+<h2>Trường hợp 3D: giải phương trình AX = XB</h2>
+<p>Với eye-in-hand hoặc khi cần tư thế 3D, robot di chuyển camera (hoặc tấm hiệu chuẩn) tới nhiều tư thế khác nhau. Mỗi tư thế, ta ghi:</p>
+<ul>
+  <li>Tư thế của tay robot so với gốc (đọc từ bộ điều khiển robot).</li>
+  <li>Tư thế của tấm hiệu chuẩn so với camera (tính bằng <code>cv2.solvePnP</code>).</li>
+</ul>
+<p>OpenCV giải bài toán này bằng <code>cv2.calibrateHandEye</code>:</p>
+<pre><code>R_cam2gripper, t_cam2gripper = cv2.calibrateHandEye(
+    R_gripper2base, t_gripper2base,      # danh sách tư thế robot
+    R_target2cam, t_target2cam,          # danh sách tư thế tấm hiệu chuẩn trong ảnh
+    method=cv2.CALIB_HAND_EYE_TSAI)</code></pre>
+<p>Cần khoảng 10–20 tư thế với các góc xoay <strong>đa dạng quanh nhiều trục</strong>; nếu chỉ tịnh tiến, bài toán không giải được chính xác.</p>
+
+<h2>Nguồn sai số thường gặp</h2>
+<ul>
+  <li>Đơn vị và quy ước góc khác nhau giữa robot (thường mm, góc Euler theo thứ tự riêng của hãng) và OpenCV (vector Rodrigues, ma trận xoay).</li>
+  <li>TCP (điểm đầu công cụ) của robot khai báo sai.</li>
+  <li>Chiều cao vật khác chiều cao mặt phẳng hiệu chuẩn (với mô hình 2D).</li>
+  <li>Camera hoặc giá đỡ bị va chạm làm lệch: cần quy trình kiểm tra lại định kỳ.</li>
+</ul>
+<p>Ứng dụng hoàn chỉnh: <a href="vision-dan-huong-robot-gap-vat.html">vision dẫn hướng robot gắp vật</a>.</p>

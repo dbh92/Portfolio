@@ -1,0 +1,78 @@
+<p>Phần lớn công việc hằng ngày của kỹ sư Vision không phải là thuật toán, mà là <strong>xử lý hàng nghìn file ảnh</strong>: duyệt thư mục, đổi tên, chia tập train/val, ghi kết quả ra CSV để báo cáo. Python làm những việc này rất gọn nếu bạn dùng đúng thư viện chuẩn.</p>
+
+<h2>Duyệt thư mục với pathlib</h2>
+<pre><code>from pathlib import Path
+
+root = Path("data/anh-kiem-tra")
+images = sorted(p for p in root.rglob("*") if p.suffix.lower() in {".png", ".jpg", ".bmp"})
+print(f"Tìm thấy {len(images)} ảnh")
+
+for p in images[:3]:
+    print(p.name, p.stem, p.parent.name, p.stat().st_size // 1024, "KB")</code></pre>
+<p><code>pathlib</code> xử lý đường dẫn đúng trên cả Windows và Linux, không cần nối chuỗi bằng tay. <code>rglob</code> duyệt cả thư mục con.</p>
+
+<h2>Chia tập train/val có thể tái lập</h2>
+<pre><code>import random, shutil
+
+random.seed(42)                       # cố định để lần sau chia giống hệt
+random.shuffle(images)
+n_val = int(len(images) * 0.2)
+splits = {"val": images[:n_val], "train": images[n_val:]}
+
+for split, files in splits.items():
+    out = Path("dataset") / split
+    out.mkdir(parents=True, exist_ok=True)
+    for f in files:
+        shutil.copy2(f, out / f.name)</code></pre>
+<p>Lưu ý thực tế: nếu ảnh được chụp liên tiếp từ cùng một sản phẩm, chia ngẫu nhiên sẽ làm tập val "dễ" giả tạo. Hãy chia theo <strong>lô, ngày hoặc mã sản phẩm</strong>.</p>
+
+<h2>Ghi kết quả kiểm tra ra CSV</h2>
+<pre><code>import csv
+from datetime import datetime
+
+with open("ket-qua.csv", "w", newline="", encoding="utf-8-sig") as fh:
+    writer = csv.writer(fh)
+    writer.writerow(["thoi_gian", "file", "ket_qua", "dien_tich"])
+    for p in images:
+        area = 0          # thay bằng kết quả xử lý ảnh thật
+        writer.writerow([datetime.now().isoformat(timespec="seconds"), p.name, "OK", area])</code></pre>
+<p>Mã hóa <code>utf-8-sig</code> giúp Excel mở file có tiếng Việt không bị lỗi font.</p>
+
+<h2>Ghi log đúng cách thay vì print</h2>
+<pre><code>import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+    handlers=[logging.FileHandler("vision.log", encoding="utf-8"), logging.StreamHandler()],
+)
+log = logging.getLogger("tram-1")
+
+log.info("Bắt đầu ca, %d ảnh", len(images))
+log.warning("Ảnh %s quá tối, độ sáng TB = %.1f", "img_0012.png", 18.4)
+log.error("Mất kết nối camera")</code></pre>
+<p>Log có thời gian và mức độ là "hộp đen" của trạm kiểm tra: khi có sự cố lúc 3 giờ sáng, đây là thứ duy nhất giúp bạn biết chuyện gì đã xảy ra.</p>
+
+<h2>Xử lý lỗi để chương trình không dừng giữa chừng</h2>
+<pre><code>import cv2
+
+ok, failed = 0, []
+for p in images:
+    try:
+        img = cv2.imread(str(p))
+        if img is None:
+            raise ValueError("không đọc được ảnh")
+        # ... xử lý ...
+        ok += 1
+    except Exception as exc:
+        failed.append(p.name)
+        log.exception("Lỗi khi xử lý %s: %s", p.name, exc)
+
+log.info("Xong: %d thành công, %d lỗi", ok, len(failed))</code></pre>
+
+<h2>Bài tập</h2>
+<ol>
+  <li>Viết script đổi tên toàn bộ ảnh trong thư mục thành <code>ma-sp_ngay_stt.png</code>.</li>
+  <li>Chia dataset theo thư mục con (mỗi thư mục là một lô) thay vì ngẫu nhiên.</li>
+  <li>Tính độ sáng trung bình mỗi ảnh, ghi ra CSV, rồi mở bằng Excel vẽ biểu đồ theo thời gian.</li>
+</ol>

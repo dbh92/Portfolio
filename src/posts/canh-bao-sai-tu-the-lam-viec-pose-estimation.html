@@ -1,0 +1,49 @@
+<p>Cúi gập lưng, nâng vật sai tư thế, giơ tay cao quá vai liên tục là nguyên nhân phổ biến của chấn thương cơ xương khớp ở công nhân. Dự án này dùng <strong>pose estimation</strong> (ước lượng tư thế) để phát hiện tư thế làm việc có nguy cơ và tạo báo cáo cải thiện công thái học cho từng trạm làm việc.</p>
+
+<h2>Pose estimation là gì?</h2>
+<p>Mô hình phát hiện các <strong>điểm khớp (keypoint)</strong> trên cơ thể người: vai, khuỷu tay, cổ tay, hông, đầu gối, mắt cá... Định dạng COCO có 17 keypoint. Từ tọa độ các khớp, ta tính được góc lưng, góc khuỷu tay, độ cao tay so với vai.</p>
+
+<h2>Chạy mô hình pose</h2>
+<pre><code>import numpy as np
+from ultralytics import YOLO
+
+model = YOLO("yolo26n-pose.pt")
+r = model("tram-dong-goi.jpg")[0]
+kpts = r.keypoints.xy.cpu().numpy()          # [số người, 17, 2]
+conf = r.keypoints.conf.cpu().numpy()        # độ tin cậy từng keypoint
+# Chỉ số COCO: 5/6 vai trái/phải, 7/8 khuỷu, 9/10 cổ tay, 11/12 hông, 13/14 đầu gối</code></pre>
+
+<h2>Tính góc cúi lưng</h2>
+<pre><code>def back_angle(k):
+    """Góc giữa thân người (hông -&gt; vai) và phương thẳng đứng, đơn vị độ."""
+    shoulder = (k[5] + k[6]) / 2
+    hip = (k[11] + k[12]) / 2
+    v = shoulder - hip
+    # trục y của ảnh hướng xuống, nên phương thẳng đứng hướng lên là (0, -1)
+    cos = np.dot(v, [0, -1]) / (np.linalg.norm(v) + 1e-9)
+    return np.degrees(np.arccos(np.clip(cos, -1, 1)))
+
+def hands_above_shoulder(k):
+    return k[9][1] &lt; k[5][1] or k[10][1] &lt; k[6][1]     # y nhỏ hơn = cao hơn
+
+for i, k in enumerate(kpts):
+    if conf[i][[5, 6, 11, 12]].min() &lt; 0.5:
+        continue                                       # khớp không rõ, bỏ qua
+    print(f"Người {i}: cúi lưng {back_angle(k):.0f}°, tay trên vai: {hands_above_shoulder(k)}")</code></pre>
+
+<h2>Từ khung hình đến báo cáo</h2>
+<ul>
+  <li>Một khung hình cúi lưng chưa phải vấn đề; vấn đề là <strong>tần suất và thời lượng</strong>. Ghi lại tỷ lệ thời gian lưng cúi quá ngưỡng (ví dụ trên 45°) và số lần giơ tay cao mỗi giờ.</li>
+  <li>Tổng hợp theo <strong>trạm làm việc và thao tác</strong>, không theo cá nhân: mục tiêu là cải thiện thiết kế trạm (độ cao bàn, vị trí đặt vật tư), không phải giám sát người lao động.</li>
+  <li>Kết hợp với chuyên gia an toàn – sức khỏe nghề nghiệp để chọn ngưỡng và diễn giải kết quả theo các phương pháp đánh giá công thái học được công nhận.</li>
+</ul>
+
+<h2>Giới hạn kỹ thuật</h2>
+<ul>
+  <li>Ảnh 2D làm sai lệch góc khi người quay nghiêng so với camera; đặt camera nhìn ngang, vuông góc với hướng làm việc chính, hoặc dùng nhiều camera.</li>
+  <li>Bàn, máy móc che khuất phần dưới cơ thể làm thiếu keypoint.</li>
+  <li>Quần áo bảo hộ rộng làm giảm độ chính xác vị trí khớp.</li>
+</ul>
+
+<h2>Quyền riêng tư và sự đồng thuận</h2>
+<p>Trao đổi rõ với người lao động về mục đích, chỉ lưu dữ liệu keypoint và số liệu tổng hợp thay vì video, xử lý tại chỗ và xóa ảnh gốc. Một dự án công thái học thành công là dự án được chính người lao động ủng hộ vì nó giúp họ làm việc an toàn hơn.</p>

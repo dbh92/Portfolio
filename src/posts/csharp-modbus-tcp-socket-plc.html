@@ -1,0 +1,105 @@
+<p>Kết quả kiểm tra phải đến được PLC để dây chuyền hành động. <strong>Modbus TCP</strong> là giao thức đơn giản, mở và gần như PLC nào cũng hỗ trợ. Bài này tự viết một Modbus TCP client nhỏ bằng C# để hiểu tận gốc giao thức, không phụ thuộc thư viện ngoài.</p>
+
+<h2>Cấu trúc một gói Modbus TCP</h2>
+<table>
+  <tr><th>Trường</th><th>Số byte</th><th>Ý nghĩa</th></tr>
+  <tr><td>Transaction ID</td><td>2</td><td>Mã giao dịch, phản hồi trả về đúng mã này</td></tr>
+  <tr><td>Protocol ID</td><td>2</td><td>Luôn là 0</td></tr>
+  <tr><td>Length</td><td>2</td><td>Số byte phía sau (Unit ID + PDU)</td></tr>
+  <tr><td>Unit ID</td><td>1</td><td>Địa chỉ thiết bị (thường 1)</td></tr>
+  <tr><td>Function code</td><td>1</td><td>0x03 đọc holding register, 0x06 ghi 1 register, 0x10 ghi nhiều register</td></tr>
+  <tr><td>Dữ liệu</td><td>n</td><td>Địa chỉ, số lượng, giá trị (big-endian)</td></tr>
+</table>
+
+<h2>Client tối giản</h2>
+<pre><code>using System.Net.Sockets;
+
+public sealed class ModbusTcpClient : IDisposable
+{
+    private readonly TcpClient _tcp = new();
+    private NetworkStream _stream = null!;
+    private ushort _tid;
+    private readonly byte _unit;
+
+    public ModbusTcpClient(string host, int port = 502, byte unit = 1)
+    {
+        _unit = unit;
+        _tcp.Connect(host, port);
+        _stream = _tcp.GetStream();
+        _stream.ReadTimeout = _stream.WriteTimeout = 1000;
+    }
+
+    private byte[] Send(byte[] pdu)
+    {
+        _tid++;
+        var frame = new byte[7 + pdu.Length];
+        frame[0] = (byte)(_tid &gt;&gt; 8); frame[1] = (byte)_tid;
+        frame[4] = (byte)((pdu.Length + 1) &gt;&gt; 8); frame[5] = (byte)(pdu.Length + 1);
+        frame[6] = _unit;
+        pdu.CopyTo(frame, 7);
+        _stream.Write(frame);
+
+        var header = ReadExact(7);
+        int len = (header[4] &lt;&lt; 8) | header[5];
+        var resp = ReadExact(len - 1);                       // PDU phản hồi
+        if ((resp[0] &amp; 0x80) != 0)
+            throw new IOException($"Modbus exception code {resp[1]}");
+        return resp;
+    }
+
+    private byte[] ReadExact(int n)
+    {
+        var buf = new byte[n];
+        int read = 0;
+        while (read &lt; n)
+        {
+            int r = _stream.Read(buf, read, n - read);
+            if (r == 0) throw new IOException("Mất kết nối");
+            read += r;
+        }
+        return buf;
+    }
+
+    public ushort[] ReadHoldingRegisters(ushort start, ushort count)
+    {
+        var resp = Send(new byte[] { 0x03, (byte)(start &gt;&gt; 8), (byte)start, (byte)(count &gt;&gt; 8), (byte)count });
+        var values = new ushort[count];
+        for (int i = 0; i &lt; count; i++)
+            values[i] = (ushort)((resp[2 + 2 * i] &lt;&lt; 8) | resp[3 + 2 * i]);
+        return values;
+    }
+
+    public void WriteSingleRegister(ushort address, ushort value) =&gt;
+        Send(new byte[] { 0x06, (byte)(address &gt;&gt; 8), (byte)address, (byte)(value &gt;&gt; 8), (byte)value });
+
+    public void Dispose() =&gt; _tcp.Dispose();
+}</code></pre>
+
+<h2>Dùng trong trạm kiểm tra</h2>
+<pre><code>using var plc = new ModbusTcpClient("192.168.0.10");
+
+ushort lenh = plc.ReadHoldingRegisters(0, 1)[0];   // thanh ghi 40001: lệnh từ PLC
+if (lenh == 1)                                    // 1 = trigger
+{
+    bool ok = KiemTra();                          // xử lý ảnh
+    plc.WriteSingleRegister(11, (ushort)(ok ? 1 : 2));   // 40012: kết quả
+    plc.WriteSingleRegister(10, 0b0100);                  // 40011: bit DONE
+}</code></pre>
+<p>Ở đây địa chỉ trong gói tin bắt đầu từ 0, nên "40001" trong tài liệu PLC tương ứng địa chỉ 0. Đây là chỗ nhầm lẫn phổ biến nhất, hãy thống nhất với kỹ sư PLC.</p>
+
+<h2>Gửi số thực 32 bit</h2>
+<pre><code>static (ushort hi, ushort lo) FloatToRegisters(float v)
+{
+    var b = BitConverter.GetBytes(v);              // little-endian trên PC
+    if (BitConverter.IsLittleEndian) Array.Reverse(b);
+    return ((ushort)((b[0] &lt;&lt; 8) | b[1]), (ushort)((b[2] &lt;&lt; 8) | b[3]));
+}</code></pre>
+<p>Một số PLC đảo thứ tự hai word ("word swap"). Kiểm tra bằng cách gửi giá trị dễ nhận biết như 1.0 và xem PLC đọc được gì.</p>
+
+<h2>Khi đưa vào sản xuất</h2>
+<ul>
+  <li>Tự kết nối lại khi mất mạng, ghi log mọi lỗi giao tiếp.</li>
+  <li>Dùng phần mềm giả lập Modbus server để thử trước khi ra hiện trường.</li>
+  <li>Với dự án lớn, dùng thư viện Modbus đã được kiểm chứng (ví dụ NModbus) thay vì tự viết.</li>
+</ul>
+<p>Xem thêm quy trình bắt tay READY/TRIGGER/DONE trong bài <a href="../kien-thuc/giao-tiep-camera-vision-voi-plc.html">giao tiếp camera vision với PLC</a>.</p>

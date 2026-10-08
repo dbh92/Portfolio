@@ -1,0 +1,52 @@
+<p>Khi cần biết chính xác hình dạng, diện tích hay chiều dài vết lỗi, khung chữ nhật của object detection là không đủ. Bài này huấn luyện mô hình <strong>instance segmentation</strong> với YOLO26-seg của Ultralytics để khoanh vùng vết lỗi trên bề mặt sản phẩm.</p>
+
+<h2>Chuẩn bị nhãn đa giác</h2>
+<p>Định dạng nhãn phân đoạn của YOLO: mỗi dòng là một đối tượng, gồm số lớp và danh sách tọa độ đỉnh đa giác <strong>chuẩn hóa 0–1</strong>:</p>
+<pre><code>0 0.412 0.305 0.455 0.298 0.471 0.340 0.430 0.362
+1 0.120 0.700 0.180 0.690 0.175 0.760 0.118 0.755</code></pre>
+<p>Vẽ đa giác bằng tay rất tốn thời gian; hãy dùng công cụ có hỗ trợ SAM để bấm một điểm là ra mặt nạ (xem <a href="../tai-nguyen/sam-gan-nhan-phan-doan-nhanh.html">gán nhãn nhanh với SAM</a>), rồi xuất định dạng YOLO.</p>
+
+<h2>File data.yaml</h2>
+<pre><code>path: dataset-loi
+train: images/train
+val: images/val
+names:
+  0: vet_xuoc
+  1: vet_bam</code></pre>
+
+<h2>Huấn luyện</h2>
+<pre><code>from ultralytics import YOLO
+
+model = YOLO("yolo26n-seg.pt")          # trọng số phân đoạn đã huấn luyện trên COCO
+model.train(data="data.yaml", epochs=150, imgsz=1024, batch=8)
+metrics = model.val()
+print(metrics.seg.map50, metrics.seg.map)    # mAP mặt nạ</code></pre>
+<p>Vết lỗi thường nhỏ so với ảnh, nên dùng <code>imgsz</code> lớn (1024 hoặc hơn) hoặc cắt ảnh thành ô trước khi huấn luyện.</p>
+
+<h2>Dự đoán và đo vết lỗi</h2>
+<pre><code>import cv2
+import numpy as np
+
+MM_PER_PX = 0.05                          # từ bước hiệu chuẩn
+model = YOLO("runs/segment/train/weights/best.pt")
+r = model("be-mat.png", conf=0.35)[0]
+
+if r.masks is not None:
+    for poly, cls, conf in zip(r.masks.xy, r.boxes.cls.tolist(), r.boxes.conf.tolist()):
+        cnt = poly.astype(np.int32).reshape(-1, 1, 2)       # đa giác theo pixel ảnh gốc
+        area_mm2 = cv2.contourArea(cnt) * MM_PER_PX ** 2
+        (_, _), (w, h), _ = cv2.minAreaRect(cnt)
+        length_mm = max(w, h) * MM_PER_PX
+        name = model.names[int(cls)]
+        verdict = "NG" if length_mm &gt; 2.0 else "chấp nhận"
+        print(f"{name}: dài {length_mm:.2f} mm, diện tích {area_mm2:.2f} mm² ({conf:.2f}) -&gt; {verdict}")
+r.save("ket-qua-seg.png")</code></pre>
+<p><code>masks.xy</code> trả về đa giác theo tọa độ ảnh gốc, tiện để đo bằng các hàm OpenCV quen thuộc. Quy tắc "dài quá 2 mm thì NG" lấy từ tiêu chuẩn chất lượng của khách hàng, không phải từ mô hình.</p>
+
+<h2>Lưu ý thực tế</h2>
+<ul>
+  <li><strong>Nhãn nhất quán</strong> quan trọng hơn số lượng: thống nhất cách vẽ biên vết lỗi giữa những người gán nhãn.</li>
+  <li><strong>Ảnh không lỗi</strong> cũng cần có trong tập huấn luyện (file nhãn rỗng) để mô hình học "không có gì để báo".</li>
+  <li>Đánh giá theo yêu cầu thực tế: sai số đo chiều dài bao nhiêu mm, tỷ lệ lọt lỗi vượt chuẩn bao nhiêu.</li>
+  <li>Ultralytics dùng giấy phép AGPL-3.0, cần giấy phép thương mại cho sản phẩm đóng mã nguồn.</li>
+</ul>

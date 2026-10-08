@@ -1,0 +1,39 @@
+<p>Hệ thống chạy hoàn hảo khi nghiệm thu buổi sáng, nhưng đến chiều thì tỷ lệ NG tăng vọt. Thủ phạm quen thuộc: <strong>ánh sáng môi trường</strong>, như nắng chiếu qua cửa sổ, đèn nhà xưởng, đèn xe nâng. Bài này tổng hợp cách làm cho trạm vision "miễn nhiễm" với ánh sáng bên ngoài.</p>
+
+<h2>Nhận diện vấn đề</h2>
+<ul>
+  <li>Kết quả thay đổi theo <strong>giờ trong ngày</strong> hoặc theo thời tiết.</li>
+  <li>Độ sáng trung bình của ROI chuẩn dao động dù không có gì thay đổi trên máy.</li>
+  <li>Lỗi xuất hiện khi có người đứng gần, xe nâng đi qua (bóng che hoặc phản xạ).</li>
+</ul>
+<p>Ghi log độ sáng trung bình của một vùng nền cố định mỗi lần chụp; vẽ theo thời gian là thấy ngay ảnh hưởng của môi trường.</p>
+
+<h2>Năm biện pháp, xếp theo hiệu quả</h2>
+<h3>1. Che chắn vật lý</h3>
+<p>Vỏ che (hood, tủ che sáng) bằng tấm nhựa đen hoặc kim loại sơn mờ bao quanh vùng chụp. Rẻ, hiệu quả nhất, nhưng phải tính tới việc bảo trì và an toàn khi thiết kế.</p>
+<h3>2. Đèn mạnh hơn hẳn môi trường</h3>
+<p>Khi đèn của hệ thống mạnh hơn ánh sáng môi trường nhiều lần, ảnh hưởng bên ngoài chỉ còn là phần nhỏ. Kết hợp <strong>đèn chớp và phơi sáng ngắn</strong>: phơi sáng vài chục micro giây thì ánh sáng môi trường gần như không kịp tác động (xem <a href="den-strobe-dong-bo-trigger-camera.html">đèn strobe</a>).</p>
+<h3>3. Kính lọc bandpass</h3>
+<p>Dùng đèn đơn sắc (đỏ, xanh, IR) và kính lọc chỉ cho đúng bước sóng đó đi qua: chặn phần lớn ánh sáng trắng của môi trường.</p>
+<h3>4. Thuật toán bền vững</h3>
+<ul>
+  <li>Ngưỡng thích nghi hoặc Otsu thay vì ngưỡng cố định.</li>
+  <li>Chuẩn hóa độ sáng theo một vùng tham chiếu trong ảnh.</li>
+  <li>Đo dựa trên cạnh và gradient (ít phụ thuộc mức sáng tuyệt đối) thay vì dựa trên mức xám.</li>
+</ul>
+<h3>5. Giám sát và cảnh báo</h3>
+<p>Nếu độ sáng vùng tham chiếu vượt ngoài dải cho phép, hệ thống báo cảnh báo hoặc dừng thay vì tiếp tục đưa ra kết quả không tin cậy.</p>
+<pre><code>REF_ROI = (20, 20, 60, 60)        # vùng nền cố định (x, y, w, h)
+def check_lighting(gray, lo=110, hi=150):
+    x, y, w, h = REF_ROI
+    m = float(gray[y:y + h, x:x + w].mean())
+    return lo &lt;= m &lt;= hi, m</code></pre>
+
+<h2>Đừng quên các nguồn thay đổi khác</h2>
+<ul>
+  <li><strong>Đèn LED lão hóa</strong>: cường độ giảm dần theo năm; theo dõi xu hướng và bù bằng cài đặt.</li>
+  <li><strong>Nhiệt độ</strong>: LED nóng thì sáng yếu hơn; đèn cần được tản nhiệt tốt.</li>
+  <li><strong>Bụi, dầu</strong> trên đèn và ống kính: đưa vệ sinh vào lịch bảo trì định kỳ.</li>
+  <li><strong>Đèn nhà xưởng nhấp nháy</strong> theo tần số điện lưới có thể gây sọc sáng khi phơi sáng ngắn; đèn và chế độ phơi sáng của hệ thống phải lấn át được nguồn này.</li>
+</ul>
+<p>Nguyên tắc vàng: <strong>giải quyết bằng phần cứng trước, thuật toán sau</strong>. Một tấm che sáng vài trăm nghìn đồng thường hiệu quả hơn nhiều tuần tinh chỉnh phần mềm.</p>
