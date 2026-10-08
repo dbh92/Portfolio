@@ -1,0 +1,52 @@
+<p><strong>Hugging Face Hub</strong> là kho chứa hàng trăm nghìn dataset và mô hình mã nguồn mở, trong đó có rất nhiều bộ dữ liệu ảnh cho phân loại, phát hiện, phân đoạn. Thư viện <code>datasets</code> cho phép tìm, tải và xử lý chúng chỉ với vài dòng Python.</p>
+
+<h2>Tìm dataset</h2>
+<ul>
+  <li>Trên trang huggingface.co, mục <strong>Datasets</strong>, lọc theo tác vụ (Image Classification, Object Detection, Image Segmentation...), ngôn ngữ, giấy phép, kích thước.</li>
+  <li>Đọc kỹ <strong>dataset card</strong>: nguồn gốc dữ liệu, cách gán nhãn, giấy phép, hạn chế đã biết.</li>
+  <li>Xem trước dữ liệu ngay trên trình duyệt bằng Dataset Viewer.</li>
+</ul>
+
+<h2>Cài đặt và tải</h2>
+<pre><code>pip install datasets</code></pre>
+<pre><code>from datasets import load_dataset
+
+ds = load_dataset("cifar10")                 # tải về bộ nhớ đệm cục bộ
+print(ds)                                    # các tập train/test và số mẫu
+sample = ds["train"][0]
+print(sample.keys())                         # tên các trường, ví dụ 'img', 'label'
+sample["img"].save("mau.png")                # ảnh là đối tượng PIL
+print(ds["train"].features["label"].names)   # tên các lớp</code></pre>
+<p>Tên trường khác nhau giữa các dataset; luôn in ra <code>features</code> để biết cấu trúc trước khi viết code xử lý.</p>
+
+<h2>Dataset lớn: tải dạng luồng</h2>
+<pre><code>ds = load_dataset("ten-to-chuc/ten-dataset", split="train", streaming=True)
+for i, item in enumerate(ds):
+    if i == 5:
+        break
+    print(item.keys())</code></pre>
+<p>Chế độ streaming đọc dần từng mẫu mà không cần tải toàn bộ dataset hàng trăm GB về máy.</p>
+
+<h2>Chuyển sang PyTorch</h2>
+<pre><code>import torch
+from torchvision import transforms
+
+tf = transforms.Compose([transforms.Resize((224, 224)), transforms.ToTensor()])
+
+def apply(batch):
+    batch["pixel_values"] = [tf(img.convert("RGB")) for img in batch["img"]]
+    return batch
+
+train = load_dataset("cifar10", split="train").with_transform(apply)
+loader = torch.utils.data.DataLoader(train, batch_size=32, shuffle=True,
+                                     collate_fn=lambda b: (torch.stack([x["pixel_values"] for x in b]),
+                                                           torch.tensor([x["label"] for x in b])))</code></pre>
+
+<h2>Đưa dataset của bạn lên Hub (riêng tư)</h2>
+<pre><code>from datasets import load_dataset
+ds = load_dataset("imagefolder", data_dir="data/nap-chai")   # thư mục con = tên lớp
+ds.push_to_hub("ten-cua-ban/nap-chai-v1", private=True)     # cần đăng nhập: huggingface-cli login</code></pre>
+<p>Chế độ riêng tư phù hợp để chia sẻ trong nhóm. Với dữ liệu mật của khách hàng, cân nhắc kỹ chính sách công ty trước khi đưa lên bất kỳ dịch vụ đám mây nào.</p>
+
+<h2>Lưu ý giấy phép</h2>
+<p>Mỗi dataset có giấy phép riêng; nhiều bộ chỉ cho phép nghiên cứu phi thương mại. Kiểm tra trường "License" trong dataset card trước khi dùng cho dự án thương mại. Xem thêm danh sách <a href="dataset-computer-vision-mien-phi.html">dataset Computer Vision miễn phí</a>.</p>

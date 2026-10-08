@@ -1,0 +1,66 @@
+<p>VS Code là trình soạn thảo được dùng nhiều nhất cho Python và AI: miễn phí, nhẹ, chạy trên Windows/Linux/macOS, hỗ trợ notebook, debug, kết nối máy từ xa. Bài này hướng dẫn thiết lập VS Code tối ưu cho dự án Computer Vision.</p>
+
+<h2>Extension cần có</h2>
+<ul>
+  <li><strong>Python</strong> và <strong>Pylance</strong> (Microsoft): gợi ý code, kiểm tra kiểu, chạy và debug.</li>
+  <li><strong>Jupyter</strong>: mở và chạy file <code>.ipynb</code> ngay trong VS Code.</li>
+  <li><strong>Ruff</strong>: kiểm tra lỗi và định dạng code tự động.</li>
+  <li><strong>Remote - SSH</strong>: viết code trên laptop nhưng chạy trên máy có GPU hoặc máy công nghiệp.</li>
+  <li><strong>GitLens</strong> (tùy chọn): xem lịch sử thay đổi từng dòng code.</li>
+</ul>
+
+<h2>Chọn đúng môi trường Python</h2>
+<p>Lỗi phổ biến nhất: cài thư viện vào môi trường ảo nhưng VS Code chạy bằng Python hệ thống, dẫn tới <code>ModuleNotFoundError</code>.</p>
+<ol>
+  <li><code>Ctrl+Shift+P</code> → <em>Python: Select Interpreter</em>.</li>
+  <li>Chọn interpreter trong thư mục <code>.venv</code> của dự án.</li>
+  <li>Terminal mới mở trong VS Code sẽ tự kích hoạt môi trường đó.</li>
+</ol>
+
+<h2>Debug thay vì in ra màn hình</h2>
+<ul>
+  <li>Bấm vào lề trái để đặt <strong>breakpoint</strong>, nhấn <code>F5</code> để chạy debug.</li>
+  <li>Khi dừng, rê chuột lên biến để xem giá trị; cửa sổ <em>Debug Console</em> cho phép chạy lệnh như <code>img.shape</code>, <code>contours[0].size</code>.</li>
+  <li>Breakpoint có điều kiện (chuột phải vào breakpoint): chỉ dừng khi <code>area &lt; 100</code>, rất tiện khi xử lý hàng nghìn ảnh.</li>
+</ul>
+<p>Cấu hình chạy với tham số trong <code>.vscode/launch.json</code>:</p>
+<pre><code>{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Kiểm tra thư mục ảnh",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/inspect_folder.py",
+      "args": ["--input", "data/test", "--save-ng"],
+      "console": "integratedTerminal"
+    }
+  ]
+}</code></pre>
+
+<h2>Xem ảnh trung gian khi debug</h2>
+<p>Trong notebook, hiển thị ảnh bằng matplotlib. Khi debug file <code>.py</code>, ghi ảnh trung gian ra thư mục tạm (<code>cv2.imwrite("debug/02_threshold.png", th)</code>) và mở song song trong VS Code: thấy ngay bước nào xử lý sai.</p>
+
+<h2>Cài đặt nên bật</h2>
+<pre><code>// .vscode/settings.json
+{
+  "editor.formatOnSave": true,
+  "[python]": { "editor.defaultFormatter": "charliermarsh.ruff" },
+  "files.trimTrailingWhitespace": true,
+  "python.analysis.typeCheckingMode": "basic"
+}</code></pre>
+
+<h2>Phím tắt đáng nhớ</h2>
+<table>
+  <tr><th>Phím tắt</th><th>Chức năng</th></tr>
+  <tr><td><code>Ctrl+P</code></td><td>Mở nhanh file theo tên</td></tr>
+  <tr><td><code>Ctrl+Shift+P</code></td><td>Bảng lệnh</td></tr>
+  <tr><td><code>F12</code></td><td>Nhảy tới định nghĩa hàm (kể cả trong thư viện)</td></tr>
+  <tr><td><code>Shift+Alt+F</code></td><td>Định dạng file</td></tr>
+  <tr><td><code>Ctrl+`</code></td><td>Mở/đóng terminal</td></tr>
+  <tr><td><code>Alt+↑/↓</code></td><td>Di chuyển dòng</td></tr>
+  <tr><td><code>Ctrl+D</code></td><td>Chọn lần xuất hiện tiếp theo của từ đang chọn</td></tr>
+</table>
+
+<h2>Làm việc trên máy GPU từ xa</h2>
+<p>Với Remote - SSH, bạn mở thư mục trên máy chủ GPU như đang ở máy mình: chỉnh code, chạy huấn luyện, debug, xem ảnh kết quả. Không cần copy file qua lại và không cần màn hình trên máy chủ.</p>

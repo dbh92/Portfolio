@@ -1,0 +1,51 @@
+<p>Cạnh (edge) là nơi cường độ sáng thay đổi đột ngột: mép chi tiết, đường viền nhãn, vết nứt. Phát hiện cạnh chính xác là nền tảng của đo kích thước, định vị và kiểm tra lỗi. Bài này đi từ lọc ảnh tới hai phương pháp quan trọng nhất: <strong>Sobel và Canny</strong>.</p>
+
+<h2>Lọc ảnh là gì?</h2>
+<p>Lọc là trượt một ma trận nhỏ (kernel) qua ảnh, mỗi điểm ảnh mới bằng tổng có trọng số của các điểm lân cận. Kernel khác nhau cho tác dụng khác nhau:</p>
+<pre><code>import cv2
+import numpy as np
+
+gray = cv2.imread("chi-tiet.png", cv2.IMREAD_GRAYSCALE)
+blur  = cv2.GaussianBlur(gray, (5, 5), 0)          # làm mịn, giảm nhiễu
+sharp = cv2.filter2D(gray, -1, np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]]))  # làm sắc</code></pre>
+
+<h2>Gradient và Sobel</h2>
+<p>Toán tử Sobel ước lượng đạo hàm theo hướng x và y. Độ lớn gradient cao nghĩa là có cạnh.</p>
+<pre><code>gx = cv2.Sobel(blur, cv2.CV_32F, 1, 0, ksize=3)   # thay đổi theo chiều ngang
+gy = cv2.Sobel(blur, cv2.CV_32F, 0, 1, ksize=3)   # thay đổi theo chiều dọc
+mag = cv2.magnitude(gx, gy)
+angle = cv2.phase(gx, gy, angleInDegrees=True)    # hướng của cạnh
+
+mag_u8 = cv2.convertScaleAbs(mag, alpha=255.0 / mag.max())</code></pre>
+<p>Dùng kiểu <code>CV_32F</code> chứ không phải <code>uint8</code>, vì gradient có giá trị âm và vượt 255. Hướng gradient rất hữu ích: ví dụ chỉ quan tâm cạnh dọc khi đo chiều rộng.</p>
+
+<h2>Canny: bộ phát hiện cạnh "chuẩn mực"</h2>
+<p>Canny gồm 4 bước: làm mịn Gaussian, tính gradient, làm mảnh cạnh (non-maximum suppression), và ngưỡng kép có liên kết (hysteresis).</p>
+<pre><code>edges = cv2.Canny(blur, 50, 150)    # ngưỡng thấp, ngưỡng cao</code></pre>
+<ul>
+  <li>Điểm có gradient &gt; <strong>ngưỡng cao</strong>: chắc chắn là cạnh.</li>
+  <li>Điểm nằm giữa hai ngưỡng: chỉ là cạnh nếu nối liền với cạnh mạnh.</li>
+  <li>Quy tắc kinh nghiệm: ngưỡng cao gấp 2–3 lần ngưỡng thấp.</li>
+</ul>
+<p>Mẹo tự động chọn ngưỡng theo trung vị độ sáng:</p>
+<pre><code>v = np.median(blur)
+edges = cv2.Canny(blur, int(max(0, 0.66 * v)), int(min(255, 1.33 * v)))</code></pre>
+
+<h2>Ứng dụng: tìm đường thẳng và đường tròn</h2>
+<pre><code>lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold=80, minLineLength=60, maxLineGap=5)
+circles = cv2.HoughCircles(blur, cv2.HOUGH_GRADIENT, dp=1.2, minDist=30,
+                           param1=150, param2=30, minRadius=10, maxRadius=80)</code></pre>
+
+<h2>Cạnh trong Machine Vision công nghiệp</h2>
+<ul>
+  <li>Phần mềm thương mại thường đo cạnh <strong>dọc theo một đường quét</strong> (caliper) để đạt độ chính xác subpixel, thay vì xử lý cả ảnh.</li>
+  <li>Ánh sáng quyết định chất lượng cạnh: <a href="../kien-thuc/7-kieu-chieu-sang-machine-vision.html">backlight</a> cho cạnh sắc nhất.</li>
+  <li>Nhiễu tạo cạnh giả: luôn làm mịn trước, và giới hạn xử lý trong ROI.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<ol>
+  <li>So sánh Canny trên ảnh gốc và ảnh đã Gaussian blur.</li>
+  <li>Dùng hướng gradient để chỉ giữ lại các cạnh gần thẳng đứng (±10°).</li>
+  <li>Phát hiện đường tròn của lỗ trên một chi tiết và in bán kính.</li>
+</ol>

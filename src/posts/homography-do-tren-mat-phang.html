@@ -1,0 +1,43 @@
+<p>Không phải lúc nào camera cũng nhìn vuông góc xuống vật: vướng cơ khí, cần nhìn cạnh bên, hoặc một camera phải bao quát vùng lớn. Khi vật nằm trên một <strong>mặt phẳng</strong>, phép biến đổi <strong>homography</strong> cho phép quy đổi tọa độ ảnh sang tọa độ thật (mm) trên mặt phẳng đó, kể cả khi camera đặt nghiêng.</p>
+
+<h2>Homography là gì?</h2>
+<p>Homography là ma trận 3×3 ánh xạ điểm từ một mặt phẳng sang mặt phẳng khác qua phép chiếu phối cảnh. Với camera, nó ánh xạ <strong>mặt phẳng ảnh</strong> sang <strong>mặt phẳng vật</strong>. Cần ít nhất 4 cặp điểm tương ứng (không có 3 điểm nào thẳng hàng) để tính.</p>
+
+<h2>Tính homography từ tấm hiệu chuẩn</h2>
+<pre><code>import cv2
+import numpy as np
+
+PATTERN, SQUARE = (9, 6), 10.0           # bàn cờ 9x6 góc trong, ô 10 mm
+gray = cv2.imread("ban-co-tren-mat-phang.png", cv2.IMREAD_GRAYSCALE)
+ok, corners = cv2.findChessboardCorners(gray, PATTERN)
+corners = cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1),
+                           (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 1e-3))
+
+world = np.float32([[x * SQUARE, y * SQUARE] for y in range(PATTERN[1]) for x in range(PATTERN[0])])
+H, mask = cv2.findHomography(corners.reshape(-1, 2), world, cv2.RANSAC, 1.0)</code></pre>
+<p>Thứ tự góc do <code>findChessboardCorners</code> trả về phải khớp thứ tự điểm thế giới. Vẽ các góc bằng <code>cv2.drawChessboardCorners</code> để kiểm tra.</p>
+
+<h2>Đo khoảng cách thật</h2>
+<pre><code>def to_mm(pts_px):
+    pts = np.float32(pts_px).reshape(-1, 1, 2)
+    return cv2.perspectiveTransform(pts, H).reshape(-1, 2)
+
+a, b = to_mm([[412.3, 288.9], [905.7, 301.2]])     # hai điểm cạnh vật, tọa độ subpixel
+print("Khoảng cách:", np.linalg.norm(a - b), "mm")</code></pre>
+
+<h2>Nắn ảnh về góc nhìn thẳng</h2>
+<pre><code>S = 5.0                                         # 1 mm = 5 pixel trên ảnh nắn
+scale = np.array([[S, 0, 0], [0, S, 0], [0, 0, 1]])
+top = cv2.warpPerspective(gray, scale @ H, (int(120 * S), int(80 * S)))</code></pre>
+<p>Ảnh nắn hữu ích để hiển thị và để chạy các thuật toán giả định nhìn thẳng (so khớp mẫu, OCR).</p>
+
+<h2>Giới hạn quan trọng</h2>
+<ul>
+  <li><strong>Chỉ đúng cho điểm nằm trên mặt phẳng hiệu chuẩn.</strong> Vật có chiều cao đáng kể thì mặt trên của vật nằm trên mặt phẳng khác: kết quả bị sai, sai càng nhiều khi camera càng nghiêng. Khi đó cần hiệu chuẩn tại đúng độ cao đo hoặc dùng mô hình 3D.</li>
+  <li><strong>Khử méo ống kính trước</strong>: homography là phép biến đổi tuyến tính trong tọa độ thuần nhất, không mô tả được méo cong của ống kính.</li>
+  <li>Góc nghiêng càng lớn, độ phân giải trên vật càng không đều: phần xa camera có ít pixel/mm hơn phần gần.</li>
+</ul>
+
+<h2>Kiểm chứng</h2>
+<p>Đặt một thước chuẩn hoặc chi tiết đã biết kích thước ở nhiều vị trí khác nhau trong vùng làm việc, đo lại. Sai số phải đồng đều; nếu sai lớn ở mép ảnh thì kiểm tra lại khử méo.</p>
+<p>Xem thêm <a href="../hoc/hieu-chuan-camera-intrinsic-meo-ong-kinh.html">hiệu chuẩn camera và méo ống kính</a>, và dự án <a href="../projects/do-kich-thuoc-chi-tiet-bang-camera.html">đo kích thước chi tiết bằng camera</a>.</p>

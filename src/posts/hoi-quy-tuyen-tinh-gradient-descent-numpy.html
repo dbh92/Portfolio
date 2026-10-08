@@ -1,0 +1,55 @@
+<p>Mọi mạng nơ-ron hiện đại, từ YOLO đến các mô hình ngôn ngữ lớn, đều học theo cùng một nguyên lý: <strong>tối thiểu hóa hàm mất mát bằng gradient descent</strong>. Cách tốt nhất để hiểu nguyên lý này là tự cài đặt nó cho bài toán đơn giản nhất: hồi quy tuyến tính, chỉ với NumPy.</p>
+
+<h2>Bài toán</h2>
+<p>Dự đoán nhiệt độ lò <code>y</code> từ công suất cấp <code>x</code>, giả định quan hệ tuyến tính <code>y ≈ w·x + b</code>. Ta cần tìm <code>w</code> và <code>b</code> từ dữ liệu.</p>
+<pre><code>import numpy as np
+
+rng = np.random.default_rng(0)
+x = rng.uniform(10, 100, size=200)          # công suất (%)
+y = 3.2 * x + 25 + rng.normal(0, 8, 200)    # nhiệt độ thật có nhiễu</code></pre>
+
+<h2>Hàm mất mát</h2>
+<p>Đo độ sai bằng <strong>trung bình bình phương sai số</strong> (MSE):</p>
+<pre><code>def mse(w, b):
+    return np.mean((w * x + b - y) ** 2)</code></pre>
+
+<h2>Gradient: hướng làm loss tăng nhanh nhất</h2>
+<p>Lấy đạo hàm của MSE theo <code>w</code> và <code>b</code>:</p>
+<pre><code>dL/dw = 2 · mean((w·x + b − y) · x)
+dL/db = 2 · mean(w·x + b − y)</code></pre>
+<p>Gradient descent đi <strong>ngược</strong> hướng gradient từng bước nhỏ:</p>
+
+<h2>Cài đặt</h2>
+<pre><code>x_n = (x - x.mean()) / x.std()      # chuẩn hóa giúp hội tụ nhanh và ổn định
+
+w, b, lr = 0.0, 0.0, 0.1
+for step in range(200):
+    err = w * x_n + b - y
+    dw = 2 * np.mean(err * x_n)
+    db = 2 * np.mean(err)
+    w -= lr * dw
+    b -= lr * db
+    if step % 50 == 0:
+        print(step, round(np.mean(err ** 2), 2))
+
+# đổi tham số về thang đo gốc của x
+w_goc = w / x.std()
+b_goc = b - w * x.mean() / x.std()
+print(f"y ≈ {w_goc:.2f}·x + {b_goc:.2f}")    # gần với 3.2·x + 25</code></pre>
+
+<h2>Learning rate quan trọng thế nào?</h2>
+<ul>
+  <li>Quá nhỏ: hội tụ rất chậm.</li>
+  <li>Quá lớn: loss dao động hoặc tăng vọt (phân kỳ).</li>
+  <li>Thử với <code>lr = 0.001</code>, <code>0.1</code>, <code>1.1</code> và quan sát loss để có cảm nhận trực quan.</li>
+</ul>
+
+<h2>Liên hệ với Deep Learning</h2>
+<table>
+  <tr><th>Ở đây</th><th>Trong mạng nơ-ron</th></tr>
+  <tr><td>2 tham số w, b</td><td>Hàng triệu đến hàng tỷ tham số</td></tr>
+  <tr><td>Tự tính đạo hàm bằng tay</td><td>Autograd tính tự động (backpropagation)</td></tr>
+  <tr><td>Dùng toàn bộ dữ liệu mỗi bước</td><td>Mini-batch (stochastic gradient descent)</td></tr>
+  <tr><td>Gradient descent thuần</td><td>Các biến thể như Adam, SGD momentum</td></tr>
+</table>
+<p>Hiểu vòng lặp nhỏ này, bạn sẽ thấy vòng lặp huấn luyện PyTorch quen thuộc ngay, xem <a href="pytorch-co-ban-tensor-autograd.html">PyTorch cơ bản</a>.</p>

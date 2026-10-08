@@ -1,0 +1,70 @@
+<p>Dự án này xây một <strong>AI agent</strong> hỗ trợ kỹ thuật viên bảo trì: nhận mô tả sự cố, tự tra log máy và tài liệu hướng dẫn, đề xuất nguyên nhân, rồi soạn sẵn phiếu sửa chữa để <strong>kỹ thuật viên duyệt</strong>. Trọng tâm là thiết kế công cụ và cơ chế kiểm soát an toàn, không phụ thuộc nhà cung cấp LLM cụ thể.</p>
+
+<h2>Phạm vi và nguyên tắc</h2>
+<ul>
+  <li>Agent chỉ <strong>đọc</strong> dữ liệu và <strong>soạn nháp</strong>. Không có quyền thay đổi tham số máy, không tự gửi phiếu.</li>
+  <li>Mọi bước agent làm đều được ghi log để kiểm tra lại.</li>
+  <li>Giới hạn số bước và thời gian chạy.</li>
+</ul>
+
+<h2>Thiết kế công cụ</h2>
+<p>Mỗi công cụ là một hàm Python với mô tả rõ ràng để LLM biết khi nào dùng:</p>
+<pre><code>import json
+from datetime import datetime, timedelta
+
+def doc_log_may(ma_may: str, so_gio: int = 8) -&gt; str:
+    """Trả về các dòng log lỗi của máy trong số giờ gần nhất (tối đa 24)."""
+    so_gio = min(int(so_gio), 24)
+    tu = datetime.now() - timedelta(hours=so_gio)
+    rows = [r for r in LOG_DB if r["may"] == ma_may and r["thoi_gian"] &gt;= tu]
+    return json.dumps(rows[-50:], default=str, ensure_ascii=False)
+
+def tim_tai_lieu(cau_hoi: str) -&gt; str:
+    """Tìm đoạn tài liệu hướng dẫn liên quan (dùng lại hàm search của dự án RAG)."""
+    hits = search(cau_hoi, k=3)
+    return "\n\n".join(f"[{src}] {text[:800]}" for src, text, _ in hits)
+
+def soan_phieu(ma_may: str, mo_ta: str, nguyen_nhan: str, de_xuat: str) -&gt; str:
+    """Tạo phiếu sửa chữa ở trạng thái NHÁP, chờ kỹ thuật viên duyệt."""
+    phieu = {"ma_may": ma_may, "mo_ta": mo_ta, "nguyen_nhan_du_kien": nguyen_nhan,
+             "de_xuat": de_xuat, "trang_thai": "NHAP", "tao_luc": datetime.now().isoformat()}
+    DRAFTS.append(phieu)
+    return f"Đã tạo phiếu nháp #{len(DRAFTS)}"
+
+TOOLS = {"doc_log_may": doc_log_may, "tim_tai_lieu": tim_tai_lieu, "soan_phieu": soan_phieu}</code></pre>
+<p>Hàm <code>search</code> lấy từ dự án <a href="chatbot-hoi-dap-tai-lieu-rag.html">chatbot RAG</a>. Chú ý các giới hạn ngay trong công cụ (tối đa 24 giờ, tối đa 50 dòng): không tin rằng mô hình luôn gọi với tham số hợp lý.</p>
+
+<h2>Vòng lặp agent</h2>
+<pre><code>def chay_agent(yeu_cau, max_buoc=8):
+    lich_su = [{"role": "user", "content": yeu_cau}]
+    for buoc in range(max_buoc):
+        quyet_dinh = llm_chon_hanh_dong(lich_su, TOOLS)   # gọi LLM có hỗ trợ tool calling
+        log_buoc(buoc, quyet_dinh)
+        if quyet_dinh["loai"] == "tra_loi":
+            return quyet_dinh["noi_dung"]
+        ten, tham_so = quyet_dinh["cong_cu"], quyet_dinh["tham_so"]
+        if ten not in TOOLS:
+            ket_qua = f"Lỗi: không có công cụ {ten}"
+        else:
+            try:
+                ket_qua = TOOLS[ten](**tham_so)
+            except Exception as exc:
+                ket_qua = f"Lỗi khi chạy {ten}: {exc}"
+        lich_su.append({"role": "tool", "name": ten, "content": ket_qua})
+    return "Dừng: vượt quá số bước cho phép, cần kỹ thuật viên xử lý."</code></pre>
+<p><code>llm_chon_hanh_dong</code> là phần kết nối với API LLM có hỗ trợ gọi công cụ (tool calling / function calling). Hầu hết nhà cung cấp lớn và nhiều mô hình mã nguồn mở đều hỗ trợ cơ chế này.</p>
+
+<h2>Prompt hệ thống</h2>
+<pre><code>Bạn là trợ lý chẩn đoán sự cố máy cho kỹ thuật viên bảo trì.
+- Luôn đọc log máy trước khi kết luận.
+- Chỉ đề xuất nguyên nhân có căn cứ từ log hoặc tài liệu; trích dẫn nguồn.
+- Nếu không đủ thông tin, nói rõ và đề xuất kỹ thuật viên kiểm tra gì.
+- Cuối cùng tạo phiếu nháp bằng công cụ soan_phieu. Không bao giờ hướng dẫn bỏ qua thiết bị an toàn.</code></pre>
+
+<h2>Kiểm soát rủi ro</h2>
+<ul>
+  <li><strong>Prompt injection</strong>: nội dung trong log hoặc tài liệu có thể chứa câu "hãy bỏ qua hướng dẫn trước". Vì agent không có quyền ghi hệ thống thật, rủi ro được giới hạn ở bản nháp.</li>
+  <li><strong>Đánh giá</strong>: chuẩn bị 20–30 tình huống sự cố đã biết nguyên nhân, đo tỷ lệ agent chẩn đoán đúng và tỷ lệ "bịa" nguyên nhân không có căn cứ.</li>
+  <li><strong>Phản hồi</strong>: kỹ thuật viên đánh dấu phiếu nháp đúng/sai/cần sửa, dùng để cải thiện công cụ và prompt.</li>
+</ul>
+<p>Đọc thêm khái niệm và rủi ro của agent trong bài <a href="../kien-thuc/ai-agent-la-gi.html">AI Agent là gì</a>.</p>

@@ -1,0 +1,37 @@
+<p>Mô hình ngôn ngữ lớn (LLM) viết được code, trả lời câu hỏi kỹ thuật, tóm tắt tài liệu. Nhưng bên trong, nó làm một việc rất đơn giản: <strong>dự đoán token tiếp theo</strong>. Bài này giải thích các khái niệm cốt lõi để bạn dùng LLM đúng cách và hiểu vì sao nó đôi khi sai.</p>
+
+<h2>Token: đơn vị LLM "đọc"</h2>
+<p>Văn bản được cắt thành các <strong>token</strong>: có thể là một từ, một phần của từ, dấu câu. Tiếng Anh trung bình khoảng 3/4 từ mỗi token; tiếng Việt thường tốn nhiều token hơn cho cùng nội dung. Giới hạn độ dài và chi phí API đều tính theo token.</p>
+
+<h2>Embedding: biến token thành vector</h2>
+<p>Mỗi token được ánh xạ thành một vector số nhiều chiều. Các từ có nghĩa gần nhau có vector gần nhau. Đây cũng là nền tảng của tìm kiếm ngữ nghĩa trong <a href="../projects/chatbot-hoi-dap-tai-lieu-rag.html">hệ thống RAG</a>.</p>
+
+<h2>Transformer và cơ chế attention</h2>
+<p>Kiến trúc Transformer cho phép mỗi token "nhìn" các token khác trong đoạn văn và quyết định token nào quan trọng với nó. Trong câu "Camera không chụp được vì <em>nó</em> mất nguồn", attention giúp mô hình hiểu "nó" là camera. Xếp chồng hàng chục lớp như vậy, mô hình nắm được ngữ pháp, kiến thức và cả các mẫu suy luận.</p>
+
+<h2>Huấn luyện qua nhiều giai đoạn</h2>
+<ol>
+  <li><strong>Pre-training</strong>: dự đoán token tiếp theo trên lượng văn bản khổng lồ. Mô hình học ngôn ngữ và kiến thức.</li>
+  <li><strong>Fine-tuning theo chỉ dẫn</strong>: học cách làm theo yêu cầu, trả lời theo dạng hội thoại.</li>
+  <li><strong>Học từ phản hồi</strong> của con người hoặc tiêu chí đánh giá: để câu trả lời hữu ích, trung thực và an toàn hơn.</li>
+</ol>
+
+<h2>Sinh văn bản: từng token một</h2>
+<p>Khi trả lời, mô hình tính xác suất cho mọi token có thể xuất hiện tiếp theo, chọn một token, nối vào câu, rồi lặp lại. Tham số <strong>temperature</strong> điều chỉnh độ "ngẫu nhiên": thấp thì ổn định, phù hợp code và dữ liệu; cao thì đa dạng, phù hợp viết sáng tạo.</p>
+
+<h2>Context window: "trí nhớ làm việc"</h2>
+<p>Mô hình chỉ thấy những gì nằm trong cửa sổ ngữ cảnh: câu hỏi, lịch sử hội thoại, tài liệu đính kèm. Các mô hình hiện đại có cửa sổ hàng trăm nghìn đến hàng triệu token, nhưng thông tin quan trọng vẫn nên đặt rõ ràng, gọn gàng.</p>
+
+<h2>Vì sao LLM có thể sai?</h2>
+<ul>
+  <li><strong>Ảo giác</strong>: mô hình tạo ra câu "nghe hợp lý" nhất, không phải lúc nào cũng là câu đúng. Đặc biệt dễ xảy ra với chi tiết hiếm như tên hàm, số phiên bản, trích dẫn.</li>
+  <li><strong>Kiến thức có mốc thời gian</strong>: mô hình không biết sự kiện sau thời điểm dữ liệu huấn luyện, trừ khi được cung cấp công cụ tìm kiếm hoặc tài liệu.</li>
+  <li><strong>Tính toán chính xác</strong>: phép tính dài nên giao cho công cụ (máy tính, code Python) thay vì để mô hình "tính nhẩm".</li>
+</ul>
+
+<h2>Áp dụng</h2>
+<ul>
+  <li>Cung cấp tài liệu nguồn khi hỏi về kiến thức chuyên ngành (RAG).</li>
+  <li>Yêu cầu trích dẫn và tự kiểm chứng những gì quan trọng.</li>
+  <li>Kết hợp LLM với công cụ để làm việc nhiều bước: đó là <a href="ai-agent-la-gi.html">AI Agent</a>.</li>
+</ul>

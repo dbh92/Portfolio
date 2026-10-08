@@ -1,0 +1,52 @@
+<p>OCR dựa trên Deep Learning đọc được chữ trong điều kiện khó mà Tesseract gặp vấn đề: chữ trên nền phức tạp, nghiêng, cong, ánh sáng không đều. Hai thư viện mã nguồn mở phổ biến là <strong>PaddleOCR</strong> và <strong>EasyOCR</strong>. Bài này so sánh và hướng dẫn dùng cả hai.</p>
+
+<h2>Kiến trúc chung: hai bước</h2>
+<ol>
+  <li><strong>Phát hiện chữ (text detection)</strong>: tìm các vùng có chữ, trả về đa giác bao từng dòng.</li>
+  <li><strong>Nhận dạng chữ (text recognition)</strong>: đọc nội dung từng vùng đã cắt và nắn thẳng.</li>
+</ol>
+
+<h2>EasyOCR: nhanh để bắt đầu</h2>
+<p>Xây dựng trên PyTorch, cài và chạy chỉ vài dòng:</p>
+<pre><code>pip install easyocr</code></pre>
+<pre><code>import easyocr
+
+reader = easyocr.Reader(["en", "vi"])          # tải mô hình lần đầu
+for bbox, text, conf in reader.readtext("nhan.jpg"):
+    print(f"{text!r}  conf={conf:.2f}  bbox={bbox}")</code></pre>
+<p>Tham số hữu ích: <code>allowlist</code> giới hạn ký tự, <code>detail=0</code> chỉ trả về văn bản.</p>
+
+<h2>PaddleOCR: mạnh cho sản xuất</h2>
+<p>PaddleOCR (từ Baidu) phiên bản 3.x đi kèm bộ mô hình nhận dạng đa ngôn ngữ PP-OCRv5, công cụ phân tích bố cục tài liệu và trích xuất thông tin, cùng đầy đủ công cụ huấn luyện và triển khai.</p>
+<pre><code>pip install paddlepaddle paddleocr</code></pre>
+<pre><code>from paddleocr import PaddleOCR
+
+ocr = PaddleOCR(
+    use_doc_orientation_classify=False,   # tắt các bước dành cho ảnh tài liệu
+    use_doc_unwarping=False,
+    use_textline_orientation=False,
+)
+for res in ocr.predict("nhan.jpg"):
+    res.print()                     # in văn bản, điểm tin cậy, tọa độ
+    res.save_to_img("output")       # lưu ảnh có vẽ kết quả</code></pre>
+<p>API của PaddleOCR thay đổi đáng kể giữa bản 2.x và 3.x; nhiều hướng dẫn cũ trên mạng không còn chạy. Hãy làm theo tài liệu đúng phiên bản bạn cài, và kiểm tra phiên bản Python được hỗ trợ.</p>
+
+<h2>So sánh nhanh</h2>
+<table>
+  <tr><th></th><th>EasyOCR</th><th>PaddleOCR</th></tr>
+  <tr><td>Bắt đầu</td><td>Rất dễ</td><td>Dễ, nhiều tùy chọn hơn</td></tr>
+  <tr><td>Độ chính xác</td><td>Khá</td><td>Thường cao hơn trong các so sánh công bố</td></tr>
+  <tr><td>Tài liệu, phân tích bố cục</td><td>Hạn chế</td><td>Mạnh</td></tr>
+  <tr><td>Huấn luyện lại trên dữ liệu riêng</td><td>Có thể nhưng ít công cụ</td><td>Bộ công cụ đầy đủ</td></tr>
+  <tr><td>Nền tảng</td><td>PyTorch</td><td>PaddlePaddle</td></tr>
+</table>
+<p>Các so sánh trên mạng thường dựa trên vài ảnh mẫu. Cách đúng duy nhất là <strong>tự đánh giá trên ảnh thật của bạn</strong>: chuẩn bị 100–200 ảnh có đáp án, đo tỷ lệ chuỗi đọc đúng hoàn toàn và thời gian xử lý.</p>
+
+<h2>Mẹo cho ứng dụng công nghiệp</h2>
+<ul>
+  <li><strong>Cắt ROI trước</strong>: nếu đã biết vùng chữ, bỏ qua bước phát hiện, chỉ chạy nhận dạng, vừa nhanh vừa ít lỗi.</li>
+  <li><strong>Hậu xử lý theo định dạng</strong>: biểu thức chính quy kiểm tra cấu trúc mã, sửa nhầm lẫn O/0, I/1 theo vị trí.</li>
+  <li><strong>Tinh chỉnh</strong> mô hình nhận dạng với vài nghìn ảnh dòng chữ của chính bạn khi font đặc thù (in phun dạng chấm).</li>
+  <li><strong>Chạy trên GPU</strong> hoặc tối ưu mô hình khi cần tốc độ cao.</li>
+</ul>
+<p class="note">Tham khảo: <a href="https://arxiv.org/abs/2507.05595" rel="noopener" target="_blank">PaddleOCR 3.0 Technical Report (arXiv)</a>, <a href="https://www.paddleocr.ai/" rel="noopener" target="_blank">tài liệu PaddleOCR</a>, <a href="https://github.com/JaidedAI/EasyOCR" rel="noopener" target="_blank">EasyOCR trên GitHub</a>.</p>

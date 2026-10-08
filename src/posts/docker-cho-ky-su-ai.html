@@ -1,0 +1,55 @@
+<p>"Chạy được trên máy tôi" là câu nói quen thuộc khi đưa phần mềm AI sang máy khác: khác phiên bản Python, thiếu thư viện hệ thống, sai bản CUDA. <strong>Docker</strong> đóng gói ứng dụng cùng toàn bộ môi trường của nó thành một <strong>container</strong> chạy giống nhau ở mọi nơi.</p>
+
+<h2>Khái niệm cơ bản</h2>
+<ul>
+  <li><strong>Image</strong>: "bản thiết kế" chứa hệ điều hành tối giản, thư viện, code của bạn. Tạo từ file <code>Dockerfile</code>.</li>
+  <li><strong>Container</strong>: một phiên chạy của image, cô lập với hệ thống bên ngoài.</li>
+  <li><strong>Registry</strong>: kho lưu image (Docker Hub hoặc registry nội bộ của công ty).</li>
+</ul>
+
+<h2>Dockerfile cho ứng dụng vision Python</h2>
+<pre><code>FROM python:3.11-slim
+
+# Thư viện hệ thống mà OpenCV cần
+RUN apt-get update &amp;&amp; apt-get install -y --no-install-recommends libgl1 libglib2.0-0 \
+    &amp;&amp; rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY src/ ./src/
+COPY models/ ./models/
+
+CMD ["python", "src/main.py"]</code></pre>
+<p>Thứ tự lệnh quan trọng: copy <code>requirements.txt</code> và cài thư viện <em>trước</em> khi copy code, để mỗi lần sửa code Docker không phải cài lại thư viện (tận dụng bộ nhớ đệm từng lớp).</p>
+
+<h2>Build và chạy</h2>
+<pre><code>docker build -t tram-vision:1.0 .
+docker run --rm -v D:/anh-test:/data -p 8000:8000 tram-vision:1.0</code></pre>
+<ul>
+  <li><code>-v</code>: gắn thư mục máy thật vào container để đọc ảnh, ghi kết quả.</li>
+  <li><code>-p</code>: mở cổng mạng (ví dụ API web của ứng dụng).</li>
+</ul>
+
+<h2>Dùng GPU NVIDIA trong container</h2>
+<p>Cài driver NVIDIA và NVIDIA Container Toolkit trên máy chủ, rồi chạy:</p>
+<pre><code>docker run --rm --gpus all tram-vision-gpu:1.0</code></pre>
+<p>Image cho GPU thường dựa trên image có sẵn CUDA hoặc image chính thức của framework (PyTorch, TensorRT). Driver trên máy chủ phải đủ mới so với phiên bản CUDA trong image.</p>
+
+<h2>Khi nào dùng Docker trong dự án Vision?</h2>
+<table>
+  <tr><th>Phù hợp</th><th>Cân nhắc kỹ</th></tr>
+  <tr><td>Máy chủ huấn luyện dùng chung nhiều dự án</td><td>Ứng dụng cần truy cập trực tiếp camera công nghiệp qua SDK, driver đặc thù</td></tr>
+  <tr><td>Dịch vụ suy luận AI chạy trên máy chủ, thiết bị biên Linux</td><td>Ứng dụng giao diện Windows (WinForms/WPF) trên máy trạm</td></tr>
+  <tr><td>Tái lập kết quả huấn luyện, chia sẻ cho đồng nghiệp</td><td>Yêu cầu thời gian thực rất chặt cần tinh chỉnh hệ điều hành</td></tr>
+</table>
+<p>Camera GigE trong container cần cấu hình mạng phù hợp (thường dùng chế độ mạng của máy chủ); hãy thử kỹ trước khi chọn kiến trúc.</p>
+
+<h2>Thói quen tốt</h2>
+<ul>
+  <li>Gắn phiên bản cụ thể cho image (<code>tram-vision:1.0.3</code>), không chỉ dùng <code>latest</code>.</li>
+  <li>Ghi phiên bản thư viện cố định trong <code>requirements.txt</code>.</li>
+  <li>Không đưa mật khẩu, khóa API vào image; truyền qua biến môi trường hoặc cơ chế quản lý bí mật.</li>
+  <li>Giữ image gọn: dùng image nền "slim", xóa bộ nhớ đệm sau khi cài.</li>
+</ul>

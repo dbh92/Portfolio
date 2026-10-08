@@ -1,0 +1,63 @@
+<p>An toàn lao động là ưu tiên hàng đầu ở công trường và nhà máy. Dự án này dùng <strong>YOLO26</strong> để phát hiện người <strong>không đội mũ bảo hộ</strong> trong vùng nguy hiểm và gửi cảnh báo. Đây là ví dụ điển hình của bài toán Computer Vision ứng dụng: phát hiện đối tượng + luật nghiệp vụ.</p>
+
+<h2>Định nghĩa bài toán</h2>
+<ul>
+  <li>Lớp cần phát hiện: <code>person</code>, <code>helmet</code> (mũ), <code>head</code> (đầu không có mũ).</li>
+  <li>Cảnh báo khi có <code>head</code> xuất hiện liên tục trong vùng nguy hiểm vượt quá vài giây (tránh báo động giả do một khung hình sai).</li>
+</ul>
+<p>Mô hình COCO có sẵn không có lớp "mũ bảo hộ", nên cần huấn luyện với dữ liệu riêng. Có thể bắt đầu từ các bộ dữ liệu công khai về PPE trên Roboflow Universe hoặc Kaggle (kiểm tra giấy phép), rồi bổ sung ảnh chụp tại chính công trường của bạn.</p>
+
+<h2>Huấn luyện</h2>
+<pre><code>from ultralytics import YOLO
+
+model = YOLO("yolo26s.pt")
+model.train(data="ppe.yaml", epochs=120, imgsz=960, batch=16)
+# ppe.yaml: names: {0: person, 1: helmet, 2: head}</code></pre>
+<p>Đầu người ở xa rất nhỏ, nên dùng <code>imgsz</code> lớn. Bổ sung dữ liệu đa dạng: ngược sáng, ban đêm, mưa, góc camera cao, các loại mũ khác màu, và cả các vật dễ nhầm như mũ vải, nón lá.</p>
+
+<h2>Luật cảnh báo theo vùng và thời gian</h2>
+<pre><code>import time
+import cv2
+import numpy as np
+
+ZONE = np.array([[200, 300], [1100, 280], [1250, 700], [100, 700]], np.int32)   # vùng nguy hiểm
+ALERT_SECONDS = 3.0
+model = YOLO("runs/detect/train/weights/best.pt")
+first_seen = {}                     # track_id -&gt; thời điểm đầu tiên thấy "head" trong vùng
+
+def in_zone(x, y):
+    return cv2.pointPolygonTest(ZONE, (float(x), float(y)), False) &gt;= 0
+
+cap = cv2.VideoCapture("rtsp://camera-cong-truong/stream")
+while True:
+    ok, frame = cap.read()
+    if not ok:
+        break
+    r = model.track(frame, persist=True, conf=0.4, verbose=False)[0]
+    now = time.time()
+    active = set()
+    if r.boxes.id is not None:
+        for tid, cls, (cx, cy, w, h) in zip(r.boxes.id.int().tolist(),
+                                            r.boxes.cls.int().tolist(), r.boxes.xywh.tolist()):
+            if model.names[cls] == "head" and in_zone(cx, cy):
+                active.add(tid)
+                first_seen.setdefault(tid, now)
+                if now - first_seen[tid] &gt; ALERT_SECONDS:
+                    print(f"CẢNH BÁO: người #{tid} không đội mũ trong vùng nguy hiểm")
+    for tid in list(first_seen):
+        if tid not in active:
+            del first_seen[tid]</code></pre>
+
+<h2>Đánh giá theo mục tiêu an toàn</h2>
+<ul>
+  <li><strong>Recall của lớp head</strong> là quan trọng nhất: bỏ sót người không đội mũ là thất bại của hệ thống.</li>
+  <li><strong>Số cảnh báo giả mỗi ngày</strong>: quá nhiều cảnh báo giả khiến người giám sát bỏ qua cả cảnh báo thật.</li>
+  <li>Thử nghiệm song song với giám sát thủ công vài tuần trước khi tin dùng.</li>
+</ul>
+
+<h2>Triển khai có trách nhiệm</h2>
+<ul>
+  <li>Hệ thống là <strong>công cụ hỗ trợ</strong>, không thay thế quy trình an toàn và người giám sát.</li>
+  <li>Thông báo rõ cho người lao động về việc giám sát bằng camera và mục đích của nó; tuân thủ quy định về dữ liệu cá nhân.</li>
+  <li>Chỉ lưu ảnh của các sự kiện cảnh báo, làm mờ khuôn mặt nếu không cần thiết, có thời hạn xóa dữ liệu.</li>
+</ul>

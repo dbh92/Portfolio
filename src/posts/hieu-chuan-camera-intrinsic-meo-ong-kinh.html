@@ -1,0 +1,69 @@
+<p>Mọi ống kính đều méo ảnh ở một mức độ nào đó: đường thẳng ở mép ảnh bị cong, kích thước vật thay đổi theo vị trí trong khung hình. <strong>Hiệu chuẩn camera</strong> (camera calibration) đo chính xác các đặc tính này để hiệu chỉnh, là bước bắt buộc trước khi đo lường hoặc dẫn hướng robot.</p>
+
+<h2>Mô hình camera pinhole</h2>
+<p>Camera lý tưởng chiếu điểm 3D lên ảnh theo <strong>ma trận nội tại (intrinsic) K</strong>:</p>
+<pre><code>K = | fx   0  cx |
+    |  0  fy  cy |
+    |  0   0   1 |</code></pre>
+<ul>
+  <li><strong>fx, fy</strong>: tiêu cự tính theo đơn vị pixel.</li>
+  <li><strong>cx, cy</strong>: tâm quang học trên ảnh (thường gần giữa ảnh nhưng không trùng hẳn).</li>
+</ul>
+
+<h2>Méo ống kính</h2>
+<ul>
+  <li><strong>Méo xuyên tâm (radial)</strong>: phổ biến nhất; dạng "thùng" (barrel) với ống kính góc rộng, "gối" (pincushion) với ống kính tele. Mô tả bằng hệ số k1, k2, k3.</li>
+  <li><strong>Méo tiếp tuyến (tangential)</strong>: do thấu kính không song song hoàn hảo với cảm biến. Hệ số p1, p2.</li>
+</ul>
+<p>OpenCV gom lại thành vector <code>dist = [k1, k2, p1, p2, k3]</code>.</p>
+
+<h2>Thực hiện hiệu chuẩn</h2>
+<pre><code>import cv2
+import glob
+import numpy as np
+
+PATTERN = (9, 6)            # số góc trong
+SQUARE = 10.0               # mm
+objp = np.zeros((PATTERN[0] * PATTERN[1], 3), np.float32)
+objp[:, :2] = np.mgrid[0:PATTERN[0], 0:PATTERN[1]].T.reshape(-1, 2) * SQUARE
+
+obj_pts, img_pts, size = [], [], None
+crit = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 1e-3)
+for f in sorted(glob.glob("calib/*.png")):
+    gray = cv2.imread(f, cv2.IMREAD_GRAYSCALE)
+    size = gray.shape[::-1]
+    ok, corners = cv2.findChessboardCorners(gray, PATTERN)
+    if ok:
+        obj_pts.append(objp)
+        img_pts.append(cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), crit))
+
+rms, K, dist, rvecs, tvecs = cv2.calibrateCamera(obj_pts, img_pts, size, None, None)
+print("RMS reprojection error:", rms)
+print("K =\n", K, "\ndist =", dist.ravel())</code></pre>
+
+<h2>Đánh giá kết quả</h2>
+<ul>
+  <li><strong>Sai số reprojection (RMS)</strong> thường dưới khoảng 0,5 pixel là tốt; cao hơn thường do góc bàn cờ phát hiện sai, ảnh nhòe hoặc bàn cờ không phẳng.</li>
+  <li>Xem sai số từng ảnh, loại bỏ ảnh có sai số lớn bất thường và hiệu chuẩn lại.</li>
+  <li>Khử méo một ảnh có nhiều đường thẳng và kiểm tra bằng mắt.</li>
+</ul>
+
+<h2>Khử méo ảnh</h2>
+<pre><code>img = cv2.imread("test.png")
+h, w = img.shape[:2]
+newK, roi = cv2.getOptimalNewCameraMatrix(K, dist, (w, h), alpha=0)
+undist = cv2.undistort(img, K, dist, None, newK)
+
+# Nhiều ảnh cùng kích thước: tính bảng ánh xạ một lần rồi remap, nhanh hơn nhiều
+map1, map2 = cv2.initUndistortRectifyMap(K, dist, None, newK, (w, h), cv2.CV_16SC2)
+undist = cv2.remap(img, map1, map2, cv2.INTER_LINEAR)</code></pre>
+<p>Trong đo lường, thường chỉ cần khử méo <strong>tọa độ các điểm đo được</strong> bằng <code>cv2.undistortPoints</code> thay vì cả ảnh.</p>
+
+<h2>Mẹo chụp ảnh hiệu chuẩn</h2>
+<ul>
+  <li>15–30 ảnh, bàn cờ phủ <strong>khắp khung hình</strong>, đặc biệt là các góc ảnh nơi méo mạnh nhất.</li>
+  <li>Nghiêng bàn cờ nhiều góc (khoảng ±30°), không chỉ đặt phẳng.</li>
+  <li>Ảnh sắc nét, không chói; giữ nguyên lấy nét và khẩu độ như khi làm việc. <strong>Thay đổi nét hoặc zoom thì phải hiệu chuẩn lại.</strong></li>
+  <li>Dùng tấm hiệu chuẩn in chính xác trên vật liệu cứng, phẳng; giấy in văn phòng dán lên bìa chỉ phù hợp để học.</li>
+</ul>
+<p>Bước tiếp theo: <a href="../kien-thuc/homography-do-tren-mat-phang.html">đo trên mặt phẳng bằng homography</a> và <a href="hand-eye-calibration-camera-robot.html">hiệu chuẩn camera – robot</a>.</p>

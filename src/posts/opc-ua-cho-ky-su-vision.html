@@ -1,0 +1,69 @@
+<p><strong>OPC UA</strong> (Open Platform Communications Unified Architecture) đang trở thành "ngôn ngữ chung" để các thiết bị và phần mềm trong nhà máy trao đổi dữ liệu: PLC, robot, trạm vision, SCADA, MES. Bài này giải thích những khái niệm cơ bản và cách một trạm vision viết bằng Python giao tiếp qua OPC UA.</p>
+
+<h2>Vì sao OPC UA?</h2>
+<ul>
+  <li><strong>Chuẩn mở, độc lập hãng</strong>: PLC của nhiều hãng lớn có sẵn OPC UA server tích hợp.</li>
+  <li><strong>Mô hình dữ liệu có cấu trúc</strong>: không chỉ là các thanh ghi số như Modbus, mà là cây đối tượng có tên, kiểu dữ liệu, đơn vị, mô tả.</li>
+  <li><strong>Bảo mật tích hợp</strong>: mã hóa, chứng chỉ, xác thực người dùng.</li>
+  <li><strong>Đăng ký nhận thay đổi</strong> (subscription): client được thông báo khi giá trị thay đổi, không cần hỏi liên tục.</li>
+</ul>
+
+<h2>Các khái niệm chính</h2>
+<ul>
+  <li><strong>Server</strong>: thiết bị cung cấp dữ liệu (PLC, trạm vision). <strong>Client</strong>: bên đọc/ghi dữ liệu.</li>
+  <li><strong>Address space</strong>: cây các <strong>node</strong> (đối tượng, biến, phương thức).</li>
+  <li><strong>NodeId</strong>: định danh của node, ví dụ <code>ns=2;s=Vision.Result</code> (namespace 2, định danh dạng chuỗi).</li>
+  <li><strong>Endpoint</strong>: địa chỉ kết nối dạng <code>opc.tcp://192.168.0.10:4840</code>.</li>
+</ul>
+
+<h2>Client Python với asyncua</h2>
+<pre><code>pip install asyncua</code></pre>
+<pre><code>import asyncio
+from asyncua import Client, ua
+
+URL = "opc.tcp://192.168.0.10:4840"
+
+async def main():
+    async with Client(url=URL) as client:
+        trigger = client.get_node("ns=2;s=Line2.Vision.Trigger")
+        result = client.get_node("ns=2;s=Line2.Vision.Result")
+        length = client.get_node("ns=2;s=Line2.Vision.LengthMM")
+
+        if await trigger.read_value():
+            ok, L = True, 25.012                       # thay bằng kết quả xử lý ảnh
+            await result.write_value(ua.Variant(1 if ok else 2, ua.VariantType.Int16))
+            await length.write_value(ua.Variant(L, ua.VariantType.Double))
+
+asyncio.run(main())</code></pre>
+<p>Kiểu dữ liệu khi ghi phải khớp kiểu của biến trên server (Int16, Double...), nếu không server sẽ từ chối. NodeId thực tế lấy từ cấu hình PLC hoặc duyệt cây bằng công cụ client OPC UA miễn phí.</p>
+
+<h2>Đăng ký nhận thay đổi thay vì hỏi liên tục</h2>
+<pre><code>class Handler:
+    async def datachange_notification(self, node, val, data):
+        if val:
+            print("Có trigger, bắt đầu chụp")
+
+async def watch():
+    async with Client(url=URL) as client:
+        trigger = client.get_node("ns=2;s=Line2.Vision.Trigger")
+        sub = await client.create_subscription(50, Handler())   # chu kỳ 50 ms
+        await sub.subscribe_data_change(trigger)
+        await asyncio.sleep(3600)</code></pre>
+
+<h2>OPC UA so với Modbus TCP</h2>
+<table>
+  <tr><th></th><th>Modbus TCP</th><th>OPC UA</th></tr>
+  <tr><td>Độ phức tạp</td><td>Rất đơn giản</td><td>Phức tạp hơn</td></tr>
+  <tr><td>Dữ liệu</td><td>Thanh ghi 16 bit, phải tự quy ước</td><td>Biến có tên, kiểu, cấu trúc</td></tr>
+  <tr><td>Bảo mật</td><td>Gần như không có</td><td>Tích hợp sẵn</td></tr>
+  <tr><td>Tích hợp lên MES/IT</td><td>Hạn chế</td><td>Rất phù hợp</td></tr>
+  <tr><td>Độ trễ thời gian thực cứng</td><td>Phụ thuộc mạng</td><td>Phụ thuộc mạng; tín hiệu yêu cầu tức thời vẫn nên dùng I/O số</td></tr>
+</table>
+
+<h2>Lời khuyên</h2>
+<ul>
+  <li>Tín hiệu trigger yêu cầu tức thời, chính xác mili giây: vẫn dùng <strong>I/O số</strong>. OPC UA dùng cho dữ liệu kết quả, thông số, trạng thái.</li>
+  <li>Bật bảo mật (chế độ ký và mã hóa) trong môi trường sản xuất thật, không để chế độ không bảo mật.</li>
+  <li>Thử nghiệm với OPC UA server giả lập trước khi kết nối PLC thật.</li>
+</ul>
+<p class="note">Tham khảo: <a href="https://github.com/FreeOpcUa/opcua-asyncio" rel="noopener" target="_blank">thư viện opcua-asyncio (asyncua)</a>.</p>

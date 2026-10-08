@@ -1,0 +1,61 @@
+<p>Mô hình chạy 200 ms mỗi ảnh trên laptop, nhưng dây chuyền yêu cầu xử lý xong trong 50 ms. Bài này tổng hợp các cách <strong>tăng tốc suy luận</strong> khi triển khai mô hình AI Vision: từ chọn định dạng, runtime, đến lượng tử hóa và tối ưu cả đường ống xử lý.</p>
+
+<h2>Đo trước khi tối ưu</h2>
+<pre><code>import time
+import numpy as np
+
+def bench(fn, x, warmup=10, n=100):
+    for _ in range(warmup):            # lần chạy đầu luôn chậm (khởi tạo, cấp phát)
+        fn(x)
+    t = []
+    for _ in range(n):
+        t0 = time.perf_counter(); fn(x); t.append(time.perf_counter() - t0)
+    t = np.array(t) * 1000
+    print(f"trung bình {t.mean():.1f} ms, p99 {np.percentile(t, 99):.1f} ms")</code></pre>
+<p>Đo <strong>toàn bộ chu trình</strong>: chụp ảnh, tiền xử lý, suy luận, hậu xử lý, gửi kết quả. Thường tiền xử lý viết chưa tốt còn chậm hơn cả mô hình. Quan tâm cả giá trị p99 (trường hợp chậm nhất), vì dây chuyền cần đảm bảo mọi sản phẩm đều kịp xử lý.</p>
+
+<h2>Chọn runtime phù hợp phần cứng</h2>
+<table>
+  <tr><th>Phần cứng</th><th>Lựa chọn phổ biến</th></tr>
+  <tr><td>CPU bất kỳ</td><td>ONNX Runtime</td></tr>
+  <tr><td>CPU / GPU tích hợp / NPU Intel</td><td>OpenVINO</td></tr>
+  <tr><td>GPU NVIDIA, Jetson</td><td>TensorRT</td></tr>
+  <tr><td>Windows, nhiều loại GPU</td><td>ONNX Runtime với DirectML</td></tr>
+</table>
+<pre><code>from ultralytics import YOLO
+m = YOLO("best.pt")
+m.export(format="onnx")        # ONNX Runtime
+m.export(format="openvino")    # Intel
+m.export(format="engine")      # TensorRT, phải chạy trên máy có GPU NVIDIA đích</code></pre>
+<p>File TensorRT engine gắn với phiên bản TensorRT và loại GPU cụ thể; hãy build trên đúng máy (hoặc cùng cấu hình) sẽ chạy thật.</p>
+
+<h2>Giảm độ chính xác số: FP16 và INT8</h2>
+<ul>
+  <li><strong>FP16</strong> (nửa độ chính xác): trên GPU hiện đại thường tăng tốc đáng kể, mất mát độ chính xác rất nhỏ.</li>
+  <li><strong>INT8</strong> (lượng tử hóa): nhanh hơn nữa và nhẹ hơn, nhưng cần <strong>dữ liệu hiệu chuẩn</strong> (vài trăm ảnh đại diện) và phải đánh giá lại kỹ, đặc biệt với lỗi nhỏ, tương phản thấp.</li>
+</ul>
+<p>Luôn so sánh kết quả trên tập test trước và sau khi tối ưu. Tốc độ tăng gấp đôi mà tỷ lệ lọt lỗi tăng là không chấp nhận được.</p>
+
+<h2>Tối ưu ở cấp mô hình và dữ liệu</h2>
+<ul>
+  <li><strong>Mô hình nhỏ hơn</strong>: YOLO cỡ n hoặc s thay vì l, x nếu độ chính xác vẫn đạt.</li>
+  <li><strong>Ảnh đầu vào nhỏ hơn</strong>: cắt ROI thay vì đưa cả ảnh lớn; giảm <code>imgsz</code> nếu vật đủ lớn.</li>
+  <li><strong>Batch</strong>: gom nhiều ảnh (nhiều camera) xử lý một lần trên GPU.</li>
+</ul>
+
+<h2>Tối ưu đường ống</h2>
+<ul>
+  <li><strong>Song song hóa</strong>: luồng chụp ảnh, luồng suy luận, luồng ghi kết quả chạy độc lập qua hàng đợi.</li>
+  <li><strong>Tránh copy dữ liệu thừa</strong> giữa CPU và GPU, giữa các thư viện.</li>
+  <li><strong>Tạo session một lần</strong>, không khởi tạo lại mô hình cho mỗi ảnh.</li>
+  <li><strong>Cố định tần số CPU/GPU</strong> và tắt chế độ tiết kiệm điện trên máy công nghiệp để thời gian xử lý ổn định.</li>
+</ul>
+
+<h2>Checklist triển khai</h2>
+<ol>
+  <li>Đo thời gian toàn chu trình trên phần cứng đích.</li>
+  <li>Chọn runtime phù hợp, thử FP16, cân nhắc INT8.</li>
+  <li>Đánh giá lại độ chính xác trên tập test thật.</li>
+  <li>Chạy thử liên tục nhiều giờ, theo dõi nhiệt độ, bộ nhớ, thời gian p99.</li>
+</ol>
+<p>Xem thêm cách chạy ONNX trong ứng dụng .NET: <a href="onnx-runtime-csharp-chay-mo-hinh-ai.html">ONNX Runtime với C#</a>.</p>

@@ -1,0 +1,78 @@
+<p>C# là ngôn ngữ phổ biến nhất cho phần mềm trên máy tính công nghiệp tại nhà máy: giao diện vận hành, kết nối PLC, cơ sở dữ liệu, SDK camera. Bài này tóm tắt những gì một kỹ sư tự động hóa cần nắm để bắt đầu viết ứng dụng Vision bằng C#.</p>
+
+<h2>Cài đặt</h2>
+<ul>
+  <li>Cài <strong>.NET SDK</strong> (bản LTS mới nhất) và <strong>Visual Studio Community</strong> hoặc VS Code + extension C# Dev Kit.</li>
+  <li>Tạo dự án: <code>dotnet new console -n TramKiemTra</code>, chạy bằng <code>dotnet run</code>.</li>
+</ul>
+
+<h2>Kiểu dữ liệu và biến</h2>
+<pre><code>int soLuong = 120;
+double kichThuoc = 25.034;          // mm
+bool ok = kichThuoc &gt;= 24.95 &amp;&amp; kichThuoc &lt;= 25.05;
+string maSp = "SP-001";
+var thoiGian = DateTime.Now;        // var: trình biên dịch tự suy ra kiểu
+
+Console.WriteLine($"{maSp}: {kichThuoc:F3} mm -&gt; {(ok ? "OK" : "NG")}");</code></pre>
+<p>C# là ngôn ngữ <strong>kiểu tĩnh</strong>: sai kiểu bị báo lỗi ngay khi biên dịch, giúp phần mềm chạy 24/7 ổn định hơn.</p>
+
+<h2>Lớp (class) để mô hình hóa dữ liệu</h2>
+<pre><code>public record KetQuaKiemTra(string MaSp, double KichThuoc, bool Ok, DateTime ThoiGian);
+
+public class BoKiemTra
+{
+    public double Min { get; }
+    public double Max { get; }
+
+    public BoKiemTra(double min, double max) { Min = min; Max = max; }
+
+    public KetQuaKiemTra DanhGia(string maSp, double kichThuoc) =&gt;
+        new(maSp, kichThuoc, kichThuoc &gt;= Min &amp;&amp; kichThuoc &lt;= Max, DateTime.Now);
+}
+
+var bo = new BoKiemTra(24.95, 25.05);
+var kq = bo.DanhGia("SP-002", 25.08);
+Console.WriteLine(kq);   // in đầy đủ các trường của record</code></pre>
+<p><code>record</code> rất hợp để lưu kết quả: bất biến, tự có <code>ToString</code> và so sánh theo giá trị.</p>
+
+<h2>Danh sách và LINQ</h2>
+<pre><code>var ketQua = new List&lt;KetQuaKiemTra&gt;();
+// ... thêm kết quả ...
+int soNg = ketQua.Count(k =&gt; !k.Ok);
+double tb = ketQua.Any() ? ketQua.Average(k =&gt; k.KichThuoc) : 0;
+var ngGanNhat = ketQua.Where(k =&gt; !k.Ok).OrderByDescending(k =&gt; k.ThoiGian).Take(10);</code></pre>
+
+<h2>Bất đồng bộ (async/await): không để giao diện bị treo</h2>
+<p>Chụp ảnh, xử lý, gửi dữ liệu cho PLC đều tốn thời gian. Nếu chạy trên luồng giao diện, cửa sổ sẽ "đơ". Dùng <code>async/await</code>:</p>
+<pre><code>private async void btnChup_Click(object sender, EventArgs e)
+{
+    btnChup.Enabled = false;
+    try
+    {
+        var kq = await Task.Run(() =&gt; XuLyAnh());   // chạy trên luồng nền
+        lblKetQua.Text = kq.Ok ? "OK" : "NG";
+    }
+    finally
+    {
+        btnChup.Enabled = true;
+    }
+}</code></pre>
+
+<h2>Xử lý ngoại lệ và giải phóng tài nguyên</h2>
+<pre><code>try
+{
+    using var file = new StreamWriter("log.csv", append: true);
+    file.WriteLine($"{kq.ThoiGian:O},{kq.MaSp},{kq.KichThuoc},{kq.Ok}");
+}
+catch (IOException ex)
+{
+    Console.WriteLine($"Không ghi được log: {ex.Message}");
+}</code></pre>
+<p><code>using</code> đảm bảo file, kết nối mạng, ảnh <code>Mat</code> của OpenCvSharp luôn được giải phóng, kể cả khi có lỗi.</p>
+
+<h2>Bước tiếp theo</h2>
+<ul>
+  <li>Xử lý ảnh: <a href="csharp-opencvsharp-xu-ly-anh.html">C# với OpenCvSharp</a>.</li>
+  <li>Giao diện camera: <a href="winforms-hien-thi-camera-opencvsharp.html">WinForms hiển thị camera</a>.</li>
+  <li>Kết nối PLC: <a href="csharp-modbus-tcp-socket-plc.html">Modbus TCP từ C#</a>.</li>
+</ul>

@@ -1,0 +1,62 @@
+<p>Đếm và phân loại phương tiện (xe máy, ô tô, xe tải, xe buýt) phục vụ quy hoạch giao thông, quản lý bãi xe, thống kê lưu lượng khu công nghiệp. Dự án này dùng <strong>YOLO26 + tracking</strong> để đếm xe theo từng loại khi đi qua một vạch trên đường.</p>
+
+<h2>Chọn lớp đối tượng</h2>
+<p>Mô hình COCO có sẵn các lớp <code>car</code> (2), <code>motorcycle</code> (3), <code>bus</code> (5), <code>truck</code> (7), <code>bicycle</code> (1). Đủ để bắt đầu thử nghiệm. Với giao thông Việt Nam đông xe máy, nên tinh chỉnh thêm bằng ảnh chụp tại chính vị trí lắp camera để giảm bỏ sót khi xe đi sát nhau.</p>
+
+<h2>Mã nguồn</h2>
+<pre><code>import cv2
+from collections import Counter
+from ultralytics import YOLO
+
+model = YOLO("yolo26s.pt")
+CLASSES = {1: "xe dap", 2: "o to", 3: "xe may", 5: "xe buyt", 7: "xe tai"}
+LINE_Y = 500
+cap = cv2.VideoCapture("nga-tu.mp4")
+
+last_y, counted = {}, set()
+counts = Counter()
+
+while True:
+    ok, frame = cap.read()
+    if not ok:
+        break
+    r = model.track(frame, persist=True, classes=list(CLASSES), conf=0.35, verbose=False)[0]
+    if r.boxes.id is not None:
+        for tid, cls, (cx, cy, w, h) in zip(r.boxes.id.int().tolist(), r.boxes.cls.int().tolist(),
+                                            r.boxes.xywh.tolist()):
+            prev = last_y.get(tid)
+            if prev is not None and prev &lt; LINE_Y &lt;= cy and tid not in counted:
+                counted.add(tid)
+                counts[CLASSES[cls]] += 1
+            last_y[tid] = cy
+    cv2.line(frame, (0, LINE_Y), (frame.shape[1], LINE_Y), (0, 255, 255), 2)
+    y0 = 30
+    for name, n in counts.items():
+        cv2.putText(frame, f"{name}: {n}", (10, y0), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+        y0 += 30
+    cv2.imshow("Dem xe", frame)
+    if cv2.waitKey(1) &amp; 0xFF == ord("q"):
+        break
+
+print(dict(counts))</code></pre>
+<p>Tập <code>counted</code> đảm bảo mỗi ID chỉ được đếm một lần, kể cả khi xe dừng ngay trên vạch rồi đi tiếp.</p>
+
+<h2>Thống kê theo thời gian</h2>
+<pre><code>import csv, time
+# Mỗi 15 phút ghi một dòng thống kê rồi đặt lại bộ đếm
+with open("luu-luong.csv", "a", newline="", encoding="utf-8-sig") as fh:
+    csv.writer(fh).writerow([time.strftime("%Y-%m-%d %H:%M"), *[counts[n] for n in CLASSES.values()]])</code></pre>
+
+<h2>Đánh giá</h2>
+<ul>
+  <li>Đếm tay 15 phút video ở các khung giờ: cao điểm, thấp điểm, ban đêm, trời mưa.</li>
+  <li>Tính sai số theo từng loại xe; xe máy đi thành đàn thường là nguồn sai số lớn nhất.</li>
+  <li>Kiểm tra nhầm lẫn giữa các loại (xe tải nhỏ và ô tô, xe buýt và xe tải).</li>
+</ul>
+
+<h2>Lắp đặt camera</h2>
+<ul>
+  <li>Đặt cao, nhìn chéo xuống theo hướng xe chạy để giảm che khuất.</li>
+  <li>Tránh ngược sáng buổi sáng/chiều; ban đêm đèn pha gây chói, cần camera có dải động rộng.</li>
+  <li>Xử lý tại chỗ trên thiết bị biên (edge), chỉ gửi số liệu thống kê về trung tâm: tiết kiệm băng thông và bảo vệ quyền riêng tư.</li>
+</ul>

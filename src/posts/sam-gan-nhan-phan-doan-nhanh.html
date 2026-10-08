@@ -1,0 +1,42 @@
+<p>Vẽ đa giác quanh từng vết lỗi để làm dữ liệu phân đoạn có thể mất vài phút mỗi đối tượng. <strong>SAM</strong> (Segment Anything Model) của Meta biến việc đó thành một cú bấm chuột: bạn chỉ cần chấm một điểm hoặc kéo một khung, mô hình trả về mặt nạ chính xác. Bài này hướng dẫn dùng SAM để tăng tốc gán nhãn.</p>
+
+<h2>SAM làm được gì?</h2>
+<ul>
+  <li><strong>SAM, SAM 2</strong>: phân đoạn theo gợi ý (prompt) là điểm hoặc khung; SAM 2 theo dõi được đối tượng qua các khung hình video.</li>
+  <li><strong>SAM 3</strong> (cuối 2025) và <strong>SAM 3.1</strong> (2026): thêm khả năng tìm và phân đoạn mọi đối tượng thuộc một <em>khái niệm</em> mô tả bằng văn bản hoặc ảnh mẫu, theo dõi nhiều đối tượng trong video hiệu quả hơn.</li>
+</ul>
+<p>SAM là mô hình lớn, chạy chậm hơn nhiều so với một mô hình nhỏ chuyên biệt. Vai trò phù hợp nhất của nó trong dự án công nghiệp là <strong>công cụ tạo nhãn</strong>, không phải mô hình chạy trên dây chuyền.</p>
+
+<h2>Cách 1: công cụ gán nhãn có tích hợp SAM</h2>
+<ul>
+  <li><strong>X-AnyLabeling</strong>: ứng dụng desktop, chọn mô hình SAM, bấm điểm trên vật để ra đa giác.</li>
+  <li><strong>CVAT</strong>: có công cụ phân đoạn tương tác dùng mô hình AI (tự cài hoặc bản cloud).</li>
+  <li><strong>Label Studio</strong>: kết nối backend mô hình để gợi ý nhãn.</li>
+</ul>
+<p>Xem so sánh chi tiết trong bài <a href="cong-cu-gan-nhan-du-lieu-anh-mien-phi.html">công cụ gán nhãn miễn phí</a>.</p>
+
+<h2>Cách 2: tự viết script với Ultralytics</h2>
+<p>Thư viện Ultralytics hỗ trợ chạy các mô hình SAM với gợi ý điểm hoặc khung:</p>
+<pre><code>from ultralytics import SAM
+
+model = SAM("sam2.1_b.pt")                     # tên trọng số theo tài liệu Ultralytics
+res = model("be-mat.png", points=[[420, 310]], labels=[1])   # 1 = điểm thuộc vật
+res[0].save("sam-mask.png")
+polys = res[0].masks.xy                        # đa giác, dùng để xuất nhãn</code></pre>
+<p>Kiểm tra tên trọng số và các phiên bản SAM được hỗ trợ trong tài liệu Ultralytics đúng phiên bản bạn cài.</p>
+
+<h2>Quy trình "bán tự động" hiệu quả</h2>
+<ol>
+  <li><strong>Gợi ý</strong>: người gán nhãn bấm điểm hoặc kéo khung quanh vết lỗi.</li>
+  <li><strong>SAM tạo mặt nạ</strong>, người gán nhãn chỉnh sửa nếu cần (thêm điểm âm để loại vùng thừa).</li>
+  <li><strong>Gán lớp</strong> cho mặt nạ (vết xước, vết bám...).</li>
+  <li><strong>Xuất</strong> sang định dạng YOLO-seg hoặc COCO.</li>
+  <li>Sau khi có vài trăm ảnh, huấn luyện mô hình chuyên biệt (ví dụ <a href="../hoc/yolo26-seg-phan-doan-vet-loi.html">YOLO26-seg</a>) và dùng nó gợi ý nhãn cho phần còn lại.</li>
+</ol>
+
+<h2>Lưu ý</h2>
+<ul>
+  <li>SAM được huấn luyện trên ảnh tự nhiên; với lỗi rất mờ, tương phản thấp (vết xước nhẹ trên kim loại), mặt nạ có thể chưa chuẩn, cần người kiểm tra.</li>
+  <li>Biên mặt nạ của SAM có thể khác cách người kiểm định chất lượng định nghĩa biên lỗi. Thống nhất quy tắc trước.</li>
+  <li>Kiểm tra giấy phép của trọng số SAM bạn dùng khi làm dự án thương mại.</li>
+</ul>

@@ -1,0 +1,63 @@
+<p>Tổng hợp các công thức tính toán thường dùng khi thiết kế hệ thống Machine Vision: độ phân giải, tiêu cự, độ phóng đại, nhòe chuyển động, băng thông. Dùng để ước lượng nhanh trước khi chọn thiết bị; luôn kiểm tra lại bằng công cụ tính của nhà sản xuất và chụp thử thực tế.</p>
+
+<h2>Ký hiệu</h2>
+<table>
+  <tr><th>Ký hiệu</th><th>Ý nghĩa</th><th>Đơn vị</th></tr>
+  <tr><td>FOV</td><td>Trường nhìn trên vật (theo một chiều)</td><td>mm</td></tr>
+  <tr><td>N</td><td>Số pixel của cảm biến theo chiều đó</td><td>pixel</td></tr>
+  <tr><td>p</td><td>Kích thước pixel trên cảm biến</td><td>µm</td></tr>
+  <tr><td>S</td><td>Kích thước cảm biến theo chiều đó = N × p</td><td>mm</td></tr>
+  <tr><td>WD</td><td>Khoảng cách làm việc (ống kính tới vật)</td><td>mm</td></tr>
+  <tr><td>f</td><td>Tiêu cự</td><td>mm</td></tr>
+  <tr><td>m</td><td>Độ phóng đại = S / FOV</td><td></td></tr>
+</table>
+
+<h2>Độ phân giải</h2>
+<table>
+  <tr><th>Đại lượng</th><th>Công thức</th></tr>
+  <tr><td>Kích thước 1 pixel trên vật</td><td><code>FOV / N</code> (mm/pixel)</td></tr>
+  <tr><td>Số pixel cần thiết</td><td><code>N ≥ FOV / (đặc trưng nhỏ nhất / số pixel phủ đặc trưng)</code></td></tr>
+  <tr><td>Quy tắc kinh nghiệm phát hiện</td><td>Đặc trưng nhỏ nhất phủ ít nhất khoảng 3–4 pixel</td></tr>
+</table>
+<p>Ví dụ: FOV 100 mm, vết lỗi 0,2 mm, cần 3 pixel → pixel trên vật ≈ 0,067 mm → N ≥ 1.500 pixel.</p>
+
+<h2>Ống kính (xấp xỉ thấu kính mỏng)</h2>
+<table>
+  <tr><th>Đại lượng</th><th>Công thức</th></tr>
+  <tr><td>Độ phóng đại</td><td><code>m = S / FOV</code></td></tr>
+  <tr><td>Tiêu cự cần thiết</td><td><code>f ≈ WD × m / (1 + m)</code></td></tr>
+  <tr><td>Khi WD ≫ f</td><td><code>f ≈ WD × S / FOV</code></td></tr>
+  <tr><td>Khoảng cách vật cho FOV mong muốn với f đã chọn</td><td><code>WD ≈ f × (1 + 1/m)</code></td></tr>
+</table>
+<p>Ví dụ: S = 8,45 mm (2448 × 3,45 µm), FOV = 100 mm, WD = 300 mm → m = 0,0845 → f ≈ 23,4 mm → chọn 25 mm, khi đó WD ≈ 320 mm.</p>
+
+<h2>Chuyển động</h2>
+<table>
+  <tr><th>Đại lượng</th><th>Công thức</th></tr>
+  <tr><td>Nhòe chuyển động (pixel)</td><td><code>v × t_exp / (FOV / N)</code></td></tr>
+  <tr><td>Thời gian phơi sáng tối đa</td><td><code>t_exp ≤ nhòe_cho_phép × (FOV / N) / v</code></td></tr>
+  <tr><td>Số ảnh mỗi giây cần thiết (vật liên tục)</td><td><code>fps ≥ v / (FOV theo chiều chuyển động × (1 − tỷ lệ chồng lấn))</code></td></tr>
+</table>
+<p>Ví dụ: v = 500 mm/s, t_exp = 100 µs, 0,067 mm/pixel → nhòe ≈ 0,75 pixel.</p>
+
+<h2>Line scan</h2>
+<table>
+  <tr><th>Đại lượng</th><th>Công thức</th></tr>
+  <tr><td>Tần số quét dòng cần thiết</td><td><code>line_rate = v / kích_thước_pixel_trên_vật_theo_chiều_chuyển_động</code></td></tr>
+  <tr><td>Ví dụ</td><td>v = 1 m/s, pixel 0,1 mm → 10.000 dòng/giây (10 kHz)</td></tr>
+</table>
+
+<h2>Băng thông dữ liệu</h2>
+<table>
+  <tr><th>Đại lượng</th><th>Công thức</th></tr>
+  <tr><td>Tốc độ dữ liệu</td><td><code>rộng × cao × bytes_mỗi_pixel × fps</code></td></tr>
+  <tr><td>Ví dụ</td><td>2448 × 2048 × 1 byte × 20 fps ≈ 100 MB/s, gần giới hạn thực tế của GigE 1 Gbit/s (khoảng 115–120 MB/s)</td></tr>
+</table>
+<p>Khi vượt giới hạn: giảm ROI, giảm fps, dùng giao tiếp băng thông cao hơn (2.5/5/10GigE, USB3, CoaXPress).</p>
+
+<h2>Khẩu độ và ánh sáng</h2>
+<ul>
+  <li>Mỗi nấc f tiêu chuẩn (f/2.8 → f/4 → f/5.6 → f/8) giảm khoảng một nửa lượng ánh sáng.</li>
+  <li>Giảm phơi sáng một nửa cần gấp đôi ánh sáng (hoặc tăng gain, đổi lại tăng nhiễu).</li>
+</ul>
+<p>Giải thích chi tiết từng bước: <a href="../kien-thuc/chon-camera-ong-kinh-machine-vision.html">cách chọn camera và ống kính</a>, <a href="../kien-thuc/do-sau-truong-anh-khau-do-lay-net.html">độ sâu trường ảnh và lấy nét</a>.</p>

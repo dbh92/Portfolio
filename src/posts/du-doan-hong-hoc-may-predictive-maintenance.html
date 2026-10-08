@@ -1,0 +1,49 @@
+<p>Máy dừng đột ngột giữa ca có thể gây thiệt hại lớn: dây chuyền đứng, đơn hàng trễ, sửa chữa khẩn cấp tốn kém. <strong>Bảo trì dự đoán</strong> (predictive maintenance) dùng dữ liệu cảm biến và Machine Learning để cảnh báo trước khi hỏng. Dự án này xây mô hình dự đoán hỏng hóc từ dữ liệu rung, nhiệt độ, dòng điện.</p>
+
+<h2>Dữ liệu</h2>
+<p>Mỗi dòng là trạng thái máy trong một khoảng thời gian (ví dụ 10 phút), kèm nhãn "có hỏng trong 24 giờ tới hay không":</p>
+<pre><code>thoi_gian, may, rung_rms, nhiet_do, dong_dien, toc_do, hong_24h
+2026-09-01 08:00, M03, 2.1, 61.5, 12.3, 1480, 0
+...</code></pre>
+<p>Nhãn được tạo từ lịch sử sửa chữa: những khoảng thời gian trong 24 giờ trước một lần hỏng được gán nhãn 1. Nếu chưa có bộ dữ liệu, có thể luyện tập với các bộ dữ liệu bảo trì dự đoán công khai trên Kaggle hoặc UCI.</p>
+
+<h2>Tạo đặc trưng theo thời gian</h2>
+<pre><code>import pandas as pd
+
+df = pd.read_csv("sensor.csv", parse_dates=["thoi_gian"]).sort_values(["may", "thoi_gian"])
+g = df.groupby("may")
+for col in ["rung_rms", "nhiet_do", "dong_dien"]:
+    df[f"{col}_tb_6"] = g[col].transform(lambda s: s.rolling(6, min_periods=1).mean())   # TB 1 giờ
+    df[f"{col}_xu_huong"] = g[col].transform(lambda s: s.diff(6))                       # thay đổi trong 1 giờ
+df = df.dropna()</code></pre>
+<p>Xu hướng tăng dần của độ rung hay nhiệt độ thường báo hiệu sớm hơn giá trị tức thời.</p>
+
+<h2>Chia dữ liệu theo thời gian</h2>
+<pre><code>split = df["thoi_gian"].quantile(0.8)
+train, test = df[df.thoi_gian &lt;= split], df[df.thoi_gian &gt; split]
+features = [c for c in df.columns if c not in ("thoi_gian", "may", "hong_24h")]</code></pre>
+<p><strong>Không chia ngẫu nhiên</strong>: dữ liệu liền kề rất giống nhau, chia ngẫu nhiên làm mô hình "nhìn thấy tương lai" và cho kết quả ảo.</p>
+
+<h2>Huấn luyện</h2>
+<pre><code>from sklearn.ensemble import HistGradientBoostingClassifier
+from sklearn.metrics import classification_report
+
+clf = HistGradientBoostingClassifier(max_iter=300, class_weight="balanced", random_state=0)
+clf.fit(train[features], train["hong_24h"])
+proba = clf.predict_proba(test[features])[:, 1]
+print(classification_report(test["hong_24h"], proba &gt; 0.5))</code></pre>
+<p>Hỏng hóc là sự kiện hiếm, nên dùng <code>class_weight="balanced"</code> và đánh giá bằng precision/recall thay vì accuracy.</p>
+
+<h2>Đánh giá theo góc nhìn bảo trì</h2>
+<ul>
+  <li>Bao nhiêu lần hỏng thật được cảnh báo trước? Trước bao lâu?</li>
+  <li>Mỗi tuần có bao nhiêu cảnh báo giả? Đội bảo trì có đủ người kiểm tra không?</li>
+  <li>Chi phí một lần hỏng bất ngờ so với chi phí một lần kiểm tra không cần thiết: dùng để chọn ngưỡng.</li>
+</ul>
+
+<h2>Đưa vào vận hành</h2>
+<ul>
+  <li>Chạy mô hình định kỳ, gửi cảnh báo kèm các đặc trưng bất thường nhất để kỹ thuật viên biết nên kiểm tra gì.</li>
+  <li>Ghi nhận phản hồi (kiểm tra thực tế có vấn đề hay không) để cải thiện mô hình.</li>
+  <li>Máy mới, sau đại tu, thay đổi chế độ chạy: dữ liệu thay đổi, mô hình cần được theo dõi và huấn luyện lại.</li>
+</ul>

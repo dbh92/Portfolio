@@ -1,0 +1,84 @@
+<p>Trang tra cứu nhanh các lệnh PyTorch thường dùng khi huấn luyện và triển khai mô hình thị giác máy. Giả định đã có <code>import torch</code>, <code>from torch import nn</code>.</p>
+
+<h2>Tensor</h2>
+<table>
+  <tr><th>Việc cần làm</th><th>Code</th></tr>
+  <tr><td>Tạo tensor</td><td><code>torch.tensor([1, 2])</code>, <code>torch.zeros(2, 3)</code>, <code>torch.randn(8, 3, 224, 224)</code></td></tr>
+  <tr><td>Từ / sang NumPy</td><td><code>torch.from_numpy(arr)</code> / <code>t.cpu().numpy()</code></td></tr>
+  <tr><td>Kích thước, kiểu, thiết bị</td><td><code>t.shape</code>, <code>t.dtype</code>, <code>t.device</code></td></tr>
+  <tr><td>Đổi hình dạng</td><td><code>t.view(8, -1)</code>, <code>t.reshape(...)</code>, <code>t.flatten(1)</code></td></tr>
+  <tr><td>Đổi thứ tự chiều HWC → CHW</td><td><code>t.permute(2, 0, 1)</code></td></tr>
+  <tr><td>Thêm / bỏ chiều</td><td><code>t.unsqueeze(0)</code> / <code>t.squeeze()</code></td></tr>
+  <tr><td>Ghép</td><td><code>torch.cat([a, b], dim=0)</code>, <code>torch.stack([a, b])</code></td></tr>
+</table>
+
+<h2>GPU</h2>
+<table>
+  <tr><th>Việc cần làm</th><th>Code</th></tr>
+  <tr><td>Kiểm tra GPU</td><td><code>torch.cuda.is_available()</code>, <code>torch.cuda.get_device_name(0)</code></td></tr>
+  <tr><td>Chọn thiết bị</td><td><code>device = "cuda" if torch.cuda.is_available() else "cpu"</code></td></tr>
+  <tr><td>Chuyển mô hình, dữ liệu</td><td><code>model.to(device)</code>, <code>x.to(device)</code></td></tr>
+  <tr><td>Bộ nhớ GPU đang dùng</td><td><code>torch.cuda.memory_allocated() / 1e9</code> (GB)</td></tr>
+</table>
+
+<h2>Lớp mạng thường dùng</h2>
+<table>
+  <tr><th>Lớp</th><th>Ghi chú</th></tr>
+  <tr><td><code>nn.Conv2d(cin, cout, k, stride, padding)</code></td><td>Tích chập 2D</td></tr>
+  <tr><td><code>nn.BatchNorm2d(c)</code>, <code>nn.ReLU()</code></td><td>Chuẩn hóa, kích hoạt</td></tr>
+  <tr><td><code>nn.MaxPool2d(2)</code>, <code>nn.AdaptiveAvgPool2d(1)</code></td><td>Giảm kích thước</td></tr>
+  <tr><td><code>nn.Linear(in, out)</code></td><td>Lớp kết nối đầy đủ</td></tr>
+  <tr><td><code>nn.Dropout(0.3)</code></td><td>Chống overfitting</td></tr>
+  <tr><td><code>nn.Sequential(...)</code></td><td>Ghép các lớp nối tiếp</td></tr>
+</table>
+
+<h2>Hàm mất mát và bộ tối ưu</h2>
+<table>
+  <tr><th>Bài toán</th><th>Hàm mất mát</th></tr>
+  <tr><td>Phân loại nhiều lớp</td><td><code>nn.CrossEntropyLoss()</code> (đầu vào là logits, chưa softmax)</td></tr>
+  <tr><td>Nhị phân / đa nhãn / mặt nạ</td><td><code>nn.BCEWithLogitsLoss()</code></td></tr>
+  <tr><td>Hồi quy</td><td><code>nn.MSELoss()</code>, <code>nn.SmoothL1Loss()</code></td></tr>
+</table>
+<pre><code>optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
+scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)</code></pre>
+
+<h2>Vòng lặp huấn luyện tối thiểu</h2>
+<pre><code>for epoch in range(epochs):
+    model.train()
+    for x, y in train_loader:
+        x, y = x.to(device), y.to(device)
+        optimizer.zero_grad()
+        loss = criterion(model(x), y)
+        loss.backward()
+        optimizer.step()
+    scheduler.step()
+
+    model.eval()
+    with torch.no_grad():
+        ...   # đánh giá trên tập validation</code></pre>
+
+<h2>Dữ liệu</h2>
+<table>
+  <tr><th>Việc cần làm</th><th>Code</th></tr>
+  <tr><td>Thư mục ảnh theo lớp</td><td><code>torchvision.datasets.ImageFolder("data/train", transform)</code></td></tr>
+  <tr><td>DataLoader</td><td><code>DataLoader(ds, batch_size=32, shuffle=True, num_workers=4)</code></td></tr>
+  <tr><td>Biến đổi ảnh</td><td><code>transforms.Compose([transforms.Resize((224, 224)), transforms.ToTensor()])</code></td></tr>
+</table>
+
+<h2>Lưu, tải và xuất</h2>
+<table>
+  <tr><th>Việc cần làm</th><th>Code</th></tr>
+  <tr><td>Lưu trọng số</td><td><code>torch.save(model.state_dict(), "model.pt")</code></td></tr>
+  <tr><td>Tải trọng số</td><td><code>model.load_state_dict(torch.load("model.pt", map_location=device))</code></td></tr>
+  <tr><td>Xuất ONNX</td><td><code>torch.onnx.export(model, dummy_input, "model.onnx", input_names=["input"], output_names=["output"])</code></td></tr>
+  <tr><td>Đếm tham số</td><td><code>sum(p.numel() for p in model.parameters())</code></td></tr>
+</table>
+
+<h2>Lỗi hay gặp</h2>
+<ul>
+  <li><strong>Expected all tensors to be on the same device</strong>: quên chuyển dữ liệu hoặc mô hình sang GPU.</li>
+  <li><strong>CUDA out of memory</strong>: giảm batch size, giảm kích thước ảnh, dùng <code>torch.no_grad()</code> khi đánh giá.</li>
+  <li><strong>Kết quả khi đánh giá thay đổi bất thường</strong>: quên <code>model.eval()</code>.</li>
+  <li><strong>Loss không giảm</strong>: kiểm tra learning rate, nhãn có khớp ảnh không, đã gọi <code>optimizer.zero_grad()</code> chưa.</li>
+</ul>
+<p>Bài giải thích chi tiết: <a href="../hoc/pytorch-co-ban-tensor-autograd.html">PyTorch cơ bản: tensor, autograd và vòng lặp huấn luyện</a>.</p>

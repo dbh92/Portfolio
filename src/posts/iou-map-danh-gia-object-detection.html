@@ -1,0 +1,47 @@
+<p>Huấn luyện YOLO xong, bạn nhận về một loạt con số: precision, recall, mAP50, mAP50-95. Bài này giải thích ý nghĩa từng chỉ số để bạn đánh giá đúng mô hình phát hiện đối tượng và biết cần cải thiện ở đâu.</p>
+
+<h2>IoU: hai khung trùng nhau bao nhiêu?</h2>
+<p><strong>IoU</strong> (Intersection over Union) = diện tích phần giao / diện tích phần hợp của khung dự đoán và khung thật. IoU = 1 là trùng khít, 0 là không chạm nhau.</p>
+<pre><code>def iou(a, b):
+    """a, b: (x1, y1, x2, y2)"""
+    ix1, iy1 = max(a[0], b[0]), max(a[1], b[1])
+    ix2, iy2 = min(a[2], b[2]), min(a[3], b[3])
+    inter = max(0, ix2 - ix1) * max(0, iy2 - iy1)
+    area_a = (a[2] - a[0]) * (a[3] - a[1])
+    area_b = (b[2] - b[0]) * (b[3] - b[1])
+    return inter / (area_a + area_b - inter + 1e-9)
+
+print(iou((10, 10, 60, 60), (30, 30, 80, 80)))   # ≈ 0.22</code></pre>
+
+<h2>Khi nào một dự đoán được tính là đúng?</h2>
+<p>Một dự đoán là <strong>True Positive</strong> nếu đúng lớp và IoU với một khung thật vượt ngưỡng (ví dụ 0,5). Mỗi khung thật chỉ được ghép với một dự đoán; dự đoán thừa là <strong>False Positive</strong>, khung thật không được ghép là <strong>False Negative</strong>.</p>
+
+<h2>Precision, Recall và đường cong PR</h2>
+<p>Thay đổi ngưỡng tin cậy (confidence) từ cao xuống thấp, ta được nhiều cặp (precision, recall) và vẽ thành đường cong. Ngưỡng cao: ít báo sai nhưng bỏ sót nhiều; ngưỡng thấp: bắt nhiều nhưng báo sai nhiều.</p>
+
+<h2>AP và mAP</h2>
+<ul>
+  <li><strong>AP</strong> (Average Precision): diện tích dưới đường cong precision–recall của <em>một lớp</em>, tóm tắt chất lượng trên mọi ngưỡng tin cậy.</li>
+  <li><strong>mAP</strong>: trung bình AP của tất cả các lớp.</li>
+  <li><strong>mAP50</strong>: tính với ngưỡng IoU 0,5, khá "dễ dãi" về vị trí khung.</li>
+  <li><strong>mAP50-95</strong>: trung bình mAP ở các ngưỡng IoU từ 0,5 đến 0,95 (bước 0,05), đòi hỏi khung chính xác. Đây là chỉ số chính trên bộ COCO.</li>
+</ul>
+
+<h2>Đọc kết quả của Ultralytics</h2>
+<pre><code>from ultralytics import YOLO
+metrics = YOLO("runs/detect/train/weights/best.pt").val(data="data.yaml")
+print(metrics.box.map50, metrics.box.map)       # mAP50, mAP50-95
+print(metrics.box.maps)                          # mAP50-95 theo từng lớp</code></pre>
+<p>Thư mục kết quả còn có ma trận nhầm lẫn và các đường cong PR, F1 theo ngưỡng tin cậy, rất hữu ích để chọn ngưỡng triển khai.</p>
+
+<h2>Chẩn đoán mô hình từ chỉ số</h2>
+<table>
+  <tr><th>Hiện tượng</th><th>Khả năng</th><th>Hướng xử lý</th></tr>
+  <tr><td>mAP50 cao, mAP50-95 thấp</td><td>Tìm đúng vật nhưng khung chưa khít</td><td>Kiểm tra chất lượng gán nhãn, tăng độ phân giải</td></tr>
+  <tr><td>Recall thấp</td><td>Bỏ sót vật, thường là vật nhỏ hoặc bị che</td><td>Thêm dữ liệu loại đó, tăng <code>imgsz</code></td></tr>
+  <tr><td>Precision thấp</td><td>Báo nhầm nền thành vật</td><td>Thêm ảnh nền không có vật, ảnh dễ gây nhầm</td></tr>
+  <tr><td>Một lớp rất thấp</td><td>Ít dữ liệu hoặc nhãn không nhất quán</td><td>Xem ma trận nhầm lẫn, rà lại nhãn lớp đó</td></tr>
+</table>
+
+<h2>Chỉ số nào cho nhà máy?</h2>
+<p>mAP phù hợp để so sánh mô hình, nhưng khi triển khai bạn chạy ở <strong>một ngưỡng cố định</strong>. Hãy báo cáo precision và recall (hoặc tỷ lệ lọt lỗi và loại nhầm) tại đúng ngưỡng đó, trên tập test chụp ở điều kiện thật. Xem thêm <a href="../kien-thuc/precision-recall-f1-ma-tran-nham-lan.html">precision, recall và ma trận nhầm lẫn</a>.</p>

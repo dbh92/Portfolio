@@ -1,0 +1,84 @@
+<p>Huấn luyện một CNN từ đầu cần rất nhiều dữ liệu. <strong>Transfer learning</strong> tận dụng mô hình đã học trên hàng triệu ảnh (ImageNet), chỉ cần tinh chỉnh lại với vài trăm ảnh của bạn. Đây là cách nhanh nhất để có một bộ phân loại OK/NG dùng được.</p>
+
+<h2>Chuẩn bị dữ liệu</h2>
+<pre><code>data/
+  train/ok/  train/ng/
+  val/ok/    val/ng/</code></pre>
+<p>Cắt ảnh về đúng vùng cần kiểm tra (ROI) trước khi đưa vào mô hình. Mô hình nhìn ROI 224×224 sẽ học tốt hơn nhiều so với cả khung hình 5 megapixel bị thu nhỏ.</p>
+
+<h2>Dataset và augmentation</h2>
+<pre><code>import torch
+from torch import nn
+from torchvision import datasets, models, transforms
+
+weights = models.ResNet18_Weights.DEFAULT
+mean, std = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]   # chuẩn hóa ImageNet
+
+train_tf = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.RandomHorizontalFlip(),
+    transforms.RandomRotation(5),
+    transforms.ColorJitter(brightness=0.2, contrast=0.2),
+    transforms.ToTensor(),
+    transforms.Normalize(mean, std),
+])
+val_tf = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean, std),
+])
+
+train_ds = datasets.ImageFolder("data/train", train_tf)
+val_ds = datasets.ImageFolder("data/val", val_tf)
+print(train_ds.classes)       # ['ng', 'ok'] theo thứ tự chữ cái
+train_dl = torch.utils.data.DataLoader(train_ds, batch_size=32, shuffle=True)
+val_dl = torch.utils.data.DataLoader(val_ds, batch_size=64)</code></pre>
+<p>Chỉ dùng augmentation có thể xảy ra thật. Nếu sản phẩm luôn đúng chiều trên băng tải, đừng xoay 90°; nếu lỗi phụ thuộc màu, đừng đổi màu mạnh.</p>
+
+<h2>Thay "đầu" của mô hình</h2>
+<pre><code>device = "cuda" if torch.cuda.is_available() else "cpu"
+model = models.resnet18(weights=weights)
+model.fc = nn.Linear(model.fc.in_features, len(train_ds.classes))   # 2 lớp
+model = model.to(device)</code></pre>
+
+<h2>Huấn luyện hai giai đoạn</h2>
+<pre><code>def run_epoch(loader, train):
+    model.train(train)
+    correct, total = 0, 0
+    with torch.set_grad_enabled(train):
+        for x, y in loader:
+            x, y = x.to(device), y.to(device)
+            out = model(x)
+            loss = criterion(out, y)
+            if train:
+                optimizer.zero_grad(); loss.backward(); optimizer.step()
+            correct += (out.argmax(1) == y).sum().item()
+            total += len(y)
+    return correct / total
+
+criterion = nn.CrossEntropyLoss()
+
+# Giai đoạn 1: đóng băng thân mạng, chỉ học lớp cuối
+for p in model.parameters():
+    p.requires_grad = False
+for p in model.fc.parameters():
+    p.requires_grad = True
+optimizer = torch.optim.Adam(model.fc.parameters(), lr=1e-3)
+for ep in range(5):
+    print("stage1", ep, run_epoch(train_dl, True), run_epoch(val_dl, False))
+
+# Giai đoạn 2: mở toàn bộ, learning rate nhỏ
+for p in model.parameters():
+    p.requires_grad = True
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+for ep in range(10):
+    print("stage2", ep, run_epoch(train_dl, True), run_epoch(val_dl, False))</code></pre>
+
+<h2>Đánh giá đúng kiểu nhà máy</h2>
+<p>Đừng chỉ nhìn accuracy. Tính tỷ lệ lọt lỗi và loại nhầm trên tập val, chọn ngưỡng xác suất NG phù hợp (xem <a href="../kien-thuc/precision-recall-f1-ma-tran-nham-lan.html">precision, recall và ma trận nhầm lẫn</a>). Với dữ liệu NG quá ít, cân nhắc <a href="../projects/phat-hien-loi-be-mat-anomaly-detection.html">anomaly detection</a>.</p>
+
+<h2>Xuất ONNX để triển khai</h2>
+<pre><code>model.eval()
+torch.onnx.export(model.cpu(), torch.randn(1, 3, 224, 224), "ok_ng.onnx",
+                  input_names=["input"], output_names=["logits"])</code></pre>
+<p>Khi chạy ONNX ở nơi khác, nhớ áp dụng <strong>đúng</strong> tiền xử lý: resize 224, RGB, chia 255, chuẩn hóa mean/std ImageNet.</p>

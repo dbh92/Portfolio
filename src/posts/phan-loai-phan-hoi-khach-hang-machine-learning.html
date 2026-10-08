@@ -1,0 +1,66 @@
+<p>Bộ phận chất lượng nhận hàng trăm phản hồi, khiếu nại mỗi tuần qua email và biểu mẫu. Phân loại thủ công vào đúng nhóm lỗi (bao bì, kích thước, ngoại quan, giao hàng...) tốn thời gian và không nhất quán. Dự án này huấn luyện mô hình <strong>phân loại văn bản tiếng Việt</strong> bằng Machine Learning cổ điển: nhanh, rẻ, chạy trên CPU và dễ giải thích.</p>
+
+<h2>Dữ liệu</h2>
+<pre><code>noi_dung,nhom
+"Hộp bị móp méo khi nhận hàng",bao_bi
+"Đường kính lỗ lớn hơn bản vẽ 0,2mm",kich_thuoc
+"Bề mặt có nhiều vết xước nhỏ",ngoai_quan
+"Giao thiếu 2 thùng so với đơn",giao_hang</code></pre>
+<p>Vài trăm đến vài nghìn phản hồi đã được phân loại thủ công trong quá khứ là đủ để bắt đầu.</p>
+
+<h2>Tiền xử lý tiếng Việt</h2>
+<pre><code>import re
+import unicodedata
+
+def clean(text):
+    text = unicodedata.normalize("NFC", str(text)).lower()   # thống nhất cách mã hóa dấu
+    text = re.sub(r"\d+([.,]\d+)?", " SO ", text)            # gom các con số
+    text = re.sub(r"[^\w\s]", " ", text)
+    return re.sub(r"\s+", " ", text).strip()</code></pre>
+<p>Chuẩn hóa Unicode NFC rất quan trọng: cùng chữ "ố" có thể được mã hóa theo nhiều cách khác nhau tùy bộ gõ.</p>
+
+<h2>Mô hình TF-IDF + Logistic Regression</h2>
+<pre><code>import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import make_pipeline
+from sklearn.metrics import classification_report
+
+df = pd.read_csv("phan-hoi.csv")
+X_train, X_test, y_train, y_test = train_test_split(
+    df.noi_dung.map(clean), df.nhom, test_size=0.2, stratify=df.nhom, random_state=42)
+
+model = make_pipeline(
+    TfidfVectorizer(ngram_range=(1, 2), min_df=2, sublinear_tf=True),   # từ đơn và cụm 2 từ
+    LogisticRegression(max_iter=2000, class_weight="balanced"),
+)
+model.fit(X_train, y_train)
+print(classification_report(y_test, model.predict(X_test)))</code></pre>
+<p>Tiếng Việt có nhiều từ ghép hai âm tiết ("bao bì", "kích thước"), nên dùng n-gram (1, 2) giúp mô hình nắm được các từ ghép này mà không cần công cụ tách từ.</p>
+
+<h2>Giải thích mô hình</h2>
+<pre><code>import numpy as np
+
+vec = model.named_steps["tfidfvectorizer"]
+clf = model.named_steps["logisticregression"]
+words = np.array(vec.get_feature_names_out())
+for i, label in enumerate(clf.classes_):
+    top = words[np.argsort(clf.coef_[i])[-8:]][::-1]
+    print(label, "-&gt;", ", ".join(top))</code></pre>
+<p>Danh sách từ khóa quan trọng của mỗi nhóm giúp kiểm tra mô hình học đúng hay học "mẹo" từ dữ liệu.</p>
+
+<h2>Dùng trong thực tế</h2>
+<pre><code>proba = model.predict_proba([clean("Nhãn dán lệch, chữ in bị mờ")])[0]
+best = proba.argmax()
+if proba[best] &lt; 0.6:
+    print("Chuyển người xử lý phân loại thủ công")
+else:
+    print("Nhóm:", model.classes_[best])</code></pre>
+<ul>
+  <li>Phản hồi có độ tin cậy thấp được chuyển cho người phân loại; kết quả của họ trở thành dữ liệu huấn luyện mới.</li>
+  <li>Theo dõi phân bố nhóm theo tuần để phát hiện sớm vấn đề chất lượng đang tăng.</li>
+</ul>
+
+<h2>Khi nào cần mô hình lớn hơn?</h2>
+<p>Khi phản hồi dài, nhiều ý, cần hiểu ngữ cảnh sâu hoặc cần trích xuất thông tin chi tiết (mã sản phẩm, số lô, mức độ nghiêm trọng), có thể dùng LLM. Nhưng hãy luôn so sánh với mô hình đơn giản này trước: nếu nó đã đạt yêu cầu, bạn tiết kiệm được rất nhiều chi phí và độ phức tạp.</p>
