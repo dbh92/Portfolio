@@ -1,0 +1,62 @@
+<p>Trong kiểm tra ngoại quan, cái khó nhất thường không phải mô hình mà là <strong>dữ liệu lỗi</strong>: dây chuyền tốt có thể chỉ sinh vài sản phẩm lỗi mỗi tuần, mỗi loại lỗi lại một kiểu. <strong>Anomaly Detection</strong> giải quyết đúng vấn đề này: mô hình chỉ học từ ảnh <em>sản phẩm tốt</em>, rồi đánh dấu bất cứ thứ gì "khác thường".</p>
+
+<h2>Ý tưởng của PatchCore</h2>
+<p>PatchCore là một trong những thuật toán anomaly detection hiệu quả và dễ dùng nhất:</p>
+<ol>
+  <li>Dùng mạng CNN đã huấn luyện sẵn (ví dụ trên ImageNet) để trích đặc trưng cho từng mảnh nhỏ (patch) của ảnh tốt.</li>
+  <li>Lưu một tập đặc trưng đại diện vào <strong>memory bank</strong> (có lấy mẫu để gọn).</li>
+  <li>Với ảnh mới, mỗi patch được so với patch gần nhất trong memory bank. Khoảng cách lớn = bất thường.</li>
+</ol>
+<p>Kết quả là một <strong>bản đồ bất thường</strong> (anomaly map) chỉ ra vị trí lỗi, cùng một điểm số cho cả ảnh. Không cần huấn luyện mạng nhiều epoch, không cần gán nhãn lỗi.</p>
+
+<h2>Chuẩn bị dữ liệu</h2>
+<pre><code>datasets/nap-chai/
+  good/        # 100–300 ảnh sản phẩm tốt (huấn luyện)
+  defect/      # vài chục ảnh lỗi (chỉ để đánh giá)
+  mask/defect/ # (tùy chọn) mặt nạ vùng lỗi để đánh giá cấp pixel</code></pre>
+<p>Ảnh phải chụp với <strong>cùng điều kiện</strong> camera, ánh sáng, vị trí như khi chạy thật. Nếu sản phẩm lệch vị trí nhiều, hãy căn chỉnh (định vị bằng template matching rồi cắt ROI) trước khi đưa vào mô hình.</p>
+
+<h2>Huấn luyện với Anomalib</h2>
+<p><a href="https://github.com/openvinotoolkit/anomalib" rel="noopener" target="_blank">Anomalib</a> là thư viện mã nguồn mở tập hợp nhiều thuật toán anomaly detection (PatchCore, PaDiM, EfficientAD…). Ví dụ dưới đây theo API Anomalib 2.x:</p>
+<pre><code>pip install anomalib</code></pre>
+<pre><code>from anomalib.data import Folder
+from anomalib.engine import Engine
+from anomalib.models import Patchcore
+
+datamodule = Folder(
+    name="nap_chai",
+    root="datasets/nap-chai",
+    normal_dir="good",
+    abnormal_dir="defect",
+    mask_dir="mask/defect",      # bỏ dòng này nếu không có mặt nạ
+)
+
+model = Patchcore()              # mặc định backbone wide_resnet50_2
+engine = Engine()
+engine.fit(model=model, datamodule=datamodule)
+engine.test(model=model, datamodule=datamodule)   # in AUROC, F1...
+
+preds = engine.predict(model=model, data_path="anh-moi/")
+for batch in preds:                # mỗi phần tử là một batch ảnh
+    for path, score, label in zip(batch.image_path, batch.pred_score, batch.pred_label):
+        print(path, float(score), "NG" if bool(label) else "OK")</code></pre>
+<p>API của Anomalib thay đổi giữa các phiên bản (ví dụ bản 1.x có tham số <code>task</code> mà bản 2.x đã bỏ). Hãy đối chiếu với tài liệu đúng phiên bản bạn cài.</p>
+
+<h2>Chọn ngưỡng OK/NG: quyết định của kỹ sư, không phải của mô hình</h2>
+<p>Mô hình cho điểm số; con người chọn ngưỡng. Hai loại sai cần cân bằng:</p>
+<ul>
+  <li><strong>Lọt lỗi (escape)</strong>: hàng lỗi bị cho là OK, đến tay khách hàng. Thường rất đắt.</li>
+  <li><strong>Loại nhầm (overkill)</strong>: hàng tốt bị loại, tốn chi phí và gây phiền cho sản xuất.</li>
+</ul>
+<p>Thực tế, nhà máy thường đặt ngưỡng để escape gần bằng 0 và chấp nhận một tỷ lệ overkill nhỏ, những sản phẩm bị loại sẽ được người kiểm tra lại.</p>
+
+<h2>Đưa vào sản xuất</h2>
+<ul>
+  <li>Xuất mô hình sang OpenVINO hoặc ONNX để chạy trên CPU công nghiệp (Anomalib hỗ trợ <code>engine.export</code>).</li>
+  <li>Đo thời gian xử lý mỗi ảnh so với cycle time dây chuyền.</li>
+  <li>Lưu lại ảnh NG kèm anomaly map để người vận hành xác nhận và để cải thiện mô hình.</li>
+  <li>Theo dõi trôi dữ liệu: đổi lô nguyên liệu, thay đèn, bụi trên ống kính đều làm điểm số thay đổi.</li>
+</ul>
+
+<h2>Dữ liệu để luyện tập</h2>
+<p>Bộ <strong>MVTec AD</strong> (15 loại vật thể và bề mặt) là chuẩn đánh giá phổ biến nhất cho bài toán này, có sẵn trong Anomalib. Xem thêm danh sách trong bài <a href="../tai-nguyen/dataset-computer-vision-mien-phi.html">dataset Computer Vision miễn phí</a>. Lưu ý MVTec AD dùng giấy phép phi thương mại CC BY-NC-SA 4.0.</p>

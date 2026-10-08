@@ -1,0 +1,57 @@
+<p>Một hệ thống Machine Vision thất bại thường không phải vì thuật toán mà vì <strong>chọn sai phần cứng</strong> ngay từ đầu: camera không đủ độ phân giải, ống kính không đủ trường nhìn, ảnh nhòe vì phơi sáng dài. Bài này hướng dẫn quy trình tính toán từng bước để chọn camera và ống kính.</p>
+
+<h2>Bước 1: xác định yêu cầu từ bài toán</h2>
+<ul>
+  <li><strong>Trường nhìn (FOV)</strong>: vùng cần nhìn thấy trên vật, cộng thêm biên cho sai lệch vị trí. Ví dụ: chi tiết 80 mm, lệch ±10 mm → FOV khoảng 100 mm.</li>
+  <li><strong>Kích thước đặc trưng nhỏ nhất</strong> cần phát hiện hoặc độ chính xác đo. Ví dụ: vết xước nhỏ nhất 0,2 mm.</li>
+  <li><strong>Khoảng cách làm việc (WD)</strong>: khoảng trống cơ khí cho phép từ ống kính tới vật. Ví dụ: 300 mm.</li>
+  <li><strong>Tốc độ</strong>: số sản phẩm mỗi giây, vật đứng yên hay chuyển động.</li>
+</ul>
+
+<h2>Bước 2: tính độ phân giải cần thiết</h2>
+<p>Quy tắc kinh nghiệm: một khuyết tật cần phủ <strong>ít nhất 3–4 pixel</strong> theo mỗi chiều để phát hiện ổn định.</p>
+<pre><code>Kích thước 1 pixel trên vật = 0,2 mm / 3 pixel ≈ 0,067 mm
+Số pixel theo chiều ngang   = 100 mm / 0,067 mm ≈ 1.500 pixel</code></pre>
+<p>Chọn camera có ít nhất 1.500 pixel theo chiều ngang, có dư địa: ví dụ cảm biến 2448 × 2048 (5 MP). Với bài toán <em>đo lường</em>, yêu cầu còn khắt khe hơn: sai số đo mong muốn nên lớn hơn vài lần kích thước một pixel trên vật.</p>
+
+<h2>Bước 3: chọn loại camera</h2>
+<table>
+  <tr><th>Lựa chọn</th><th>Khi nào dùng</th></tr>
+  <tr><td><strong>Đơn sắc (mono)</strong></td><td>Mặc định cho đo lường, kiểm tra hình dạng: nhạy sáng hơn, chi tiết sắc hơn camera màu cùng độ phân giải</td></tr>
+  <tr><td>Màu</td><td>Chỉ khi bài toán thật sự cần phân biệt màu</td></tr>
+  <tr><td><strong>Global shutter</strong></td><td>Vật chuyển động: toàn bộ cảm biến phơi sáng cùng lúc, không méo hình</td></tr>
+  <tr><td>Rolling shutter</td><td>Vật đứng yên, cần chi phí thấp</td></tr>
+  <tr><td>Area scan</td><td>Phần lớn ứng dụng</td></tr>
+  <tr><td>Line scan</td><td>Vật dạng cuộn liên tục (vải, giấy, thép tấm) hoặc bề mặt trụ quay</td></tr>
+</table>
+<p>Về chuẩn giao tiếp: <strong>GigE Vision</strong> (cáp dài tới 100 m, phổ biến nhất trong nhà máy), <strong>USB3 Vision</strong> (đơn giản, cáp ngắn), <strong>CoaXPress</strong> (băng thông rất cao cho camera tốc độ cao).</p>
+
+<h2>Bước 4: tính tiêu cự ống kính</h2>
+<p>Lấy ví dụ cảm biến 2448 pixel × 3,45 µm = <strong>8,45 mm</strong> chiều ngang.</p>
+<pre><code>Độ phóng đại   m = kích thước cảm biến / FOV = 8,45 / 100 = 0,0845
+Tiêu cự gần đúng  f = WD × m / (1 + m) = 300 × 0,0845 / 1,0845 ≈ 23,4 mm</code></pre>
+<p>Chọn ống kính tiêu chuẩn gần nhất là <strong>25 mm</strong>. Khi đó, để giữ FOV 100 mm, khoảng cách vật cần khoảng <code>f × (1 + 1/m) ≈ 25 × 12,8 ≈ 320 mm</code>. Công thức thấu kính mỏng chỉ là gần đúng; luôn kiểm tra bằng công cụ tính của hãng ống kính hoặc chụp thử.</p>
+
+<h2>Bước 5: kiểm tra những thông số hay bị bỏ quên</h2>
+<ul>
+  <li><strong>Ống kính phải "phủ" được cảm biến</strong>: ống kính thiết kế cho cảm biến 2/3" lắp lên cảm biến 1.1" sẽ bị tối góc.</li>
+  <li><strong>Độ phân giải của ống kính</strong>: pixel càng nhỏ thì ống kính càng phải tốt; ống kính rẻ trên camera 20 MP cho ảnh không nét hơn camera 5 MP.</li>
+  <li><strong>Độ sâu trường ảnh (DOF)</strong>: đóng khẩu độ (số f lớn hơn) để tăng DOF, đổi lại cần nhiều ánh sáng hơn.</li>
+  <li><strong>Ngàm ống kính</strong>: C-mount phổ biến nhất, kiểm tra tương thích với camera.</li>
+  <li><strong>Ống kính telecentric</strong>: độ phóng đại không đổi theo khoảng cách, gần như không méo phối cảnh. Gần như bắt buộc cho đo lường chính xác cao, nhưng FOV bị giới hạn bởi đường kính ống kính và giá cao.</li>
+</ul>
+
+<h2>Bước 6: thời gian phơi sáng khi vật chuyển động</h2>
+<pre><code>Nhòe chuyển động (pixel) = tốc độ vật × thời gian phơi sáng / kích thước pixel trên vật
+Ví dụ: 500 mm/s × 0,0001 s / 0,067 mm ≈ 0,75 pixel</code></pre>
+<p>Giữ độ nhòe dưới khoảng 1 pixel. Phơi sáng ngắn nghĩa là cần đèn mạnh hơn, hoặc dùng đèn chớp (strobe) đồng bộ với camera.</p>
+
+<h2>Tóm tắt quy trình</h2>
+<ol>
+  <li>FOV + đặc trưng nhỏ nhất → độ phân giải.</li>
+  <li>Chuyển động, màu sắc → loại cảm biến, shutter.</li>
+  <li>Kích thước cảm biến + FOV + WD → tiêu cự.</li>
+  <li>Kiểm tra độ phủ, độ phân giải ống kính, DOF, phơi sáng.</li>
+  <li>Chụp thử với mẫu thật trước khi đặt hàng số lượng lớn.</li>
+</ol>
+<p>Phần cứng chỉ hoàn chỉnh khi có ánh sáng phù hợp, xem tiếp <a href="7-kieu-chieu-sang-machine-vision.html">7 kiểu chiếu sáng trong Machine Vision</a>.</p>

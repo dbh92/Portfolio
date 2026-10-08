@@ -1,0 +1,73 @@
+<p>OpenCV là thư viện xử lý ảnh mã nguồn mở phổ biến nhất thế giới, dùng được từ Python, C++, C# (qua OpenCvSharp) và chạy trên hầu hết phần cứng. Bài này giúp bạn làm chủ ba việc cơ bản nhất: <strong>đọc/ghi ảnh, xử lý video và lấy hình từ camera</strong>.</p>
+
+<h2>Cài đặt</h2>
+<pre><code>python -m venv .venv
+# Windows: .venv\Scripts\activate    Linux/macOS: source .venv/bin/activate
+pip install opencv-python numpy</code></pre>
+<p>Gói <code>opencv-python</code> có giao diện cửa sổ (<code>imshow</code>). Trên máy chủ không màn hình, dùng <code>opencv-python-headless</code>. Đừng cài cả hai cùng lúc vì chúng xung đột nhau.</p>
+
+<h2>Đọc, hiển thị, ghi ảnh</h2>
+<pre><code>import cv2
+
+img = cv2.imread("san-pham.jpg")
+if img is None:                       # imread KHÔNG báo lỗi khi sai đường dẫn
+    raise FileNotFoundError("Không đọc được ảnh")
+
+cv2.imshow("Anh goc", img)
+cv2.waitKey(0)                        # chờ bấm phím
+cv2.destroyAllWindows()
+
+cv2.imwrite("ket-qua.png", img)       # PNG không nén mất dữ liệu
+cv2.imwrite("ket-qua.jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 95])</code></pre>
+<p>Hai lưu ý quan trọng: <code>cv2.imread</code> trả về <code>None</code> thay vì báo lỗi, và trên Windows nó không đọc được đường dẫn có dấu tiếng Việt. Cách xử lý đường dẫn Unicode:</p>
+<pre><code>import numpy as np
+data = np.fromfile("D:/Ảnh mẫu/lỗi-01.png", dtype=np.uint8)
+img = cv2.imdecode(data, cv2.IMREAD_COLOR)</code></pre>
+
+<h2>Đổi không gian màu</h2>
+<pre><code>gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+hsv  = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+# Lọc màu đỏ trong HSV (OpenCV dùng H: 0-179)
+mask1 = cv2.inRange(hsv, (0, 80, 60), (10, 255, 255))
+mask2 = cv2.inRange(hsv, (170, 80, 60), (179, 255, 255))
+red_mask = cv2.bitwise_or(mask1, mask2)</code></pre>
+<p>HSV tách <em>màu sắc</em> (H) khỏi <em>độ sáng</em> (V), nên lọc màu ổn định hơn nhiều so với lọc trực tiếp trên BGR khi ánh sáng thay đổi.</p>
+
+<h2>Vẽ kết quả lên ảnh</h2>
+<pre><code>cv2.rectangle(img, (50, 40), (220, 180), (0, 255, 0), 2)
+cv2.circle(img, (300, 200), 25, (255, 0, 0), -1)          # -1 = tô kín
+cv2.putText(img, "OK", (50, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)</code></pre>
+<p><code>putText</code> không hỗ trợ tiếng Việt có dấu; nếu cần, vẽ chữ bằng thư viện Pillow.</p>
+
+<h2>Đọc video và camera</h2>
+<pre><code>cap = cv2.VideoCapture(0)              # 0 = camera đầu tiên; hoặc "video.mp4"
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+
+while True:
+    ok, frame = cap.read()
+    if not ok:
+        break
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    cv2.imshow("Camera", gray)
+    if cv2.waitKey(1) &amp; 0xFF == ord("q"):   # bấm q để thoát
+        break
+
+cap.release()
+cv2.destroyAllWindows()</code></pre>
+<p><code>VideoCapture</code> dùng tốt cho webcam USB. Camera công nghiệp chuẩn GigE Vision/USB3 Vision thường cần SDK của hãng (hoặc thư viện như Harvesters), sau đó chuyển khung hình sang mảng NumPy để xử lý bằng OpenCV như bình thường.</p>
+
+<h2>Ghi video</h2>
+<pre><code>fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+out = cv2.VideoWriter("ghi-lai.mp4", fourcc, 30.0, (1280, 720))
+# trong vòng lặp: out.write(frame)  (kích thước frame phải đúng 1280x720)
+out.release()</code></pre>
+
+<h2>Bài tập</h2>
+<ol>
+  <li>Mở webcam, hiển thị song song ảnh màu và ảnh xám.</li>
+  <li>Vẽ một khung ROI cố định giữa màn hình và in độ sáng trung bình của ROI lên ảnh theo thời gian thực.</li>
+  <li>Bấm phím <code>s</code> để lưu khung hình hiện tại thành file PNG có tên theo thời gian.</li>
+</ol>
+<p>Bài tiếp theo: <a href="phan-nguong-contour-dem-do-vat.html">phân ngưỡng và contour để đếm, đo vật thể</a>.</p>

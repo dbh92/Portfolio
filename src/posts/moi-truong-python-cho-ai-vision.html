@@ -1,0 +1,61 @@
+<p>Rất nhiều người bỏ cuộc khi học AI không phải vì thuật toán khó, mà vì <strong>môi trường cài đặt rối tung</strong>: xung đột phiên bản, PyTorch không nhận GPU, code chạy máy này không chạy máy kia. Bài này hướng dẫn thiết lập môi trường Python gọn gàng, có thể tái lập, cho học AI và Computer Vision.</p>
+
+<h2>Nguyên tắc vàng: mỗi dự án một môi trường ảo</h2>
+<p>Không bao giờ <code>pip install</code> thẳng vào Python của hệ thống. Mỗi dự án có một môi trường ảo riêng với phiên bản thư viện riêng.</p>
+
+<h3>Cách 1: venv có sẵn trong Python</h3>
+<pre><code>python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# Linux / macOS
+source .venv/bin/activate
+
+pip install --upgrade pip
+pip install numpy opencv-python matplotlib jupyter
+pip freeze &gt; requirements.txt          # lưu danh sách phiên bản</code></pre>
+
+<h3>Cách 2: uv, nhanh hơn nhiều</h3>
+<p><a href="https://docs.astral.sh/uv/" rel="noopener" target="_blank">uv</a> là công cụ quản lý gói và môi trường cho Python, cài thư viện nhanh hơn pip đáng kể và quản lý luôn cả phiên bản Python.</p>
+<pre><code>uv init vision-demo
+cd vision-demo
+uv add numpy opencv-python ultralytics    # tự tạo .venv và ghi vào pyproject.toml
+uv run python main.py                     # chạy trong môi trường của dự án</code></pre>
+<p>File <code>pyproject.toml</code> và <code>uv.lock</code> giúp người khác (hoặc máy công nghiệp) tạo lại đúng môi trường chỉ bằng <code>uv sync</code>.</p>
+
+<h2>Cài PyTorch có GPU đúng cách</h2>
+<ol>
+  <li>Cài driver NVIDIA mới. Kiểm tra bằng lệnh <code>nvidia-smi</code>.</li>
+  <li>Vào trang <a href="https://pytorch.org/get-started/locally/" rel="noopener" target="_blank">pytorch.org/get-started</a>, chọn hệ điều hành, pip và phiên bản CUDA, <strong>copy đúng lệnh cài</strong> trang đó đưa ra (thường có tham số <code>--index-url</code> trỏ tới bản build CUDA).</li>
+  <li>Kiểm tra:</li>
+</ol>
+<pre><code>import torch
+print(torch.__version__)
+print(torch.cuda.is_available())          # phải là True
+print(torch.cuda.get_device_name(0))</code></pre>
+<p>Lỗi phổ biến nhất: cài <code>ultralytics</code> hoặc thư viện khác <em>trước</em>, pip kéo về bản PyTorch chỉ chạy CPU. Hãy cài PyTorch bản GPU trước, rồi mới cài các thư viện còn lại. Bạn <strong>không</strong> cần cài CUDA Toolkit riêng để chạy PyTorch; bản build của PyTorch đã kèm thư viện CUDA cần thiết, chỉ cần driver đủ mới.</p>
+
+<h2>Trình soạn thảo: VS Code</h2>
+<ul>
+  <li>Cài extension <strong>Python</strong> và <strong>Jupyter</strong> của Microsoft.</li>
+  <li><code>Ctrl+Shift+P</code> → <em>Python: Select Interpreter</em> → chọn <code>.venv</code> của dự án.</li>
+  <li>Dùng file <code>.ipynb</code> để thử nghiệm, xem ảnh trung gian; chuyển code ổn định sang file <code>.py</code>.</li>
+  <li>Bật định dạng tự động (ví dụ Ruff hoặc Black) để code luôn gọn.</li>
+</ul>
+
+<h2>Cấu trúc thư mục gợi ý</h2>
+<pre><code>vision-demo/
+  data/            # ảnh, dataset (không commit file lớn lên Git)
+  notebooks/       # thử nghiệm
+  src/             # mã nguồn chính
+  models/          # trọng số đã huấn luyện
+  pyproject.toml   # hoặc requirements.txt
+  .gitignore       # bỏ qua .venv/, data/, models/*.pt</code></pre>
+
+<h2>Checklist khi mang code sang máy khác</h2>
+<ul>
+  <li>Có file khai báo phiên bản (<code>requirements.txt</code> hoặc <code>uv.lock</code>).</li>
+  <li>Ghi rõ phiên bản Python, driver GPU trong README.</li>
+  <li>Không dùng đường dẫn tuyệt đối kiểu <code>C:\Users\ten-ban\...</code> trong code.</li>
+  <li>Thử cài lại từ đầu trên một máy sạch (hoặc máy ảo) trước khi giao cho khách hàng.</li>
+</ul>
+<p>Môi trường đã sẵn sàng? Bắt đầu với bài <a href="../hoc/numpy-anh-la-mang-so.html">NumPy cho xử lý ảnh</a>.</p>

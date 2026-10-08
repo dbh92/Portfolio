@@ -1,0 +1,76 @@
+<p>Đếm người ra vào cửa hàng, đếm xe qua cổng, đếm sản phẩm đa dạng trên băng tải: tất cả đều là một bài toán gồm hai phần, <strong>phát hiện</strong> (detection) và <strong>theo dõi</strong> (tracking). Dự án này dùng YOLO26 của Ultralytics với tracker tích hợp sẵn để đếm người đi qua một vạch theo hai chiều vào/ra.</p>
+
+<h2>Vì sao cần tracking?</h2>
+<p>Detection chỉ cho biết "khung hình này có 3 người ở đâu". Để đếm, ta cần biết người ở khung hình sau <em>có phải là cùng một người</em> ở khung hình trước không. Tracker gán cho mỗi đối tượng một <strong>ID</strong> ổn định qua các khung hình (Ultralytics mặc định dùng BoT-SORT, có thể đổi sang ByteTrack hoặc tracker khác qua file YAML).</p>
+
+<h2>Cài đặt</h2>
+<pre><code>pip install ultralytics opencv-python</code></pre>
+
+<h2>Mã nguồn</h2>
+<pre><code>import cv2
+from ultralytics import YOLO
+
+model = YOLO("yolo26n.pt")             # mô hình COCO, lớp 0 = person
+cap = cv2.VideoCapture("cua-ra-vao.mp4")
+LINE_Y = 360                           # vạch đếm nằm ngang
+
+last_y = {}                            # track_id -&gt; tọa độ y của tâm ở khung trước
+count_in, count_out = 0, 0
+
+while True:
+    ok, frame = cap.read()
+    if not ok:
+        break
+
+    results = model.track(frame, persist=True, classes=[0], conf=0.4, verbose=False)
+    boxes = results[0].boxes
+
+    if boxes.id is not None:
+        ids = boxes.id.int().tolist()
+        for tid, (cx, cy, w, h) in zip(ids, boxes.xywh.tolist()):
+            prev = last_y.get(tid)
+            if prev is not None:
+                if prev &lt; LINE_Y &lt;= cy:
+                    count_in += 1          # đi từ trên xuống: vào
+                elif prev &gt;= LINE_Y &gt; cy:
+                    count_out += 1         # đi từ dưới lên: ra
+            last_y[tid] = cy
+            cv2.rectangle(frame, (int(cx - w / 2), int(cy - h / 2)),
+                          (int(cx + w / 2), int(cy + h / 2)), (0, 255, 0), 2)
+            cv2.putText(frame, f"#{tid}", (int(cx - w / 2), int(cy - h / 2) - 6),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+
+    cv2.line(frame, (0, LINE_Y), (frame.shape[1], LINE_Y), (0, 255, 255), 2)
+    cv2.putText(frame, f"Vao: {count_in}  Ra: {count_out}", (10, 40),
+                cv2.FONT_HERSHEY_SIMPLEX, 1.1, (0, 0, 255), 3)
+    cv2.imshow("Dem nguoi", frame)
+    if cv2.waitKey(1) &amp; 0xFF == ord("q"):
+        break
+
+cap.release()
+cv2.destroyAllWindows()</code></pre>
+<p>Điểm mấu chốt là <code>persist=True</code>: nó giữ trạng thái tracker giữa các lần gọi, nếu thiếu thì ID bị đặt lại mỗi khung hình. Ultralytics cũng có sẵn lớp <code>solutions.ObjectCounter</code> làm việc tương tự chỉ với vài dòng; tự viết như trên giúp bạn hiểu cơ chế và tùy biến logic đếm.</p>
+
+<h2>Đánh giá độ chính xác</h2>
+<ol>
+  <li>Quay 10 phút video ở vị trí thật, tự đếm tay số người vào/ra.</li>
+  <li>Chạy chương trình, so sánh. Sai số tính theo % của tổng số lượt.</li>
+  <li>Xem lại các đoạn đếm sai để tìm nguyên nhân.</li>
+</ol>
+<table>
+  <tr><th>Lỗi</th><th>Nguyên nhân thường gặp</th><th>Cách khắc phục</th></tr>
+  <tr><td>Đếm thiếu khi đông người</td><td>Người che khuất nhau</td><td>Đặt camera cao, nhìn chéo xuống hoặc nhìn thẳng từ trên</td></tr>
+  <tr><td>Đếm 2 lần một người</td><td>Mất ID rồi gán ID mới khi đứng ngay vạch</td><td>Dùng "vùng đệm" hai vạch thay vì một vạch</td></tr>
+  <tr><td>Bỏ sót người ở xa</td><td>Người quá nhỏ trong ảnh</td><td>Tăng <code>imgsz</code>, dùng mô hình cỡ s/m</td></tr>
+</table>
+
+<h2>Chạy nhanh hơn trên máy yếu</h2>
+<ul>
+  <li>Giảm độ phân giải đầu vào hoặc chỉ xử lý mỗi khung thứ 2.</li>
+  <li>Xuất sang OpenVINO (CPU Intel) hoặc TensorRT (GPU NVIDIA, Jetson): <code>model.export(format="openvino")</code>.</li>
+  <li>Chỉ chạy detection trong vùng quanh cửa (cắt ROI).</li>
+</ul>
+
+<h2>Quyền riêng tư</h2>
+<p>Hệ thống đếm người xử lý hình ảnh con người. Chỉ lưu số đếm, không lưu video nếu không cần; thông báo rõ khu vực có camera và tuân thủ quy định về bảo vệ dữ liệu cá nhân hiện hành.</p>
+<p>Muốn huấn luyện YOLO cho vật thể của riêng bạn? Xem bài <a href="../hoc/yolo26-object-detection-nhap-mon.html">Object Detection với YOLO26</a>.</p>

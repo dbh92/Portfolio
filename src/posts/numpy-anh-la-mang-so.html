@@ -1,0 +1,66 @@
+<p>Trước khi học OpenCV hay Deep Learning, có một sự thật cần nắm thật chắc: <strong>với máy tính, một bức ảnh chỉ là một mảng số</strong>. Hiểu điều này, mọi thao tác xử lý ảnh (cắt, tăng sáng, tạo mặt nạ, đếm điểm ảnh) chỉ còn là phép toán trên mảng NumPy.</p>
+
+<h2>Ảnh xám và ảnh màu trong NumPy</h2>
+<p>Khi đọc ảnh bằng OpenCV, kết quả là một <code>numpy.ndarray</code>:</p>
+<pre><code>import cv2
+import numpy as np
+
+img = cv2.imread("linh-kien.jpg")          # ảnh màu
+gray = cv2.imread("linh-kien.jpg", cv2.IMREAD_GRAYSCALE)
+
+print(type(img))        # &lt;class 'numpy.ndarray'&gt;
+print(img.shape)        # (480, 640, 3)  -&gt; cao, rộng, số kênh
+print(gray.shape)       # (480, 640)
+print(img.dtype)        # uint8 -&gt; mỗi giá trị từ 0 đến 255</code></pre>
+<ul>
+  <li><strong>Ảnh xám</strong>: mảng 2 chiều <code>(cao, rộng)</code>, 0 là đen, 255 là trắng.</li>
+  <li><strong>Ảnh màu</strong>: mảng 3 chiều <code>(cao, rộng, 3)</code>. OpenCV lưu theo thứ tự <strong>BGR</strong>, không phải RGB, đây là lỗi người mới gặp nhiều nhất khi hiển thị ảnh bằng matplotlib.</li>
+  <li>Chỉ số luôn là <code>img[hàng, cột]</code>, tức <code>img[y, x]</code>, ngược với thói quen viết (x, y).</li>
+</ul>
+
+<h2>Đọc và sửa từng điểm ảnh</h2>
+<pre><code>b, g, r = img[100, 200]          # điểm ảnh ở hàng 100, cột 200
+img[100, 200] = (0, 0, 255)      # tô đỏ (B=0, G=0, R=255)
+
+rgb = img[:, :, ::-1]            # đổi BGR -&gt; RGB bằng cách đảo trục kênh</code></pre>
+<p>Không bao giờ dùng vòng lặp <code>for</code> duyệt từng điểm ảnh để xử lý: ảnh 5 megapixel có 5 triệu điểm, vòng lặp Python sẽ chậm hàng trăm lần so với phép toán vector hóa của NumPy.</p>
+
+<h2>Cắt vùng quan tâm (ROI) bằng slicing</h2>
+<p>Trong Machine Vision, ta hầu như chỉ xử lý một vùng nhỏ của ảnh, gọi là ROI (Region of Interest):</p>
+<pre><code>roi = img[150:350, 200:500]      # y từ 150 đến 350, x từ 200 đến 500
+roi_copy = roi.copy()            # slicing trả về "view", sửa roi là sửa luôn img</code></pre>
+<p>Lưu ý <code>roi</code> là <em>view</em> chia sẻ bộ nhớ với ảnh gốc. Muốn xử lý độc lập thì phải <code>.copy()</code>.</p>
+
+<h2>Cái bẫy tràn số uint8</h2>
+<p>Đây là lỗi kinh điển khi tăng độ sáng:</p>
+<pre><code>a = np.array([200], dtype=np.uint8)
+print(a + 100)                   # [44]  -&gt; 300 bị "quay vòng" thành 44!
+
+# Cách đúng 1: đổi sang kiểu lớn hơn rồi cắt về 0..255
+bright = np.clip(img.astype(np.int16) + 60, 0, 255).astype(np.uint8)
+
+# Cách đúng 2: dùng hàm của OpenCV, tự động "bão hòa" ở 255
+bright = cv2.add(img, (60, 60, 60, 0))</code></pre>
+
+<h2>Mặt nạ (mask) và phép so sánh</h2>
+<p>Phép so sánh trên mảng trả về mảng <code>True/False</code>, đó chính là một mặt nạ:</p>
+<pre><code>mask = gray &gt; 128                # điểm sáng
+print(mask.sum())                # số điểm ảnh sáng
+ratio = mask.mean() * 100        # % diện tích sáng
+gray_dark = gray.copy()
+gray_dark[mask] = 0              # tô đen tất cả điểm sáng</code></pre>
+<p>Kỹ thuật này dùng rất nhiều trong kiểm tra sản phẩm: ví dụ đếm tỷ lệ điểm tối trên bề mặt sáng để phát hiện vết bẩn.</p>
+
+<h2>Các thống kê hữu ích</h2>
+<pre><code>print(gray.mean(), gray.std())   # độ sáng trung bình, độ tương phản
+print(gray.min(), gray.max())
+hist = np.bincount(gray.ravel(), minlength=256)   # histogram 256 mức xám</code></pre>
+<p>Độ sáng trung bình của ROI là một "cảm biến" đơn giản mà rất hiệu quả: kiểm tra có/không có linh kiện, nắp chai đã đậy chưa, đèn có sáng không.</p>
+
+<h2>Bài tập</h2>
+<ol>
+  <li>Đọc một ảnh, in ra <code>shape</code>, <code>dtype</code> và độ sáng trung bình của từng kênh B, G, R.</li>
+  <li>Cắt ROI ở giữa ảnh, tăng sáng 50 mức mà không bị tràn số, ghi ra file mới.</li>
+  <li>Tạo mặt nạ các điểm có độ xám nhỏ hơn 50 và tính tỷ lệ % diện tích của chúng.</li>
+</ol>
+<p>Nắm vững NumPy là nền móng cho chặng tiếp theo trong lộ trình Vision Engineer: <a href="../lo-trinh/vision-engineer.html#step-opencv">OpenCV</a>.</p>

@@ -1,0 +1,72 @@
+<p>Khi bài toán quá phức tạp để viết luật bằng tay (vật đa dạng hình dạng, nền lộn xộn, ánh sáng thay đổi), ta chuyển sang <strong>Object Detection</strong> bằng Deep Learning. Họ mô hình phổ biến nhất cho việc này là <strong>YOLO</strong>, và phiên bản Ultralytics mới nhất hiện tại là <strong>YOLO26</strong> (ra mắt tháng 1/2026).</p>
+
+<h2>YOLO26 có gì mới?</h2>
+<ul>
+  <li><strong>Không cần NMS</strong> (end-to-end): mô hình trả thẳng các khung cuối cùng, bỏ bước hậu xử lý Non-Maximum Suppression, giúp triển khai trên thiết bị biên đơn giản và nhanh hơn.</li>
+  <li><strong>Bỏ DFL</strong> (Distribution Focal Loss) ở đầu dự đoán khung, xuất mô hình sang ONNX/TensorRT gọn hơn.</li>
+  <li>Công thức huấn luyện mới: bộ tối ưu <strong>MuSGD</strong>, <strong>ProgLoss</strong> và <strong>STAL</strong> (cải thiện vật nhỏ).</li>
+  <li>Theo tài liệu Ultralytics, YOLO26n chạy CPU (ONNX) nhanh hơn tới khoảng 43% so với YOLO11n; YOLO26n đạt 40,9 mAP50-95 trên COCO.</li>
+</ul>
+<p>Một lưu ý pháp lý: thư viện Ultralytics phát hành theo giấy phép <strong>AGPL-3.0</strong>. Dùng trong sản phẩm thương mại đóng mã nguồn cần mua giấy phép Enterprise.</p>
+
+<h2>Cài đặt và chạy thử</h2>
+<pre><code>pip install ultralytics</code></pre>
+<pre><code>from ultralytics import YOLO
+
+model = YOLO("yolo26n.pt")               # tự tải trọng số đã huấn luyện trên COCO
+results = model("duong-pho.jpg")         # dự đoán
+for r in results:
+    for box in r.boxes:
+        cls = model.names[int(box.cls)]
+        conf = float(box.conf)
+        x1, y1, x2, y2 = box.xyxy[0].tolist()
+        print(f"{cls}: {conf:.2f} tại ({x1:.0f},{y1:.0f})-({x2:.0f},{y2:.0f})")
+results[0].save("ket-qua.jpg")</code></pre>
+<p>Các cỡ mô hình: <code>n</code> (nano), <code>s</code>, <code>m</code>, <code>l</code>, <code>x</code>. Bắt đầu bằng <code>n</code> hoặc <code>s</code>, chỉ tăng cỡ khi độ chính xác chưa đủ.</p>
+
+<h2>Huấn luyện trên dữ liệu của bạn</h2>
+<h3>1. Chuẩn bị dữ liệu theo định dạng YOLO</h3>
+<pre><code>dataset/
+  images/train/  images/val/
+  labels/train/  labels/val/      # mỗi ảnh một file .txt cùng tên</code></pre>
+<p>Mỗi dòng trong file nhãn là một vật: <code>class cx cy w h</code>, tọa độ <strong>chuẩn hóa về 0–1</strong> theo kích thước ảnh. Ví dụ <code>0 0.512 0.430 0.120 0.085</code>. Dùng công cụ gán nhãn như CVAT hoặc Label Studio để xuất đúng định dạng.</p>
+
+<h3>2. File cấu hình data.yaml</h3>
+<pre><code>path: dataset
+train: images/train
+val: images/val
+names:
+  0: vit
+  1: oc
+  2: long_den</code></pre>
+
+<h3>3. Huấn luyện</h3>
+<pre><code>from ultralytics import YOLO
+
+model = YOLO("yolo26n.pt")               # transfer learning từ trọng số COCO
+model.train(data="data.yaml", epochs=100, imgsz=640, batch=16)
+
+metrics = model.val()
+print(metrics.box.map50, metrics.box.map)   # mAP50 và mAP50-95</code></pre>
+<p>Kết quả (biểu đồ loss, ma trận nhầm lẫn, trọng số tốt nhất <code>best.pt</code>) nằm trong thư mục <code>runs/detect/train*/</code>.</p>
+
+<h2>Mẹo để mô hình tốt hơn</h2>
+<ul>
+  <li><strong>Dữ liệu quan trọng hơn mô hình.</strong> 300 ảnh gán nhãn cẩn thận, đa dạng góc chụp và ánh sáng tốt hơn 3.000 ảnh na ná nhau.</li>
+  <li>Tập validation phải giống điều kiện thực tế ở nhà máy, không lấy ngẫu nhiên từ cùng một đoạn video với tập train.</li>
+  <li>Vật nhỏ: tăng <code>imgsz</code> (ví dụ 1024) hoặc cắt ảnh thành ô (tiling).</li>
+  <li>Xem kỹ các ảnh mô hình sai trong tập val, bổ sung dữ liệu đúng loại đó thay vì tăng epoch.</li>
+</ul>
+
+<h2>Xuất mô hình để triển khai</h2>
+<pre><code>model = YOLO("runs/detect/train/weights/best.pt")
+model.export(format="onnx")              # hoặc "engine" (TensorRT), "openvino"</code></pre>
+<p>File ONNX chạy được bằng ONNX Runtime trong C#, C++ hoặc Python trên máy tính công nghiệp. Đây chính là chặng <a href="../lo-trinh/vision-engineer.html#step-deployment">Deployment</a> trong lộ trình Vision Engineer.</p>
+
+<h2>Bài tập</h2>
+<ol>
+  <li>Chạy YOLO26n trên webcam và in số người trong khung hình.</li>
+  <li>Chụp và gán nhãn 100 ảnh 2 loại vật dụng trên bàn, huấn luyện 50 epoch, ghi lại mAP50.</li>
+  <li>Xuất ONNX và so sánh tốc độ CPU giữa <code>.pt</code> và <code>.onnx</code>.</li>
+</ol>
+<p class="note">Nguồn tham khảo: <a href="https://docs.ultralytics.com/models/yolo26/" rel="noopener" target="_blank">Ultralytics YOLO26 Docs</a>, <a href="https://arxiv.org/abs/2509.25164" rel="noopener" target="_blank">YOLO26: Key Architectural Enhancements and Performance Benchmarking (arXiv)</a>.</p>

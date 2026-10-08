@@ -1,0 +1,78 @@
+<p>Rất nhiều bài toán Machine Vision trong nhà máy, như đếm sản phẩm, kiểm tra có/không có linh kiện, đo diện tích, được giải quyết bằng một chuỗi xử lý cổ điển: <strong>làm mờ → phân ngưỡng → hình thái học → tìm contour → đo đặc trưng</strong>. Không cần AI, chạy cực nhanh và dễ giải thích với khách hàng.</p>
+
+<h2>Bước 1: làm mờ để giảm nhiễu</h2>
+<pre><code>import cv2
+import numpy as np
+
+img = cv2.imread("khay-oc-vit.png")
+gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+blur = cv2.GaussianBlur(gray, (5, 5), 0)</code></pre>
+<p>Kernel càng lớn thì càng mịn nhưng biên vật càng nhòe. Với nhiễu dạng "muối tiêu", dùng <code>cv2.medianBlur(gray, 5)</code> hiệu quả hơn.</p>
+
+<h2>Bước 2: phân ngưỡng</h2>
+<p>Phân ngưỡng biến ảnh xám thành ảnh nhị phân: vật = trắng (255), nền = đen (0).</p>
+<pre><code># Ngưỡng cố định: dùng khi ánh sáng rất ổn định
+_, th = cv2.threshold(blur, 120, 255, cv2.THRESH_BINARY)
+
+# Otsu: tự tìm ngưỡng tối ưu khi histogram có 2 đỉnh (vật và nền)
+t, th = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+print("Ngưỡng Otsu:", t)
+
+# Thích nghi: khi ánh sáng không đều trên ảnh
+th_ad = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                              cv2.THRESH_BINARY, 31, 5)</code></pre>
+<p>Nếu vật tối hơn nền, dùng <code>cv2.THRESH_BINARY_INV</code> để vật luôn là màu trắng. Thực tế, <strong>ánh sáng tốt quan trọng hơn thuật toán phân ngưỡng giỏi</strong>: một tấm đèn nền (backlight) biến bài toán khó thành dễ.</p>
+
+<h2>Bước 3: hình thái học (morphology)</h2>
+<pre><code>kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+clean = cv2.morphologyEx(th, cv2.MORPH_OPEN, kernel)     # xóa đốm nhiễu nhỏ
+clean = cv2.morphologyEx(clean, cv2.MORPH_CLOSE, kernel) # lấp lỗ nhỏ trong vật</code></pre>
+
+<h2>Bước 4: tìm contour và lọc theo diện tích</h2>
+<pre><code>contours, _ = cv2.findContours(clean, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+objects = []
+for c in contours:
+    area = cv2.contourArea(c)
+    if area &lt; 200:                  # bỏ nhiễu
+        continue
+    x, y, w, h = cv2.boundingRect(c)
+    M = cv2.moments(c)
+    cx, cy = int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"])
+    objects.append((area, cx, cy))
+    cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
+    cv2.circle(img, (cx, cy), 3, (0, 0, 255), -1)
+
+print("Số vật:", len(objects))</code></pre>
+<p><code>RETR_EXTERNAL</code> chỉ lấy đường bao ngoài cùng, phù hợp để đếm. Nếu cần lỗ bên trong (ví dụ kiểm tra vòng đệm có lỗ hay không) thì dùng <code>RETR_CCOMP</code> hoặc <code>RETR_TREE</code> và đọc mảng <code>hierarchy</code>.</p>
+
+<h2>Bước 5: đặc trưng để phân loại OK/NG</h2>
+<table>
+  <tr><th>Đặc trưng</th><th>Cách tính</th><th>Dùng để</th></tr>
+  <tr><td>Diện tích</td><td><code>cv2.contourArea(c)</code></td><td>Phát hiện vật thiếu, vỡ, dính chùm</td></tr>
+  <tr><td>Chu vi</td><td><code>cv2.arcLength(c, True)</code></td><td>Phát hiện mép răng cưa, ba via</td></tr>
+  <tr><td>Độ tròn</td><td><code>4π·A / P²</code></td><td>Phân biệt vật tròn và méo</td></tr>
+  <tr><td>Hình chữ nhật xoay</td><td><code>cv2.minAreaRect(c)</code></td><td>Đo dài/rộng, góc xoay</td></tr>
+  <tr><td>Độ đặc (solidity)</td><td><code>A / diện tích bao lồi</code></td><td>Phát hiện vết khuyết, mẻ</td></tr>
+</table>
+<pre><code>import math
+for c in contours:
+    A = cv2.contourArea(c)
+    P = cv2.arcLength(c, True)
+    if A &lt; 200 or P == 0:
+        continue
+    roundness = 4 * math.pi * A / (P * P)
+    hull_area = cv2.contourArea(cv2.convexHull(c))
+    solidity = A / hull_area if hull_area else 0
+    status = "OK" if 0.80 &lt; roundness and solidity &gt; 0.95 else "NG"</code></pre>
+
+<h2>Khi hai vật dính nhau</h2>
+<p>Hai vật chạm nhau sẽ thành một contour lớn, làm sai số đếm. Cách xử lý phổ biến: chia theo diện tích chuẩn (<code>round(area / area_1_vat)</code>) hoặc tách bằng <em>distance transform + watershed</em>. Tốt nhất vẫn là thiết kế cơ khí (rung, tách hàng) để vật không chồng lên nhau.</p>
+
+<h2>Bài tập</h2>
+<ol>
+  <li>Chụp ảnh 10 đồng xu trên nền giấy trắng, đếm số đồng xu.</li>
+  <li>Phân loại đồng xu theo diện tích thành 2 nhóm và tô 2 màu khác nhau.</li>
+  <li>Thử làm lại với ánh sáng lệch một bên: phân ngưỡng cố định, Otsu hay thích nghi cho kết quả tốt nhất?</li>
+</ol>
+<p>Muốn áp dụng vào bài toán thật? Xem dự án <a href="../projects/dem-san-pham-bang-tai-opencv.html">đếm sản phẩm trên băng tải</a>.</p>

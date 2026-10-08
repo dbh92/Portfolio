@@ -1,0 +1,82 @@
+<p>Trong nhà máy, rất nhiều phần mềm điều khiển trạm kiểm tra được viết bằng <strong>C# và .NET</strong>: giao diện WinForms/WPF quen thuộc, dễ kết nối PLC, cơ sở dữ liệu và SDK camera công nghiệp (đa số hãng camera đều có SDK .NET). Tin vui là bạn vẫn dùng được toàn bộ sức mạnh của OpenCV trong C# nhờ thư viện <strong>OpenCvSharp</strong>.</p>
+
+<h2>OpenCvSharp là gì?</h2>
+<p>OpenCvSharp là lớp bọc (wrapper) .NET cho OpenCV, giữ tên hàm gần giống bản C++: <code>Cv2.Threshold</code>, <code>Cv2.FindContours</code>, <code>Mat</code>… Nên mọi tài liệu và kinh nghiệm OpenCV bằng Python/C++ đều chuyển sang C# rất dễ.</p>
+
+<h2>Tạo dự án và cài đặt</h2>
+<pre><code>dotnet new console -n VisionDemo
+cd VisionDemo
+dotnet add package OpenCvSharp4
+dotnet add package OpenCvSharp4.runtime.win</code></pre>
+<p>Gói <code>OpenCvSharp4</code> chỉ chứa phần managed; bạn cần thêm gói <em>runtime</em> chứa thư viện native cho hệ điều hành (ví dụ <code>runtime.win</code> cho Windows). Khi làm giao diện WinForms/WPF, cài thêm <code>OpenCvSharp4.Extensions</code> (chuyển <code>Mat</code> sang <code>Bitmap</code>) hoặc <code>OpenCvSharp4.WpfExtensions</code>.</p>
+
+<h2>Đếm vật thể: từ Python sang C#</h2>
+<p>Đây là chuỗi xử lý "làm mờ → Otsu → contour" trong bài <a href="phan-nguong-contour-dem-do-vat.html">phân ngưỡng và contour</a>, viết lại bằng C#:</p>
+<pre><code>using OpenCvSharp;
+
+using var src = Cv2.ImRead("khay-oc-vit.png", ImreadModes.Color);
+if (src.Empty()) throw new Exception("Không đọc được ảnh");
+
+using var gray = new Mat();
+using var blur = new Mat();
+using var bin = new Mat();
+Cv2.CvtColor(src, gray, ColorConversionCodes.BGR2GRAY);
+Cv2.GaussianBlur(gray, blur, new Size(5, 5), 0);
+double t = Cv2.Threshold(blur, bin, 0, 255, ThresholdTypes.Binary | ThresholdTypes.Otsu);
+
+Cv2.FindContours(bin, out Point[][] contours, out HierarchyIndex[] _,
+    RetrievalModes.External, ContourApproximationModes.ApproxSimple);
+
+int count = 0;
+foreach (var c in contours)
+{
+    double area = Cv2.ContourArea(c);
+    if (area &lt; 200) continue;                  // bỏ nhiễu
+    count++;
+    Rect r = Cv2.BoundingRect(c);
+    Cv2.Rectangle(src, r, Scalar.LimeGreen, 2);
+}
+
+Cv2.PutText(src, $"Count: {count}", new Point(10, 30),
+    HersheyFonts.HersheySimplex, 1.0, Scalar.Red, 2);
+Cv2.ImWrite("ket-qua.png", src);
+Console.WriteLine($"Ngưỡng Otsu = {t}, số vật = {count}");</code></pre>
+
+<h2>Quản lý bộ nhớ: điều quan trọng nhất với Mat trong C#</h2>
+<p><code>Mat</code> giữ bộ nhớ <em>native</em> (ngoài vùng quản lý của .NET). Garbage Collector không biết một <code>Mat</code> 5 megapixel "nặng" thế nào, nên trong vòng lặp camera chạy liên tục, quên giải phóng sẽ làm RAM tăng dần đến khi chương trình sập. Quy tắc:</p>
+<ul>
+  <li>Luôn dùng <code>using var</code> hoặc gọi <code>Dispose()</code> cho mọi <code>Mat</code> tạo ra.</li>
+  <li>Trong vòng lặp, tái sử dụng các <code>Mat</code> tạm thay vì tạo mới mỗi khung hình.</li>
+  <li>Kiểm tra bằng Task Manager: bộ nhớ phải đi ngang khi chạy vài giờ.</li>
+</ul>
+
+<h2>Đọc camera trong vòng lặp</h2>
+<pre><code>using var cap = new VideoCapture(0);
+using var frame = new Mat();
+using var gray = new Mat();
+
+while (true)
+{
+    if (!cap.Read(frame) || frame.Empty()) break;
+    Cv2.CvtColor(frame, gray, ColorConversionCodes.BGR2GRAY);
+    Cv2.ImShow("Camera", gray);
+    if (Cv2.WaitKey(1) == 'q') break;
+}</code></pre>
+<p>Với camera công nghiệp, bạn lấy buffer ảnh từ SDK của hãng rồi tạo <code>Mat</code> từ con trỏ dữ liệu, tránh copy không cần thiết.</p>
+
+<h2>Python hay C#?</h2>
+<table>
+  <tr><th></th><th>Python</th><th>C#</th></tr>
+  <tr><td>Thử nghiệm thuật toán, AI</td><td>Rất mạnh (Jupyter, PyTorch)</td><td>Hạn chế hơn</td></tr>
+  <tr><td>Giao diện vận hành trên máy công nghiệp</td><td>Làm được nhưng ít phổ biến</td><td>Rất mạnh (WinForms, WPF)</td></tr>
+  <tr><td>Kết nối PLC, SDK camera, database</td><td>Có thư viện</td><td>Hệ sinh thái .NET rất đầy đủ</td></tr>
+  <tr><td>Chạy mô hình AI</td><td>Trực tiếp</td><td>Qua ONNX Runtime / OpenCV DNN</td></tr>
+</table>
+<p>Cách làm phổ biến của nhiều kỹ sư: <strong>nghiên cứu và huấn luyện bằng Python, xuất mô hình ONNX, triển khai trong ứng dụng C#</strong>. Biết cả hai ngôn ngữ là lợi thế lớn khi ứng tuyển vị trí Vision Engineer.</p>
+
+<h2>Bài tập</h2>
+<ol>
+  <li>Viết lại chương trình đếm vật bằng C#, in ra diện tích từng vật.</li>
+  <li>Tạo ứng dụng WinForms có nút "Chụp", hiển thị ảnh camera trong <code>PictureBox</code> và kết quả OK/NG.</li>
+  <li>Chạy vòng lặp camera 30 phút và theo dõi bộ nhớ để chắc chắn không rò rỉ.</li>
+</ol>
