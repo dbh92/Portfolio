@@ -28,7 +28,6 @@ with open(os.path.join(SRC, "posts.json"), encoding="utf-8") as fh:
     DATA = json.load(fh)
 
 SITE = DATA["site"]
-CATS = {c["slug"]: c for c in DATA["categories"]}
 POSTS = sorted(DATA["posts"], key=lambda p: p["date"], reverse=True)
 BY_SLUG = {p["slug"]: p for p in POSTS}
 e = html.escape
@@ -64,13 +63,6 @@ def load_body(p):
         return fh.read()
 
 
-for _p in POSTS:
-    _p["body"] = load_body(_p)
-    _words = len(strip_tags(_p["body"]).split())
-    _p["minutes"] = max(1, -(-_words // 180))  # ~180 từ/phút, làm tròn lên
-    _p["cat"] = CATS[_p["category"]]
-
-
 # ---------------------------------------------------------------- menu & lộ trình
 with open(os.path.join(SRC, "nav.json"), encoding="utf-8") as fh:
     NAV = json.load(fh)
@@ -81,6 +73,17 @@ SECTIONS = NAV["sections"]
 SEC = {s["key"]: s for s in SECTIONS}
 JOURNEY = sorted((s for s in SECTIONS if s.get("step")), key=lambda s: s["step"])
 PATH_BY = {p["slug"]: p for p in PATHS}
+
+# Chuyên mục của bài viết = một mục menu có chủ đề (hoc, projects, kien-thuc, tin-tuc-ai, ngoai-ngu, tai-nguyen).
+# Bài nằm ở <mục>/<slug>.html, cùng thư mục với trang chủ đề của mục đó.
+CATS = {s["slug"]: {"slug": s["slug"], "name": s["label"], "section": s["key"]} for s in SECTIONS if s.get("groups")}
+
+for _p in POSTS:
+    _p["body"] = load_body(_p)
+    _words = len(strip_tags(_p["body"]).split())
+    _p["minutes"] = max(1, -(-_words // 180))  # ~180 từ/phút, làm tròn lên
+    assert _p["category"] in CATS, f"Bài {_p['slug']}: category phải là một trong {sorted(CATS)}"
+    _p["cat"] = CATS[_p["category"]]
 
 
 def section_url(sec):
@@ -113,6 +116,12 @@ for _s in SECTIONS:
                 "sec": _s, "group": _g, "item": _i, "posts": match_posts(_i),
             })
 TOPIC_BY = {t["ref"]: t for t in TOPICS}
+
+
+def section_posts(sec):
+    """Bài thuộc một mục menu: nằm trong mục đó hoặc khớp một chủ đề của mục."""
+    refs = {id(p) for t in TOPICS if t["sec"] is sec for p in t["posts"]}
+    return [p for p in POSTS if p["category"] == sec.get("slug") or id(p) in refs]
 assert len(TOPIC_BY) == len(TOPICS), "Trùng slug chủ đề trong src/nav.json"
 assert not {t["url"] for t in TOPICS} & {f"{p['category']}/{p['slug']}.html" for p in POSTS}, \
     "Slug chủ đề trùng với slug bài viết"
@@ -354,6 +363,7 @@ def footer(root):
     learn = col("Học &amp; thực hành", JOURNEY)
     explore = col("Khám phá", [s for s in SECTIONS if s.get("groups") and not s.get("step")])
     latest = "".join(f'<li><a href="{root}{post_url(p)}">{e(p["title"])}</a></li>' for p in POSTS[:4])
+    latest = f"<div><h3>Bài mới</h3><ul>{latest}</ul></div>" if latest else ""
     year = date.today().year
     return f"""<footer class="site-footer">
   <div class="container footer-grid">
@@ -363,10 +373,7 @@ def footer(root):
     </div>
     {learn}
     {explore}
-    <div>
-      <h3>Bài mới</h3>
-      <ul>{latest}</ul>
-    </div>
+    {latest}
     <div>
       <h3>HọcFree</h3>
       <ul>
@@ -399,19 +406,6 @@ def meta(p, author=False):
             f'<span>{ICON["clock"]}{p["minutes"]} phút đọc</span></div>')
 
 
-def card_overlay(root, p, big=False, eager=False):
-    load = "eager" if eager else "lazy"
-    return f"""<article class="card-overlay{' big' if big else ''}">
-  <img src="{root}{img_url(p)}" alt="{e(p['title'])}" width="1200" height="675" loading="{load}">
-  <div class="card-overlay-body">
-    {cat_pill(root, p)}
-    <h{2 if big else 3}><a href="{root}{post_url(p)}">{e(p['title'])}</a></h{2 if big else 3}>
-    {'<p>' + e(p['excerpt']) + '</p>' if big else ''}
-    {meta(p)}
-  </div>
-</article>"""
-
-
 def post_row(root, p):
     return f"""<article class="post-row">
   <a class="thumb" href="{root}{post_url(p)}" tabindex="-1" aria-hidden="true"><img src="{root}{img_url(p)}" alt="" width="1200" height="675" loading="lazy"></a>
@@ -434,34 +428,30 @@ def card(root, p):
 
 
 def sidebar(root, current=None):
-    popular = [BY_SLUG[s] for s in DATA["popular"] if s in BY_SLUG and s != current][:5]
+    popular = [BY_SLUG[x] for x in DATA.get("popular", []) if x in BY_SLUG and x != current][:5]
     pop = "".join(
         f'<li><a href="{root}{post_url(p)}"><span class="num">{i}</span><span class="t">{e(p["title"])}</span></a></li>'
         for i, p in enumerate(popular, 1))
-    cats = "".join(
-        f'<li><a href="{root}{c["slug"]}/index.html"><span>{e(c["name"])}</span><span class="count">'
-        f'{sum(1 for p in POSTS if p["category"] == c["slug"])}</span></a></li>'
-        for c in DATA["categories"])
+    secs = "".join(
+        f'<li><a href="{root}{section_url(s)}"><span>{e(s["label"])}</span>'
+        f'<span class="count">{count_label(len(section_posts(s)))}</span></a></li>'
+        for s in SECTIONS if s.get("groups"))
     tags = sorted({t for p in POSTS for t in p["tags"]}, key=str.lower)
     tag_html = "".join(f'<a class="tag" href="{root}search.html?q={e(t)}">{e(t)}</a>' for t in tags)
+    pop_w = f'<section class="widget"><h2 class="widget-title">Đọc nhiều nhất</h2><ol class="popular">{pop}</ol></section>' if pop else ""
+    tag_w = f'<section class="widget"><h2 class="widget-title">Thẻ</h2><div class="tags">{tag_html}</div></section>' if tags else ""
     return f"""<aside class="sidebar">
-  <section class="widget">
-    <h2 class="widget-title">Đọc nhiều nhất</h2>
-    <ol class="popular">{pop}</ol>
-  </section>
+  {pop_w}
   <section class="widget">
     <h2 class="widget-title">Chuyên mục</h2>
-    <ul class="cat-list">{cats}</ul>
+    <ul class="cat-list">{secs}</ul>
   </section>
   <section class="widget widget-about">
     <h2 class="widget-title">Về HọcFree</h2>
-    <p>Nơi chia sẻ <strong>miễn phí</strong> kiến thức lập trình, ngoại ngữ và kinh nghiệm tự học dành cho người Việt. Không quảng cáo, không thu phí.</p>
+    <p>Nơi học <strong>miễn phí</strong> AI, lập trình, Computer Vision và ngoại ngữ dành cho người Việt. Không quảng cáo, không thu phí.</p>
     <a class="btn" href="{root}gioi-thieu.html">Tìm hiểu thêm</a>
   </section>
-  <section class="widget">
-    <h2 class="widget-title">Thẻ</h2>
-    <div class="tags">{tag_html}</div>
-  </section>
+  {tag_w}
 </aside>"""
 
 
@@ -473,92 +463,62 @@ def section_title(text, link=None, root=""):
 # ---------------------------------------------------------------- trang chủ
 def build_home():
     root = ""
-    hero_main, *hero_side = POSTS[:3]
-    latest = POSTS[3:11]
-    blocks = ""
-    for c in DATA["categories"]:
-        ps = [p for p in POSTS if p["category"] == c["slug"]][:4]
-        first, rest = ps[0], ps[1:]
-        items = "".join(
-            f'<li><a href="{post_url(p)}">{e(p["title"])}</a><time datetime="{p["date"]}">{fmt_date(p["date"])}</time></li>'
-            for p in rest)
-        blocks += f"""<section class="cat-block cat-{c['slug']}">
-  {section_title(c['name'], c['slug'] + '/index.html')}
-  {card(root, first)}
-  <ul class="cat-block-list">{items}</ul>
-</section>"""
+    flag = next(p for p in PATHS if p.get("flagship"))
+    explore = ""
+    for sec in SECTIONS:
+        if not sec.get("groups") or sec.get("layout") == "mega":
+            continue
+        chips = "".join(f'<a class="chip" href="{t["url"]}">{e(t["item"]["label"])}</a>'
+                        for t in TOPICS if t["sec"] is sec)
+        kick = f'<span class="explore-step">Bước {sec["step"]} · {e(sec["stepLabel"])}</span>' if sec.get("step") else ""
+        explore += f"""<section class="explore-card">
+      {kick}
+      <h3><a href="{section_url(sec)}">{e(sec['label'])}</a></h3>
+      <p>{e(sec['description'])}</p>
+      <div class="chips">{chips}</div>
+    </section>"""
+    latest = ""
+    if POSTS:
+        latest = section_title("Bài viết mới nhất") + f'<div class="post-list">{"".join(post_row(root, p) for p in POSTS[:8])}</div>'
+    hoc = SEC["hoc"]
+
     page = head(root, SITE["name"], SITE["description"], "", "assets/images/og-default.jpg")
-    page += header(root)
+    page += header(root, active="home")
     page += f"""<main id="main">
-  <section class="container hero">
-    {card_overlay(root, hero_main, big=True, eager=True)}
-    <div class="hero-side">
-      {''.join(card_overlay(root, p, eager=True) for p in hero_side)}
+  <section class="home-hero">
+    <div class="container home-hero-inner">
+      <div class="home-hero-text">
+        <p class="home-eyebrow">Miễn phí · Tiếng Việt · Thực chiến</p>
+        <h1>Học AI, lập trình và Computer Vision, từ nền tảng đến kỹ sư</h1>
+        <p class="lead">HọcFree giúp bạn học có lộ trình: nắm kiến thức, làm dự án thực tế và định hướng nghề nghiệp, đặc biệt là <strong>Vision Engineer</strong>.</p>
+        <div class="home-cta">
+          <a class="btn" href="lo-trinh/index.html">Bắt đầu học</a>
+          <button type="button" class="btn ghost search-open">{ICON['search']}Tìm chủ đề</button>
+        </div>
+      </div>
+      {feature_card(root, flag)}
     </div>
   </section>
 
-  <div class="container layout">
-    <div class="content">
-      {section_title('Bài viết mới nhất')}
-      <div class="post-list">
-        {''.join(post_row(root, p) for p in latest)}
-      </div>
-    </div>
-    {sidebar(root)}
-  </div>
-
-  <div class="band">
-    <div class="container cat-blocks">
-      {blocks}
-    </div>
+  <div class="container home">
+    <section aria-labelledby="journey-t">
+      <h2 class="home-h2" id="journey-t">Học → Thực hành → Trở thành kỹ sư</h2>
+      {journey(root)}
+    </section>
+    <section>
+      {section_title(hoc['label'], section_url(hoc))}
+      {topic_overview(root, hoc)}
+    </section>
+    <section aria-labelledby="explore-t">
+      <h2 class="home-h2" id="explore-t">Khám phá thêm</h2>
+      <div class="explore-grid">{explore}</div>
+    </section>
+    {latest}
   </div>
 </main>
 """
     page += footer(root)
     write("index.html", page)
-
-
-# ---------------------------------------------------------------- chuyên mục
-def topic_bar(root, c):
-    """Thanh chủ đề cho chuyên mục là trang tổng của một mục menu (vd. Ngoại ngữ)."""
-    sec = next((s for s in SECTIONS if s.get("category") == c["slug"]), None)
-    if not sec:
-        return ""
-    chips = "".join(f'<a class="chip" href="{root}{t["url"]}">{e(t["item"]["label"])}</a>'
-                    for t in TOPICS if t["sec"] is sec)
-    return f'<nav class="container topic-bar" aria-label="Chủ đề {e(sec["label"])}"><span>Chủ đề:</span>{chips}</nav>'
-
-
-def build_category(c):
-    root = "../"
-    ps = [p for p in POSTS if p["category"] == c["slug"]]
-    page = head(root, c["name"], c["description"], f"{c['slug']}/", img_url(ps[0]))
-    page += header(root, active=c["section"])
-    page += f"""<main id="main">
-  <div class="page-head cat-{c['slug']}">
-    <div class="container">
-      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{root}index.html">Trang chủ</a><span>/</span><span>{e(c['name'])}</span></nav>
-      <h1>{e(c['name'])}</h1>
-      <p>{e(c['description'])}</p>
-      <span class="page-count">{len(ps)} bài viết</span>
-    </div>
-  </div>
-  {topic_bar(root, c)}
-  <section class="container hero hero-cat">
-    {card_overlay(root, ps[0], big=True, eager=True)}
-    <div class="hero-side">{''.join(card_overlay(root, p, eager=True) for p in ps[1:3])}</div>
-  </section>
-  <div class="container layout">
-    <div class="content">
-      {section_title('Tất cả bài viết')}
-      <div class="post-list">{''.join(post_row(root, p) for p in ps)}</div>
-    </div>
-    {sidebar(root)}
-  </div>
-</main>
-"""
-    page += footer(root)
-    write(f"{c['slug']}/index.html", page)
 
 
 # ---------------------------------------------------------------- bài viết
@@ -695,8 +655,8 @@ def build_search():
 def build_about():
     root = ""
     counts = "".join(
-        f'<li><a href="{c["slug"]}/index.html"><strong>{e(c["name"])}</strong></a>: {e(c["description"])}</li>'
-        for c in DATA["categories"])
+        f'<li><a href="{section_url(s)}"><strong>{e(s["label"])}</strong></a>: {e(s["description"])}</li>'
+        for s in SECTIONS if s.get("description"))
     page = head(root, "Giới thiệu", "Giới thiệu về HọcFree.vn – website chia sẻ kiến thức miễn phí.",
                 "gioi-thieu.html", "assets/images/og-default.jpg")
     page += header(root)
@@ -705,7 +665,7 @@ def build_about():
     <article class="article">
       <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{root}index.html">Trang chủ</a><span>/</span><span>Giới thiệu</span></nav>
       <header class="article-head"><h1>Về HọcFree</h1>
-      <p class="lead">Kiến thức là để chia sẻ. HọcFree ra đời với mong muốn ai cũng có thể tự học lập trình và ngoại ngữ mà không phải lo về chi phí.</p></header>
+      <p class="lead">Kiến thức là để chia sẻ. HọcFree ra đời với mong muốn ai cũng có thể tự học AI, lập trình, Computer Vision và ngoại ngữ mà không phải lo về chi phí.</p></header>
       <div class="prose">
         <h2>Chúng tôi viết về điều gì?</h2>
         <ul>{counts}</ul>
@@ -716,7 +676,7 @@ def build_about():
           <li><strong>Chính xác</strong>: nội dung được kiểm tra và cập nhật thường xuyên.</li>
         </ul>
         <h2>Công nghệ</h2>
-        <p>Website được xây dựng hoàn toàn bằng HTML, CSS và JavaScript thuần, lưu trữ miễn phí trên GitHub Pages. Bạn có thể đọc bài <a href="blog/github-pages-ten-mien-rieng.html">Làm website miễn phí với GitHub Pages</a> để tự làm một trang như thế này.</p>
+        <p>Website được xây dựng hoàn toàn bằng HTML, CSS và JavaScript thuần, lưu trữ miễn phí trên GitHub Pages. </p>
       </div>
     </article>
     {sidebar(root)}
@@ -836,15 +796,10 @@ def build_topic(t):
     write(t["url"], page)
 
 
-def build_hub(sec):
-    root = "../"
+def topic_overview(root, sec):
+    """Lưới chủ đề của một mục: thẻ chủ đề (1 nhóm) hoặc thẻ theo nhóm (nhiều nhóm)."""
     topics = [t for t in TOPICS if t["sec"] is sec]
-    ps = []
-    for t in topics:
-        ps += [p for p in t["posts"] if p not in ps]
-    ps.sort(key=lambda p: p["date"], reverse=True)
     groups = sec["groups"]
-
     if len(groups) == 1:
         cards = "".join(
             f'<a class="topic-card" href="{root}{t["url"]}"><b>{e(t["item"]["label"])}</b>'
@@ -860,6 +815,15 @@ def build_hub(sec):
                 for i in g["items"])
             body += f'<section class="group-card" id="{g["slug"]}"><h2>{e(g["label"])}</h2><ul class="cat-list">{lis}</ul></section>'
         body += "</div>"
+    return body
+
+
+def build_hub(sec):
+    root = "../"
+    topics = [t for t in TOPICS if t["sec"] is sec]
+    ps = section_posts(sec)
+
+    body = topic_overview(root, sec)
 
     feature = ""
     if sec.get("featured"):
@@ -870,7 +834,7 @@ def build_hub(sec):
     strip = journey(root, sec["key"]) if sec.get("step") else ""
 
     head_html = page_head(root, [(sec["label"], None)], sec["label"], sec["description"], step_kicker(sec),
-                          f"{len(topics)} chủ đề · {len(ps)} bài viết")
+                          f"{len(topics)} chủ đề" + (f" · {len(ps)} bài viết" if ps else ""))
     page = head(root, sec["label"], sec["description"], f"{sec['slug']}/", "assets/images/og-default.jpg")
     page += header(root, active=sec["key"])
     page += f"""<main id="main">
@@ -1074,8 +1038,7 @@ def build_search_data():
 
 def build_sitemap():
     today = date.today().isoformat()
-    urls = [("", today, "1.0")] + [(f"{c['slug']}/", today, "0.8") for c in DATA["categories"]]
-    urls += [(f"{s['slug']}/", today, "0.8") for s in SECTIONS if s.get("groups") and not s.get("category")]
+    urls = [("", today, "1.0")] + [(f"{s['slug']}/", today, "0.8") for s in SECTIONS if s.get("groups")]
     urls += [("lo-trinh/", today, "0.8")] + [(path_url(p), today, "0.9") for p in PATHS if p.get("steps")]
     urls += [(t["url"], today, "0.6") for t in TOPICS if t["posts"]]  # chủ đề trống để noindex
     urls += [(post_url(p), p["date"], "0.7") for p in POSTS] + [("gioi-thieu.html", today, "0.3")]
@@ -1089,12 +1052,10 @@ def build_sitemap():
 
 def main():
     build_home()
-    for c in DATA["categories"]:
-        build_category(c)
     for p in POSTS:
         build_post(p)
     for s in SECTIONS:
-        if s.get("groups") and not s.get("category"):
+        if s.get("groups"):
             build_hub(s)
     for t in TOPICS:
         if not t["item"].get("href"):
@@ -1109,7 +1070,7 @@ def main():
     build_login()
     build_search_data()
     build_sitemap()
-    print(f"Xong: {len(POSTS)} bài viết, {len(DATA['categories'])} chuyên mục, {len(TOPICS)} chủ đề, "
+    print(f"Xong: {len(POSTS)} bài viết, {len(TOPICS)} chủ đề, "
           f"{sum(1 for p in PATHS if p.get('steps'))} lộ trình.")
 
 

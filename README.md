@@ -6,16 +6,15 @@ Website tĩnh (HTML + CSS + JavaScript thuần) chia sẻ kiến thức lập tr
 
 ```
 index.html                 Trang chủ
-kien-thuc-lap-trinh/       Chuyên mục + bài viết
-ngoai-ngu/                 Chuyên mục + bài viết
-blog/                      Chuyên mục + bài viết
-search.html, gioi-thieu.html, 404.html
+hoc/ projects/ lo-trinh/   Các mục menu: trang tổng, trang chủ đề và bài viết của mục
+kien-thuc/ tin-tuc-ai/ ngoai-ngu/ tai-nguyen/
+search.html, gioi-thieu.html, dang-nhap.html, 404.html
 assets/css/style.css       Giao diện (sáng/tối, responsive)
 assets/js/main.js          Tìm kiếm, menu mobile, copy code, dark mode…
 assets/js/search-data.js   Chỉ mục tìm kiếm (tự sinh)
 assets/images/posts/       Ảnh đại diện bài viết (1200x675)
-src/posts.json             Danh sách bài viết, chuyên mục, bài "đọc nhiều"
-src/posts/<slug>.html      Nội dung từng bài
+src/posts.json             Thông tin website, danh sách bài viết, bài "đọc nhiều"
+src/posts/<slug>.html      Nội dung từng bài (tạo thư mục khi viết bài đầu tiên)
 src/nav.json               Menu chính: mục → nhóm → chủ đề
 src/learning-paths.json    Learning Paths (lộ trình Vision Engineer…)
 tools/build.py             Sinh toàn bộ trang HTML từ src/
@@ -23,11 +22,25 @@ tools/make_thumbs.py       Vẽ ảnh đại diện tự động
 CNAME                      Tên miền riêng: hocfree.vn
 ```
 
-> Các file `.html` ở thư mục gốc và trong các chuyên mục được **sinh tự động**, hãy sửa trong `src/` rồi build lại.
+> Các file `.html` ở thư mục gốc và trong các mục được **sinh tự động**, hãy sửa trong `src/` rồi build lại.
 
 ## Thêm bài viết mới
 
-1. Thêm một mục vào `posts` trong `src/posts.json` (slug, category, title, excerpt, date, tags, thumb).
+1. Thêm một mục vào `posts` trong `src/posts.json`, ví dụ:
+   ```json
+   {
+     "slug": "opencv-doc-anh-tu-camera",
+     "category": "hoc",
+     "title": "OpenCV: đọc ảnh từ camera",
+     "excerpt": "…",
+     "date": "2026-10-10",
+     "tags": ["OpenCV", "Python"],
+     "thumb": { "glyph": "CV", "colors": ["#ff6a3d", "#1b2a49"] }
+   }
+   ```
+   - `category` là một mục menu: `hoc`, `projects`, `kien-thuc`, `tin-tuc-ai`, `ngoai-ngu`, `tai-nguyen`.
+     Bài nằm ở `<category>/<slug>.html`.
+   - `tags` quyết định bài hiện ở trang chủ đề nào (khớp với `tags` của chủ đề trong `src/nav.json`).
 2. Tạo file `src/posts/<slug>.html` chứa phần thân bài (`<h2>`, `<p>`, `<ul>`, `<pre><code>`…).
 3. Ảnh đại diện: chép ảnh thật vào `assets/images/posts/<slug>.jpg` (tỉ lệ 16:9), hoặc chạy
    `python tools/make_thumbs.py` để vẽ tự động.
