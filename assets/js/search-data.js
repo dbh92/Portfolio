@@ -8,7 +8,7 @@ window.HF_POSTS = [
   "cn": "Ngoại ngữ",
   "d": "09/10/2026",
   "m": 5,
-  "img": "assets/images/posts/lo-trinh-700-toeic.jpg",
+  "img": "assets/images/posts/lo-trinh-700-toeic.webp",
   "tags": [
    "Tiếng Anh",
    "TOEIC"
@@ -22,7 +22,7 @@ window.HF_POSTS = [
   "cn": "Ngoại ngữ",
   "d": "09/10/2026",
   "m": 4,
-  "img": "assets/images/posts/cach-hoc-tieng-anh-hieu-qua.jpg",
+  "img": "assets/images/posts/cach-hoc-tieng-anh-hieu-qua.webp",
   "tags": [
    "Tiếng Anh"
   ]
@@ -35,7 +35,7 @@ window.HF_POSTS = [
   "cn": "Ngoại ngữ",
   "d": "09/10/2026",
   "m": 3,
-  "img": "assets/images/posts/giao-trinh-hf-700toeic.jpg",
+  "img": "assets/images/posts/giao-trinh-hf-700toeic.webp",
   "tags": [
    "Tiếng Anh",
    "TOEIC",
@@ -50,7 +50,7 @@ window.HF_POSTS = [
   "cn": "Ngoại ngữ",
   "d": "09/10/2026",
   "m": 4,
-  "img": "assets/images/posts/lo-trinh-hsk3.jpg",
+  "img": "assets/images/posts/lo-trinh-hsk3.webp",
   "tags": [
    "Tiếng Trung",
    "HSK"
@@ -64,7 +64,7 @@ window.HF_POSTS = [
   "cn": "Ngoại ngữ",
   "d": "09/10/2026",
   "m": 4,
-  "img": "assets/images/posts/cach-hoc-tieng-trung-hieu-qua.jpg",
+  "img": "assets/images/posts/cach-hoc-tieng-trung-hieu-qua.webp",
   "tags": [
    "Tiếng Trung"
   ]
@@ -77,7 +77,7 @@ window.HF_POSTS = [
   "cn": "Ngoại ngữ",
   "d": "09/10/2026",
   "m": 4,
-  "img": "assets/images/posts/giao-trinh-hf-hsk3.jpg",
+  "img": "assets/images/posts/giao-trinh-hf-hsk3.webp",
   "tags": [
    "Tiếng Trung",
    "HSK",
@@ -92,7 +92,7 @@ window.HF_POSTS = [
   "cn": "Tin tức AI",
   "d": "08/10/2026",
   "m": 3,
-  "img": "assets/images/posts/sierra-meta-personal-agent-protocol.jpg",
+  "img": "assets/images/posts/sierra-meta-personal-agent-protocol.webp",
   "tags": [
    "AI News",
    "AI Industry",
@@ -108,7 +108,7 @@ window.HF_POSTS = [
   "cn": "Tài nguyên",
   "d": "08/10/2026",
   "m": 3,
-  "img": "assets/images/posts/cach-tra-cuu-tai-lieu-opencv-pytorch-ultralytics.jpg",
+  "img": "assets/images/posts/cach-tra-cuu-tai-lieu-opencv-pytorch-ultralytics.webp",
   "tags": [
    "Documentation",
    "OpenCV",
@@ -124,7 +124,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "07/10/2026",
   "m": 3,
-  "img": "assets/images/posts/xay-portfolio-du-an-ai-vision.jpg",
+  "img": "assets/images/posts/xay-portfolio-du-an-ai-vision.webp",
   "tags": [
    "Kinh nghiệm",
    "Tips"
@@ -138,7 +138,7 @@ window.HF_POSTS = [
   "cn": "Tin tức AI",
   "d": "07/10/2026",
   "m": 3,
-  "img": "assets/images/posts/mistral-large-4-ra-mat-ban-xem-truoc.jpg",
+  "img": "assets/images/posts/mistral-large-4-ra-mat-ban-xem-truoc.webp",
   "tags": [
    "AI Models",
    "AI News",
@@ -153,7 +153,7 @@ window.HF_POSTS = [
   "cn": "Tin tức AI",
   "d": "07/10/2026",
   "m": 3,
-  "img": "assets/images/posts/google-constellation-hop-dong-dien-hat-nhan.jpg",
+  "img": "assets/images/posts/google-constellation-hop-dong-dien-hat-nhan.webp",
   "tags": [
    "AI Industry",
    "Technology"
@@ -167,7 +167,7 @@ window.HF_POSTS = [
   "cn": "Học AI & Lập trình",
   "d": "06/10/2026",
   "m": 4,
-  "img": "assets/images/posts/toi-uu-toc-do-suy-luan-onnx-tensorrt-openvino.jpg",
+  "img": "assets/images/posts/toi-uu-toc-do-suy-luan-onnx-tensorrt-openvino.webp",
   "tags": [
    "Deployment",
    "Deep Learning"
@@ -181,7 +181,7 @@ window.HF_POSTS = [
   "cn": "Tin tức AI",
   "d": "06/10/2026",
   "m": 3,
-  "img": "assets/images/posts/wikimedia-phat-hien-agent-openai.jpg",
+  "img": "assets/images/posts/wikimedia-phat-hien-agent-openai.webp",
   "tags": [
    "AI News",
    "AI Agents"
@@ -195,7 +195,7 @@ window.HF_POSTS = [
   "cn": "Tài nguyên",
   "d": "06/10/2026",
   "m": 3,
-  "img": "assets/images/posts/doc-tai-lieu-sdk-camera-genicam.jpg",
+  "img": "assets/images/posts/doc-tai-lieu-sdk-camera-genicam.webp",
   "tags": [
    "Documentation",
    "Camera",
@@ -210,7 +210,7 @@ window.HF_POSTS = [
   "cn": "Projects",
   "d": "05/10/2026",
   "m": 4,
-  "img": "assets/images/posts/chatbot-hoi-dap-tai-lieu-rag.jpg",
+  "img": "assets/images/posts/chatbot-hoi-dap-tai-lieu-rag.webp",
   "tags": [
    "AI Project",
    "LLM",
@@ -226,7 +226,7 @@ window.HF_POSTS = [
   "cn": "Tài nguyên",
   "d": "05/10/2026",
   "m": 3,
-  "img": "assets/images/posts/cong-cu-ai-ho-tro-tu-hoc.jpg",
+  "img": "assets/images/posts/cong-cu-ai-ho-tro-tu-hoc.webp",
   "tags": [
    "AI Tools",
    "Tự học"
@@ -240,7 +240,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "04/10/2026",
   "m": 3,
-  "img": "assets/images/posts/moi-truong-python-cho-ai-vision.jpg",
+  "img": "assets/images/posts/moi-truong-python-cho-ai-vision.webp",
   "tags": [
    "Công cụ",
    "Python",
@@ -256,7 +256,7 @@ window.HF_POSTS = [
   "cn": "Projects",
   "d": "04/10/2026",
   "m": 4,
-  "img": "assets/images/posts/agent-tra-cuu-tai-lieu-tao-phieu-sua-chua.jpg",
+  "img": "assets/images/posts/agent-tra-cuu-tai-lieu-tao-phieu-sua-chua.webp",
   "tags": [
    "AI Project",
    "AI Agents"
@@ -270,7 +270,7 @@ window.HF_POSTS = [
   "cn": "Tin tức AI",
   "d": "04/10/2026",
   "m": 3,
-  "img": "assets/images/posts/apple-camera-gia-dinh-mo-ta-van-ban.jpg",
+  "img": "assets/images/posts/apple-camera-gia-dinh-mo-ta-van-ban.webp",
   "tags": [
    "Technology",
    "CV News"
@@ -284,7 +284,7 @@ window.HF_POSTS = [
   "cn": "Học AI & Lập trình",
   "d": "03/10/2026",
   "m": 4,
-  "img": "assets/images/posts/yolo26-object-detection-nhap-mon.jpg",
+  "img": "assets/images/posts/yolo26-object-detection-nhap-mon.webp",
   "tags": [
    "Object Detection",
    "YOLO",
@@ -301,7 +301,7 @@ window.HF_POSTS = [
   "cn": "Projects",
   "d": "03/10/2026",
   "m": 3,
-  "img": "assets/images/posts/canh-bao-sai-tu-the-lam-viec-pose-estimation.jpg",
+  "img": "assets/images/posts/canh-bao-sai-tu-the-lam-viec-pose-estimation.webp",
   "tags": [
    "CV Project",
    "Computer Vision"
@@ -315,7 +315,7 @@ window.HF_POSTS = [
   "cn": "Tin tức AI",
   "d": "03/10/2026",
   "m": 3,
-  "img": "assets/images/posts/robot-hinh-nguoi-nua-dau-2026.jpg",
+  "img": "assets/images/posts/robot-hinh-nguoi-nua-dau-2026.webp",
   "tags": [
    "Robotics",
    "AI Industry"
@@ -329,7 +329,7 @@ window.HF_POSTS = [
   "cn": "Tài nguyên",
   "d": "03/10/2026",
   "m": 4,
-  "img": "assets/images/posts/cong-cu-gan-nhan-du-lieu-anh-mien-phi.jpg",
+  "img": "assets/images/posts/cong-cu-gan-nhan-du-lieu-anh-mien-phi.webp",
   "tags": [
    "AI Tools",
    "Dataset"
@@ -343,7 +343,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "02/10/2026",
   "m": 3,
-  "img": "assets/images/posts/kiem-tra-hieu-chuan-dinh-ky-san-xuat.jpg",
+  "img": "assets/images/posts/kiem-tra-hieu-chuan-dinh-ky-san-xuat.webp",
   "tags": [
    "Calibration",
    "Machine Vision"
@@ -357,7 +357,7 @@ window.HF_POSTS = [
   "cn": "Tin tức AI",
   "d": "02/10/2026",
   "m": 3,
-  "img": "assets/images/posts/ucla-chip-quang-hoc-phat-hien-deepfake.jpg",
+  "img": "assets/images/posts/ucla-chip-quang-hoc-phat-hien-deepfake.webp",
   "tags": [
    "Technology",
    "Computer Vision",
@@ -372,7 +372,7 @@ window.HF_POSTS = [
   "cn": "Tài nguyên",
   "d": "02/10/2026",
   "m": 3,
-  "img": "assets/images/posts/tai-lieu-on-toeic-mien-phi-chinh-thong.jpg",
+  "img": "assets/images/posts/tai-lieu-on-toeic-mien-phi-chinh-thong.webp",
   "tags": [
    "Ebook",
    "TOEIC"
@@ -386,7 +386,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "01/10/2026",
   "m": 3,
-  "img": "assets/images/posts/opc-ua-cho-ky-su-vision.jpg",
+  "img": "assets/images/posts/opc-ua-cho-ky-su-vision.webp",
   "tags": [
    "Industrial Automation",
    "PLC"
@@ -400,7 +400,7 @@ window.HF_POSTS = [
   "cn": "Projects",
   "d": "01/10/2026",
   "m": 4,
-  "img": "assets/images/posts/dem-nguoi-qua-cua-yolo-tracking.jpg",
+  "img": "assets/images/posts/dem-nguoi-qua-cua-yolo-tracking.webp",
   "tags": [
    "CV Project",
    "Object Detection",
@@ -417,7 +417,7 @@ window.HF_POSTS = [
   "cn": "Tài nguyên",
   "d": "01/10/2026",
   "m": 3,
-  "img": "assets/images/posts/tai-lieu-ultralytics-cac-mode.jpg",
+  "img": "assets/images/posts/tai-lieu-ultralytics-cac-mode.webp",
   "tags": [
    "Documentation",
    "YOLO"
@@ -431,7 +431,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "30/09/2026",
   "m": 5,
-  "img": "assets/images/posts/giao-tiep-camera-vision-voi-plc.jpg",
+  "img": "assets/images/posts/giao-tiep-camera-vision-voi-plc.webp",
   "tags": [
    "PLC",
    "Industrial Automation",
@@ -447,7 +447,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "30/09/2026",
   "m": 3,
-  "img": "assets/images/posts/so-sanh-pytorch-tensorflow-onnx.jpg",
+  "img": "assets/images/posts/so-sanh-pytorch-tensorflow-onnx.webp",
   "tags": [
    "Công cụ",
    "PyTorch",
@@ -462,7 +462,7 @@ window.HF_POSTS = [
   "cn": "Tài nguyên",
   "d": "30/09/2026",
   "m": 3,
-  "img": "assets/images/posts/viet-tai-lieu-ky-thuat-du-an-vision.jpg",
+  "img": "assets/images/posts/viet-tai-lieu-ky-thuat-du-an-vision.webp",
   "tags": [
    "Documentation",
    "Kinh nghiệm"
@@ -476,7 +476,7 @@ window.HF_POSTS = [
   "cn": "Học AI & Lập trình",
   "d": "29/09/2026",
   "m": 3,
-  "img": "assets/images/posts/vision-dan-huong-robot-gap-vat.jpg",
+  "img": "assets/images/posts/vision-dan-huong-robot-gap-vat.webp",
   "tags": [
    "Robot",
    "Machine Vision",
@@ -491,7 +491,7 @@ window.HF_POSTS = [
   "cn": "Tài nguyên",
   "d": "29/09/2026",
   "m": 3,
-  "img": "assets/images/posts/sach-khoa-hoc-computer-vision-mien-phi.jpg",
+  "img": "assets/images/posts/sach-khoa-hoc-computer-vision-mien-phi.webp",
   "tags": [
    "Ebook",
    "Deep Learning",
@@ -507,7 +507,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "28/09/2026",
   "m": 3,
-  "img": "assets/images/posts/kiem-soat-anh-sang-moi-truong-nha-may.jpg",
+  "img": "assets/images/posts/kiem-soat-anh-sang-moi-truong-nha-may.webp",
   "tags": [
    "Lighting",
    "Machine Vision"
@@ -521,7 +521,7 @@ window.HF_POSTS = [
   "cn": "Projects",
   "d": "28/09/2026",
   "m": 4,
-  "img": "assets/images/posts/phat-hien-loi-be-mat-anomaly-detection.jpg",
+  "img": "assets/images/posts/phat-hien-loi-be-mat-anomaly-detection.webp",
   "tags": [
    "Industrial Project",
    "AI Vision",
@@ -537,7 +537,7 @@ window.HF_POSTS = [
   "cn": "Học AI & Lập trình",
   "d": "27/09/2026",
   "m": 3,
-  "img": "assets/images/posts/yolo26-seg-phan-doan-vet-loi.jpg",
+  "img": "assets/images/posts/yolo26-seg-phan-doan-vet-loi.webp",
   "tags": [
    "Segmentation",
    "YOLO",
@@ -552,7 +552,7 @@ window.HF_POSTS = [
   "cn": "Tài nguyên",
   "d": "27/09/2026",
   "m": 3,
-  "img": "assets/images/posts/tai-lieu-hoc-llm-mien-phi.jpg",
+  "img": "assets/images/posts/tai-lieu-hoc-llm-mien-phi.webp",
   "tags": [
    "Ebook",
    "LLM"
@@ -566,7 +566,7 @@ window.HF_POSTS = [
   "cn": "Học AI & Lập trình",
   "d": "26/09/2026",
   "m": 4,
-  "img": "assets/images/posts/csharp-opencvsharp-xu-ly-anh.jpg",
+  "img": "assets/images/posts/csharp-opencvsharp-xu-ly-anh.webp",
   "tags": [
    "C#",
    ".NET",
@@ -581,7 +581,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "26/09/2026",
   "m": 3,
-  "img": "assets/images/posts/mes-truy-xuat-nguon-goc-vision.jpg",
+  "img": "assets/images/posts/mes-truy-xuat-nguon-goc-vision.webp",
   "tags": [
    "MES",
    "Industrial Automation"
@@ -595,7 +595,7 @@ window.HF_POSTS = [
   "cn": "Projects",
   "d": "26/09/2026",
   "m": 3,
-  "img": "assets/images/posts/nhan-dien-bien-so-xe-yolo-ocr.jpg",
+  "img": "assets/images/posts/nhan-dien-bien-so-xe-yolo-ocr.webp",
   "tags": [
    "CV Project",
    "OCR",
@@ -610,7 +610,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "25/09/2026",
   "m": 3,
-  "img": "assets/images/posts/ai-agent-la-gi.jpg",
+  "img": "assets/images/posts/ai-agent-la-gi.webp",
   "tags": [
    "AI Agents",
    "LLM"
@@ -624,7 +624,7 @@ window.HF_POSTS = [
   "cn": "Tài nguyên",
   "d": "25/09/2026",
   "m": 3,
-  "img": "assets/images/posts/cheat-sheet-cong-thuc-quang-hoc-machine-vision.jpg",
+  "img": "assets/images/posts/cheat-sheet-cong-thuc-quang-hoc-machine-vision.webp",
   "tags": [
    "Cheat Sheet",
    "Lens",
@@ -639,7 +639,7 @@ window.HF_POSTS = [
   "cn": "Học AI & Lập trình",
   "d": "24/09/2026",
   "m": 4,
-  "img": "assets/images/posts/csharp-modbus-tcp-socket-plc.jpg",
+  "img": "assets/images/posts/csharp-modbus-tcp-socket-plc.webp",
   "tags": [
    "C#",
    ".NET",
@@ -655,7 +655,7 @@ window.HF_POSTS = [
   "cn": "Tin tức AI",
   "d": "24/09/2026",
   "m": 3,
-  "img": "assets/images/posts/qualcomm-mua-picknik-moveit.jpg",
+  "img": "assets/images/posts/qualcomm-mua-picknik-moveit.webp",
   "tags": [
    "Robotics",
    "AI Industry"
@@ -669,7 +669,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "23/09/2026",
   "m": 4,
-  "img": "assets/images/posts/rule-based-hay-deep-learning-kiem-tra-loi.jpg",
+  "img": "assets/images/posts/rule-based-hay-deep-learning-kiem-tra-loi.webp",
   "tags": [
    "AI Vision",
    "Machine Vision",
@@ -685,7 +685,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "23/09/2026",
   "m": 3,
-  "img": "assets/images/posts/docker-cho-ky-su-ai.jpg",
+  "img": "assets/images/posts/docker-cho-ky-su-ai.webp",
   "tags": [
    "Công cụ",
    "Deployment"
@@ -699,7 +699,7 @@ window.HF_POSTS = [
   "cn": "Tin tức AI",
   "d": "23/09/2026",
   "m": 3,
-  "img": "assets/images/posts/cognex-mua-realsense.jpg",
+  "img": "assets/images/posts/cognex-mua-realsense.webp",
   "tags": [
    "CV News",
    "AI Industry",
@@ -715,7 +715,7 @@ window.HF_POSTS = [
   "cn": "Tin tức AI",
   "d": "23/09/2026",
   "m": 3,
-  "img": "assets/images/posts/openai-gpt-6-sol-luna.jpg",
+  "img": "assets/images/posts/openai-gpt-6-sol-luna.webp",
   "tags": [
    "AI Models"
   ]
@@ -728,7 +728,7 @@ window.HF_POSTS = [
   "cn": "Học AI & Lập trình",
   "d": "22/09/2026",
   "m": 3,
-  "img": "assets/images/posts/unet-phan-doan-anh.jpg",
+  "img": "assets/images/posts/unet-phan-doan-anh.webp",
   "tags": [
    "Segmentation",
    "Deep Learning",
@@ -743,7 +743,7 @@ window.HF_POSTS = [
   "cn": "Tin tức AI",
   "d": "22/09/2026",
   "m": 3,
-  "img": "assets/images/posts/boston-dynamics-trung-tam-atlas-hyundai.jpg",
+  "img": "assets/images/posts/boston-dynamics-trung-tam-atlas-hyundai.webp",
   "tags": [
    "Robotics",
    "AI Industry"
@@ -757,7 +757,7 @@ window.HF_POSTS = [
   "cn": "Tài nguyên",
   "d": "22/09/2026",
   "m": 3,
-  "img": "assets/images/posts/cheat-sheet-opencv-python.jpg",
+  "img": "assets/images/posts/cheat-sheet-opencv-python.webp",
   "tags": [
    "Cheat Sheet",
    "OpenCV",
@@ -772,7 +772,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "21/09/2026",
   "m": 3,
-  "img": "assets/images/posts/den-strobe-dong-bo-trigger-camera.jpg",
+  "img": "assets/images/posts/den-strobe-dong-bo-trigger-camera.webp",
   "tags": [
    "Lighting",
    "Camera"
@@ -786,7 +786,7 @@ window.HF_POSTS = [
   "cn": "Projects",
   "d": "21/09/2026",
   "m": 4,
-  "img": "assets/images/posts/do-kich-thuoc-chi-tiet-bang-camera.jpg",
+  "img": "assets/images/posts/do-kich-thuoc-chi-tiet-bang-camera.webp",
   "tags": [
    "Industrial Project",
    "Calibration",
@@ -805,7 +805,7 @@ window.HF_POSTS = [
   "cn": "Tài nguyên",
   "d": "21/09/2026",
   "m": 3,
-  "img": "assets/images/posts/doc-paper-ai-hieu-qua.jpg",
+  "img": "assets/images/posts/doc-paper-ai-hieu-qua.webp",
   "tags": [
    "Documentation",
    "Tự học"
@@ -819,7 +819,7 @@ window.HF_POSTS = [
   "cn": "Học AI & Lập trình",
   "d": "20/09/2026",
   "m": 3,
-  "img": "assets/images/posts/hand-eye-calibration-camera-robot.jpg",
+  "img": "assets/images/posts/hand-eye-calibration-camera-robot.webp",
   "tags": [
    "Calibration",
    "Robot"
@@ -833,7 +833,7 @@ window.HF_POSTS = [
   "cn": "Projects",
   "d": "20/09/2026",
   "m": 3,
-  "img": "assets/images/posts/tro-ly-viet-bao-cao-ca-san-xuat-llm.jpg",
+  "img": "assets/images/posts/tro-ly-viet-bao-cao-ca-san-xuat-llm.webp",
   "tags": [
    "AI Project",
    "LLM",
@@ -848,7 +848,7 @@ window.HF_POSTS = [
   "cn": "Học AI & Lập trình",
   "d": "19/09/2026",
   "m": 4,
-  "img": "assets/images/posts/phan-nguong-contour-dem-do-vat.jpg",
+  "img": "assets/images/posts/phan-nguong-contour-dem-do-vat.webp",
   "tags": [
    "Image Processing",
    "OpenCV",
@@ -863,7 +863,7 @@ window.HF_POSTS = [
   "cn": "Học AI & Lập trình",
   "d": "19/09/2026",
   "m": 3,
-  "img": "assets/images/posts/iou-map-danh-gia-object-detection.jpg",
+  "img": "assets/images/posts/iou-map-danh-gia-object-detection.webp",
   "tags": [
    "Object Detection",
    "AI Vision"
@@ -877,7 +877,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "18/09/2026",
   "m": 3,
-  "img": "assets/images/posts/homography-do-tren-mat-phang.jpg",
+  "img": "assets/images/posts/homography-do-tren-mat-phang.webp",
   "tags": [
    "Calibration",
    "Image Processing"
@@ -891,7 +891,7 @@ window.HF_POSTS = [
   "cn": "Projects",
   "d": "18/09/2026",
   "m": 3,
-  "img": "assets/images/posts/phat-hien-mu-bao-ho-ppe-yolo.jpg",
+  "img": "assets/images/posts/phat-hien-mu-bao-ho-ppe-yolo.webp",
   "tags": [
    "CV Project",
    "Object Detection",
@@ -906,7 +906,7 @@ window.HF_POSTS = [
   "cn": "Tin tức AI",
   "d": "18/09/2026",
   "m": 4,
-  "img": "assets/images/posts/computer-vision-2026-yolo26-sam-3-1.jpg",
+  "img": "assets/images/posts/computer-vision-2026-yolo26-sam-3-1.webp",
   "tags": [
    "CV News",
    "AI Models",
@@ -921,7 +921,7 @@ window.HF_POSTS = [
   "cn": "Học AI & Lập trình",
   "d": "17/09/2026",
   "m": 3,
-  "img": "assets/images/posts/onnx-runtime-csharp-chay-mo-hinh-ai.jpg",
+  "img": "assets/images/posts/onnx-runtime-csharp-chay-mo-hinh-ai.webp",
   "tags": [
    "C#",
    ".NET",
@@ -937,7 +937,7 @@ window.HF_POSTS = [
   "cn": "Tài nguyên",
   "d": "17/09/2026",
   "m": 3,
-  "img": "assets/images/posts/tim-va-tai-dataset-hugging-face.jpg",
+  "img": "assets/images/posts/tim-va-tai-dataset-hugging-face.webp",
   "tags": [
    "Dataset",
    "AI Tools"
@@ -951,7 +951,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "16/09/2026",
   "m": 4,
-  "img": "assets/images/posts/7-kieu-chieu-sang-machine-vision.jpg",
+  "img": "assets/images/posts/7-kieu-chieu-sang-machine-vision.webp",
   "tags": [
    "Machine Vision",
    "Lighting"
@@ -965,7 +965,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "16/09/2026",
   "m": 4,
-  "img": "assets/images/posts/llm-hoat-dong-the-nao.jpg",
+  "img": "assets/images/posts/llm-hoat-dong-the-nao.webp",
   "tags": [
    "LLM",
    "Generative AI"
@@ -979,7 +979,7 @@ window.HF_POSTS = [
   "cn": "Projects",
   "d": "16/09/2026",
   "m": 3,
-  "img": "assets/images/posts/doc-so-seri-linh-kien-ocr-ocv.jpg",
+  "img": "assets/images/posts/doc-so-seri-linh-kien-ocr-ocv.webp",
   "tags": [
    "Industrial Project",
    "OCR",
@@ -994,7 +994,7 @@ window.HF_POSTS = [
   "cn": "Học AI & Lập trình",
   "d": "15/09/2026",
   "m": 3,
-  "img": "assets/images/posts/du-lieu-tong-hop-synthetic-data-ai-vision.jpg",
+  "img": "assets/images/posts/du-lieu-tong-hop-synthetic-data-ai-vision.webp",
   "tags": [
    "Generative AI",
    "AI Vision",
@@ -1009,7 +1009,7 @@ window.HF_POSTS = [
   "cn": "Tài nguyên",
   "d": "15/09/2026",
   "m": 4,
-  "img": "assets/images/posts/dataset-computer-vision-mien-phi.jpg",
+  "img": "assets/images/posts/dataset-computer-vision-mien-phi.webp",
   "tags": [
    "Dataset",
    "Computer Vision"
@@ -1023,7 +1023,7 @@ window.HF_POSTS = [
   "cn": "Học AI & Lập trình",
   "d": "14/09/2026",
   "m": 3,
-  "img": "assets/images/posts/opencv-co-ban-anh-video-camera.jpg",
+  "img": "assets/images/posts/opencv-co-ban-anh-video-camera.webp",
   "tags": [
    "OpenCV",
    "Python",
@@ -1038,7 +1038,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "14/09/2026",
   "m": 4,
-  "img": "assets/images/posts/mau-den-kinh-loc-phan-cuc.jpg",
+  "img": "assets/images/posts/mau-den-kinh-loc-phan-cuc.webp",
   "tags": [
    "Lighting",
    "Machine Vision"
@@ -1052,7 +1052,7 @@ window.HF_POSTS = [
   "cn": "Tin tức AI",
   "d": "14/09/2026",
   "m": 3,
-  "img": "assets/images/posts/eccv-2026-hoi-nghi-thi-giac-may-tinh.jpg",
+  "img": "assets/images/posts/eccv-2026-hoi-nghi-thi-giac-may-tinh.webp",
   "tags": [
    "CV News",
    "Technology"
@@ -1066,7 +1066,7 @@ window.HF_POSTS = [
   "cn": "Học AI & Lập trình",
   "d": "13/09/2026",
   "m": 3,
-  "img": "assets/images/posts/ocr-deep-learning-paddleocr-easyocr.jpg",
+  "img": "assets/images/posts/ocr-deep-learning-paddleocr-easyocr.webp",
   "tags": [
    "OCR",
    "Deep Learning"
@@ -1080,7 +1080,7 @@ window.HF_POSTS = [
   "cn": "Tài nguyên",
   "d": "13/09/2026",
   "m": 3,
-  "img": "assets/images/posts/sach-machine-vision-cong-nghiep-nen-doc.jpg",
+  "img": "assets/images/posts/sach-machine-vision-cong-nghiep-nen-doc.webp",
   "tags": [
    "Ebook",
    "Machine Vision"
@@ -1094,7 +1094,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "12/09/2026",
   "m": 3,
-  "img": "assets/images/posts/phan-doan-anh-semantic-instance-panoptic.jpg",
+  "img": "assets/images/posts/phan-doan-anh-semantic-instance-panoptic.webp",
   "tags": [
    "Segmentation",
    "Computer Vision"
@@ -1108,7 +1108,7 @@ window.HF_POSTS = [
   "cn": "Projects",
   "d": "12/09/2026",
   "m": 4,
-  "img": "assets/images/posts/dem-san-pham-bang-tai-opencv.jpg",
+  "img": "assets/images/posts/dem-san-pham-bang-tai-opencv.webp",
   "tags": [
    "Industrial Project",
    "OpenCV",
@@ -1125,7 +1125,7 @@ window.HF_POSTS = [
   "cn": "Học AI & Lập trình",
   "d": "11/09/2026",
   "m": 3,
-  "img": "assets/images/posts/phan-loai-anh-ok-ng-transfer-learning-pytorch.jpg",
+  "img": "assets/images/posts/phan-loai-anh-ok-ng-transfer-learning-pytorch.webp",
   "tags": [
    "PyTorch",
    "Deep Learning",
@@ -1141,7 +1141,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "11/09/2026",
   "m": 5,
-  "img": "assets/images/posts/chon-camera-ong-kinh-machine-vision.jpg",
+  "img": "assets/images/posts/chon-camera-ong-kinh-machine-vision.webp",
   "tags": [
    "Machine Vision",
    "Camera",
@@ -1156,7 +1156,7 @@ window.HF_POSTS = [
   "cn": "Tài nguyên",
   "d": "11/09/2026",
   "m": 3,
-  "img": "assets/images/posts/cheat-sheet-pytorch.jpg",
+  "img": "assets/images/posts/cheat-sheet-pytorch.webp",
   "tags": [
    "Cheat Sheet",
    "PyTorch"
@@ -1170,7 +1170,7 @@ window.HF_POSTS = [
   "cn": "Học AI & Lập trình",
   "d": "10/09/2026",
   "m": 4,
-  "img": "assets/images/posts/numpy-anh-la-mang-so.jpg",
+  "img": "assets/images/posts/numpy-anh-la-mang-so.webp",
   "tags": [
    "Python",
    "NumPy",
@@ -1185,7 +1185,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "10/09/2026",
   "m": 3,
-  "img": "assets/images/posts/prompt-engineering-cho-ky-su.jpg",
+  "img": "assets/images/posts/prompt-engineering-cho-ky-su.webp",
   "tags": [
    "Generative AI",
    "LLM",
@@ -1200,7 +1200,7 @@ window.HF_POSTS = [
   "cn": "Tài nguyên",
   "d": "10/09/2026",
   "m": 3,
-  "img": "assets/images/posts/sam-gan-nhan-phan-doan-nhanh.jpg",
+  "img": "assets/images/posts/sam-gan-nhan-phan-doan-nhanh.webp",
   "tags": [
    "Segmentation",
    "AI Tools"
@@ -1214,7 +1214,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "09/09/2026",
   "m": 3,
-  "img": "assets/images/posts/overfitting-chia-train-val-test.jpg",
+  "img": "assets/images/posts/overfitting-chia-train-val-test.webp",
   "tags": [
    "Machine Learning",
    "Deep Learning"
@@ -1228,7 +1228,7 @@ window.HF_POSTS = [
   "cn": "Projects",
   "d": "09/09/2026",
   "m": 3,
-  "img": "assets/images/posts/doc-ma-qr-datamatrix-tren-bao-bi.jpg",
+  "img": "assets/images/posts/doc-ma-qr-datamatrix-tren-bao-bi.webp",
   "tags": [
    "Industrial Project",
    "OCR",
@@ -1243,7 +1243,7 @@ window.HF_POSTS = [
   "cn": "Học AI & Lập trình",
   "d": "08/09/2026",
   "m": 3,
-  "img": "assets/images/posts/ocr-tesseract-tien-xu-ly-anh.jpg",
+  "img": "assets/images/posts/ocr-tesseract-tien-xu-ly-anh.webp",
   "tags": [
    "OCR",
    "Python",
@@ -1258,7 +1258,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "08/09/2026",
   "m": 3,
-  "img": "assets/images/posts/vs-code-cho-python-va-ai.jpg",
+  "img": "assets/images/posts/vs-code-cho-python-va-ai.webp",
   "tags": [
    "VS Code",
    "Công cụ"
@@ -1272,7 +1272,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "07/09/2026",
   "m": 3,
-  "img": "assets/images/posts/do-sau-truong-anh-khau-do-lay-net.jpg",
+  "img": "assets/images/posts/do-sau-truong-anh-khau-do-lay-net.webp",
   "tags": [
    "Lens",
    "Machine Vision"
@@ -1286,7 +1286,7 @@ window.HF_POSTS = [
   "cn": "Tài nguyên",
   "d": "07/09/2026",
   "m": 3,
-  "img": "assets/images/posts/tro-ly-lap-trinh-ai-dung-dung-cach.jpg",
+  "img": "assets/images/posts/tro-ly-lap-trinh-ai-dung-dung-cach.webp",
   "tags": [
    "AI Tools",
    "Tips"
@@ -1300,7 +1300,7 @@ window.HF_POSTS = [
   "cn": "Học AI & Lập trình",
   "d": "06/09/2026",
   "m": 3,
-  "img": "assets/images/posts/hieu-chuan-camera-intrinsic-meo-ong-kinh.jpg",
+  "img": "assets/images/posts/hieu-chuan-camera-intrinsic-meo-ong-kinh.webp",
   "tags": [
    "Calibration",
    "Computer Vision"
@@ -1314,7 +1314,7 @@ window.HF_POSTS = [
   "cn": "Projects",
   "d": "06/09/2026",
   "m": 3,
-  "img": "assets/images/posts/dem-phan-loai-xe-camera-giao-thong.jpg",
+  "img": "assets/images/posts/dem-phan-loai-xe-camera-giao-thong.webp",
   "tags": [
    "CV Project",
    "Object Detection"
@@ -1328,7 +1328,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "05/09/2026",
   "m": 3,
-  "img": "assets/images/posts/ocr-trong-cong-nghiep.jpg",
+  "img": "assets/images/posts/ocr-trong-cong-nghiep.webp",
   "tags": [
    "OCR",
    "Machine Vision"
@@ -1342,7 +1342,7 @@ window.HF_POSTS = [
   "cn": "Tin tức AI",
   "d": "05/09/2026",
   "m": 3,
-  "img": "assets/images/posts/openai-ra-mat-gpt-6-astra.jpg",
+  "img": "assets/images/posts/openai-ra-mat-gpt-6-astra.webp",
   "tags": [
    "AI News",
    "AI Models"
@@ -1356,7 +1356,7 @@ window.HF_POSTS = [
   "cn": "Học AI & Lập trình",
   "d": "04/09/2026",
   "m": 3,
-  "img": "assets/images/posts/pytorch-co-ban-tensor-autograd.jpg",
+  "img": "assets/images/posts/pytorch-co-ban-tensor-autograd.webp",
   "tags": [
    "PyTorch",
    "Deep Learning",
@@ -1371,7 +1371,7 @@ window.HF_POSTS = [
   "cn": "Projects",
   "d": "04/09/2026",
   "m": 3,
-  "img": "assets/images/posts/phan-loai-phan-hoi-khach-hang-machine-learning.jpg",
+  "img": "assets/images/posts/phan-loai-phan-hoi-khach-hang-machine-learning.webp",
   "tags": [
    "AI Project",
    "Machine Learning"
@@ -1385,7 +1385,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "03/09/2026",
   "m": 3,
-  "img": "assets/images/posts/precision-recall-f1-ma-tran-nham-lan.jpg",
+  "img": "assets/images/posts/precision-recall-f1-ma-tran-nham-lan.webp",
   "tags": [
    "Machine Learning",
    "AI Vision"
@@ -1399,7 +1399,7 @@ window.HF_POSTS = [
   "cn": "Tin tức AI",
   "d": "03/09/2026",
   "m": 3,
-  "img": "assets/images/posts/gemini-3-8-flash-ra-mat.jpg",
+  "img": "assets/images/posts/gemini-3-8-flash-ra-mat.webp",
   "tags": [
    "AI Models",
    "AI News"
@@ -1413,7 +1413,7 @@ window.HF_POSTS = [
   "cn": "Tài nguyên",
   "d": "03/09/2026",
   "m": 3,
-  "img": "assets/images/posts/cheat-sheet-git-cho-ky-su.jpg",
+  "img": "assets/images/posts/cheat-sheet-git-cho-ky-su.webp",
   "tags": [
    "Cheat Sheet",
    "Git"
@@ -1427,7 +1427,7 @@ window.HF_POSTS = [
   "cn": "Học AI & Lập trình",
   "d": "02/09/2026",
   "m": 3,
-  "img": "assets/images/posts/winforms-hien-thi-camera-opencvsharp.jpg",
+  "img": "assets/images/posts/winforms-hien-thi-camera-opencvsharp.webp",
   "tags": [
    "C#",
    ".NET",
@@ -1443,7 +1443,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "02/09/2026",
   "m": 3,
-  "img": "assets/images/posts/viet-code-python-sach-cho-ky-su.jpg",
+  "img": "assets/images/posts/viet-code-python-sach-cho-ky-su.webp",
   "tags": [
    "Lập trình",
    "Python"
@@ -1457,7 +1457,7 @@ window.HF_POSTS = [
   "cn": "Học AI & Lập trình",
   "d": "01/09/2026",
   "m": 3,
-  "img": "assets/images/posts/bien-doi-hinh-hoc-affine-phoi-canh.jpg",
+  "img": "assets/images/posts/bien-doi-hinh-hoc-affine-phoi-canh.webp",
   "tags": [
    "Image Processing",
    "OpenCV",
@@ -1472,7 +1472,7 @@ window.HF_POSTS = [
   "cn": "Học AI & Lập trình",
   "d": "31/08/2026",
   "m": 3,
-  "img": "assets/images/posts/hoi-quy-tuyen-tinh-gradient-descent-numpy.jpg",
+  "img": "assets/images/posts/hoi-quy-tuyen-tinh-gradient-descent-numpy.webp",
   "tags": [
    "Machine Learning",
    "Python"
@@ -1486,7 +1486,7 @@ window.HF_POSTS = [
   "cn": "Học AI & Lập trình",
   "d": "30/08/2026",
   "m": 3,
-  "img": "assets/images/posts/watershed-tach-vat-dinh-nhau.jpg",
+  "img": "assets/images/posts/watershed-tach-vat-dinh-nhau.webp",
   "tags": [
    "Segmentation",
    "Image Processing",
@@ -1501,7 +1501,7 @@ window.HF_POSTS = [
   "cn": "Tài nguyên",
   "d": "30/08/2026",
   "m": 3,
-  "img": "assets/images/posts/sach-python-mien-phi-cho-nguoi-moi.jpg",
+  "img": "assets/images/posts/sach-python-mien-phi-cho-nguoi-moi.webp",
   "tags": [
    "Ebook",
    "Python"
@@ -1515,7 +1515,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "29/08/2026",
   "m": 3,
-  "img": "assets/images/posts/global-rolling-shutter-area-line-scan.jpg",
+  "img": "assets/images/posts/global-rolling-shutter-area-line-scan.webp",
   "tags": [
    "Camera",
    "Machine Vision"
@@ -1529,7 +1529,7 @@ window.HF_POSTS = [
   "cn": "Học AI & Lập trình",
   "d": "28/08/2026",
   "m": 3,
-  "img": "assets/images/posts/scikit-learn-phan-loai-ok-ng.jpg",
+  "img": "assets/images/posts/scikit-learn-phan-loai-ok-ng.webp",
   "tags": [
    "Machine Learning",
    "Python",
@@ -1544,7 +1544,7 @@ window.HF_POSTS = [
   "cn": "Projects",
   "d": "28/08/2026",
   "m": 3,
-  "img": "assets/images/posts/du-doan-hong-hoc-may-predictive-maintenance.jpg",
+  "img": "assets/images/posts/du-doan-hong-hoc-may-predictive-maintenance.webp",
   "tags": [
    "AI Project",
    "Machine Learning"
@@ -1558,7 +1558,7 @@ window.HF_POSTS = [
   "cn": "Học AI & Lập trình",
   "d": "27/08/2026",
   "m": 3,
-  "img": "assets/images/posts/histogram-can-bang-sang-clahe.jpg",
+  "img": "assets/images/posts/histogram-can-bang-sang-clahe.webp",
   "tags": [
    "Image Processing",
    "OpenCV"
@@ -1572,7 +1572,7 @@ window.HF_POSTS = [
   "cn": "Tài nguyên",
   "d": "27/08/2026",
   "m": 3,
-  "img": "assets/images/posts/cheat-sheet-numpy-cho-xu-ly-anh.jpg",
+  "img": "assets/images/posts/cheat-sheet-numpy-cho-xu-ly-anh.webp",
   "tags": [
    "Cheat Sheet",
    "Python"
@@ -1586,7 +1586,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "26/08/2026",
   "m": 3,
-  "img": "assets/images/posts/generative-ai-la-gi.jpg",
+  "img": "assets/images/posts/generative-ai-la-gi.webp",
   "tags": [
    "Generative AI",
    "Deep Learning"
@@ -1600,7 +1600,7 @@ window.HF_POSTS = [
   "cn": "Tin tức AI",
   "d": "26/08/2026",
   "m": 3,
-  "img": "assets/images/posts/xpeng-iron-huy-dong-900-trieu-usd.jpg",
+  "img": "assets/images/posts/xpeng-iron-huy-dong-900-trieu-usd.webp",
   "tags": [
    "Robotics"
   ]
@@ -1613,7 +1613,7 @@ window.HF_POSTS = [
   "cn": "Học AI & Lập trình",
   "d": "25/08/2026",
   "m": 3,
-  "img": "assets/images/posts/csharp-co-ban-cho-ky-su-tu-dong-hoa.jpg",
+  "img": "assets/images/posts/csharp-co-ban-cho-ky-su-tu-dong-hoa.webp",
   "tags": [
    "C#",
    ".NET",
@@ -1628,7 +1628,7 @@ window.HF_POSTS = [
   "cn": "Học AI & Lập trình",
   "d": "24/08/2026",
   "m": 3,
-  "img": "assets/images/posts/loc-anh-phat-hien-canh-sobel-canny.jpg",
+  "img": "assets/images/posts/loc-anh-phat-hien-canh-sobel-canny.webp",
   "tags": [
    "Image Processing",
    "OpenCV"
@@ -1642,7 +1642,7 @@ window.HF_POSTS = [
   "cn": "Tài nguyên",
   "d": "24/08/2026",
   "m": 4,
-  "img": "assets/images/posts/tu-xay-dataset-anh-cong-nghiep.jpg",
+  "img": "assets/images/posts/tu-xay-dataset-anh-cong-nghiep.webp",
   "tags": [
    "Dataset",
    "AI Vision"
@@ -1656,7 +1656,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "23/08/2026",
   "m": 3,
-  "img": "assets/images/posts/git-cho-du-an-ai-vision.jpg",
+  "img": "assets/images/posts/git-cho-du-an-ai-vision.webp",
   "tags": [
    "Git",
    "Công cụ",
@@ -1671,7 +1671,7 @@ window.HF_POSTS = [
   "cn": "Học AI & Lập trình",
   "d": "22/08/2026",
   "m": 3,
-  "img": "assets/images/posts/python-xu-ly-thu-muc-anh-va-log.jpg",
+  "img": "assets/images/posts/python-xu-ly-thu-muc-anh-va-log.webp",
   "tags": [
    "Python",
    "Lập trình"
@@ -1685,7 +1685,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "21/08/2026",
   "m": 3,
-  "img": "assets/images/posts/machine-learning-la-gi.jpg",
+  "img": "assets/images/posts/machine-learning-la-gi.webp",
   "tags": [
    "Machine Learning",
    "AI/ML"
@@ -1699,7 +1699,7 @@ window.HF_POSTS = [
   "cn": "Kiến thức",
   "d": "20/08/2026",
   "m": 3,
-  "img": "assets/images/posts/tu-hoc-ai-khi-di-lam-ke-hoach-6-thang.jpg",
+  "img": "assets/images/posts/tu-hoc-ai-khi-di-lam-ke-hoach-6-thang.webp",
   "tags": [
    "Tự học",
    "Kinh nghiệm"
@@ -2046,7 +2046,7 @@ window.HF_TOPICS = [
  },
  {
   "t": "Python Developer",
-  "u": "lo-trinh/index.html#python-developer",
+  "u": "lo-trinh/#python-developer",
   "s": "Learning Path",
   "g": "Python, công cụ, tự động hóa",
   "n": -1,

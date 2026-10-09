@@ -284,7 +284,7 @@
       var url = ROOT + p.u;
       return '<article class="post-row">' +
         '<a class="thumb" href="' + url + '" tabindex="-1" aria-hidden="true"><img src="' + ROOT + p.img + '" alt="" loading="lazy"></a>' +
-        '<div class="post-row-body"><a class="kicker cat-' + p.c + '" href="' + ROOT + p.c + '/index.html">' + escapeHtml(p.cn) + "</a>" +
+        '<div class="post-row-body"><a class="kicker cat-' + p.c + '" href="' + ROOT + p.c + '/">' + escapeHtml(p.cn) + "</a>" +
         '<h3><a href="' + url + '">' + highlight(p.t, q) + "</a></h3>" +
         "<p>" + highlight(p.e, q) + "</p>" +
         '<div class="meta"><span>' + p.d + "</span><span>" + p.m + " phút đọc</span></div></div></article>";
