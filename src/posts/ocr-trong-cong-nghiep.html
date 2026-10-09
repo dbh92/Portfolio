@@ -1,44 +1,316 @@
-<p>Trong nhà máy, rất nhiều thông tin được in hoặc khắc trực tiếp lên sản phẩm: số lô, hạn sử dụng, số seri, mã linh kiện. <strong>OCR</strong> (Optical Character Recognition, nhận dạng ký tự quang học) giúp đọc tự động những thông tin này để truy xuất nguồn gốc và kiểm tra in ấn.</p>
+<p>Bài đọc mã QR và DataMatrix cho thấy mã 2D dễ đọc tin cậy nhờ mẫu định vị và mã sửa lỗi. Chữ in thì không có những thứ đó: không có mẫu định vị, không có Reed-Solomon, một vết mực nhỏ đủ biến "8" thành "B". Vậy mà nhà máy vẫn phải đọc chữ: hạn dùng in phun trên lon, số lô trên bao bì, số seri khắc laser trên linh kiện, vì luật ghi nhãn yêu cầu người đọc được, hoặc vì khách hàng chưa in mã 2D. Bài này là nền tảng khái niệm cho phần OCR của chặng: phân biệt <strong>đọc</strong> (OCR) và <strong>xác minh</strong> (OCV), nhận diện các loại chữ in, khắc trong nhà máy, và các bẫy nhầm ký tự cùng cách chặn chúng bằng định dạng. Bài sau, <strong>OCR với Tesseract và tiền xử lý</strong>, đi vào công cụ cụ thể.</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Giải thích được khi nào trạm cần OCR, khi nào cần OCV; chọn cách chiếu sáng và tiền xử lý theo loại chữ (in phun chấm, in nhiệt, khắc laser, dập nổi); liệt kê các cặp ký tự hay nhầm và viết hàm sửa theo định dạng mã lô; đo hệ thống bằng đúng chỉ số (tỉ lệ chuỗi đúng, không đọc được, đọc sai).</div>
 
-<h2>OCR và OCV</h2>
-<ul>
-  <li><strong>OCR (đọc)</strong>: hệ thống không biết trước nội dung, phải đọc ra chuỗi ký tự. Ví dụ đọc số seri để lưu vào MES.</li>
-  <li><strong>OCV (Optical Character Verification, xác minh)</strong>: hệ thống biết trước nội dung đúng, chỉ kiểm tra chữ in ra có đúng và đủ chất lượng không. Ví dụ kiểm tra hạn sử dụng in trên lon khớp với lệnh sản xuất.</li>
-</ul>
-<p>OCV dễ đạt độ tin cậy cao hơn OCR, vì có "đáp án" để so sánh.</p>
-
-<h2>Các loại chữ trong công nghiệp</h2>
+<h2>1. OCR và OCV: hai câu hỏi khác nhau</h2>
+<p><strong>OCR</strong> (Optical Character Recognition, nhận dạng ký tự quang học) trả lời câu hỏi "chữ này là gì?": hệ thống không biết trước nội dung và phải đọc ra chuỗi. <strong>OCV</strong> (Optical Character Verification, xác minh ký tự quang học) trả lời "chữ in ra có đúng là chuỗi mong đợi và đủ chất lượng không?": hệ thống biết trước nội dung (từ lệnh sản xuất, từ máy in, hoặc từ mã 2D bên cạnh) và chỉ kiểm tra.</p>
 <table>
-  <tr><th>Loại</th><th>Đặc điểm</th><th>Thách thức</th></tr>
-  <tr><td>In phun (inkjet) dạng chấm</td><td>Ký tự tạo từ các chấm rời</td><td>Chấm không liền, cần nối chấm trước khi đọc</td></tr>
-  <tr><td>In nhiệt, in laser trên nhãn</td><td>Nét liền, tương phản tốt</td><td>Nhãn nhăn, bóng</td></tr>
-  <tr><td>Khắc laser trên kim loại, nhựa</td><td>Tương phản thấp</td><td>Cần chiếu sáng góc thấp hoặc đồng trục</td></tr>
-  <tr><td>Dập nổi, đúc</td><td>Chữ cùng màu với nền</td><td>Chỉ thấy được nhờ bóng đổ, chiếu sáng có hướng</td></tr>
+  <tr><th></th><th>OCR (đọc)</th><th>OCV (xác minh)</th></tr>
+  <tr><td>Đầu vào thêm</td><td>Không có, hoặc chỉ biết định dạng</td><td>Chuỗi mong đợi</td></tr>
+  <tr><td>Đầu ra</td><td>Chuỗi đọc được + độ tin cậy</td><td>OK/NG cho từng ký tự + điểm chất lượng</td></tr>
+  <tr><td>Ví dụ</td><td>Đọc số seri linh kiện để lưu vào MES; đọc số lô trên bao bì nhà cung cấp</td><td>Kiểm tra hạn dùng in phun trên lon khớp lệnh sản xuất; kiểm tra chữ in không bị mất nét</td></tr>
+  <tr><td>Lỗi nguy hiểm nhất</td><td>Đọc sai mà tự tin (lưu seri sai vào hệ thống)</td><td>Cho qua chữ in sai hoặc in kém (escape)</td></tr>
+  <tr><td>Độ khó</td><td>Cao: phải phân biệt cả 36 ký tự hoặc hơn ở mọi vị trí</td><td>Thấp hơn: mỗi vị trí chỉ so với một ký tự mong đợi</td></tr>
+</table>
+<p>OCV dễ đạt độ tin cậy cao hơn vì có đáp án. Nhưng OCV còn làm được việc OCR không làm: <strong>chấm chất lượng in</strong>. Một chữ "8" bị mất nửa nét dưới vẫn có thể được OCR đọc đúng là "8", nhưng người tiêu dùng có thể đọc thành "9"; OCV so với mẫu và báo NG. Nhiều trạm thực tế làm cả hai: OCR để đọc, rồi OCV để xác nhận chuỗi đọc được khớp lệnh và chữ in đạt chất lượng.</p>
+
+<h2>2. Quy trình của một trạm OCR/OCV</h2>
+<ol>
+  <li><strong>Định vị vùng chữ</strong>: theo một mốc cố định (logo, cạnh nhãn, mã 2D) bằng template matching như bài template matching, hoặc bằng mô hình phát hiện chữ. Định vị theo mốc ổn định hơn tìm chữ trực tiếp.</li>
+  <li><strong>Chuẩn hóa</strong>: xoay thẳng dòng chữ, cắt ROI, đưa về chữ tối trên nền sáng (hoặc ngược lại, nhất quán), chiều cao chữ cố định.</li>
+  <li><strong>Tách ký tự</strong> (phương pháp cổ điển: chiếu histogram theo cột, thành phần liên thông) hoặc đọc cả dòng (Deep Learning, bài OCR bằng Deep Learning).</li>
+  <li><strong>Nhận dạng</strong> từng ký tự (so mẫu, phân loại) hoặc cả chuỗi, kèm điểm tin cậy.</li>
+  <li><strong>Kiểm tra hợp lệ</strong>: định dạng (vị trí nào là chữ, vị trí nào là số), giá trị hợp lý (tháng 01–12), chữ số kiểm tra, khớp lệnh sản xuất.</li>
+  <li><strong>Quyết định</strong>: OK, NG, hoặc "không đọc được" (NOREAD), và lưu ảnh.</li>
+</ol>
+<p>Bước 5 thường bị xem nhẹ nhưng lại là bước tạo ra độ tin cậy. Mục 5 sẽ cho thấy nó sửa và chặn lỗi thế nào.</p>
+
+<h2>3. Các loại chữ trong nhà máy</h2>
+<table>
+  <tr><th>Loại</th><th>Đặc điểm</th><th>Thách thức</th><th>Gợi ý chiếu sáng, xử lý</th></tr>
+  <tr><td>In phun liên tục (CIJ) dạng chấm</td><td>Ký tự ghép từ ma trận chấm (ví dụ 5×7, 7×9), hạn dùng trên lon, chai, túi</td><td>Chấm rời nhau, khoảng cách chấm thay đổi theo tốc độ băng tải, mực lem trên bề mặt cong</td><td>Đèn khuếch tán; nối chấm bằng phép đóng (closing) trước khi tách ký tự</td></tr>
+  <tr><td>In phun nhiệt (TIJ), in nhiệt (TTO) trên nhãn, màng</td><td>Nét liền, độ phân giải cao</td><td>Màng bóng phản xạ, nhãn nhăn, ruy băng mòn làm mất nét</td><td>Đèn khuếch tán hoặc vòm, nghiêng camera tránh phản xạ gương</td></tr>
+  <tr><td>Khắc laser trên bao bì, nhãn</td><td>Đốt bỏ lớp mực tạo chữ sáng trên nền màu</td><td>Tương phản phụ thuộc màu nền, chữ âm bản (sáng trên tối)</td><td>Chọn màu đèn tăng tương phản; đảo ảnh cho thống nhất</td></tr>
+  <tr><td>Khắc laser, khắc chấm (dot peen) trên kim loại</td><td>Chữ cùng vật liệu với nền, phản xạ thay đổi theo góc</td><td>Tương phản thấp, vân gia công, bề mặt cong</td><td>Đèn góc thấp (dark field) cho chữ lõm; đèn đồng trục cho bề mặt phẳng bóng</td></tr>
+  <tr><td>Dập nổi, đúc (lốp xe, vỏ nhựa, chi tiết đúc)</td><td>Chữ cùng màu với nền, chỉ thấy qua bóng đổ</td><td>Phụ thuộc mạnh vào hướng sáng</td><td>Đèn có hướng góc thấp; ghép nhiều ảnh chiếu từ các hướng (photometric stereo) cho trường hợp khó</td></tr>
+</table>
+<p>Chữ in phun dạng chấm là loại hay gặp nhất ở Việt Nam (hạn dùng thực phẩm, đồ uống) và cũng là loại làm hỏng các bước tách ký tự cổ điển, vì mỗi ký tự là hàng chục thành phần rời. Thí nghiệm: mô phỏng chữ in chấm rồi đếm thành phần liên thông trước và sau phép đóng.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+# Mô phỏng in phun chấm: vẽ chữ nét liền rồi chỉ giữ chấm tại các nút lưới bước 5 px
+chu = np.zeros((60, 260), np.uint8)
+cv2.putText(chu, "26/10/27", (8, 48), cv2.FONT_HERSHEY_SIMPLEX, 1.5, 255, 5, cv2.LINE_AA)
+cham = np.zeros_like(chu)
+for y in range(0, 60, 5):
+    for x in range(0, 260, 5):
+        if chu[y, x] &gt; 128:
+            cv2.circle(cham, (x, y), 2, 255, -1)              # mỗi chấm mực đường kính 5 px, cách nhau 5 px tâm-tâm
+cham[:, ::10] = 0                                            # băng tải nhanh hơn: chấm theo chiều ngang thưa ra
+so_tp = cv2.connectedComponents(cham)[0] - 1
+dong = cv2.morphologyEx(cham, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
+so_tp_dong = cv2.connectedComponents(dong)[0] - 1
+print("số ký tự thật               : 8")
+print("thành phần liên thông (chấm):", so_tp)
+print("sau closing 5×5             :", so_tp_dong)
+cv2.imwrite("in_cham.png", np.hstack([cham, dong]))</code></pre>
+<pre><code class="language-text">số ký tự thật               : 8
+thành phần liên thông (chấm): 94
+sau closing 5×5             : 8</code></pre>
+<p>Trước phép đóng, một chuỗi 8 ký tự vỡ thành rất nhiều mảnh, không thể tách ký tự theo thành phần liên thông. Sau closing với phần tử 5×5 (cỡ khoảng cách chấm), số thành phần về đúng 8: mỗi ký tự thành một khối. Kích thước phần tử phải theo khoảng cách chấm: quá nhỏ thì chưa nối, quá lớn thì các ký tự sát nhau dính vào nhau. Vì khoảng cách chấm đổi theo tốc độ băng tải, trạm cần kiểm tra lại khi dây chuyền đổi tốc độ.</p>
+
+<h2>4. Bẫy nhầm ký tự</h2>
+<p>Các cặp ký tự hay nhầm phụ thuộc font, nhưng một số cặp gần như font nào cũng nguy hiểm. Đo trực tiếp: vẽ 36 ký tự (0–9, A–Z) bằng font Hershey của OpenCV, tính tương quan chuẩn hóa (NCC) giữa từng cặp, cho phép lệch ±3 px, rồi in các cặp giống nhau nhất.</p>
+<pre><code class="language-python">import itertools
+import string
+
+import cv2
+import numpy as np
+
+KY_TU = string.digits + string.ascii_uppercase
+
+
+def ve_ky_tu(c):
+    o = np.zeros((44, 32), np.uint8)
+    (w, h), _ = cv2.getTextSize(c, cv2.FONT_HERSHEY_SIMPLEX, 1.0, 2)
+    cv2.putText(o, c, ((32 - w) // 2, (44 + h) // 2), cv2.FONT_HERSHEY_SIMPLEX, 1.0, 255, 2, cv2.LINE_AA)
+    return o
+
+
+def giong_nhau(a, b):
+    """NCC lớn nhất khi cho b trượt ±3 px trên a."""
+    a = cv2.copyMakeBorder(a, 3, 3, 3, 3, cv2.BORDER_CONSTANT, value=0)
+    return float(cv2.matchTemplate(a, b, cv2.TM_CCOEFF_NORMED).max())
+
+
+MAU = {c: ve_ky_tu(c) for c in KY_TU}
+cap = sorted(((giong_nhau(MAU[a], MAU[b]), a, b) for a, b in itertools.combinations(KY_TU, 2)), reverse=True)
+print("12 cặp giống nhau nhất (trên 630 cặp):")
+print("  " + "   ".join(f"{a}/{b} {s:.2f}" for s, a, b in cap[:12]))
+for a, b in (("1", "I"), ("5", "S"), ("2", "Z"), ("6", "G"), ("1", "7")):
+    print(f"  cặp {a}/{b}: {giong_nhau(MAU[a], MAU[b]):.2f}", end="")
+print()
+print(f"trung vị NCC của mọi cặp: {np.median([s for s, _, _ in cap]):.2f}")</code></pre>
+<pre><code class="language-text">12 cặp giống nhau nhất (trên 630 cặp):
+  O/Q 0.97   D/O 0.95   G/O 0.93   8/B 0.92   C/O 0.91   D/Q 0.91   0/O 0.90   G/Q 0.90   F/P 0.90   P/R 0.90   8/S 0.90   C/G 0.90
+  cặp 1/I: 0.74  cặp 5/S: 0.88  cặp 2/Z: 0.84  cặp 6/G: 0.69  cặp 1/7: 0.63
+trung vị NCC của mọi cặp: 0.58</code></pre>
+<p>Với font này, các ký tự tròn (O, Q, D, G, C, 0) giống nhau trên 0,9; 8/B, P/R, F/P cũng vậy. Nhiễu, mực lem hoặc mất nét nhỏ là đủ đảo thứ hạng. Một số cặp như 1/I (0,74) hay 2/Z (0,84) ít giống hơn trong font này (trung vị mọi cặp là 0,58) nhưng rất giống trong font khác (font đơn giản của máy in phun 5×7 vẽ "1" và "I" chỉ khác một chấm). Bảng tổng hợp từ kinh nghiệm thực tế:</p>
+<table>
+  <tr><th>Nhóm</th><th>Cặp hay nhầm</th><th>Nguyên nhân thường gặp</th></tr>
+  <tr><td>Tròn</td><td>0 / O / D / Q, C / G, 6 / G</td><td>Mất nét nhỏ (đuôi Q, ngang G), font co hẹp</td></tr>
+  <tr><td>Thẳng</td><td>1 / I / l / 7 / T, ký tự "|"</td><td>Font không chân, chấm in thiếu</td></tr>
+  <tr><td>Có eo</td><td>8 / B / 3, 5 / S, 2 / Z, 4 / A</td><td>Cạnh trái của B bị mờ, nét cong bị vuông hóa trong font chấm</td></tr>
+  <tr><td>Ghép</td><td>rn / m, vv / w, cl / d</td><td>Khoảng cách ký tự quá hẹp</td></tr>
+  <tr><td>Hướng</td><td>6 / 9, M / W, N / Z khi chữ bị xoay 180° hoặc 90°</td><td>Sản phẩm đặt ngược, không kiểm tra hướng</td></tr>
+  <tr><td>Ký tự rác</td><td>Dấu chấm, gạch thừa từ bụi, vết xước</td><td>Không giới hạn tập ký tự, ROI rộng</td></tr>
+</table>
+<p>Nhiều chuẩn mã hóa né sẵn các bẫy này. Ví dụ số khung xe (VIN, ISO 3779) không dùng các chữ I, O, Q; nhiều hãng thiết kế số seri chỉ dùng chữ số hoặc bỏ các chữ dễ nhầm. Nếu bạn được tham gia thiết kế mã, đây là cách rẻ nhất để tăng độ tin cậy.</p>
+
+<h2>5. Sửa nhầm theo định dạng mã lô</h2>
+<p>Ý tưởng: nếu biết vị trí nào chỉ có thể là chữ số, vị trí nào chỉ có thể là chữ cái, thì một chữ "O" đọc được ở vị trí chữ số gần như chắc chắn là số "0". Ta mô tả định dạng bằng một <strong>mặt nạ</strong>: <code>9</code> = chữ số, <code>A</code> = chữ cái, ký tự khác = ký tự cố định. Ví dụ mã lô của một nhà máy đồ uống: <code>L</code> + năm 2 số + tháng 2 số + mã dây chuyền 1 chữ + ca 2 số, như <code>L2610A07</code>, mặt nạ <code>L9999A99</code>.</p>
+<pre><code class="language-python">import re
+
+SANG_SO = {"O": "0", "D": "0", "Q": "0", "I": "1", "L": "1", "T": "7", "Z": "2", "S": "5", "B": "8", "G": "6"}
+SANG_CHU = {"0": "O", "1": "I", "2": "Z", "5": "S", "8": "B", "6": "G", "4": "A"}
+NHOM_NHAM = ("0ODQ", "1IL7T", "2Z", "5S", "8B3", "6G", "4A")                  # các nhóm hay nhầm với nhau
+
+
+def cung_nhom(a, b):
+    return a == b or any(a in n and b in n for n in NHOM_NHAM)
+
+
+def sua_theo_mat_na(chuoi, mat_na):
+    """Trả (chuỗi đã sửa, danh sách sửa) hoặc (None, lý do). 9 = chữ số, A = chữ cái, khác = cố định."""
+    chuoi = chuoi.strip().upper().replace(" ", "")
+    if len(chuoi) != len(mat_na):
+        return None, f"sai độ dài: {len(chuoi)} thay vì {len(mat_na)}"
+    ket_qua, da_sua = [], []
+    for i, (c, m) in enumerate(zip(chuoi, mat_na)):
+        if m == "9":
+            moi = c if c.isdigit() else SANG_SO.get(c)
+        elif m == "A":
+            moi = c if c.isalpha() else SANG_CHU.get(c)
+        else:
+            moi = m if cung_nhom(c, m) else None                                # ký tự cố định
+        if moi is None:
+            return None, f"vị trí {i}: '{c}' không thể là {'chữ số' if m == '9' else 'chữ cái' if m == 'A' else repr(m)}"
+        if moi != c:
+            da_sua.append(f"{i}:{c}→{moi}")
+        ket_qua.append(moi)
+    return "".join(ket_qua), da_sua
+
+
+MAU_LO = re.compile(r"^L(\d{2})(0[1-9]|1[0-2])([ABC])(0[1-9]|1[0-9]|2[0-1])$")   # tháng 01–12, line A–C, ca 01–21
+
+
+def kiem_tra_lo(chuoi_ocr, lo_mong_doi):
+    sua, ghi_chu = sua_theo_mat_na(chuoi_ocr, "L9999A99")
+    if sua is None:
+        return "NOREAD", ghi_chu
+    if not MAU_LO.match(sua):
+        return "NOREAD", f"{sua}: giá trị không hợp lệ (tháng, dây chuyền hoặc ca)"
+    if sua != lo_mong_doi:
+        return "NG", f"{sua} khác lô mong đợi {lo_mong_doi} (sửa: {ghi_chu})"
+    return "OK", f"{sua} (sửa: {ghi_chu if ghi_chu else 'không'})"
+
+
+for ocr in ("L2610A07", "L261OA07", "12610AO7", "L26I0A0T", "L2618A07", "L2610807", "L2610A0", "L2610A01"):
+    print(f"{ocr:9s} → {kiem_tra_lo(ocr, 'L2610A07')}")</code></pre>
+<pre><code class="language-text">L2610A07  → ('OK', 'L2610A07 (sửa: không)')
+L261OA07  → ('OK', "L2610A07 (sửa: ['4:O→0'])")
+12610AO7  → ('OK', "L2610A07 (sửa: ['0:1→L', '6:O→0'])")
+L26I0A0T  → ('OK', "L2610A07 (sửa: ['3:I→1', '7:T→7'])")
+L2618A07  → ('NOREAD', 'L2618A07: giá trị không hợp lệ (tháng, dây chuyền hoặc ca)')
+L2610807  → ('NG', "L2610B07 khác lô mong đợi L2610A07 (sửa: ['5:8→B'])")
+L2610A0   → ('NOREAD', 'sai độ dài: 7 thay vì 8')
+L2610A01  → ('NG', 'L2610A01 khác lô mong đợi L2610A07 (sửa: [])')</code></pre>
+<p>Đọc kết quả như một kỹ sư:</p>
+<ul>
+  <li>"O" ở vị trí tháng, "1" ở vị trí chữ L cố định (cùng nhóm nhầm 1/I/L), "I" và "T" ở vị trí chữ số đều được sửa đúng. Ghi lại danh sách sửa: nếu một vị trí bị sửa liên tục, chữ in ở đó có vấn đề (đầu in tắc một vòi).</li>
+  <li><code>L2618A07</code>: tháng 18 không tồn tại, nên dù đúng mặt nạ vẫn bị chặn thành NOREAD (có thể là "0" đọc thành "8"). Đây là sức mạnh của kiểm tra <strong>giá trị</strong>, không chỉ kiểm tra loại ký tự.</li>
+  <li><code>L2610807</code>: "8" ở vị trí dây chuyền được sửa thành "B", hợp lệ về định dạng (dây chuyền B tồn tại) nhưng khác lô mong đợi, nên NG. Nếu trạm chỉ OCR mà không có lô mong đợi, chuỗi <code>L2610B07</code> sai sẽ được ghi vào hệ thống. Sửa theo định dạng có thể <strong>biến một lỗi đọc thành một chuỗi hợp lệ nhưng sai</strong>; vì vậy cần thêm lớp chặn: chữ số kiểm tra, so với lệnh sản xuất (OCV), hoặc yêu cầu độ tin cậy cao cho các vị trí đã bị sửa.</li>
+  <li><code>L2610A01</code> đọc đúng mặt nạ và giá trị nhưng khác lô: đây là lỗi in thật (máy in còn dữ liệu ca 01), phải NG chứ không phải NOREAD. Phân biệt hai loại này giúp bộ phận sản xuất biết lỗi ở máy in hay ở camera.</li>
+</ul>
+<div class="warn"><strong>Không sửa ở vị trí "chữ hoặc số"</strong>Nếu mặt nạ cho phép cả chữ và số ở một vị trí (ví dụ seri dạng chữ-số tự do), không có cơ sở để sửa O thành 0 ở đó. Khi ấy chỉ còn cách tăng chất lượng ảnh, dùng chữ số kiểm tra, hoặc thiết kế lại mã để tránh ký tự dễ nhầm.</div>
+
+<h2>6. Đo đúng chỉ số</h2>
+<p>"OCR đúng 98%" là một câu vô nghĩa nếu không nói 98% của cái gì. Nhà máy cần <strong>tỉ lệ chuỗi đúng hoàn toàn</strong>, và quan trọng hơn, tách riêng hai kiểu thất bại:</p>
+<ul>
+  <li><strong>NOREAD</strong> (không đọc được): hệ thống tự biết mình không chắc, sản phẩm bị đẩy ra để người kiểm tra. Tốn công nhưng an toàn.</li>
+  <li><strong>Đọc sai</strong> (misread): hệ thống trả về chuỗi sai mà tự tin là đúng. Đây là escape, sai dữ liệu truy xuất, có thể dẫn tới thu hồi sản phẩm. Mục tiêu gần như bằng 0.</li>
+</ul>
+<pre><code class="language-python">p_ky_tu = 0.995                                      # xác suất đọc đúng MỘT ký tự
+for n in (8, 12, 20):
+    print(f"chuỗi {n:2d} ký tự: tỉ lệ chuỗi đúng ≈ {p_ky_tu ** n:.1%} (nếu lỗi các ký tự độc lập)")
+
+# Kết quả một ca chạy thử: (đáp án, chuỗi hệ thống trả về; None = NOREAD)
+ket_qua = [("L2610A07", "L2610A07")] * 960 + [("L2610A07", None)] * 31 + \
+          [("L2610A07", "L2610B07")] * 2 + [("L2610A07", "L2610A01")] * 7
+dung = sum(1 for d, r in ket_qua if r == d)
+noread = sum(1 for d, r in ket_qua if r is None)
+sai = len(ket_qua) - dung - noread
+print(f"\n{len(ket_qua)} mẫu: đúng {dung / len(ket_qua):.1%}, NOREAD {noread / len(ket_qua):.1%}, "
+      f"đọc sai {sai / len(ket_qua):.1%} ({sai} mẫu)")</code></pre>
+<pre><code class="language-text">chuỗi  8 ký tự: tỉ lệ chuỗi đúng ≈ 96.1% (nếu lỗi các ký tự độc lập)
+chuỗi 12 ký tự: tỉ lệ chuỗi đúng ≈ 94.2% (nếu lỗi các ký tự độc lập)
+chuỗi 20 ký tự: tỉ lệ chuỗi đúng ≈ 90.5% (nếu lỗi các ký tự độc lập)
+
+1000 mẫu: đúng 96.0%, NOREAD 3.1%, đọc sai 0.9% (9 mẫu)</code></pre>
+<p>Độ chính xác ký tự 99,5% nghe rất cao, nhưng với chuỗi 20 ký tự chỉ còn khoảng 90% chuỗi đúng. Ở ca chạy thử, 0,9% đọc sai gồm 2 mẫu đọc nhầm A thành B (lỗi của trạm, phải điều tra) và 7 mẫu thực ra in sai ca (lỗi máy in, trạm làm đúng khi báo NG). Khi đánh giá, phải xem ảnh từng ca đọc sai để phân loại; trộn chung là che mất vấn đề. Bộ ảnh đánh giá nên có vài trăm ảnh thật có đáp án gõ tay, gồm cả ảnh khó (mờ, lệch, mực nhòe).</p>
+
+<h2>7. OCV: xác minh và chấm chất lượng in</h2>
+<p>Khi đã biết chuỗi mong đợi, so từng ô ký tự với mẫu của ký tự mong đợi. Mẫu tốt nhất là ký tự cắt từ chính chữ in thật của máy in trên dây chuyền (font, cỡ, độ đậm giống hệt); ở đây ta vẽ bằng OpenCV. Thử với ba bản in: in tốt, in mất nét (đầu in tắc một vòi), và in sai một ký tự.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+BUOC = 26                                                    # máy in nhãn: mỗi ký tự rộng cố định 26 px
+
+
+def in_dong(chuoi, mat_net_o=None, seed=0):
+    """Ảnh một dòng chữ đen trên nền sáng, mỗi ký tự một ô BUOC px; có thể làm mất nét ở ô mat_net_o."""
+    rng = np.random.default_rng(seed)
+    anh = np.full((44, BUOC * len(chuoi)), 230, np.uint8)
+    for i, c in enumerate(chuoi):
+        cv2.putText(anh, c, (i * BUOC + 3, 36), cv2.FONT_HERSHEY_SIMPLEX, 1.0, 30, 2, cv2.LINE_AA)
+    if mat_net_o is not None:
+        anh[22:30, mat_net_o * BUOC:(mat_net_o + 1) * BUOC] = 230   # một dải ngang không có mực
+    return np.clip(anh + rng.normal(0, 5, anh.shape), 0, 255).astype(np.uint8)
+
+
+def ocv(anh, mong_doi, nguong=0.85):
+    mau = in_dong(mong_doi, seed=99)                         # "mẫu vàng" của chuỗi mong đợi
+    diem = []                                                # ô dấu cách: mẫu phẳng, NCC vô nghĩa, bỏ qua
+    for i in range(len(mong_doi)):
+        o = anh[:, i * BUOC:(i + 1) * BUOC].astype(np.float32)
+        m = mau[:, i * BUOC:(i + 1) * BUOC].astype(np.float32)
+        diem.append(float(cv2.matchTemplate(o, m, cv2.TM_CCOEFF_NORMED)[0, 0]))
+    xau = [(i, mong_doi[i], round(d, 2)) for i, d in enumerate(diem) if d &lt; nguong and mong_doi[i] != " "]
+    return ("OK" if not xau else "NG"), min(d for d, c in zip(diem, mong_doi) if c != " "), xau
+
+
+MONG_DOI = "HSD 26/10/27"
+for ten, anh in (("in tốt", in_dong(MONG_DOI, seed=1)),
+                 ("mất nét ô 8", in_dong(MONG_DOI, mat_net_o=8, seed=2)),
+                 ("in sai năm", in_dong("HSD 26/10/28", seed=3))):
+    kq, thap_nhat, xau = ocv(anh, MONG_DOI)
+    print(f"{ten:12s}: {kq}  NCC thấp nhất {thap_nhat:.2f}  ô kém {xau}")</code></pre>
+<pre><code class="language-text">in tốt      : OK  NCC thấp nhất 0.99  ô kém []
+mất nét ô 8 : NG  NCC thấp nhất 0.73  ô kém [(8, '0', 0.73)]
+in sai năm  : NG  NCC thấp nhất 0.49  ô kém [(11, '7', 0.49)]</code></pre>
+<p>Bản in mất nét ở chữ "0" (ô 8, đếm từ 0) vẫn có thể được OCR đọc đúng, nhưng OCV báo ô này kém. Bản in sai năm bị bắt ngay ở ô cuối. Ô dấu cách (ô 3) được bỏ qua: mẫu gần như phẳng nên NCC không có ý nghĩa (chia cho độ lệch chuẩn gần 0); nếu cần, kiểm tra ô trống bằng độ lệch chuẩn thấp, nghĩa là không có vết mực. Ngưỡng 0,85 phải chọn từ thống kê trên ảnh thật như bài template matching: điểm thấp nhất của chữ in tốt và điểm cao nhất của chữ lỗi.</p>
+<p>Các chỉ số chất lượng in khác hay dùng trong OCV: tương phản chữ/nền, độ dày nét (so với mẫu), diện tích pixel lệch so với mẫu (bắt vết mực thừa), độ lệch vị trí và góc của dòng chữ. Các phần mềm vision thương mại có công cụ OCV với đủ các chỉ số này; tự viết thì bắt đầu từ NCC theo ô như trên.</p>
+
+<h2>8. Chọn công nghệ</h2>
+<table>
+  <tr><th>Lựa chọn</th><th>Phù hợp khi</th><th>Lưu ý</th></tr>
+  <tr><td>Công cụ OCR/OCV của phần mềm vision thương mại</td><td>Chữ công nghiệp (in phun chấm, khắc), cần huấn luyện nhanh bằng vài mẫu, có hỗ trợ kỹ thuật</td><td>Chi phí bản quyền; phụ thuộc hãng</td></tr>
+  <tr><td>Tesseract (mã nguồn mở)</td><td>Chữ in rõ, nét liền, nền sạch, sau tiền xử lý tốt</td><td>Kém với chữ chấm, chữ khắc tương phản thấp; xem bài OCR với Tesseract</td></tr>
+  <tr><td>OCR Deep Learning (PaddleOCR, EasyOCR)</td><td>Nền phức tạp, chữ nghiêng, cong, nhiều font</td><td>Nặng hơn, cần GPU hoặc tối ưu cho cycle time ngắn; xem bài OCR bằng Deep Learning</td></tr>
+  <tr><td>So mẫu theo ô (template OCR/OCV)</td><td>Font và bước chữ cố định (máy in nhãn), cần rất nhanh</td><td>Không đọc được font lạ; mẫu phải cắt từ chữ in thật</td></tr>
+  <tr><td>Mô hình riêng huấn luyện trên dữ liệu của bạn</td><td>Font đặc thù, khối lượng lớn, đủ dữ liệu có nhãn</td><td>Tốn công thu thập và gán nhãn vài nghìn mẫu</td></tr>
+  <tr><td>In thêm mã 2D cạnh chữ</td><td>Bạn có quyền thay đổi thiết kế nhãn</td><td>Đọc tin cậy hơn OCR rất nhiều; chữ vẫn cần cho người đọc và có thể OCV theo nội dung mã</td></tr>
 </table>
 
-<h2>Quy trình OCR điển hình</h2>
-<ol>
-  <li><strong>Định vị vùng chữ</strong>: template matching hoặc mô hình phát hiện chữ.</li>
-  <li><strong>Chuẩn hóa</strong>: xoay thẳng, cắt ROI, tăng tương phản.</li>
-  <li><strong>Tách ký tự</strong> (với phương pháp cổ điển) hoặc đọc cả dòng (với Deep Learning).</li>
-  <li><strong>Nhận dạng</strong> từng ký tự hoặc chuỗi.</li>
-  <li><strong>Kiểm tra hợp lệ</strong>: định dạng (ví dụ 2 chữ + 6 số), ký tự kiểm tra (checksum), so với dữ liệu từ hệ thống.</li>
-</ol>
+<h2>9. Lỗi thường gặp</h2>
+<table>
+  <tr><th>Lỗi</th><th>Hậu quả</th><th>Cách tránh</th></tr>
+  <tr><td>Báo cáo độ chính xác ký tự thay vì chuỗi</td><td>Khách hàng nghiệm thu xong mới thấy tỉ lệ NG cao</td><td>Đo tỉ lệ chuỗi đúng, NOREAD, đọc sai riêng</td></tr>
+  <tr><td>Hệ thống luôn trả về một chuỗi, kể cả khi không chắc</td><td>Đọc sai lọt vào MES</td><td>Ngưỡng tin cậy, kiểm tra định dạng và giá trị; không chắc thì NOREAD</td></tr>
+  <tr><td>Sửa theo định dạng mà không có lớp chặn sau</td><td>Lỗi đọc thành chuỗi hợp lệ nhưng sai</td><td>Chữ số kiểm tra, so với lệnh sản xuất, giới hạn số vị trí được sửa</td></tr>
+  <tr><td>Không kiểm tra hướng chữ</td><td>Sản phẩm ngược cho ra chuỗi rác hoặc 6/9 đảo</td><td>Định vị theo mốc có hướng; thử cả hai hướng và chọn hướng hợp định dạng</td></tr>
+  <tr><td>Đánh giá trên vài ảnh đẹp</td><td>Thất bại khi gặp mực nhòe, nhãn nhăn</td><td>Bộ ảnh vài trăm mẫu, có ảnh khó và ảnh lỗi thật</td></tr>
+</table>
 
-<h2>Các lựa chọn công nghệ</h2>
+<h2>Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1 (thực hành của bài).</strong> Mã lô của một nhà máy dược có dạng <code>B</code> + 2 chữ số năm + 1 chữ cái tháng (A = tháng 1 … L = tháng 12) + 4 chữ số thứ tự, ví dụ <code>B26J0315</code>. Liệt kê các cặp ký tự có thể nhầm ở từng vị trí, viết mặt nạ và quy tắc sửa, và chỉ ra các chữ cái nào ở vị trí tháng là "bẫy" mà quy tắc không sửa được.</p>
+<details><summary>Xem đáp án</summary>
+<p>Mặt nạ <code>B99A9999</code>. Vị trí 0 cố định "B": chấp nhận "8" (sửa thành B). Vị trí 1, 2, 4–7 là chữ số: sửa O/D/Q→0, I/L→1, Z→2, S→5, B→8, G→6, T→7. Vị trí 3 là chữ cái tháng, chỉ hợp lệ A–L: sửa 0→O thì vô nghĩa vì O không phải tháng hợp lệ; 8→B, 6→G, 1→I, 4→A vẫn sửa được. Bẫy: các cặp nhầm giữa hai chữ cái <em>cùng hợp lệ</em>: C/G (tháng 3 và 7), E/F (5 và 6), I/J (9 và 10), B/D (2 và 4). Mặt nạ không sửa được chúng; cần kiểm tra giá trị với lệnh sản xuất (tháng sản xuất đã biết) hoặc OCV.</p>
+<pre><code class="language-python">import re
+
+SANG_SO = {"O": "0", "D": "0", "Q": "0", "I": "1", "L": "1", "Z": "2", "S": "5", "B": "8", "G": "6", "T": "7"}
+SANG_CHU = {"8": "B", "6": "G", "1": "I", "4": "A"}
+MAU = re.compile(r"^B\d{2}[A-L]\d{4}$")
+
+
+def sua_lo_duoc(s):
+    s = s.upper().replace(" ", "")
+    if len(s) != 8:
+        return None
+    s = ("B" if s[0] in "B8" else s[0]) + "".join(SANG_SO.get(c, c) for c in s[1:3]) + \
+        SANG_CHU.get(s[3], s[3]) + "".join(SANG_SO.get(c, c) for c in s[4:])
+    return s if MAU.match(s) else None
+
+
+for ocr in ("B26J0315", "826J03I5", "B26JO3I5", "B26MO315", "B26G0315"):
+    print(ocr, "→", sua_lo_duoc(ocr))</code></pre>
+<pre><code class="language-text">B26J0315 → B26J0315
+826J03I5 → B26J0315
+B26JO3I5 → B26J0315
+B26MO315 → None
+B26G0315 → B26G0315</code></pre>
+<p>Chú ý dòng cuối: <code>B26G0315</code> hợp lệ (tháng 7) nhưng nếu lô thật là <code>B26C0315</code> (tháng 3) thì đây là đọc sai mà quy tắc không thể phát hiện. Dòng <code>B26MO315</code> bị chặn vì M không phải tháng hợp lệ.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Một trạm OCR đọc số seri 14 ký tự. Khách hàng yêu cầu tỉ lệ chuỗi đúng ≥ 99%. Độ chính xác ký tự tối thiểu phải là bao nhiêu (giả sử lỗi độc lập)? Nếu trạm đạt 99,5% chuỗi đúng, 0,45% NOREAD và 0,05% đọc sai, bạn đánh giá thế nào?</p>
+<details><summary>Xem đáp án</summary>
+<p>Cần p<sup>14</sup> ≥ 0,99, tức p ≥ 0,99<sup>1/14</sup> ≈ 0,99928, khoảng 99,93% mỗi ký tự (chưa tới 1 lỗi trên 1.400 ký tự). Kết quả 99,5% đạt yêu cầu tỉ lệ đúng; 0,45% NOREAD chấp nhận được nếu quy trình xử lý thủ công theo kịp (ví dụ 10.000 sản phẩm/ca thì khoảng 45 sản phẩm cần người kiểm tra). Nhưng 0,05% đọc sai là 5 seri sai mỗi ca được ghi vào hệ thống mà không ai biết: phải xem ảnh từng ca, tìm nguyên nhân, và thêm lớp chặn (chữ số kiểm tra, ngưỡng tin cậy cao hơn, chấp nhận tăng NOREAD) để đưa đọc sai về gần 0.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Hạn dùng in phun chấm trên đáy lon nhôm (bề mặt cong, bóng), băng tải 1.200 lon/phút. Khách hàng hỏi nên làm OCR hay OCV. Bạn trả lời thế nào?</p>
+<details><summary>Xem đáp án</summary>
+<p>OCV. Hạn dùng của cả lô đã biết trước từ lệnh sản xuất (và từ dữ liệu gửi xuống máy in), nên câu hỏi thật là "máy in có in đúng và đọc được không", không phải "in gì". OCV nhanh hơn (1.200 lon/phút = 50 ms mỗi lon), tin cậy hơn, và chấm được chất lượng in (chấm thiếu do tắc vòi). Về ảnh: đèn vòm hoặc đèn khuếch tán để giảm phản xạ trên đáy lon bóng, phơi sáng rất ngắn vì lon chạy nhanh, phép đóng để nối chấm. Nên đọc thêm OCR ở chế độ giám sát (ghi log) để phát hiện khi máy in bị cài nhầm dữ liệu.</p>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
 <ul>
-  <li><strong>Công cụ OCR trong phần mềm Machine Vision thương mại</strong>: tối ưu cho chữ công nghiệp, có sẵn font in phun, huấn luyện nhanh trên vài mẫu.</li>
-  <li><strong>Tesseract</strong>: mã nguồn mở, tốt cho văn bản in rõ ràng, cần tiền xử lý kỹ (xem <a href="../hoc/ocr-tesseract-tien-xu-ly-anh.html">bài hướng dẫn</a>).</li>
-  <li><strong>OCR Deep Learning</strong> như PaddleOCR, EasyOCR: mạnh với chữ trong cảnh phức tạp (xem <a href="../hoc/ocr-deep-learning-paddleocr-easyocr.html">so sánh</a>).</li>
-  <li><strong>Mô hình riêng</strong>: khi font và định dạng cố định, một mô hình nhỏ huấn luyện trên dữ liệu của bạn thường vừa nhanh vừa chính xác nhất.</li>
+  <li>OCR đọc ra chuỗi khi chưa biết nội dung; OCV xác minh chuỗi mong đợi và chấm chất lượng in. OCV tin cậy hơn và bắt được chữ in kém mà OCR vẫn đọc "đúng".</li>
+  <li>Loại chữ quyết định chiếu sáng và tiền xử lý: in phun chấm cần nối chấm, khắc kim loại cần đèn góc thấp hoặc đồng trục, dập nổi cần đèn có hướng.</li>
+  <li>Cặp nhầm điển hình: 0/O/D/Q, 1/I/7, 8/B, 5/S, 2/Z, 6/G; mức nguy hiểm phụ thuộc font, hãy đo trên font của bạn.</li>
+  <li>Sửa theo mặt nạ định dạng rồi kiểm tra giá trị; luôn có lớp chặn sau vì sửa có thể biến lỗi đọc thành chuỗi hợp lệ nhưng sai.</li>
+  <li>Đo tỉ lệ chuỗi đúng, NOREAD và đọc sai riêng biệt; đọc sai là chỉ số phải gần 0.</li>
 </ul>
-
-<h2>Bẫy thường gặp</h2>
-<ul>
-  <li>Nhầm ký tự giống nhau: <strong>0/O/D, 1/I/l, 5/S, 8/B, 2/Z</strong>. Dùng quy tắc định dạng để loại trừ (vị trí này chỉ có thể là số).</li>
-  <li>Đánh giá theo "tỷ lệ ký tự đúng" là chưa đủ; nhà máy cần <strong>tỷ lệ chuỗi đúng hoàn toàn</strong>.</li>
-  <li>Khi không chắc chắn, hệ thống nên báo "không đọc được" thay vì đoán, để người vận hành xử lý.</li>
-</ul>
-
-<h2>Đọc mã thay vì đọc chữ</h2>
-<p>Nếu có quyền quyết định, hãy in thêm <strong>mã DataMatrix hoặc QR</strong> cạnh chữ: mã 2D có cơ chế sửa lỗi, đọc tin cậy hơn OCR rất nhiều. Xem dự án <a href="../projects/doc-ma-qr-datamatrix-tren-bao-bi.html">đọc mã QR và DataMatrix</a>.</p>
+<p>Bài tiếp theo: <strong>OCR với Tesseract và tiền xử lý</strong>, biến ảnh chụp thực tế thành ảnh mà bộ OCR đọc đúng.</p>
