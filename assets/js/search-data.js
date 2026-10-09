@@ -1,6 +1,90 @@
 /* Tự động sinh bởi tools/build.py – không sửa tay */
 window.HF_POSTS = [
  {
+  "t": "Lộ trình 700 TOEIC trong 5 tháng cho người đi làm",
+  "u": "ngoai-ngu/lo-trinh-700-toeic.html",
+  "e": "Cấu trúc đề 200 câu, phân bổ điểm mục tiêu, kế hoạch từng tháng, lịch học 60–90 phút mỗi ngày và mốc thi thử để theo dõi tiến độ.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "09/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/lo-trinh-700-toeic.jpg",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC"
+  ]
+ },
+ {
+  "t": "Cách học tiếng Anh hiệu quả: 7 nguyên tắc cho người đi làm",
+  "u": "ngoai-ngu/cach-hoc-tieng-anh-hieu-qua.html",
+  "e": "Đầu vào dễ hiểu, học từ trong câu, lặp lại ngắt quãng, tự kiểm tra, shadowing, học ngữ pháp để dùng và lịch học tuần mẫu.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "09/10/2026",
+  "m": 4,
+  "img": "assets/images/posts/cach-hoc-tieng-anh-hieu-qua.jpg",
+  "tags": [
+   "Tiếng Anh"
+  ]
+ },
+ {
+  "t": "Bộ giáo trình tự học tiếng Anh HF-700TOEIC",
+  "u": "ngoai-ngu/giao-trinh-hf-700toeic.html",
+  "e": "Giáo trình miễn phí theo lộ trình 5 tháng: từ vựng 12 chủ đề, ngữ pháp Part 5–6, luyện nghe Part 1–4, đọc hiểu Part 7 và luyện đề.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "09/10/2026",
+  "m": 3,
+  "img": "assets/images/posts/giao-trinh-hf-700toeic.jpg",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Ebook"
+  ]
+ },
+ {
+  "t": "Lộ trình HSK3 từ con số 0 trong 8 tháng",
+  "u": "ngoai-ngu/lo-trinh-hsk3.html",
+  "e": "HSK 2.0 hay HSK 3.0, ba giai đoạn từ pinyin đến cấp 3, lịch học 60 phút mỗi ngày và lợi thế âm Hán Việt của người Việt.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "09/10/2026",
+  "m": 4,
+  "img": "assets/images/posts/lo-trinh-hsk3.jpg",
+  "tags": [
+   "Tiếng Trung",
+   "HSK"
+  ]
+ },
+ {
+  "t": "Cách học tiếng Trung hiệu quả: 7 nguyên tắc cho người Việt",
+  "u": "ngoai-ngu/cach-hoc-tieng-trung-hieu-qua.html",
+  "e": "Pinyin và thanh điệu, chữ Hán qua bộ thủ, tận dụng âm Hán Việt, học theo mẫu câu, shadowing và thẻ ghi nhớ có audio.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "09/10/2026",
+  "m": 4,
+  "img": "assets/images/posts/cach-hoc-tieng-trung-hieu-qua.jpg",
+  "tags": [
+   "Tiếng Trung"
+  ]
+ },
+ {
+  "t": "Bộ giáo trình tự học tiếng Trung HF-HSK3",
+  "u": "ngoai-ngu/giao-trinh-hf-hsk3.html",
+  "e": "Giáo trình miễn phí từ con số 0 đến HSK 3 theo chuẩn HSK 3.0: pinyin, từ vựng cấp 1–3, ngữ pháp, chữ Hán, nghe nói và luyện đề.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "09/10/2026",
+  "m": 4,
+  "img": "assets/images/posts/giao-trinh-hf-hsk3.jpg",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Ebook"
+  ]
+ },
+ {
   "t": "Sierra và Meta đề xuất Personal Agent Protocol cho agent cá nhân",
   "u": "tin-tuc-ai/sierra-meta-personal-agent-protocol.html",
   "e": "Chuẩn mở về cách agent của người dùng tương tác với doanh nghiệp, với Walmart, Shopify, Stripe là đối tác sáng lập.",
@@ -14,20 +98,6 @@ window.HF_POSTS = [
    "AI Industry",
    "Technology",
    "AI Agents"
-  ]
- },
- {
-  "t": "Giới từ trong tiếng Anh kỹ thuật: by, to, within, of",
-  "u": "ngoai-ngu/gioi-tu-tieng-anh-ky-thuat.html",
-  "e": "Giới từ chỉ thời gian, số liệu và thay đổi, vị trí, cụm động từ hay dùng và bài tập nhanh.",
-  "c": "ngoai-ngu",
-  "cn": "Ngoại ngữ",
-  "d": "08/10/2026",
-  "m": 3,
-  "img": "assets/images/posts/gioi-tu-tieng-anh-ky-thuat.jpg",
-  "tags": [
-   "Tiếng Anh",
-   "Ngữ pháp"
   ]
  },
  {
@@ -118,20 +188,6 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Tiếng Trung cho kỹ sư nhà máy: 50 từ vựng và 10 mẫu câu",
-  "u": "ngoai-ngu/tieng-trung-cho-ky-su-nha-may.html",
-  "e": "Từ vựng sản xuất, chất lượng, thị giác máy và bảo trì kèm pinyin, cùng các câu dùng ngay khi làm việc với chuyên gia Trung Quốc.",
-  "c": "ngoai-ngu",
-  "cn": "Ngoại ngữ",
-  "d": "06/10/2026",
-  "m": 4,
-  "img": "assets/images/posts/tieng-trung-cho-ky-su-nha-may.jpg",
-  "tags": [
-   "Tiếng Trung",
-   "Từ vựng"
-  ]
- },
- {
   "t": "Đọc tài liệu SDK camera công nghiệp và chuẩn GenICam",
   "u": "tai-nguyen/doc-tai-lieu-sdk-camera-genicam.html",
   "e": "GenICam, SFNC và các tính năng chuẩn hay dùng, cách đọc tài liệu SDK và thiết kế phần mềm ít phụ thuộc hãng.",
@@ -160,20 +216,6 @@ window.HF_POSTS = [
    "LLM",
    "Generative AI",
    "Source Code"
-  ]
- },
- {
-  "t": "Từ vựng TOEIC chủ đề sản xuất và kho vận",
-  "u": "ngoai-ngu/tu-vung-toeic-san-xuat-kho-van.html",
-  "e": "Từ thường gặp trong đề về nhà máy, kho hàng, giao nhận kèm ví dụ và các cặp đồng nghĩa hay bị paraphrase.",
-  "c": "ngoai-ngu",
-  "cn": "Ngoại ngữ",
-  "d": "05/10/2026",
-  "m": 3,
-  "img": "assets/images/posts/tu-vung-toeic-san-xuat-kho-van.jpg",
-  "tags": [
-   "TOEIC",
-   "Từ vựng"
   ]
  },
  {
@@ -323,21 +365,6 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Lộ trình TOEIC 650+ trong 3 tháng cho kỹ sư bận rộn",
-  "u": "ngoai-ngu/lo-trinh-toeic-650-3-thang-cho-ky-su.html",
-  "e": "Cấu trúc đề 200 câu, kế hoạch học từng tháng, lịch 60–90 phút mỗi ngày và chiến thuật phân bổ thời gian phần Reading.",
-  "c": "ngoai-ngu",
-  "cn": "Ngoại ngữ",
-  "d": "02/10/2026",
-  "m": 4,
-  "img": "assets/images/posts/lo-trinh-toeic-650-3-thang-cho-ky-su.jpg",
-  "tags": [
-   "TOEIC",
-   "Tiếng Anh",
-   "Luyện nghe"
-  ]
- },
- {
   "t": "Tài liệu ôn TOEIC miễn phí, chính thống",
   "u": "tai-nguyen/tai-lieu-on-toeic-mien-phi-chinh-thong.html",
   "e": "Nguồn chính thức, công cụ bổ trợ miễn phí, cách kết hợp tài liệu và cảnh giác với tài liệu không rõ nguồn gốc.",
@@ -457,20 +484,6 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Hiện tại hoàn thành hay quá khứ đơn? Dùng đúng trong báo cáo công việc",
-  "u": "ngoai-ngu/thi-hien-tai-hoan-thanh-va-qua-khu-don-trong-bao-cao.html",
-  "e": "Phân biệt hai thì qua ví dụ báo cáo tiến độ, dấu hiệu nhận biết và mẫu báo cáo tuần bằng tiếng Anh.",
-  "c": "ngoai-ngu",
-  "cn": "Ngoại ngữ",
-  "d": "29/09/2026",
-  "m": 3,
-  "img": "assets/images/posts/thi-hien-tai-hoan-thanh-va-qua-khu-don-trong-bao-cao.jpg",
-  "tags": [
-   "Tiếng Anh",
-   "Ngữ pháp"
-  ]
- },
- {
   "t": "Sách và khóa học Computer Vision, Deep Learning miễn phí, hợp pháp",
   "u": "tai-nguyen/sach-khoa-hoc-computer-vision-mien-phi.html",
   "e": "Dive into Deep Learning, Understanding Deep Learning, Szeliski, CS231n và thứ tự học gợi ý từ nền tảng đến chuyên sâu.",
@@ -529,20 +542,6 @@ window.HF_POSTS = [
    "Segmentation",
    "YOLO",
    "AI Vision"
-  ]
- },
- {
-  "t": "7 điểm ngữ pháp tiếng Anh để viết tài liệu kỹ thuật",
-  "u": "ngoai-ngu/ngu-phap-tieng-anh-viet-tai-lieu-ky-thuat.html",
-  "e": "Câu bị động, mệnh lệnh, shall/should/may, câu điều kiện, mệnh đề quan hệ, danh từ ghép và cách viết số đo cho báo cáo, email kỹ thuật.",
-  "c": "ngoai-ngu",
-  "cn": "Ngoại ngữ",
-  "d": "27/09/2026",
-  "m": 4,
-  "img": "assets/images/posts/ngu-phap-tieng-anh-viet-tai-lieu-ky-thuat.jpg",
-  "tags": [
-   "Tiếng Anh",
-   "Ngữ pháp"
   ]
  },
  {
@@ -660,20 +659,6 @@ window.HF_POSTS = [
   "tags": [
    "Robotics",
    "AI Industry"
-  ]
- },
- {
-  "t": "Mẹo TOEIC Listening Part 3–4: hội thoại và bài nói ngắn",
-  "u": "ngoai-ngu/meo-toeic-listening-part-3-4.html",
-  "e": "Đọc câu hỏi trước, dạng câu hỏi quen thuộc, bẫy lặp từ, paraphrase và cách luyện ở nhà.",
-  "c": "ngoai-ngu",
-  "cn": "Ngoại ngữ",
-  "d": "24/09/2026",
-  "m": 3,
-  "img": "assets/images/posts/meo-toeic-listening-part-3-4.jpg",
-  "tags": [
-   "TOEIC",
-   "Luyện nghe"
   ]
  },
  {
@@ -856,21 +841,6 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Cách đọc datasheet camera công nghiệp bằng tiếng Anh",
-  "u": "ngoai-ngu/doc-datasheet-camera-cong-nghiep-tieng-anh.html",
-  "e": "Giải mã từng mục sensor, performance, interface, mechanical cùng các từ viết tắt và mẹo đọc thông số như kỹ sư.",
-  "c": "ngoai-ngu",
-  "cn": "Ngoại ngữ",
-  "d": "20/09/2026",
-  "m": 4,
-  "img": "assets/images/posts/doc-datasheet-camera-cong-nghiep-tieng-anh.jpg",
-  "tags": [
-   "Tiếng Anh",
-   "IT English",
-   "Camera"
-  ]
- },
- {
   "t": "Phân ngưỡng và contour: đếm và đo vật thể bằng OpenCV",
   "u": "hoc/phan-nguong-contour-dem-do-vat.html",
   "e": "Chuỗi xử lý kinh điển của Machine Vision: làm mờ, Otsu, hình thái học, tìm contour, tính diện tích, độ tròn để phân loại OK/NG.",
@@ -897,20 +867,6 @@ window.HF_POSTS = [
   "tags": [
    "Object Detection",
    "AI Vision"
-  ]
- },
- {
-  "t": "HSK 3.0: cấu trúc 9 cấp và lộ trình cho người đi làm",
-  "u": "ngoai-ngu/hsk-3-0-cau-truc-va-lo-trinh.html",
-  "e": "Thời điểm áp dụng, ba giai đoạn sơ – trung – cao cấp, thay đổi về kỹ năng và lộ trình ôn thi gợi ý.",
-  "c": "ngoai-ngu",
-  "cn": "Ngoại ngữ",
-  "d": "19/09/2026",
-  "m": 3,
-  "img": "assets/images/posts/hsk-3-0-cau-truc-va-lo-trinh.jpg",
-  "tags": [
-   "Tiếng Trung",
-   "HSK"
   ]
  },
  {
@@ -1046,20 +1002,6 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Ngữ pháp TOEIC Part 5: từ loại và thì của động từ",
-  "u": "ngoai-ngu/ngu-phap-toeic-part-5-tu-loai-va-thi.html",
-  "e": "Chọn đúng từ loại theo vị trí, nhận diện qua đuôi từ, dấu hiệu thời gian, chủ động bị động và chiến thuật làm bài.",
-  "c": "ngoai-ngu",
-  "cn": "Ngoại ngữ",
-  "d": "15/09/2026",
-  "m": 3,
-  "img": "assets/images/posts/ngu-phap-toeic-part-5-tu-loai-va-thi.jpg",
-  "tags": [
-   "TOEIC",
-   "Ngữ pháp"
-  ]
- },
- {
   "t": "Dataset Computer Vision miễn phí để luyện tập và nghiên cứu",
   "u": "tai-nguyen/dataset-computer-vision-mien-phi.html",
   "e": "MVTec AD, VisA, COCO, Open Images, ImageNet và nhiều bộ khác theo từng bài toán, kèm lưu ý giấy phép khi dùng thương mại.",
@@ -1131,21 +1073,6 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "60 thuật ngữ tiếng Anh ngành Computer Vision và Machine Vision",
-  "u": "ngoai-ngu/tu-vung-tieng-anh-computer-vision.html",
-  "e": "Từ vựng về ảnh, xử lý ảnh, phần cứng, kiểm tra đo lường và AI Vision, kèm nghĩa và câu ví dụ để đọc tài liệu tự tin hơn.",
-  "c": "ngoai-ngu",
-  "cn": "Ngoại ngữ",
-  "d": "13/09/2026",
-  "m": 4,
-  "img": "assets/images/posts/tu-vung-tieng-anh-computer-vision.jpg",
-  "tags": [
-   "Tiếng Anh",
-   "Từ vựng",
-   "IT English"
-  ]
- },
- {
   "t": "Sách và tài liệu Machine Vision công nghiệp nên đọc",
   "u": "tai-nguyen/sach-machine-vision-cong-nghiep-nen-doc.html",
   "e": "Sách chuyên ngành kinh điển, tài liệu miễn phí từ nhà sản xuất, các tiêu chuẩn và thứ tự đọc gợi ý.",
@@ -1188,20 +1115,6 @@ window.HF_POSTS = [
    "Machine Vision",
    "Industrial Vision",
    "Source Code"
-  ]
- },
- {
-  "t": "Từ vựng tiếng Trung về máy tính, lập trình và AI",
-  "u": "ngoai-ngu/tu-vung-tieng-trung-may-tinh-lap-trinh.html",
-  "e": "Đọc giao diện phần mềm, trao đổi với kỹ sư Trung Quốc và tra cứu tài liệu với các từ vựng chuyên ngành kèm pinyin.",
-  "c": "ngoai-ngu",
-  "cn": "Ngoại ngữ",
-  "d": "12/09/2026",
-  "m": 3,
-  "img": "assets/images/posts/tu-vung-tieng-trung-may-tinh-lap-trinh.jpg",
-  "tags": [
-   "Tiếng Trung",
-   "Từ vựng"
   ]
  },
  {
@@ -1352,20 +1265,6 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Tiếng Anh cho email và cuộc họp công việc",
-  "u": "ngoai-ngu/tu-vung-tieng-anh-hop-va-email-cong-viec.html",
-  "e": "Cụm từ mở đầu, yêu cầu, báo vấn đề, kết thúc email và các câu then chốt khi họp với đối tác nước ngoài.",
-  "c": "ngoai-ngu",
-  "cn": "Ngoại ngữ",
-  "d": "08/09/2026",
-  "m": 4,
-  "img": "assets/images/posts/tu-vung-tieng-anh-hop-va-email-cong-viec.jpg",
-  "tags": [
-   "Tiếng Anh",
-   "Từ vựng"
-  ]
- },
- {
   "t": "Độ sâu trường ảnh, khẩu độ và quy trình lấy nét cho Machine Vision",
   "u": "kien-thuc/do-sau-truong-anh-khau-do-lay-net.html",
   "e": "Số f, DOF, giới hạn nhiễu xạ, quy trình lấy nét bằng chỉ số độ nét và cách giữ ống kính ổn định trong sản xuất.",
@@ -1447,20 +1346,6 @@ window.HF_POSTS = [
   "tags": [
    "AI News",
    "AI Models"
-  ]
- },
- {
-  "t": "Shadowing: luyện nghe nói tiếng Anh 15 phút mỗi ngày",
-  "u": "ngoai-ngu/shadowing-luyen-nghe-noi-cho-nguoi-di-lam.html",
-  "e": "Quy trình 5 bước, lỗi phát âm người Việt cần chú ý và lịch luyện ngắn gọn cho người đi làm.",
-  "c": "ngoai-ngu",
-  "cn": "Ngoại ngữ",
-  "d": "05/09/2026",
-  "m": 3,
-  "img": "assets/images/posts/shadowing-luyen-nghe-noi-cho-nguoi-di-lam.jpg",
-  "tags": [
-   "Tiếng Anh",
-   "Luyện nghe"
   ]
  },
  {
@@ -1577,20 +1462,6 @@ window.HF_POSTS = [
    "Image Processing",
    "OpenCV",
    "Computer Vision"
-  ]
- },
- {
-  "t": "6 điểm ngữ pháp tiếng Trung nền tảng qua câu công việc",
-  "u": "ngoai-ngu/ngu-phap-tieng-trung-co-ban.html",
-  "e": "Trật tự từ, định ngữ với 的, phủ định 不 và 没, trợ từ 了, câu hỏi và lượng từ, kèm ví dụ ở nhà máy.",
-  "c": "ngoai-ngu",
-  "cn": "Ngoại ngữ",
-  "d": "01/09/2026",
-  "m": 3,
-  "img": "assets/images/posts/ngu-phap-tieng-trung-co-ban.jpg",
-  "tags": [
-   "Tiếng Trung",
-   "Ngữ pháp"
   ]
  },
  {
@@ -1750,20 +1621,6 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Luyện nghe tiếng Anh kỹ thuật qua video: phương pháp 4 lượt",
-  "u": "ngoai-ngu/luyen-nghe-tieng-anh-ky-thuat-qua-video.html",
-  "e": "Vì sao nghe tiếng Anh chuyên ngành khó, chọn nguồn nghe và quy trình 4 lượt giúp hiểu nhiều hơn rõ rệt.",
-  "c": "ngoai-ngu",
-  "cn": "Ngoại ngữ",
-  "d": "25/08/2026",
-  "m": 3,
-  "img": "assets/images/posts/luyen-nghe-tieng-anh-ky-thuat-qua-video.jpg",
-  "tags": [
-   "Tiếng Anh",
-   "Luyện nghe"
-  ]
- },
- {
   "t": "Lọc ảnh và phát hiện cạnh: Gaussian, Sobel, Canny",
   "u": "hoc/loc-anh-phat-hien-canh-sobel-canny.html",
   "e": "Từ kernel lọc ảnh đến gradient Sobel, bộ phát hiện cạnh Canny, cách chọn ngưỡng và tìm đường thẳng, đường tròn bằng Hough.",
@@ -1832,20 +1689,6 @@ window.HF_POSTS = [
   "tags": [
    "Machine Learning",
    "AI/ML"
-  ]
- },
- {
-  "t": "Pinyin và thanh điệu: bước đầu học tiếng Trung",
-  "u": "ngoai-ngu/pinyin-thanh-dieu-nhap-mon-tieng-trung.html",
-  "e": "Bốn thanh điệu, các biến điệu quan trọng, những âm người Việt hay đọc sai và cách luyện nghe, phát âm.",
-  "c": "ngoai-ngu",
-  "cn": "Ngoại ngữ",
-  "d": "21/08/2026",
-  "m": 3,
-  "img": "assets/images/posts/pinyin-thanh-dieu-nhap-mon-tieng-trung.jpg",
-  "tags": [
-   "Tiếng Trung",
-   "Luyện nghe"
   ]
  },
  {
@@ -1981,7 +1824,7 @@ window.HF_TOPICS = [
   "u": "hoc/camera-lens.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 8
+  "n": 7
  },
  {
   "t": "Lighting",
@@ -2142,42 +1985,14 @@ window.HF_TOPICS = [
   "u": "ngoai-ngu/english.html",
   "s": "Ngoại ngữ",
   "g": "Ngôn ngữ",
-  "n": 9
+  "n": 3
  },
  {
   "t": "Chinese",
   "u": "ngoai-ngu/chinese.html",
   "s": "Ngoại ngữ",
   "g": "Ngôn ngữ",
-  "n": 5
- },
- {
-  "t": "Vocabulary",
-  "u": "ngoai-ngu/vocabulary.html",
-  "s": "Ngoại ngữ",
-  "g": "Kỹ năng",
-  "n": 5
- },
- {
-  "t": "Grammar",
-  "u": "ngoai-ngu/grammar.html",
-  "s": "Ngoại ngữ",
-  "g": "Kỹ năng",
-  "n": 5
- },
- {
-  "t": "Listening",
-  "u": "ngoai-ngu/listening.html",
-  "s": "Ngoại ngữ",
-  "g": "Kỹ năng",
-  "n": 5
- },
- {
-  "t": "TOEIC / HSK",
-  "u": "ngoai-ngu/toeic-hsk.html",
-  "s": "Ngoại ngữ",
-  "g": "Luyện thi",
-  "n": 6
+  "n": 3
  },
  {
   "t": "Source Code",
@@ -2212,7 +2027,7 @@ window.HF_TOPICS = [
   "u": "tai-nguyen/ebook.html",
   "s": "Tài nguyên",
   "g": "",
-  "n": 5
+  "n": 7
  },
  {
   "t": "AI Tools",

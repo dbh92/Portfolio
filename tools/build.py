@@ -58,9 +58,28 @@ def img_url(p):
     return f"assets/images/posts/{p['slug']}.jpg"
 
 
+# Link tải tài liệu (Google Drive…) khai báo một chỗ trong posts.json → "downloads".
+# Trong thân bài viết {{download:<key>}} để chèn hộp tải; đổi link chỉ cần sửa posts.json.
+DOWNLOADS = DATA.get("downloads", {})
+
+
+def download_box(key):
+    d = DOWNLOADS[key]
+    note = "" if d.get("ready") else (
+        '<p class="download-note">Bộ tài liệu đang được hoàn thiện, link sẽ mở được khi tài liệu được tải lên.</p>')
+    return (f'<div class="download-box"><div class="download-info"><strong>{e(d["label"])}</strong>'
+            f'<span>{e(d["desc"])}</span></div>'
+            f'<a class="btn" href="{e(d["url"])}" target="_blank" rel="noopener">{e(d.get("cta", "Mở Google Drive"))} →</a>'
+            f'{note}</div>')
+
+
 def load_body(p):
     with open(os.path.join(SRC, "posts", p["slug"] + ".html"), encoding="utf-8") as fh:
-        return fh.read()
+        body = fh.read()
+    for key in re.findall(r"\{\{download:([\w-]+)\}\}", body):
+        assert key in DOWNLOADS, f"Bài {p['slug']}: không có downloads.{key} trong posts.json"
+        body = body.replace("{{download:%s}}" % key, download_box(key))
+    return body
 
 
 # ---------------------------------------------------------------- menu & lộ trình
@@ -746,7 +765,7 @@ def build_topic(t):
     label = item["label"]
     desc = item.get("desc") or f"Bài học và bài viết về {label} trên HọcFree."
     crumbs = [(sec["label"], section_url(sec))]
-    if group["label"] != sec["label"]:
+    if len(sec["groups"]) > 1:  # mục chỉ có một nhóm thì trang mục không có anchor nhóm
         crumbs.append((group["label"], f"{section_url(sec)}#{group['slug']}"))
     crumbs.append((label, None))
 
