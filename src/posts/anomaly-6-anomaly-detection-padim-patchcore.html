@@ -131,7 +131,7 @@ cov_inv = torch.linalg.inv(cov)
 def ban_do_padim(imgs):
     f = dac_trung(imgs)[:, chon].permute(2, 3, 0, 1).reshape(H * W, len(imgs), -1)
     dx = f - mu[:, None]
-    m2 = torch.einsum("pnd,pde,pne->pn", dx, cov_inv, dx)          # Mahalanobis² cho mọi vị trí, mọi ảnh
+    m2 = torch.einsum("pnd,pde,pne-&gt;pn", dx, cov_inv, dx)          # Mahalanobis² cho mọi vị trí, mọi ảnh
     return m2.clamp_min(0).sqrt().T.reshape(-1, 1, H, W)
 
 
@@ -333,7 +333,7 @@ for k in (8, 32, 96):
     cov_k = (X - mu_k[:, None]).transpose(1, 2) @ (X - mu_k[:, None]) / (N - 1) + 0.01 * torch.eye(k)
     inv_k = torch.linalg.inv(cov_k)
     f = f_test[:, ch].permute(2, 3, 0, 1).reshape(H * W, len(f_test), -1) - mu_k[:, None]
-    m = torch.einsum("pnd,pde,pne->pn", f, inv_k, f).clamp_min(0).sqrt().T.reshape(-1, 1, H, W)
+    m = torch.einsum("pnd,pde,pne-&gt;pn", f, inv_k, f).clamp_min(0).sqrt().T.reshape(-1, 1, H, W)
     s = phong_to(m).reshape(len(f_test), -1).max(1)
     print(f"{k:3d} chiều: AUROC {roc_auc_score(y, s):.3f}, Σ⁻¹ chiếm {inv_k.numel() * 4 / 1e6:6.2f} MB")</code></pre>
 <pre><code class="language-text">  8 chiều: AUROC 0.951, Σ⁻¹ chiếm   0.15 MB
