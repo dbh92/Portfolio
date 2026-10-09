@@ -165,6 +165,32 @@ for _p in PATHS:
             assert _ref in TOPIC_BY, f"Lộ trình {_p['slug']}: chủ đề {_ref} không có trong nav.json"
             TOPIC_IN_PATH.setdefault(_ref, []).append((_p, _n, _st))
 
+# ---------------------------------------------------------------- giáo trình (bài học theo thứ tự)
+KIND = {"lesson": "Bài học", "lab": "Thực hành", "project": "Dự án"}
+LESSON = {}  # slug bài đã viết → vị trí trong giáo trình
+for _p in PATHS:
+    for _n, _st in enumerate(_p.get("steps", []), 1):
+        for _i, _l in enumerate(_st.get("lessons", [])):
+            assert _l["kind"] in KIND, f"Bài học {_l['slug']}: kind phải là {list(KIND)}"
+            if _l["slug"] in BY_SLUG:
+                assert _l["slug"] not in LESSON, f"Bài {_l['slug']} nằm trong hai chặng"
+                LESSON[_l["slug"]] = {"path": _p, "n": _n, "step": _st, "i": _i, "lesson": _l}
+        for _x in _st.get("extras", []):
+            assert _x in BY_SLUG, f"Chặng {_st['slug']}: bài đọc thêm {_x} không có trong posts.json"
+
+
+def step_url(p, st):
+    return f"lo-trinh/{p['slug']}/{st['slug']}.html"
+
+
+def course_order(p):
+    """Mọi bài học đã viết của lộ trình theo đúng thứ tự học (xuyên qua các chặng)."""
+    return [l["slug"] for st in p.get("steps", []) for l in st.get("lessons", []) if l["slug"] in BY_SLUG]
+
+
+def step_hours(st):
+    return round(sum(l["min"] for l in st.get("lessons", [])) / 60)
+
 
 def write(rel, content):
     path = os.path.join(ROOT, rel)
@@ -752,6 +778,77 @@ def add_heading_ids(body):
     return body, toc
 
 
+def lesson_parts(root, p):
+    """Các khối riêng của trang bài học: breadcrumb, thanh khóa học, mục tiêu, bài tập, nút học xong, mục lục chặng."""
+    info = LESSON[p["slug"]]
+    path, st, n, i, les = info["path"], info["step"], info["n"], info["i"], info["lesson"]
+    lessons = st["lessons"]
+    order = course_order(path)
+    k = order.index(p["slug"])
+    prev_s = order[k - 1] if k else None
+    next_s = order[k + 1] if k + 1 < len(order) else None
+    surl = f"{root}{step_url(path, st)}"
+
+    crumb = (f'<nav class="breadcrumb" aria-label="Breadcrumb"><a href="{link(root)}">Trang chủ</a><span>/</span>'
+             f'<a href="{root}lo-trinh/">Learning Paths</a><span>/</span><a href="{root}{path_url(path)}">{e(path["short"])}</a>'
+             f'<span>/</span><a href="{surl}">Chặng {n}: {e(st["title"])}</a></nav>')
+    bar = (f'<div class="course-bar" data-course="{path["slug"]}"><a class="course-chip" href="{surl}">⭐ {e(path["short"])} · Chặng {n}</a>'
+           f'<span class="lesson-no">Bài {i + 1}/{len(lessons)}</span><span class="kind kind-{les["kind"]}">{KIND[les["kind"]]}</span>'
+           f'<span class="lesson-min">{icon("clock")}~{les["min"]} phút</span></div>')
+    goals = "".join(f"<li>{e(g)}</li>" for g in les["goals"])
+    before = ""
+    if prev_s:
+        pp = BY_SLUG[prev_s]
+        before = f'<p class="goals-before">Nên học trước: <a href="{root}{post_url(pp)}">{e(LESSON[prev_s]["lesson"]["title"])}</a></p>'
+    goals_html = (f'<section class="lesson-goals" aria-label="Mục tiêu bài học"><h2>Học xong bài này, bạn sẽ</h2>'
+                  f'<ul>{goals}</ul>{before}</section>')
+    practice = ""
+    if les.get("practice"):
+        items = "".join(f"<li>{e(x)}</li>" for x in les["practice"])
+        practice = (f'<section class="practice"><h2>{icon("target")}Bài tập thực hành</h2><ol>{items}</ol>'
+                    f'<p>Làm xong bài tập mới chuyển sang bài tiếp theo: tự viết code là cách duy nhất để nhớ lâu.</p></section>')
+
+    def nav_link(slug, cls, label):
+        if not slug:
+            return f'<a class="{cls}" href="{surl}"><span>{label}</span>Về trang chặng {n}</a>'
+        q, inf = BY_SLUG[slug], LESSON[slug]
+        where = f"Bài {inf['i'] + 1} · Chặng {inf['n']}" if inf["n"] != n else f"Bài {inf['i'] + 1}"
+        return f'<a class="{cls}" href="{root}{post_url(q)}"><span>{label} · {where}</span>{e(inf["lesson"]["title"])}</a>'
+
+    nxt = BY_SLUG[next_s] if next_s else None
+    next_btn = (f'<a class="btn lg" href="{root}{post_url(nxt)}">Bài tiếp theo{icon("arrow-right")}</a>' if nxt
+                else f'<a class="btn lg" href="{root}{path_url(path)}#muc-tieu">Xem đích đến 🎯</a>')
+    done = (f'<div class="lesson-done" data-course="{path["slug"]}">'
+            f'<button type="button" class="lesson-done-btn" data-lesson-done="{p["slug"]}" aria-pressed="false">'
+            f'<span class="box">{icon("check")}</span><span class="off">Đánh dấu đã học xong</span><span class="on">Đã học xong bài này</span></button>'
+            f'{next_btn}</div>')
+    pager = ('<nav class="pager lesson-pager" aria-label="Bài học trước/sau">'
+             + nav_link(prev_s, "prev", "← Bài trước") + nav_link(next_s, "next", "Bài tiếp →") + "</nav>")
+
+    rows = ""
+    for j, l in enumerate(lessons):
+        cur = l["slug"] == p["slug"]
+        aria = ' aria-current="page"' if cur else ""
+        li_cls = ' class="is-current"' if cur else ""
+        if l["slug"] in BY_SLUG:
+            a = (f'<a href="{root}{post_url(BY_SLUG[l["slug"]])}"{aria}>'
+                 f'<span class="tn">{j + 1}</span><span class="tt">{e(l["title"])}</span></a>')
+        else:
+            a = f'<span class="soon"><span class="tn">{j + 1}</span><span class="tt">{e(l["title"])}<small>Đang biên soạn</small></span></span>'
+        rows += f'<li data-lesson="{l["slug"]}"{li_cls}>{a}</li>'
+    all_slugs = " ".join(l["slug"] for l in lessons if l["slug"] in BY_SLUG)
+    toc = f"""<aside class="sidebar course-side" data-course="{path['slug']}">
+      <section class="widget course-toc">
+        <p class="widget-title">Chặng {n}/{len(path['steps'])} · {e(path['short'])}</p>
+        <a class="course-toc-title" href="{surl}">{e(st['title'])}</a>
+        <div class="lc" data-lesson-count="{all_slugs}"><div class="lc-bar"><span data-lc-bar></span></div><span data-lc-text>0/{len(lessons)} bài</span></div>
+        <ol class="toc-lessons">{rows}</ol>
+        <a class="more" href="{root}{path_url(path)}">Xem toàn bộ lộ trình{icon("arrow-right")}</a>
+      </section>
+    </aside>"""
+    return {"crumb": crumb, "bar": bar, "goals": goals_html, "practice": practice, "done": done, "pager": pager, "toc": toc}
+
+
 def build_post(p):
     root = "../"
     url = post_url(p)
@@ -775,6 +872,9 @@ def build_post(p):
     pager += (f'<a class="next" href="{root}{post_url(newer)}"><span>Bài tiếp →</span>{e(newer["title"])}</a>'
               if newer else "<span></span>")
     pager += "</nav>"
+    course = lesson_parts(root, p) if p["slug"] in LESSON else None
+    if course:
+        pager = course["pager"]
     tags = "".join(f'<a class="tag" href="{root}search.html?q={e(t)}">#{e(t)}</a>' for t in p["tags"])
     share_url = f"{SITE['domain']}/{url}"
     share = f"""<div class="share">
@@ -791,19 +891,25 @@ def build_post(p):
         "author": {"@type": "Organization", "name": SITE["author"], "url": f"{SITE['domain']}/gioi-thieu.html"},
         "publisher": ORG, "mainEntityOfPage": {"@type": "WebPage", "@id": share_url}}
     crumb_ld = breadcrumb_ld([(p["cat"]["name"], f"{p['category']}/"), (p["title"], None)])
+    if course:
+        info = LESSON[p["slug"]]
+        crumb_ld = breadcrumb_ld([("Learning Paths", "lo-trinh/"), (info["path"]["label"], path_url(info["path"])),
+                                  (f'Chặng {info["n"]}: {info["step"]["title"]}', step_url(info["path"], info["step"])),
+                                  (p["title"], None)])
+        article_ld["isPartOf"] = {"@type": "Course", "name": info["path"]["label"], "url": f"{SITE['domain']}/{path_url(info['path'])}"}
     og_extra = (f'<meta property="article:published_time" content="{p["date"]}">\n'
                 f'<meta property="article:section" content="{e(p["cat"]["name"])}">\n'
                 + "".join(f'<meta property="article:tag" content="{e(t)}">\n' for t in p["tags"]))
     extra = og_extra + ld_json(article_ld, crumb_ld)
 
     page = head(root, p["title"], p["excerpt"], url, og_img(p), og_type="article", extra=extra)
-    page += header(root, active=p["cat"]["section"])
+    page += header(root, active="lo-trinh" if course else p["cat"]["section"])
     page += f"""<main id="main">
   <div class="container layout article-layout">
     <article class="article">
-      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{link(root)}">Trang chủ</a><span>/</span><a href="{root}{p['category']}/">{e(p['cat']['name'])}</a></nav>
+      {course["crumb"] if course else f'<nav class="breadcrumb" aria-label="Breadcrumb"><a href="{link(root)}">Trang chủ</a><span>/</span><a href="{root}{p["category"]}/">{e(p["cat"]["name"])}</a></nav>'}
       <header class="article-head">
-        {cat_pill(root, p)}
+        {course["bar"] if course else cat_pill(root, p)}
         <h1>{e(p['title'])}</h1>
         <p class="lead">{e(p['excerpt'])}</p>
         <div class="article-meta">
@@ -814,10 +920,12 @@ def build_post(p):
       <figure class="article-cover">
         <img src="{root}{img_url(p)}" alt="{e(p['title'])}" width="1200" height="675" fetchpriority="high" decoding="async">
       </figure>
+      {course["goals"] if course else ""}
       {toc_html}
       <div class="prose">
 {body}
       </div>
+      {course["practice"] + course["done"] if course else ""}
       <footer class="article-foot">
         <div class="tags">{tags}</div>
         {share}
@@ -831,7 +939,7 @@ def build_post(p):
       </div>
       {pager}
     </article>
-    {sidebar(root, current=p['slug'])}
+    {course["toc"] if course else sidebar(root, current=p['slug'])}
   </div>
   <section class="band">
     <div class="container">
@@ -991,8 +1099,23 @@ def build_topic(t):
         crumbs.append((group["label"], f"{section_url(sec)}#{group['slug']}"))
     crumbs.append((label, None))
 
+    banner = ""
+    for path, n, st in TOPIC_IN_PATH.get(t["ref"], []):
+        if st.get("lessons"):
+            avail = [l for l in st["lessons"] if l["slug"] in BY_SLUG]
+            first = f"{root}{post_url(BY_SLUG[avail[0]['slug']])}" if avail else f"{root}{step_url(path, st)}"
+            banner = f"""<div class="topic-path">
+        <div><p class="eyebrow">⭐ Mới bắt đầu? Học theo thứ tự</p>
+          <h2>Chặng {n}: {e(st['title'])} <span>trong lộ trình {e(path['short'])}</span></h2>
+          <p>{len(st['lessons'])} bài học sắp xếp từ dễ đến khó, có mục tiêu, bài tập và dự án cuối chặng.</p></div>
+        <div class="topic-path-cta"><a class="btn" href="{first}">Bắt đầu bài 1{icon("arrow-right")}</a>
+          <a class="more" href="{root}{step_url(path, st)}">Xem {len(st['lessons'])} bài học{icon("arrow-right")}</a></div>
+      </div>"""
+            order = {l["slug"]: k for k, l in enumerate(st["lessons"])}
+            ps = sorted(ps, key=lambda q: (order.get(q["slug"], 999), ps.index(q)))
+            break
     if ps:
-        content = section_title(f"Bài viết về {label}") + f'<div class="post-list">{"".join(post_row(root, p) for p in ps)}</div>'
+        content = banner + section_title(f"Bài viết về {label}") + f'<div class="post-list">{"".join(post_row(root, p) for p in ps)}</div>'
     else:
         paths = TOPIC_IN_PATH.get(t["ref"], [])
         go = (f'<a class="btn" href="{root}{path_url(paths[0][0])}#step-{paths[0][2]["slug"]}">Xem chặng này trong lộ trình</a>'
@@ -1154,11 +1277,23 @@ def build_path(p):
         for st in ph_steps:
             n = num[st["slug"]]
             learn = "".join(f"<li>{e(x)}</li>" for x in st["learn"])
+            les = st.get("lessons", [])
+            avail = [l["slug"] for l in les if l["slug"] in BY_SLUG]
+            les_li = ""
+            for j, l in enumerate(les, 1):
+                if l["slug"] in BY_SLUG:
+                    les_li += (f'<li data-lesson="{l["slug"]}"><a href="{root}{post_url(BY_SLUG[l["slug"]])}">{e(l["title"])}</a>'
+                               f'<span class="kind kind-{l["kind"]}">{KIND[l["kind"]]}</span></li>')
+                else:
+                    les_li += f'<li class="soon">{e(l["title"])}<span class="badge-soon">Đang biên soạn</span></li>'
+            les_html = (f"""<details class="step-lessons"><summary>{len(les)} bài học · ~{step_hours(st)} giờ
+              <span class="lc" data-lesson-count="{' '.join(avail)}"><span data-lc-text>0/{len(avail)} bài</span></span></summary>
+              <ol>{les_li}</ol></details>""" if les else "")
             cards += f"""<li class="step" id="step-{st['slug']}" data-step="{st['slug']}">
           <span class="step-marker" aria-hidden="true">{n}</span>
           <div class="step-card">
             <div class="step-head">
-              <h3><span class="sr-only">Chặng {n}: </span>{e(st['title'])}</h3>
+              <h3><span class="sr-only">Chặng {n}: </span><a href="{root}{step_url(p, st)}">{e(st['title'])}</a></h3>
               <span class="step-here">Bạn đang ở đây</span>
               <span class="step-weeks">~{st['weeks']} tuần</span>
             </div>
@@ -1166,9 +1301,10 @@ def build_path(p):
               <div><p class="step-label">Bạn sẽ học</p><ul>{learn}</ul></div>
               <div class="step-outcome"><p class="step-label">Học xong bạn có thể</p><p>{e(st['outcome'])}</p></div>
             </div>
+            {les_html}
             <div class="step-foot">
-              <div class="chips">{topic_chips(st)}</div>
-              <label class="step-check"><input type="checkbox" data-step-check="{st['slug']}"> Đã hoàn thành</label>
+              <a class="btn" href="{root}{step_url(p, st)}">Vào học chặng {n}{icon("arrow-right")}</a>
+              <label class="step-check"><input type="checkbox" data-step-check="{st['slug']}"> Đã hoàn thành chặng</label>
             </div>
           </div>
         </li>"""
@@ -1192,7 +1328,7 @@ def build_path(p):
                 extra=f'<script type="application/ld+json">{ld}</script>\n'
                 + ld_json(breadcrumb_ld([("Learning Paths", "lo-trinh/"), (p["label"], None)])))
     page += header(root, active="lo-trinh")
-    page += f"""<main id="main" class="path-page" data-path="{p['slug']}">
+    page += f"""<main id="main" class="path-page" data-path="{p['slug']}" data-course="{p['slug']}">
   <div class="page-head path-head">
     <div class="container">
       <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{link(root)}">Trang chủ</a><span>/</span><a href="{root}lo-trinh/">Learning Paths</a><span>/</span><span>{e(p['short'])}</span></nav>
@@ -1251,6 +1387,112 @@ def build_path(p):
     write(path_url(p), page)
 
 
+def build_step(p, n, st):
+    """Trang một chặng: danh sách bài học theo đúng thứ tự, tiến độ, đọc thêm, chặng trước/sau."""
+    root = "../../"
+    steps, phases = p["steps"], p["phases"]
+    ph_n = next(k for k, ph in enumerate(phases, 1) if ph["slug"] == st["phase"])
+    ph = phases[ph_n - 1]
+    lessons = st.get("lessons", [])
+    avail = [l for l in lessons if l["slug"] in BY_SLUG]
+    url = step_url(p, st)
+
+    rows = ""
+    for j, l in enumerate(lessons):
+        goals = " · ".join(e(g) for g in l["goals"])
+        if l["slug"] in BY_SLUG:
+            q = BY_SLUG[l["slug"]]
+            title = f'<a href="{root}{post_url(q)}" data-lesson-link="{l["slug"]}">{e(l["title"])}</a>'
+            check = (f'<label class="syl-check"><input type="checkbox" data-lesson-check="{l["slug"]}">'
+                     f'<span class="sr-only">Đã học bài {j + 1}</span></label>')
+        else:
+            title = f'<span>{e(l["title"])}</span>'
+            check = '<span class="badge-soon">Đang biên soạn</span>'
+        rows += f"""<li class="syl syl-{l['kind']}" data-lesson="{l['slug']}">
+          <span class="syl-n">{j + 1}</span>
+          <div class="syl-body"><h3>{title}</h3><p>{goals}</p>
+            <span class="syl-meta"><span class="kind kind-{l['kind']}">{KIND[l['kind']]}</span><span>{icon("clock")}~{l['min']} phút</span></span></div>
+          {check}
+        </li>"""
+
+    learn = "".join(f"<li>{e(x)}</li>" for x in st["learn"])
+    extras = "".join(post_row(root, BY_SLUG[x]) for x in st.get("extras", []))
+    extras_html = (f'<section class="step-extras"><h2 class="path-h2">Đọc thêm</h2>'
+                   f'<p class="muted">Không bắt buộc, đọc khi muốn hiểu sâu hơn.</p><div class="post-list">{extras}</div></section>'
+                   if extras else "")
+    prev_st = steps[n - 2] if n > 1 else None
+    next_st = steps[n] if n < len(steps) else None
+    nav = '<nav class="pager" aria-label="Chặng trước/sau">'
+    nav += (f'<a class="prev" href="{root}{step_url(p, prev_st)}"><span>← Chặng {n - 1}</span>{e(prev_st["title"])}</a>'
+            if prev_st else f'<a class="prev" href="{root}{path_url(p)}"><span>← Lộ trình</span>{e(p["label"])}</a>')
+    nav += (f'<a class="next" href="{root}{step_url(p, next_st)}"><span>Chặng {n + 1} →</span>{e(next_st["title"])}</a>'
+            if next_st else f'<a class="next" href="{root}{path_url(p)}#muc-tieu"><span>Đích đến →</span>{e(p["goal"]["title"])}</a>')
+    nav += "</nav>"
+    smap = ""
+    for k, x in enumerate(steps, 1):
+        aria = ' aria-current="page"' if x is st else ""
+        smap += f'<li><a href="{root}{step_url(p, x)}"{aria}><span class="tn">{k}</span>{e(x["title"])}</a></li>'
+    all_slugs = " ".join(l["slug"] for l in avail)
+    first = f"{root}{post_url(BY_SLUG[avail[0]['slug']])}" if avail else f"{root}{path_url(p)}"
+    hours = step_hours(st)
+
+    desc = (f"Chặng {n}/{len(steps)} lộ trình {p['label']}: {len(lessons)} bài học theo thứ tự, khoảng {hours} giờ. "
+            f"Học xong bạn có thể: {st['outcome']}")
+    ld = ld_json({"@context": "https://schema.org", "@type": "ItemList", "name": f"Chặng {n}: {st['title']}",
+                  "itemListElement": [{"@type": "ListItem", "position": j, "name": l["title"],
+                                       **({"url": f"{SITE['domain']}/{post_url(BY_SLUG[l['slug']])}"} if l["slug"] in BY_SLUG else {})}
+                                      for j, l in enumerate(lessons, 1)]},
+                 breadcrumb_ld([("Learning Paths", "lo-trinh/"), (p["label"], path_url(p)), (f"Chặng {n}: {st['title']}", None)]))
+    page = head(root, f"Chặng {n}: {st['title']} – {p['short']}", desc, url, "assets/images/og-default.jpg", extra=ld)
+    page += header(root, active="lo-trinh")
+    page += f"""<main id="main" class="step-page" data-course="{p['slug']}">
+  <div class="page-head path-head">
+    <div class="container">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{link(root)}">Trang chủ</a><span>/</span><a href="{root}lo-trinh/">Learning Paths</a><span>/</span><a href="{root}{path_url(p)}">{e(p['short'])}</a><span>/</span><span>Chặng {n}</span></nav>
+      <p class="page-kicker">Giai đoạn {ph_n} · {e(ph['label'])} · Chặng {n}/{len(steps)}</p>
+      <h1>Chặng {n}: {e(st['title'])}</h1>
+      <p class="path-tagline">Học xong chặng này, bạn có thể: {e(st['outcome'])}</p>
+      <ul class="path-stats"><li><b>{len(lessons)}</b> bài học</li><li><b>~{hours}</b> giờ học</li><li><b>~{st['weeks']}</b> tuần</li>
+        <li data-lesson-count="{all_slugs}"><b data-lc-text>0/{len(avail)} bài</b> đã học</li></ul>
+      <div class="path-actions">
+        <a class="btn lg" href="{first}" data-lesson-continue>Bắt đầu bài 1{icon("arrow-right")}</a>
+        <a class="btn lg ghost-light" href="{root}{path_url(p)}#step-{st['slug']}">Xem cả lộ trình</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="container step-layout">
+    <div class="step-main">
+      <section class="step-intro">
+        <div class="step-before"><h2>{icon("shield-check")}Trước khi bắt đầu</h2><p>{e(st.get('before', ''))}</p></div>
+        <div class="step-learn"><h2>{icon("book-open")}Chặng này gồm</h2><ul>{learn}</ul></div>
+      </section>
+      <section aria-labelledby="syl-t">
+        <h2 class="path-h2" id="syl-t">Bài học theo thứ tự</h2>
+        <p class="muted">Học lần lượt từ trên xuống. Làm hết bài tập trong mỗi bài, đánh dấu đã học để theo dõi tiến độ.</p>
+        <ol class="syllabus">{rows}</ol>
+      </section>
+      {extras_html}
+      {nav}
+    </div>
+    <aside class="sidebar step-side">
+      <section class="widget">
+        <p class="widget-title">Tiến độ chặng</p>
+        <div class="lc big" data-lesson-count="{all_slugs}"><div class="lc-bar"><span data-lc-bar></span></div><span data-lc-text>0/{len(avail)} bài</span></div>
+        <p class="step-out"><b>Đầu ra:</b> {e(st['outcome'])}</p>
+      </section>
+      <section class="widget">
+        <p class="widget-title">{e(p['short'])} · {len(steps)} chặng</p>
+        <ol class="step-map">{smap}</ol>
+      </section>
+    </aside>
+  </div>
+</main>
+"""
+    page += footer(root)
+    write(url, page)
+
+
 def build_login():
     root = ""
     page = head(root, "Đăng nhập", "Tài khoản HọcFree.", "dang-nhap.html", "assets/images/og-default.jpg",
@@ -1280,6 +1522,8 @@ def build_search_data():
     } for t in TOPICS]
     topics += [{"t": p["label"], "u": path_url(p), "s": "Learning Path", "g": p["tagline"], "n": -1,
                 "f": 1 if p.get("flagship") else 0} for p in PATHS]
+    topics += [{"t": f"Chặng {n}: {st['title']}", "u": step_url(p, st), "s": p["short"], "g": f"{len(st.get('lessons', []))} bài học",
+                "n": -1} for p in PATHS for n, st in enumerate(p.get("steps", []), 1)]
     write("assets/js/search-data.js",
           "/* Tự động sinh bởi tools/build.py – không sửa tay */\nwindow.HF_POSTS = "
           + json.dumps(items, ensure_ascii=False, indent=1) + ";\nwindow.HF_TOPICS = "
@@ -1290,6 +1534,7 @@ def build_sitemap():
     today = date.today().isoformat()
     urls = [("", today, "1.0")] + [(f"{s['slug']}/", today, "0.8") for s in SECTIONS if s.get("groups")]
     urls += [("lo-trinh/", today, "0.8")] + [(path_url(p), today, "0.9") for p in PATHS if p.get("steps")]
+    urls += [(step_url(p, st), today, "0.8") for p in PATHS for st in p.get("steps", [])]
     urls += [(t["url"], today, "0.6") for t in TOPICS if t["posts"]]  # chủ đề trống để noindex
     urls += [(post_url(p), p["date"], "0.7") for p in POSTS] + [("gioi-thieu.html", today, "0.3")]
     xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
@@ -1314,6 +1559,15 @@ def main():
     for p in PATHS:
         if p.get("steps"):
             build_path(p)
+            for n, st in enumerate(p["steps"], 1):
+                build_step(p, n, st)
+            # lo-trinh/<slug>/ (thư mục chứa trang chặng) chuyển về trang lộ trình, tránh 404
+            target = f"../{p['slug']}.html"
+            write(f"lo-trinh/{p['slug']}/index.html",
+                  f'<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><title>{e(p["label"])}</title>'
+                  f'<meta name="robots" content="noindex"><link rel="canonical" href="{SITE["domain"]}/{path_url(p)}">'
+                  f'<meta http-equiv="refresh" content="0; url={target}"></head>'
+                  f'<body><h1>{e(p["label"])}</h1><p><a href="{target}">Mở lộ trình</a></p></body></html>\n')
     build_search()
     build_about()
     build_404()

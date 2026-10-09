@@ -342,6 +342,64 @@
     renderPath();
   }
 
+  /* ---------- Giáo trình: bài học đã học (lưu trên trình duyệt) ---------- */
+  var courseEl = $("[data-course]");
+  if (courseEl) {
+    var lessonKey = "hf-lessons-" + courseEl.getAttribute("data-course");
+    var learned = {};
+    try { (JSON.parse(localStorage.getItem(lessonKey)) || []).forEach(function (s) { learned[s] = true; }); } catch (e) { /* bỏ qua */ }
+    var saveLearned = function () {
+      try { localStorage.setItem(lessonKey, JSON.stringify(Object.keys(learned))); } catch (e) { /* bỏ qua */ }
+    };
+    var renderLessons = function () {
+      $$("[data-lesson]").forEach(function (el) { el.classList.toggle("is-done", !!learned[el.getAttribute("data-lesson")]); });
+      $$("[data-lesson-check]").forEach(function (cb) { cb.checked = !!learned[cb.getAttribute("data-lesson-check")]; });
+      $$("[data-lesson-done]").forEach(function (b) {
+        var on = !!learned[b.getAttribute("data-lesson-done")];
+        b.classList.toggle("is-on", on);
+        b.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+      $$("[data-lesson-count]").forEach(function (el) {
+        var raw = el.getAttribute("data-lesson-count");
+        var list = raw ? raw.split(" ") : [];
+        var n = list.filter(function (s) { return learned[s]; }).length;
+        var t = $("[data-lc-text]", el);
+        if (t) t.textContent = n + "/" + list.length + " bài";
+        var bar = $("[data-lc-bar]", el);
+        if (bar) bar.style.width = (list.length ? n / list.length * 100 : 0) + "%";
+      });
+      // Nút "Bắt đầu bài 1" trên trang chặng → bài đầu tiên chưa học
+      var cont = $("[data-lesson-continue]");
+      var links = $$("[data-lesson-link]");
+      if (cont && links.length) {
+        var started = links.some(function (a) { return learned[a.getAttribute("data-lesson-link")]; });
+        var next = links.filter(function (a) { return !learned[a.getAttribute("data-lesson-link")]; })[0];
+        if (started && next) {
+          cont.href = next.href;
+          cont.firstChild.textContent = "Học tiếp: " + next.textContent + " ";
+        } else if (!next) {
+          cont.firstChild.textContent = "Đã học hết chặng này ✓ Ôn lại ";
+        }
+      }
+    };
+    document.addEventListener("change", function (ev) {
+      var slug = ev.target.getAttribute && ev.target.getAttribute("data-lesson-check");
+      if (!slug) return;
+      if (ev.target.checked) learned[slug] = true; else delete learned[slug];
+      saveLearned();
+      renderLessons();
+    });
+    document.addEventListener("click", function (ev) {
+      var btn = ev.target.closest && ev.target.closest("[data-lesson-done]");
+      if (!btn) return;
+      var slug = btn.getAttribute("data-lesson-done");
+      if (learned[slug]) delete learned[slug]; else learned[slug] = true;
+      saveLearned();
+      renderLessons();
+    });
+    renderLessons();
+  }
+
   /* ---------- Bài viết: bảng, nút copy code, tiến độ đọc ---------- */
   $$(".prose table").forEach(function (t) {
     var wrap = document.createElement("div");

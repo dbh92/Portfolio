@@ -1,0 +1,190 @@
+<p>Ảnh, dữ liệu cảm biến, đầu ra của mô hình AI: tất cả đều là <strong>mảng số</strong>. NumPy là thư viện làm việc với mảng số nhanh gấp hàng chục đến hàng trăm lần so với list Python, và là nền móng của OpenCV, PyTorch, scikit-learn. Bài này dạy những gì bạn cần trước khi chạm vào ảnh: tạo mảng, <code>shape</code>, <code>dtype</code>, cắt mảng, mặt nạ boolean và tư duy <strong>vector hóa</strong>.</p>
+<p>Cài đặt (trong môi trường ảo đã tạo ở bài trước):</p>
+<pre><code class="language-bash">pip install numpy</code></pre>
+
+<h2>1. Tạo mảng</h2>
+<pre><code class="language-python">import numpy as np
+
+a = np.array([12.48, 12.51, 12.47, 12.52])        # từ list
+z = np.zeros((3, 4))                               # mảng 3 hàng 4 cột toàn số 0
+o = np.ones(5, dtype=np.uint8)                     # 5 số 1 kiểu uint8
+r = np.arange(0, 1, 0.25)                          # giống range nhưng cho số thực
+l = np.linspace(0, 100, 5)                         # 5 điểm cách đều từ 0 đến 100
+
+print(a)
+print(z.shape, o, r, l)</code></pre>
+<pre><code class="language-text">[12.48 12.51 12.47 12.52]
+(3, 4) [1 1 1 1 1] [0.   0.25 0.5  0.75] [  0.  25.  50.  75. 100.]</code></pre>
+<p>Quy ước chung là <code>import numpy as np</code>, mọi tài liệu và ví dụ trên mạng đều viết như vậy.</p>
+
+<h2>2. shape, ndim, dtype: ba thuộc tính phải nhìn đầu tiên</h2>
+<pre><code class="language-python">m = np.array([[1, 2, 3],
+              [4, 5, 6]])
+print(m.shape)   # (2, 3): 2 hàng, 3 cột
+print(m.ndim)    # 2 chiều
+print(m.dtype)   # int64 (Windows có thể là int32)
+print(m.size)    # 6 phần tử</code></pre>
+<p>Một ảnh xám là mảng 2 chiều <code>(cao, rộng)</code>, ảnh màu là mảng 3 chiều <code>(cao, rộng, 3)</code>. Khi gặp lỗi với ảnh, việc đầu tiên luôn là in <code>shape</code> và <code>dtype</code>.</p>
+<table>
+  <tr><th>dtype</th><th>Khoảng giá trị</th><th>Dùng cho</th></tr>
+  <tr><td><code>uint8</code></td><td>0 → 255</td><td>Ảnh thông thường</td></tr>
+  <tr><td><code>uint16</code></td><td>0 → 65535</td><td>Ảnh 12/16 bit từ camera công nghiệp, ảnh độ sâu</td></tr>
+  <tr><td><code>float32</code></td><td>số thực</td><td>Tính toán trung gian, đầu vào mô hình AI</td></tr>
+  <tr><td><code>bool</code></td><td>True/False</td><td>Mặt nạ</td></tr>
+</table>
+
+<h2>3. Truy cập và cắt mảng</h2>
+<p>Với mảng 2 chiều, chỉ số viết <code>[hàng, cột]</code>, slicing giống list và <strong>không gồm vị trí kết thúc</strong>:</p>
+<pre><code class="language-python">m = np.arange(1, 21).reshape(4, 5)   # 20 số xếp thành 4 hàng 5 cột
+print(m)
+print(m[1, 2])        # hàng 1, cột 2 → 8
+print(m[0])           # cả hàng 0
+print(m[:, 1])        # cả cột 1
+print(m[1:3, 2:5])    # hàng 1–2, cột 2–4: một "vùng con"</code></pre>
+<pre><code class="language-text">[[ 1  2  3  4  5]
+ [ 6  7  8  9 10]
+ [11 12 13 14 15]
+ [16 17 18 19 20]]
+8
+[1 2 3 4 5]
+[ 2  7 12 17]
+[[ 8  9 10]
+ [13 14 15]]</code></pre>
+<p>Dòng cuối chính là thao tác <strong>cắt ROI</strong> trên ảnh: <code>anh[y1:y2, x1:x2]</code>. Lưu ý thứ tự: <strong>hàng (y) trước, cột (x) sau</strong>, ngược với cách nói thông thường "x, y". Đây là nguồn lỗi số một của người mới.</p>
+
+<h3>View hay copy?</h3>
+<pre><code class="language-python">vung = m[1:3, 2:5]
+vung[:] = 0          # sửa vùng con...
+print(m[1])          # ...mảng gốc cũng bị đổi!
+
+m = np.arange(1, 21).reshape(4, 5)
+vung = m[1:3, 2:5].copy()
+vung[:] = 0
+print(m[1])          # copy() thì mảng gốc giữ nguyên</code></pre>
+<pre><code class="language-text">[ 6  7  0  0  0]
+[ 6  7  8  9 10]</code></pre>
+<p>Slicing tạo ra <strong>view</strong>: một cửa sổ nhìn vào cùng vùng nhớ, không sao chép dữ liệu (nên rất nhanh). Muốn sửa vùng con mà không ảnh hưởng ảnh gốc, dùng <code>.copy()</code>.</p>
+
+<h2>4. Vector hóa: bỏ vòng lặp</h2>
+<p>Phép toán trên mảng NumPy áp dụng cho <strong>mọi phần tử cùng lúc</strong>:</p>
+<pre><code class="language-python">do_mm = np.array([12.48, 12.51, 12.47, 12.62, 12.50])
+print(do_mm * 1000)              # đổi sang µm: [12480. 12510. ...]
+print(do_mm - 12.50)             # độ lệch so với danh nghĩa
+print(np.abs(do_mm - 12.50) &gt; 0.10)   # mảng bool: phần tử nào ngoài dung sai</code></pre>
+<pre><code class="language-text">[12480. 12510. 12470. 12620. 12500.]
+[-0.02  0.01 -0.03  0.12  0.  ]
+[False False False  True False]</code></pre>
+<p>So sánh tốc độ với vòng lặp Python trên 1 triệu phần tử:</p>
+<pre><code class="language-python">import time
+
+x = np.random.default_rng(0).random(1_000_000)
+
+t0 = time.perf_counter()
+tong_lap = 0.0
+for v in x:
+    tong_lap += v * v
+t1 = time.perf_counter()
+tong_np = np.sum(x * x)
+t2 = time.perf_counter()
+
+print(f"Vòng lặp: {(t1 - t0) * 1000:.0f} ms, NumPy: {(t2 - t1) * 1000:.1f} ms")
+print(np.isclose(tong_lap, tong_np))</code></pre>
+<pre><code class="language-text">Vòng lặp: 250 ms, NumPy: 4.0 ms
+True</code></pre>
+<p>Con số cụ thể tùy máy, nhưng NumPy thường nhanh hơn <strong>vài chục lần</strong>, với phép chuyên dụng như <code>np.dot(x, x)</code> còn nhanh hơn nữa. Lần gọi NumPy đầu tiên trong chương trình có thể chậm hơn vì thư viện còn khởi động, nên khi đo tốc độ hãy chạy vài lần và lấy kết quả sau. Một ảnh 5 MP có 5 triệu pixel: duyệt bằng vòng lặp <code>for</code> là quá chậm cho dây chuyền. Quy tắc: <strong>khi thấy mình viết vòng lặp qua từng pixel, hãy dừng lại và tìm cách vector hóa.</strong></p>
+
+<h2>5. Mặt nạ boolean: lọc theo điều kiện</h2>
+<pre><code class="language-python">do_mm = np.array([12.48, 12.51, 12.47, 12.62, 12.50, 12.36])
+ngoai = np.abs(do_mm - 12.50) &gt; 0.10      # mặt nạ
+
+print(do_mm[ngoai])          # lấy các giá trị ngoài dung sai: [12.62 12.36]
+print(ngoai.sum())           # đếm số True: 2
+print(np.where(ngoai)[0])    # vị trí: [3 5]
+print(np.where(ngoai, "NG", "OK"))   # chọn giá trị theo điều kiện</code></pre>
+<pre><code class="language-text">[12.62 12.36]
+2
+[3 5]
+['OK' 'OK' 'OK' 'NG' 'OK' 'NG']</code></pre>
+<p>Kết hợp nhiều điều kiện dùng <code>&amp;</code> (và), <code>|</code> (hoặc), <code>~</code> (phủ định), và <strong>bắt buộc đặt từng điều kiện trong ngoặc</strong>: <code>(a &gt; 10) &amp; (a &lt; 20)</code>. Dùng <code>and</code>/<code>or</code> với mảng sẽ báo lỗi.</p>
+
+<h2>6. Thống kê và trục (axis)</h2>
+<pre><code class="language-python">rng = np.random.default_rng(1)
+# 3 ca sản xuất × 4 lần đo mỗi ca
+do = np.round(12.5 + rng.normal(0, 0.03, size=(3, 4)), 3)
+print(do)
+print("TB toàn bộ:", do.mean().round(4))
+print("TB theo ca (axis=1):", do.mean(axis=1).round(4))
+print("Độ lệch chuẩn theo lần đo (axis=0):", do.std(axis=0).round(4))
+print("Max:", do.max(), "tại", np.unravel_index(do.argmax(), do.shape))</code></pre>
+<p><code>axis=0</code> gộp <strong>theo cột</strong> (đi dọc xuống các hàng), <code>axis=1</code> gộp <strong>theo hàng</strong>. Với ảnh màu <code>(cao, rộng, 3)</code>, <code>anh.mean(axis=(0, 1))</code> cho độ sáng trung bình của từng kênh màu, một phép bạn sẽ dùng nhiều.</p>
+
+<h2>7. Broadcasting: phép toán giữa mảng khác kích thước</h2>
+<pre><code class="language-python">anh_mau = np.full((2, 3, 3), 100, dtype=np.float32)   # ảnh 2x3 màu, mọi pixel = 100
+he_so_kenh = np.array([1.2, 1.0, 0.8])                  # cân bằng trắng: nhân từng kênh
+ket_qua = anh_mau * he_so_kenh                          # (2,3,3) × (3,) → (2,3,3)
+print(ket_qua[0, 0])                                    # [120. 100.  80.]</code></pre>
+<p>NumPy tự "kéo giãn" mảng nhỏ cho khớp mảng lớn khi các chiều cuối tương thích. Đây là cách chuẩn hóa ảnh trước khi đưa vào mô hình AI: <code>(anh - mean) / std</code> với <code>mean</code>, <code>std</code> là mảng 3 phần tử.</p>
+
+<h2>8. reshape, nối mảng</h2>
+<pre><code class="language-python">v = np.arange(12)
+print(v.reshape(3, 4).shape)        # (3, 4)
+print(v.reshape(2, -1).shape)       # -1: NumPy tự tính → (2, 6)
+a, b = np.zeros((2, 3)), np.ones((2, 3))
+print(np.vstack([a, b]).shape)      # chồng theo chiều dọc → (4, 3)
+print(np.hstack([a, b]).shape)      # ghép ngang → (2, 6)</code></pre>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Luôn kiểm tra <code>shape</code> và <code>dtype</code>. Ảnh: <code>(cao, rộng)</code> hoặc <code>(cao, rộng, 3)</code>, thường <code>uint8</code>.</li>
+  <li>Chỉ số <code>[hàng, cột]</code> = <code>[y, x]</code>; slicing tạo view, cần <code>.copy()</code> nếu muốn độc lập.</li>
+  <li>Vector hóa thay cho vòng lặp; mặt nạ boolean để lọc; <code>&amp; | ~</code> với ngoặc.</li>
+  <li><code>axis</code> chọn chiều để gộp; broadcasting cho phép toán giữa mảng khác kích thước.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Kiểm tra lô hàng</h3>
+<p>Tạo 1000 giá trị đo ngẫu nhiên phân phối chuẩn quanh 25,00 mm, độ lệch chuẩn 0,02 (<code>rng.normal</code>, seed 42). Không dùng vòng lặp, tính: trung bình, độ lệch chuẩn, số sản phẩm ngoài dung sai ±0,05 và vị trí của 3 sản phẩm đầu tiên bị NG.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import numpy as np
+
+rng = np.random.default_rng(42)
+do = rng.normal(25.00, 0.02, size=1000)
+ng = np.abs(do - 25.00) &gt; 0.05
+print(f"TB {do.mean():.4f}, std {do.std():.4f}")
+print("Số NG:", ng.sum())
+print("3 vị trí NG đầu tiên:", np.where(ng)[0][:3])</code></pre>
+<p>Với độ lệch chuẩn 0,02 thì giới hạn ±0,05 là ±2,5σ, nên lý thuyết khoảng 1,2% sản phẩm nằm ngoài, tức khoảng 12 trên 1000. Kết quả của bạn sẽ quanh con số này.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. "Ảnh" bàn cờ</h3>
+<p>Tạo mảng <code>uint8</code> 8×8, ô (hàng + cột) chẵn có giá trị 255, ô lẻ có giá trị 0, không dùng vòng lặp. Gợi ý: <code>np.indices</code> hoặc broadcasting giữa <code>np.arange(8)[:, None]</code> và <code>np.arange(8)</code>.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import numpy as np
+
+hang = np.arange(8)[:, None]      # shape (8, 1)
+cot = np.arange(8)                # shape (8,)
+ban_co = np.where((hang + cot) % 2 == 0, 255, 0).astype(np.uint8)
+print(ban_co[:3])</code></pre>
+<pre><code class="language-text">[[255   0 255   0 255   0 255   0]
+ [  0 255   0 255   0 255   0 255]
+ [255   0 255   0 255   0 255   0]]</code></pre>
+<p>Đây chính là ảnh bàn cờ dùng để hiệu chuẩn camera ở chặng 8 (dĩ nhiên với ô lớn hơn).</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 3. Thống kê theo lưới ô</h3>
+<p>Tạo mảng 480×640 số ngẫu nhiên 0–255 (seed 0). Chia thành lưới 3×4 ô (mỗi ô 160×160) và tính giá trị trung bình của từng ô, kết quả là mảng 3×4. Thử làm bằng <code>reshape</code> thay vì vòng lặp.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import numpy as np
+
+anh = np.random.default_rng(0).integers(0, 256, size=(480, 640)).astype(np.float32)
+o = 160
+tb_o = anh.reshape(480 // o, o, 640 // o, o).mean(axis=(1, 3))
+print(tb_o.shape)        # (3, 4)
+print(tb_o.round(1))</code></pre>
+<p><code>reshape(3, 160, 4, 160)</code> tách mỗi chiều thành (số ô, kích thước ô); lấy trung bình theo trục 1 và 3 (bên trong ô). Kỹ thuật này dùng để phát hiện vùng ảnh bị tối cục bộ, ví dụ khi một đèn trong dãy đèn bị hỏng.</p>
+</details>
+</div>
+<p>Bài tiếp theo: áp dụng mọi thứ vừa học lên <strong>ảnh thật</strong>, khi ảnh chỉ là một mảng số.</p>

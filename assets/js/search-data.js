@@ -1,6 +1,120 @@
 /* Tự động sinh bởi tools/build.py – không sửa tay */
 window.HF_POSTS = [
  {
+  "t": "Python cơ bản: cài Python, VS Code và chạy chương trình đầu tiên",
+  "u": "hoc/python-1-cai-dat-python-va-vs-code.html",
+  "e": "Cài Python 3.13 đúng cách trên Windows, macOS, Linux, cài VS Code, chạy file .py đầu tiên và học cách đọc thông báo lỗi.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/python-1-cai-dat-python-va-vs-code.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Python cơ bản: biến, kiểu dữ liệu và toán tử",
+  "u": "hoc/python-2-bien-kieu-du-lieu-toan-tu.html",
+  "e": "int, float, str, bool qua ví dụ đo lường và OK/NG, f-string định dạng số, ép kiểu và hai cái bẫy về số thực.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/python-2-bien-kieu-du-lieu-toan-tu.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Python cơ bản: rẽ nhánh và vòng lặp",
+  "u": "hoc/python-3-re-nhanh-va-vong-lap.html",
+  "e": "if/elif/else cho tiêu chí OK/NG, for, range, enumerate, while có giới hạn, break, continue và bài tập dừng dây chuyền.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/python-3-re-nhanh-va-vong-lap.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Python cơ bản: list, tuple, dict và set",
+  "u": "hoc/python-4-list-tuple-dict-set.html",
+  "e": "Lưu và thống kê dữ liệu sản xuất: slicing, list comprehension, dict cấu hình, đếm lỗi Pareto, set phát hiện mã trùng.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/python-4-list-tuple-dict-set.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Python cơ bản: hàm và module",
+  "u": "hoc/python-5-ham-va-module.html",
+  "e": "Viết hàm có tham số mặc định, trả nhiều giá trị, type hint, docstring, tách module và khối if __name__ == \"__main__\".",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/python-5-ham-va-module.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Python cơ bản: đọc ghi file, pathlib và xử lý lỗi",
+  "u": "hoc/python-6-doc-ghi-file-va-xu-ly-loi.html",
+  "e": "Đọc ghi file UTF-8 với with, đường dẫn bằng pathlib, try/except đúng cách và hàm đọc cấu hình JSON an toàn.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/python-6-doc-ghi-file-va-xu-ly-loi.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "NumPy cơ bản: mảng, slicing, mặt nạ và vector hóa",
+  "u": "hoc/python-9-numpy-co-ban.html",
+  "e": "shape, dtype, cắt mảng theo [hàng, cột], view và copy, mặt nạ boolean, axis, broadcasting: nền tảng trước khi xử lý ảnh.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 9,
+  "img": "assets/images/posts/python-9-numpy-co-ban.webp",
+  "tags": [
+   "Python",
+   "NumPy",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Dự án chặng 1: báo cáo chất lượng thư mục ảnh bằng Python",
+  "u": "hoc/python-du-an-chang-1-bao-cao-thu-muc-anh.html",
+  "e": "Công cụ quét hàng nghìn ảnh, phát hiện ảnh hỏng, tối, sáng, mờ, xuất CSV và log. Có yêu cầu, gợi ý thiết kế, lời giải và tiêu chí tự đánh giá.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 9,
+  "img": "assets/images/posts/python-du-an-chang-1-bao-cao-thu-muc-anh.webp",
+  "tags": [
+   "Python",
+   "Source Code",
+   "Image Processing"
+  ]
+ },
+ {
   "t": "Lộ trình 700 TOEIC trong 5 tháng cho người đi làm",
   "u": "ngoai-ngu/lo-trinh-700-toeic.html",
   "e": "Cấu trúc đề 200 câu, phân bổ điểm mục tiêu, kế hoạch từng tháng, lịch học 60–90 phút mỗi ngày và mốc thi thử để theo dõi tiến độ.",
@@ -1712,7 +1826,7 @@ window.HF_TOPICS = [
   "u": "hoc/python.html",
   "s": "Học AI & Lập trình",
   "g": "Programming",
-  "n": 12
+  "n": 20
  },
  {
   "t": "C#",
@@ -1768,7 +1882,7 @@ window.HF_TOPICS = [
   "u": "hoc/image-processing.html",
   "s": "Học AI & Lập trình",
   "g": "Computer Vision",
-  "n": 8
+  "n": 9
  },
  {
   "t": "Computer Vision",
@@ -1880,7 +1994,7 @@ window.HF_TOPICS = [
   "u": "kien-thuc/programming.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 5
+  "n": 12
  },
  {
   "t": "AI / Machine Learning",
@@ -1999,7 +2113,7 @@ window.HF_TOPICS = [
   "u": "tai-nguyen/source-code.html",
   "s": "Tài nguyên",
   "g": "",
-  "n": 6
+  "n": 7
  },
  {
   "t": "Dataset",
@@ -2051,5 +2165,103 @@ window.HF_TOPICS = [
   "g": "Python, công cụ, tự động hóa",
   "n": -1,
   "f": 0
+ },
+ {
+  "t": "Chặng 1: Python",
+  "u": "lo-trinh/vision-engineer/python.html",
+  "s": "Vision Engineer",
+  "g": "11 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 2: OpenCV",
+  "u": "lo-trinh/vision-engineer/opencv.html",
+  "s": "Vision Engineer",
+  "g": "6 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 3: Image Processing",
+  "u": "lo-trinh/vision-engineer/image-processing.html",
+  "s": "Vision Engineer",
+  "g": "8 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 4: Machine Vision",
+  "u": "lo-trinh/vision-engineer/machine-vision.html",
+  "s": "Vision Engineer",
+  "g": "4 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 5: Industrial Vision",
+  "u": "lo-trinh/vision-engineer/industrial-vision.html",
+  "s": "Vision Engineer",
+  "g": "6 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 6: Camera / Lens / Lighting",
+  "u": "lo-trinh/vision-engineer/camera-lens-lighting.html",
+  "s": "Vision Engineer",
+  "g": "8 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 7: Measurement / Matching / OCR",
+  "u": "lo-trinh/vision-engineer/measurement-matching-ocr.html",
+  "s": "Vision Engineer",
+  "g": "8 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 8: Calibration",
+  "u": "lo-trinh/vision-engineer/calibration.html",
+  "s": "Vision Engineer",
+  "g": "6 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 9: PLC / Robot / MES",
+  "u": "lo-trinh/vision-engineer/plc-robot-mes.html",
+  "s": "Vision Engineer",
+  "g": "9 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 10: Deep Learning",
+  "u": "lo-trinh/vision-engineer/deep-learning.html",
+  "s": "Vision Engineer",
+  "g": "7 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 11: AI Vision",
+  "u": "lo-trinh/vision-engineer/ai-vision.html",
+  "s": "Vision Engineer",
+  "g": "6 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 12: Detection / Segmentation / Anomaly Detection",
+  "u": "lo-trinh/vision-engineer/detection-segmentation-anomaly.html",
+  "s": "Vision Engineer",
+  "g": "7 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 13: Deployment",
+  "u": "lo-trinh/vision-engineer/deployment.html",
+  "s": "Vision Engineer",
+  "g": "6 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 14: Real-world Projects",
+  "u": "lo-trinh/vision-engineer/real-world-projects.html",
+  "s": "Vision Engineer",
+  "g": "5 bài học",
+  "n": -1
  }
 ];
