@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="vi" data-root="../">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Capstone: kiểm tra lỗi bề mặt bằng AI, ONNX real-time, PLC và giám sát drift</title>
+<meta name="description" content="Dự án portfolio: dữ liệu chia theo lô, huấn luyện CNN, chọn ngưỡng theo escape, xuất ONNX kiểm sai số, trạm ONNX Runtime trả PLC, lưu ảnh NG, giám sát drift.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://hocfree.vn/hoc/capstone-3-kiem-tra-loi-be-mat-ai-plc.html">
+<meta property="og:site_name" content="HọcFree">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Capstone: kiểm tra lỗi bề mặt bằng AI, ONNX real-time, PLC và giám sát drift">
+<meta property="og:description" content="Dự án portfolio: dữ liệu chia theo lô, huấn luyện CNN, chọn ngưỡng theo escape, xuất ONNX kiểm sai số, trạm ONNX Runtime trả PLC, lưu ảnh NG, giám sát drift.">
+<meta property="og:url" content="https://hocfree.vn/hoc/capstone-3-kiem-tra-loi-be-mat-ai-plc.html">
+<meta property="og:image" content="https://hocfree.vn/assets/images/posts/capstone-3-kiem-tra-loi-be-mat-ai-plc.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="Capstone: kiểm tra lỗi bề mặt bằng AI, ONNX real-time, PLC và giám sát drift">
+<meta property="og:locale" content="vi_VN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Capstone: kiểm tra lỗi bề mặt bằng AI, ONNX real-time, PLC và giám sát drift">
+<meta name="twitter:description" content="Dự án portfolio: dữ liệu chia theo lô, huấn luyện CNN, chọn ngưỡng theo escape, xuất ONNX kiểm sai số, trạm ONNX Runtime trả PLC, lưu ảnh NG, giám sát drift.">
+<meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/capstone-3-kiem-tra-loi-be-mat-ai-plc.jpg">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/fonts.css?v=20261009">
+<link rel="stylesheet" href="../assets/css/style.css?v=20261009">
+<script>try{var t=localStorage.getItem('hf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
+<meta property="article:published_time" content="2026-10-09">
+<meta property="article:section" content="Học AI &amp; Lập trình">
+<meta property="article:tag" content="AI Vision">
+<meta property="article:tag" content="PLC">
+<meta property="article:tag" content="Industrial Vision">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "Capstone: kiểm tra lỗi bề mặt bằng AI, ONNX real-time, PLC và giám sát drift", "description": "Dự án portfolio: dữ liệu chia theo lô, huấn luyện CNN, chọn ngưỡng theo escape, xuất ONNX kiểm sai số, trạm ONNX Runtime trả PLC, lưu ảnh NG, giám sát drift.", "image": ["https://hocfree.vn/assets/images/posts/capstone-3-kiem-tra-loi-be-mat-ai-plc.jpg"], "datePublished": "2026-10-09", "dateModified": "2026-10-09", "inLanguage": "vi", "articleSection": "Học AI & Lập trình", "keywords": "AI Vision, PLC, Industrial Vision", "wordCount": 7684, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/hoc/capstone-3-kiem-tra-loi-be-mat-ai-plc.html"}, "isPartOf": {"@type": "Course", "name": "Trở thành Vision Engineer", "url": "https://hocfree.vn/lo-trinh/vision-engineer.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Learning Paths", "item": "https://hocfree.vn/lo-trinh/"}, {"@type": "ListItem", "position": 3, "name": "Trở thành Vision Engineer", "item": "https://hocfree.vn/lo-trinh/vision-engineer.html"}, {"@type": "ListItem", "position": 4, "name": "Chặng 14: Real-world Projects", "item": "https://hocfree.vn/lo-trinh/vision-engineer/real-world-projects.html"}, {"@type": "ListItem", "position": 5, "name": "Capstone: kiểm tra lỗi bề mặt bằng AI, ONNX real-time, PLC và giám sát drift"}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div class="progress" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="container wide header-top">
+    <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="nav-scrim" hidden></div>
+    <a class="logo" href="../" aria-label="HọcFree – Trang chủ"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+    <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
+    <div class="header-actions">
+      <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="login-link" href="../dang-nhap.html">Đăng nhập</a>
+      <a class="btn start-btn" href="../lo-trinh/">Bắt đầu học</a>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="container wide">
+      <nav class="site-nav" id="site-nav" aria-label="Menu chính">
+        <div class="drawer-head">
+          <a class="logo" href="../" tabindex="-1"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+          <button class="icon-btn nav-close" aria-label="Đóng menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <button type="button" class="drawer-search search-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Tìm bài học, chủ đề…</span></button>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="../">Trang chủ</a></li><li class="nav-item has-panel is-mega"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-hoc">Học AI &amp; Lập trình<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel mega" id="nav-panel-hoc">
+  <div class="container wide mega-inner">
+    <div class="mega-groups"><div class="mega-group"><a class="mega-group-title" href="../hoc/#programming">Programming</a><ul><li><a href="../hoc/python.html">Python</a></li><li><a href="../hoc/csharp.html">C#</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#ai-machine-learning">AI &amp; Machine Learning</a><ul><li><a href="../hoc/machine-learning.html">Machine Learning</a></li><li><a href="../hoc/deep-learning.html">Deep Learning</a></li><li><a href="../hoc/pytorch.html">PyTorch</a></li><li><a href="../hoc/generative-ai.html">Generative AI</a></li><li><a href="../hoc/llm-ai-agents.html">LLM / AI Agents</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#computer-vision">Computer Vision</a><ul><li><a href="../hoc/opencv.html">OpenCV</a></li><li><a href="../hoc/image-processing.html">Image Processing</a></li><li><a href="../hoc/computer-vision.html">Computer Vision</a></li><li><a href="../hoc/ocr.html">OCR</a></li><li><a href="../hoc/object-detection.html">Object Detection</a></li><li><a href="../hoc/segmentation.html">Segmentation</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#vision-engineering">Vision Engineering</a><ul><li><a href="../hoc/machine-vision.html">Machine Vision</a></li><li><a href="../hoc/ai-vision.html">AI Vision</a></li><li><a href="../hoc/industrial-vision.html">Industrial Vision</a></li><li><a href="../hoc/camera-lens.html">Camera &amp; Lens</a></li><li><a href="../hoc/lighting.html">Lighting</a></li><li><a href="../hoc/calibration.html">Calibration</a></li><li><a href="../hoc/plc-robot-mes.html">PLC / Robot / MES</a></li><li><a href="../hoc/vision-deployment.html">Vision Deployment</a></li></ul></div></div>
+    <a class="feature-card" href="../lo-trinh/vision-engineer.html">
+  <span class="feature-eyebrow">⭐ Learning Path nổi bật</span>
+  <span class="feature-title">Trở thành Vision Engineer</span>
+  <span class="feature-sub">Machine Vision + AI Vision + Industrial Automation</span>
+  <span class="feature-desc">Lộ trình thực chiến từ Python, OpenCV và Machine Vision đến Deep Learning, AI Vision, Camera, PLC, Robot và triển khai hệ thống Vision trong nhà máy.</span>
+  <span class="feature-chain" aria-label="Các chặng chính"><span>Python</span><i aria-hidden="true">→</i><span>OpenCV</span><i aria-hidden="true">→</i><span>Machine Vision</span><i aria-hidden="true">→</i><span>AI Vision</span><i aria-hidden="true">→</i><span class="chain-goal">🎯 Vision Engineer</span></span>
+  <span class="feature-meta">14 chặng · 5 giai đoạn · ~12 tháng</span>
+  <span class="feature-cta">Xem lộ trình →</span>
+</a>
+  </div>
+  <div class="mega-foot"><div class="container wide mega-foot-inner"><ol class="journey compact" aria-label="Học, thực hành, trở thành kỹ sư"><li><a href="../hoc/" aria-current="step"><span class="journey-n">1</span><span class="journey-t"><b>Học</b><small>Học AI &amp; Lập trình</small></span></a></li><li><a href="../projects/"><span class="journey-n">2</span><span class="journey-t"><b>Thực hành</b><small>Projects</small></span></a></li><li><a href="../lo-trinh/"><span class="journey-n">3</span><span class="journey-t"><b>Trở thành kỹ sư</b><small>Learning Paths</small></span></a></li></ol><a class="panel-all" href="../hoc/">Xem tất cả Học AI &amp; Lập trình →</a></div></div>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-projects">Projects<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-projects">
+  <p class="panel-kicker"><span>Bước 2 · Thực hành</span>Áp dụng vào dự án thật</p>
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../projects/ai-projects.html"><span class="drop-label">AI Projects</span><span class="drop-desc">Ứng dụng ML và LLM, từ ý tưởng đến bản demo</span></a></li><li><a class="drop-link" href="../projects/computer-vision-projects.html"><span class="drop-label">Computer Vision Projects</span><span class="drop-desc">Phát hiện, nhận dạng và theo dõi đối tượng</span></a></li><li><a class="drop-link" href="../projects/industrial-vision-projects.html"><span class="drop-label">Industrial Vision Projects</span><span class="drop-desc">Đo kích thước, kiểm tra lỗi, đọc mã trên dây chuyền</span></a></li></ul></div></div>
+  <a class="panel-all" href="../projects/">Xem tất cả Projects →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger is-active" aria-expanded="false" aria-controls="nav-panel-lo-trinh" aria-current="true">Learning Paths<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-lo-trinh">
+  <p class="panel-kicker"><span>Bước 3 · Trở thành kỹ sư</span>Định hướng nghề nghiệp</p>
+  <ul class="drop-list"><li><a class="drop-link is-flagship" href="../lo-trinh/vision-engineer.html"><span class="drop-label">⭐ Trở thành Vision Engineer</span><span class="drop-desc">Machine Vision + AI Vision + Industrial Automation · 14 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/#python-developer"><span class="drop-label">Python Developer<span class="badge-soon">Sắp ra mắt</span></span><span class="drop-desc">Python, công cụ, tự động hóa</span></a></li></ul>
+  <a class="panel-all" href="../lo-trinh/">Xem tất cả lộ trình →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-kien-thuc">Kiến thức<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-kien-thuc">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Lĩnh vực</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/programming.html"><span class="drop-label">Programming</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-machine-learning.html"><span class="drop-label">AI / Machine Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/deep-learning.html"><span class="drop-label">Deep Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/machine-vision.html"><span class="drop-label">Machine Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-vision.html"><span class="drop-label">AI Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/industrial-automation.html"><span class="drop-label">Industrial Automation</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Công cụ &amp; mẹo</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/tools-frameworks.html"><span class="drop-label">Tools &amp; Frameworks</span></a></li><li><a class="drop-link" href="../kien-thuc/tips-tricks.html"><span class="drop-label">Tips &amp; Tricks</span></a></li></ul></div></div>
+  <a class="panel-all" href="../kien-thuc/">Xem tất cả Kiến thức →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tin-tuc-ai">Tin tức AI<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tin-tuc-ai">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tin-tuc-ai/ai-news.html"><span class="drop-label">AI News</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-models.html"><span class="drop-label">AI Models</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/technology.html"><span class="drop-label">Technology</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/robotics.html"><span class="drop-label">Robotics</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-industry.html"><span class="drop-label">AI Industry</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tin-tuc-ai/">Xem tất cả Tin tức AI →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-ngoai-ngu">Ngoại ngữ<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-ngoai-ngu">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/english.html"><span class="drop-label">English</span><span class="drop-desc">Lộ trình 700 TOEIC, phương pháp học, giáo trình HF-700TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chinese.html"><span class="drop-label">Chinese</span><span class="drop-desc">Lộ trình HSK3, phương pháp học, giáo trình HF-HSK3</span></a></li></ul></div></div>
+  <a class="panel-all" href="../ngoai-ngu/">Xem tất cả Ngoại ngữ →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tai-nguyen">Tài nguyên<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tai-nguyen">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tai-nguyen/source-code.html"><span class="drop-label">Source Code</span><span class="drop-desc">Mã nguồn mẫu đi kèm bài học</span></a></li><li><a class="drop-link" href="../tai-nguyen/dataset.html"><span class="drop-label">Dataset</span><span class="drop-desc">Bộ dữ liệu ảnh để luyện tập</span></a></li><li><a class="drop-link" href="../tai-nguyen/cheat-sheets.html"><span class="drop-label">Cheat Sheets</span><span class="drop-desc">Tóm tắt nhanh trong một trang</span></a></li><li><a class="drop-link" href="../tai-nguyen/documentation.html"><span class="drop-label">Documentation</span><span class="drop-desc">Tài liệu tra cứu thư viện, API</span></a></li><li><a class="drop-link" href="../tai-nguyen/ebook.html"><span class="drop-label">Ebook / Tài liệu</span><span class="drop-desc">Sách và tài liệu tham khảo</span></a></li><li><a class="drop-link" href="../tai-nguyen/ai-tools.html"><span class="drop-label">AI Tools</span><span class="drop-desc">Công cụ AI hữu ích cho việc học</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tai-nguyen/">Xem tất cả Tài nguyên →</a>
+</div></li></ul>
+        <div class="drawer-foot">
+          <a class="btn ghost" href="../dang-nhap.html">Đăng nhập</a>
+          <a class="btn" href="../lo-trinh/">Bắt đầu học</a>
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+<div class="search-dialog" hidden>
+  <div class="search-scrim"></div>
+  <div class="search-box" role="dialog" aria-modal="true" aria-label="Tìm kiếm">
+    <form class="search-form" action="../search.html" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" placeholder="Tìm bài học, chủ đề, bài viết…" autocomplete="off" aria-label="Từ khóa tìm kiếm" aria-controls="search-suggest">
+      <button type="button" class="icon-btn search-close" aria-label="Đóng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </form>
+    <div class="search-suggest" id="search-suggest" aria-live="polite">
+      <div class="search-empty">
+        <p class="search-group-title">Chủ đề phổ biến</p>
+        <div class="chips"><a class="chip" href="../hoc/python.html">Python</a><a class="chip" href="../hoc/opencv.html">OpenCV</a><a class="chip" href="../hoc/machine-vision.html">Machine Vision</a><a class="chip" href="../hoc/deep-learning.html">Deep Learning</a><a class="chip" href="../hoc/ai-vision.html">AI Vision</a><a class="chip" href="../hoc/object-detection.html">Object Detection</a><a class="chip" href="../hoc/pytorch.html">PyTorch</a><a class="chip" href="../ngoai-ngu/english.html">English</a></div>
+        <p class="search-group-title">Lộ trình nổi bật</p>
+        <a class="search-item" href="../lo-trinh/vision-engineer.html"><span class="search-ico" aria-hidden="true">⭐</span><span>Trở thành Vision Engineer<small>Learning Path · Machine Vision + AI Vision + Industrial Automation</small></span></a>
+      </div>
+    </div>
+    <div class="search-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> chọn</span><span><kbd>Enter</kbd> mở</span><span><kbd>Esc</kbd> đóng</span></div>
+  </div>
+</div>
+<main id="main">
+  <div class="container layout article-layout">
+    <article class="article">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../lo-trinh/">Learning Paths</a><span>/</span><a href="../lo-trinh/vision-engineer.html">Vision Engineer</a><span>/</span><a href="../lo-trinh/vision-engineer/real-world-projects.html">Chặng 14: Real-world Projects</a></nav>
+      <header class="article-head">
+        <div class="course-bar" data-course="vision-engineer"><a class="course-chip" href="../lo-trinh/vision-engineer/real-world-projects.html">⭐ Vision Engineer · Chặng 14</a><span class="lesson-no">Bài 3/5</span><span class="kind kind-project">Dự án</span><span class="lesson-min"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></svg>~480 phút</span></div>
+        <h1>Capstone: kiểm tra lỗi bề mặt bằng AI, ONNX real-time, PLC và giám sát drift</h1>
+        <p class="lead">Dự án portfolio: dữ liệu chia theo lô, huấn luyện CNN, chọn ngưỡng theo escape, xuất ONNX kiểm sai số, trạm ONNX Runtime trả PLC, lưu ảnh NG, giám sát drift.</p>
+        <div class="article-meta">
+          <span class="avatar" aria-hidden="true">HF</span>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>43 phút đọc</span></div>
+        </div>
+      </header>
+      <figure class="article-cover">
+        <img src="../assets/images/posts/capstone-3-kiem-tra-loi-be-mat-ai-plc.webp" alt="Capstone: kiểm tra lỗi bề mặt bằng AI, ONNX real-time, PLC và giám sát drift" width="1200" height="675" fetchpriority="high" decoding="async">
+      </figure>
+      <section class="lesson-goals" aria-label="Mục tiêu bài học"><h2>Học xong bài này, bạn sẽ</h2><ul><li>Dữ liệu, huấn luyện, chọn ngưỡng</li><li>Triển khai ONNX real-time</li><li>Tích hợp PLC, lưu ảnh NG, giám sát</li></ul><p class="goals-before">Nên học trước: <a href="../hoc/capstone-2-tram-doc-ma-va-ocr.html">Capstone 2: trạm đọc DataMatrix và số seri</a></p></section>
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol class="toc-plain"><li><a href="#1-boi-canh">1. Bối cảnh</a></li><li><a href="#2-yeu-cau-va-tieu-chi-nghiem-thu">2. Yêu cầu và tiêu chí nghiệm thu</a></li><li><a href="#3-kien-thuc-su-dung">3. Kiến thức sử dụng</a></li><li><a href="#4-kien-truc-tham-chieu">4. Kiến trúc tham chiếu</a></li><li><a href="#5-lo-trinh-thuc-hien-theo-moc">5. Lộ trình thực hiện theo mốc</a></li><li><a href="#6-ma-khoi-dau-va-phan-loi">6. Mã khởi đầu và phần lõi</a></li><li><a href="#7-kiem-thu-va-nghiem-thu">7. Kiểm thử và nghiệm thu</a></li><li><a href="#8-san-pham-ban-giao-cho-portfolio">8. Sản phẩm bàn giao cho portfolio</a></li><li><a href="#9-tu-danh-gia">9. Tự đánh giá</a></li><li><a href="#10-mo-rong">10. Mở rộng</a></li><li><a href="#tom-tat">Tóm tắt</a></li></ol></details>
+      <div class="prose">
+<p>Dự án cuối cùng ghép mọi chặng lại: một trạm kiểm tra <strong>lỗi bề mặt bằng AI</strong> chạy thật trên dây chuyền, từ dữ liệu tới PLC. Bạn sẽ tạo dữ liệu có chia theo lô vật liệu, huấn luyện một CNN nhỏ, chọn ngưỡng theo ràng buộc escape trên tập validation, đánh giá một lần trên tập test, xuất ONNX và kiểm tra sai số, chạy ONNX Runtime trong vòng lặp có đo thời gian từng bước, trả kết quả cho PLC qua Modbus TCP, lưu ảnh NG, và cuối cùng là phần mà đa số dự án AI trên mạng bỏ qua: <strong>giám sát sau khi triển khai</strong>, phát hiện khi camera mất nét trước khi trạm bắt đầu lọt lỗi. Dự án dùng kiến thức của các chặng Deep Learning, AI Vision, Detection / Segmentation / Anomaly Detection, Deployment và PLC / Robot / MES; hai dự án trước (trạm đo kích thước, trạm đọc mã) đã cho bạn khung tích hợp PLC và cách viết biên bản nghiệm thu.</p>
+
+<div class="tip"><strong>Mục tiêu dự án</strong>(1) Dữ liệu, huấn luyện, chọn ngưỡng theo tiêu chí nhà máy. (2) Triển khai ONNX real-time, đo latency p50/p99. (3) Tích hợp PLC, lưu ảnh NG, giám sát trôi dữ liệu và tỉ lệ NG. Thời lượng dự kiến: khoảng 8 giờ.</div>
+
+<h2 id="1-boi-canh">1. Bối cảnh</h2>
+<p>Một nhà máy gia công vỏ thiết bị âm thanh làm <strong>nắp nhôm xước sợi</strong> (brushed aluminium, bề mặt có vân xước song song do đánh bóng bằng băng nhám) kích thước 120 × 80 mm, sau đó anod hóa. Lỗi cần bắt trước khi anod hóa: <strong>vết xước</strong> cắt ngang vân (dài từ khoảng 1 mm) và <strong>đốm</strong> (vết lõm, bụi kẹt, đường kính từ khoảng 0,2 mm). Kiểm tra bằng mắt hiện bỏ sót nhiều vì vân xước sợi "che" lỗi, và hai ca đánh giá rất khác nhau. Thử rule-based (ngưỡng, lọc hình thái) cho overkill cao vì độ sáng và hướng vân thay đổi theo lô nhôm: đây đúng là trường hợp bài "Rule-based hay Deep Learning" khuyên chuyển sang AI.</p>
+<table>
+  <tr><th>Thông số</th><th>Giá trị</th></tr>
+  <tr><td>Nhịp dây chuyền</td><td>30 nắp/phút (2 s/nắp); PLC cho trạm <strong>500 ms</strong> từ TRIGGER tới DONE</td></tr>
+  <tr><td>Quang học (trạm thật)</td><td>Camera đơn sắc khoảng 5 MP, đèn chiếu xiên (low angle) để vết xước nổi lên, khoảng 0,05 mm/px</td></tr>
+  <tr><td>Cách kiểm tra</td><td>Định vị nắp bằng rule-based, chia vùng kiểm tra thành các ô, mô hình chấm điểm NG từng ô; nắp NG nếu có ít nhất một ô NG</td></tr>
+  <tr><td>Tỉ lệ lỗi thật</td><td>Khoảng 3% số nắp</td></tr>
+  <tr><td>Dữ liệu có sẵn</td><td>Ảnh của 10 lô nhôm, đã được QC gán nhãn OK/NG (lô 1–6 cũ nhất, lô 9–10 mới nhất)</td></tr>
+  <tr><td>PLC</td><td>Modbus TCP, cùng bảng địa chỉ kiểu Capstone 1; thêm điểm NG (float32) và phiên bản mô hình</td></tr>
+</table>
+<div class="warn"><strong>Phiên bản mô phỏng trong bài</strong>Để cả trang chạy trong khoảng 1 phút trên CPU, mỗi "sản phẩm" trong demo là <strong>một ô 48 × 48 px</strong> tổng hợp, và mô hình chỉ có khoảng 6 nghìn tham số. Trạm thật dùng ô lớn hơn (thường 128–256 px) và mô hình lớn hơn, thường là backbone đã huấn luyện sẵn như bài "Phân loại ảnh OK/NG bằng transfer learning với PyTorch". Quy trình (chia theo lô, chọn ngưỡng, ONNX, đo thời gian, PLC, giám sát) giữ nguyên.</div>
+
+<h2 id="2-yeu-cau-va-tieu-chi-nghiem-thu">2. Yêu cầu và tiêu chí nghiệm thu</h2>
+<table>
+  <tr><th>Mã</th><th>Yêu cầu</th><th>Tiêu chí đạt</th><th>Cách thử</th></tr>
+  <tr><td>R1</td><td>Chia dữ liệu chống rò rỉ</td><td>Train / val / test không chung lô vật liệu</td><td>Kiểm tra tập lô</td></tr>
+  <tr><td>R2</td><td>Không lọt lỗi</td><td>Escape = 0 trên tập test (2 lô chưa từng thấy)</td><td>Ngưỡng chọn trên val, áp một lần lên test</td></tr>
+  <tr><td>R3</td><td>Loại nhầm trong ngân sách</td><td>Overkill ≤ 2% trên test</td><td>Như R2</td></tr>
+  <tr><td>R4</td><td>ONNX tương đương PyTorch</td><td>Sai lệch điểm ≤ 1e-4, không quyết định nào bị lật</td><td>600 ô val + test</td></tr>
+  <tr><td>R5</td><td>Tốc độ</td><td>Suy luận một nắp (lô 64 ô) p99 ≤ 50 ms trên PC trạm</td><td>Đo 30 lần</td></tr>
+  <tr><td>R6</td><td>Tích hợp PLC</td><td>PLC nhận đúng kết quả 60/60 chu kỳ, kể cả chu kỳ camera không trả ảnh (LỖI)</td><td>PLC giả, kịch bản biết trước</td></tr>
+  <tr><td>R7</td><td>Lưu ảnh NG</td><td>Mọi ô NG có ảnh trên đĩa, tên file có chu kỳ và điểm</td><td>Đếm file</td></tr>
+  <tr><td>R8</td><td>Giám sát</td><td>Cảnh báo trôi dữ liệu xuất hiện <strong>trước</strong> escape đầu tiên khi camera mất nét dần</td><td>Mô phỏng 2000 sản phẩm</td></tr>
+  <tr><td>R9</td><td>Truy vết mô hình</td><td>File metadata đi kèm ONNX: phiên bản, ngưỡng, tiền xử lý, lô dùng để huấn luyện; PLC và CSDL nhận số phiên bản</td><td>Xem xét</td></tr>
+</table>
+
+<h2 id="3-kien-thuc-su-dung">3. Kiến thức sử dụng</h2>
+<ul>
+  <li><strong>Deep Learning</strong>: bài "PyTorch cơ bản: tensor, autograd và vòng lặp huấn luyện"; bài "Overfitting và cách chia train/validation/test đúng" (vì sao chia theo lô); bài "Phân loại ảnh OK/NG bằng transfer learning với PyTorch".</li>
+  <li><strong>AI Vision</strong>: bài "Rule-based hay Deep Learning", bài "Tự xây dataset ảnh công nghiệp", bài "Dữ liệu tổng hợp (synthetic data) khi thiếu ảnh lỗi", bài "Precision, Recall, F1 và ma trận nhầm lẫn", và bài chọn ngưỡng, đánh giá theo nhà máy của chặng này.</li>
+  <li><strong>Detection / Segmentation / Anomaly Detection</strong>: dự án "Phát hiện lỗi bề mặt bằng Anomaly Detection (PatchCore)", phương án khi gần như không có ảnh lỗi (mục 10).</li>
+  <li><strong>Deployment</strong>: các bài xuất ONNX và kiểm tra sai số, đo latency, logging và giám sát, đóng gói ứng dụng chạy 24/7; bài "Tăng tốc suy luận: ONNX Runtime, OpenVINO, TensorRT".</li>
+  <li><strong>Industrial Vision</strong> và <strong>PLC / Robot / MES</strong>: escape/overkill, quy tắc 3/n, Modbus TCP, ảnh NG theo ngày.</li>
+</ul>
+<pre><code class="language-bash">pip install torch onnx onnxscript onnxruntime opencv-python numpy pymodbus
+# Bài viết chạy với torch 2.14 (CPU), onnx 1.23, onnxscript 0.7, onnxruntime 1.31, OpenCV 5.0, pymodbus 3.15.0</code></pre>
+
+<h2 id="4-kien-truc-tham-chieu">4. Kiến trúc tham chiếu</h2>
+<p>Hai thế giới tách biệt: <strong>máy huấn luyện</strong> (PyTorch, dữ liệu, notebook) và <strong>máy trạm</strong> (chỉ ONNX Runtime, OpenCV, pymodbus). Thứ duy nhất đi từ bên này sang bên kia là cặp file <code>mo_hinh.onnx</code> + <code>mo_hinh.json</code>. Máy trạm không cài PyTorch: ít phụ thuộc hơn, khởi động nhanh hơn, và không ai "sửa nhanh" mô hình trên dây chuyền được.</p>
+<pre><code class="language-text">MÁY HUẤN LUYỆN                                   MÁY TRẠM (24/7)
+du_lieu.py → du_lieu.npz (ảnh, nhãn, lô)         ┌───────────────────────────────────────┐
+huan_luyen.py → mo_hinh.pt                       │ PLC ─TRIGGER─► vòng lặp trạm           │
+chon_nguong.py (val) → NGUONG                    │   chụp → cắt ô → BoSuyLuan.diem()      │
+danh_gia (test, MỘT lần)                         │   → OK/NG/LỖI → ghi HR (1 lệnh) → DONE │
+xuat_onnx.py → mo_hinh.onnx + mo_hinh.json ════► │   → SQLite + ảnh NG (anh_ng/ngày/)     │
+                                                 │   → GiamSat: độ sáng, độ nét, tỉ lệ NG │
+                                                 └──────────────┬────────────────────────┘
+                                                                ▼ cảnh báo HMI / email / log</code></pre>
+<p>Cấu trúc repo đề xuất:</p>
+<pre><code class="language-text">tram-ai-be-mat/
+├── README.md, MODEL_CARD.md       mô hình học gì, từ lô nào, ngưỡng, giới hạn đã biết
+├── train/                         du_lieu.py, huan_luyen.py, chon_nguong.py, xuat_onnx.py
+├── models/v3/                     mo_hinh.onnx, mo_hinh.json  (mỗi phiên bản một thư mục)
+├── station/
+│   ├── suy_luan.py                BoSuyLuan: chỉ onnxruntime + numpy
+│   ├── plc.py, luu_tru.py         như Capstone 1
+│   ├── giam_sat.py                EWMA độ sáng/độ nét, tỉ lệ NG hai phía
+│   └── main.py                    cấu hình, log xoay vòng, tự kết nối lại
+├── eval/                          bao_cao.py → biên bản
+└── deploy/                        dịch vụ chạy 24/7 (systemd/Windows service), Dockerfile</code></pre>
+<p>Bảng địa chỉ Modbus: coil 0 TRIGGER (PLC), coil 1–3 READY/BUSY/DONE (vision); HR 0–1 mã sản phẩm, số chu kỳ (PLC); HR 10 kết quả (1 OK, 2 NG, 3 LỖI), HR 11 chu kỳ trả lại, HR 12 mã lỗi (bit 0 NG do AI, bit 8 lỗi ảnh), HR 13 phiên bản mô hình, HR 14–15 điểm NG lớn nhất (float32, −1 khi không có ảnh). Gửi phiên bản mô hình cho PLC để mọi sản phẩm trong MES biết được kiểm bằng mô hình nào.</p>
+
+<h2 id="5-lo-trinh-thuc-hien-theo-moc">5. Lộ trình thực hiện theo mốc</h2>
+<table>
+  <tr><th>Mốc</th><th>Việc chính</th><th>Sản phẩm</th><th>Xong khi</th><th>Thời gian</th></tr>
+  <tr><td>M1</td><td>Đặc tả lỗi bằng con số, bảng địa chỉ PLC, ngân sách thời gian; dữ liệu và cách chia theo lô</td><td><code>docs/dac_ta.md</code>, <code>du_lieu.npz</code></td><td>Định nghĩa được "lỗi nhỏ nhất phải bắt"; tập test là các lô mới nhất, chưa ai nhìn</td><td>60 phút</td></tr>
+  <tr><td>M2</td><td>Huấn luyện baseline, theo dõi loss và val</td><td><code>huan_luyen.py</code>, <code>mo_hinh.pt</code></td><td>Val ổn định qua các epoch; ghi lại seed, phiên bản thư viện</td><td>90 phút</td></tr>
+  <tr><td>M3</td><td>Chọn ngưỡng trên val theo escape, đánh giá test một lần</td><td><code>chon_nguong.py</code>, bảng ngưỡng</td><td>R1–R3 đạt; giải thích được vì sao chọn ngưỡng đó</td><td>60 phút</td></tr>
+  <tr><td>M4</td><td>Xuất ONNX, kiểm tra sai số, metadata; lớp suy luận không phụ thuộc PyTorch</td><td><code>mo_hinh.onnx</code>, <code>mo_hinh.json</code></td><td>R4, R5, R9 đạt</td><td>60 phút</td></tr>
+  <tr><td>M5</td><td>Vòng lặp trạm: PLC giả, ảnh NG, SQLite, đo thời gian từng bước</td><td><code>station/</code></td><td>R6, R7 đạt; chạy lại 3 lần không treo, không lỗi cổng</td><td>90 phút</td></tr>
+  <tr><td>M6</td><td>Giám sát drift và tỉ lệ NG; thử bằng kịch bản mất nét</td><td><code>giam_sat.py</code></td><td>R8 đạt; ngưỡng cảnh báo không báo nhầm trong giai đoạn bình thường</td><td>60 phút</td></tr>
+  <tr><td>M7</td><td>Biên bản, model card, README, video</td><td>Repo hoàn chỉnh</td><td>Người khác chạy lại được từ đầu và ra cùng biên bản</td><td>60 phút</td></tr>
+</table>
+
+<h2 id="6-ma-khoi-dau-va-phan-loi">6. Mã khởi đầu và phần lõi</h2>
+<h3 id="6-1-ma-khoi-dau-be-mat-xuoc-soi-tong-hop-chia-theo-lo">6.1. Mã khởi đầu: bề mặt xước sợi tổng hợp, chia theo lô</h3>
+<p>Vân xước sợi được tạo bằng nhiễu làm mờ rất lệch (σ 4 px theo một chiều, 0,5 px theo chiều kia) rồi xoay theo hướng vân của lô. Mỗi lô có độ sáng, độ thô của vân, hướng vân và độ dốc chiếu sáng riêng: đó là lý do <strong>phải chia theo lô</strong>. Nếu trộn ngẫu nhiên, ô của cùng một lô nằm ở cả train và test, mô hình được "xem trước" lô test và con số đánh giá sẽ đẹp hơn thực tế. Tập dữ liệu được làm giàu lỗi (35%) để có đủ mẫu NG; dây chuyền thật chỉ khoảng 3%.</p>
+<pre><code class="language-python"># ===== du_lieu.py — bề mặt nhôm xước sợi tổng hợp, chia theo lô, có nhãn và loại lỗi =====
+import math
+
+import cv2
+import numpy as np
+
+S = 48                                  # kích thước một ô ảnh (px)
+
+
+def thong_so_lo(lo):
+    """Mỗi lô vật liệu có độ sáng, độ thô sợi, hướng sợi và độ dốc chiếu sáng hơi khác nhau."""
+    r = np.random.default_rng(1000 + lo)
+    return {"sang": r.uniform(125, 150), "tho": r.uniform(5, 8), "huong": r.uniform(-10, 10),
+            "doc": r.uniform(-12, 12, 2)}
+
+
+def ve_o(rng, p, loi=None, do_sang=1.0):
+    """Một ô 48 × 48: vân xước sợi + độ dốc sáng + nhiễu; loi ∈ {None, 'xuoc', 'dom'}."""
+    B = S + 24
+    van = cv2.GaussianBlur(rng.normal(0, 1, (B, B)).astype(np.float32), (0, 0), sigmaX=4.0, sigmaY=0.5)
+    M = cv2.getRotationMatrix2D((B / 2, B / 2), p["huong"] + rng.uniform(-3, 3), 1.0)
+    van = cv2.warpAffine(van, M, (B, B))[12:12 + S, 12:12 + S]
+    van /= van.std() + 1e-6
+    yy, xx = np.mgrid[0:S, 0:S] / S - 0.5
+    anh = p["sang"] + p["tho"] * van + p["doc"][0] * xx + p["doc"][1] * yy + rng.normal(0, 2.5, (S, S))
+    if loi is not None:
+        lop = np.zeros((S, S), np.float32)
+        if loi == "xuoc":                              # vết xước mảnh, dài 12–30 px, hướng bất kỳ
+            a, L = rng.uniform(0, math.pi), rng.uniform(12, 30)
+            cx, cy = rng.uniform(12, 36, 2)
+            d = (L / 2 * math.cos(a), L / 2 * math.sin(a))
+            cv2.line(lop, (int(cx - d[0]), int(cy - d[1])), (int(cx + d[0]), int(cy + d[1])), 1.0, 1, cv2.LINE_AA)
+            anh -= rng.uniform(28, 50) * lop
+        else:                                          # đốm (lõm, bụi kẹt) bán kính 2–3 px
+            c = tuple(int(v) for v in rng.uniform(6, 42, 2))
+            cv2.circle(lop, c, int(rng.integers(2, 4)), 1.0, -1, cv2.LINE_AA)
+            anh -= rng.uniform(30, 55) * cv2.GaussianBlur(lop, (0, 0), 0.7)
+    return np.clip(anh * do_sang, 0, 255).astype(np.uint8)
+
+
+def tao_lo(lo, so_o, ti_le_loi, do_sang=1.0, seed=None):
+    rng = np.random.default_rng(lo if seed is None else seed)
+    p = thong_so_lo(lo)
+    X, y, loai = [], [], []
+    for _ in range(so_o):
+        loi = None
+        if rng.random() &lt; ti_le_loi:
+            loi = "xuoc" if rng.random() &lt; 0.6 else "dom"
+        X.append(ve_o(rng, p, loi, do_sang))
+        y.append(int(loi is not None))
+        loai.append(loi or "ok")
+    return np.array(X), np.array(y), np.array(loai)
+
+
+if __name__ == "__main__":
+    # 10 lô × 150 ô, làm giàu lỗi 35% (dây chuyền thật chỉ vài %: xem mục 7)
+    X, y, lo, loai = [], [], [], []
+    for k in range(1, 11):
+        a, b, c = tao_lo(k, 150, 0.35)
+        X.append(a), y.append(b), loai.append(c), lo.append(np.full(len(b), k))
+    X, y, lo, loai = map(np.concatenate, (X, y, lo, loai))
+    np.savez_compressed("du_lieu.npz", X=X, y=y, lo=lo, loai=loai)
+    tam = np.vstack([np.hstack(list(X[lo == k][:10])) for k in (1, 5, 9)])
+    cv2.imwrite("mau_be_mat.png", cv2.resize(tam, None, fx=3, fy=3, interpolation=cv2.INTER_NEAREST))
+    for ten, tap in (("train", [1, 2, 3, 4, 5, 6]), ("val", [7, 8]), ("test", [9, 10])):
+        m = np.isin(lo, tap)
+        print(f"{ten:5s}: lô {tap} | {m.sum()} ô | lỗi {y[m].sum()} (xước {(loai[m] == 'xuoc').sum()}, "
+              f"đốm {(loai[m] == 'dom').sum()})")</code></pre>
+<pre><code class="language-text">train: lô [1, 2, 3, 4, 5, 6] | 900 ô | lỗi 305 (xước 190, đốm 115)
+val  : lô [7, 8] | 300 ô | lỗi 92 (xước 57, đốm 35)
+test : lô [9, 10] | 300 ô | lỗi 89 (xước 51, đốm 38)</code></pre>
+<p>Mở <code>mau_be_mat.png</code>: ba hàng là ba lô khác nhau. Một số vết xước gần song song với vân rất khó thấy bằng mắt, giống thực tế.</p>
+
+<h3 id="6-2-khung-chuong-trinh-ban-can-viet">6.2. Khung chương trình bạn cần viết</h3>
+<pre><code class="language-text">tien_xu_ly(X_uint8) -&gt; float32 (N, 1, 48, 48)     DÙNG CHUNG cho huấn luyện và trạm, ghi vào metadata
+MangNho(nn.Module): forward(x) -&gt; logit (N,)       sigmoid(logit) = điểm NG trong [0, 1]
+huan_luyen: tăng cường (xoay 90°, lật), Adam, giảm lr dạng cosine, lưu state_dict
+chon_nguong(diem_val, y_val) -&gt; NGUONG           escape val = 0 VÀ overkill val ≤ 2%, ưu tiên ngưỡng thấp
+xuat_onnx(mo_hinh) -&gt; mo_hinh.onnx + mo_hinh.json; kiểm sai số trên 600 ô
+BoSuyLuan(onnx, json).diem(cac_o) -&gt; điểm NG      chỉ numpy + onnxruntime
+vòng lặp trạm: TRIGGER↑ → chụp → điểm → ghi HR → DONE → lưu → chờ TRIGGER↓
+GiamSat.cap_nhat(i, anh, ng)                       EWMA độ sáng, EWMA log độ nét, tỉ lệ NG hai phía</code></pre>
+
+<h3 id="6-3-loi-giai-phan-loi">6.3. Lời giải phần lõi</h3>
+<details><summary>Xem lời giải phần lõi (4 phần, chạy nối tiếp sau khối 6.1)</summary>
+<p><strong>Phần 1: huấn luyện.</strong> Mạng 3 khối conv + BatchNorm, kết thúc bằng <strong>max pooling toàn ảnh</strong>: một vết lỗi nhỏ ở bất kỳ đâu cũng kích hoạt đầu ra, trong khi average pooling sẽ "pha loãng" nó với phần còn lại của ô. Tiền xử lý trừ trung bình từng ảnh (bỏ khác biệt độ sáng giữa các lô) nhưng chia cho một hằng số thay vì độ lệch chuẩn của ảnh (giữ thông tin tương phản của vết lỗi).</p>
+<pre><code class="language-python"># ===== huan_luyen.py — CNN nhỏ phân loại ô OK/NG, chia train/val/test THEO LÔ =====
+import time
+
+import numpy as np
+import torch
+import torch.nn as nn
+
+torch.manual_seed(0)
+torch.set_num_threads(1)        # mô hình rất nhỏ: 1 luồng thường nhanh hơn nhiều luồng (xem chú thích bên dưới)
+
+d = np.load("du_lieu.npz")
+X, y, lo = d["X"], d["y"], d["lo"]
+TAP = {"train": [1, 2, 3, 4, 5, 6], "val": [7, 8], "test": [9, 10]}
+chia = {k: np.isin(lo, v) for k, v in TAP.items()}
+
+
+class MangNho(nn.Module):
+    """3 khối conv; gộp bằng MAX toàn ảnh: lỗi nhỏ, nằm ở đâu cũng được "nhìn thấy"."""
+
+    def __init__(self):
+        super().__init__()
+        def khoi(vao, ra):
+            return [nn.Conv2d(vao, ra, 3, padding=1), nn.BatchNorm2d(ra), nn.ReLU()]
+        self.dac_trung = nn.Sequential(*khoi(1, 8), nn.MaxPool2d(2), *khoi(8, 16), nn.MaxPool2d(2),
+                                       *khoi(16, 32), nn.AdaptiveMaxPool2d(1))
+        self.dau_ra = nn.Linear(32, 1)
+
+    def forward(self, x):
+        return self.dau_ra(self.dac_trung(x).flatten(1)).squeeze(1)       # logit; sigmoid → điểm NG
+
+
+def tien_xu_ly(X):
+    """uint8 (N, 48, 48) → float32 (N, 1, 48, 48): trừ trung bình từng ảnh, chia hằng số 32.
+    Hằng số (không chia độ lệch chuẩn) để giữ thông tin tương phản; ghi vào metadata khi triển khai."""
+    x = X.astype(np.float32)[:, None]
+    return (x - x.mean(axis=(2, 3), keepdims=True)) / 32.0
+
+
+def diem_ng(mo_hinh, X):
+    mo_hinh.eval()
+    with torch.no_grad():
+        return torch.sigmoid(mo_hinh(torch.from_numpy(tien_xu_ly(X)))).numpy()
+
+
+mo_hinh = MangNho()
+SO_EPOCH = 25
+opt = torch.optim.Adam(mo_hinh.parameters(), lr=3e-3)
+lich = torch.optim.lr_scheduler.CosineAnnealingLR(opt, SO_EPOCH)
+ham_mat = nn.BCEWithLogitsLoss()
+xt, yt = torch.from_numpy(tien_xu_ly(X[chia["train"]])), torch.from_numpy(y[chia["train"]]).float()
+t0 = time.time()
+for ep in range(1, SO_EPOCH + 1):
+    mo_hinh.train()
+    hoan_vi, tong = torch.randperm(len(xt)), 0.0
+    for i in range(0, len(xt), 64):
+        idx = hoan_vi[i:i + 64]
+        xb = torch.rot90(xt[idx], int(torch.randint(0, 4, (1,))), (2, 3))   # tăng cường: xoay 90°, lật
+        if torch.rand(1) &lt; 0.5:
+            xb = torch.flip(xb, (3,))
+        mat = ham_mat(mo_hinh(xb), yt[idx])
+        opt.zero_grad()
+        mat.backward()
+        opt.step()
+        tong += mat.item() * len(idx)
+    lich.step()
+    if ep % 5 == 0:
+        s = diem_ng(mo_hinh, X[chia["val"]])
+        dung = ((s &gt; 0.5) == y[chia["val"]]).mean()
+        print(f"epoch {ep:2d}: loss train {tong / len(xt):.3f} | val đúng {dung:.3f} (ngưỡng tạm 0,5)")
+torch.save(mo_hinh.state_dict(), "mo_hinh.pt")
+print(f"Đã lưu mo_hinh.pt, {sum(p.numel() for p in mo_hinh.parameters())} tham số, "
+      f"huấn luyện {time.time() - t0:.0f} s (tùy máy)")</code></pre>
+<pre><code class="language-text">epoch  5: loss train 0.042 | val đúng 0.993 (ngưỡng tạm 0,5)
+epoch 10: loss train 0.017 | val đúng 0.990 (ngưỡng tạm 0,5)
+epoch 15: loss train 0.008 | val đúng 0.997 (ngưỡng tạm 0,5)
+epoch 20: loss train 0.011 | val đúng 0.993 (ngưỡng tạm 0,5)
+epoch 25: loss train 0.009 | val đúng 0.993 (ngưỡng tạm 0,5)
+Đã lưu mo_hinh.pt, 6033 tham số, huấn luyện 22 s (tùy máy)</code></pre>
+<p>Con số loss và độ đúng có thể lệch chút ít giữa các CPU và phiên bản thư viện; thời gian tùy máy. Về <code>torch.set_num_threads(1)</code>: với mô hình vài nghìn tham số và ảnh 48 × 48, khi viết bài này, chạy 4 luồng trên máy đang có tải chậm hơn 1 luồng khoảng 10 lần, vì chi phí đồng bộ luồng lớn hơn phần tính toán. Luôn đo trước khi tin "nhiều luồng nhanh hơn"; trên máy trạm, giữ lõi CPU cho camera và giao tiếp cũng quan trọng.</p>
+<p><strong>Phần 2: chọn ngưỡng trên val, đánh giá một lần trên test.</strong> Quy tắc được viết ra <em>trước</em> khi nhìn kết quả: escape trên val phải bằng 0, overkill trên val không quá ngân sách 2%, và trong các ngưỡng thỏa mãn, chọn ngưỡng thấp nhất để cách xa các ô NG nhất.</p>
+<pre><code class="language-python"># ===== chon_nguong.py — chọn ngưỡng trên VAL theo ràng buộc escape, rồi đánh giá một lần trên TEST =====
+import numpy as np
+import torch
+
+mo_hinh = MangNho()
+mo_hinh.load_state_dict(torch.load("mo_hinh.pt", weights_only=True))
+s_val, y_val = diem_ng(mo_hinh, X[chia["val"]]), y[chia["val"]]
+OVERKILL_TOI_DA = 0.02          # ngân sách loại nhầm do QC/sản xuất chấp nhận (từ phân tích chi phí)
+
+
+def escape_overkill(s, yy, t):
+    ng, ok = s[yy == 1], s[yy == 0]
+    return (ng &lt; t).mean(), (ok &gt;= t).mean()          # escape: NG có điểm dưới ngưỡng → bị cho qua
+
+
+print("ngưỡng | escape val | overkill val")
+ung_vien = []
+for t in np.arange(0.05, 0.96, 0.05):
+    e, o = escape_overkill(s_val, y_val, t)
+    print(f"  {t:.2f} | {e:9.1%} | {o:9.1%}")
+    if e == 0 and o &lt;= OVERKILL_TOI_DA:
+        ung_vien.append(t)
+# Ưu tiên không lọt lỗi: trong các ngưỡng đạt cả hai ràng buộc, chọn ngưỡng THẤP nhất (xa các ô NG nhất)
+NGUONG = round(float(min(ung_vien)), 2)
+print(f"Điểm NG thấp nhất trên val: {s_val[y_val == 1].min():.3f} | điểm OK cao nhất: {s_val[y_val == 0].max():.3f}")
+print(f"→ Chọn ngưỡng {NGUONG}")
+
+# Đánh giá MỘT lần trên test (2 lô chưa từng thấy) — không chỉnh ngưỡng theo kết quả này
+s_test, y_test, lo_test = diem_ng(mo_hinh, X[chia["test"]]), y[chia["test"]], lo[chia["test"]]
+e, o = escape_overkill(s_test, y_test, NGUONG)
+so_ng, so_ok = int((y_test == 1).sum()), int((y_test == 0).sum())
+print(f"TEST: escape {int(round(e * so_ng))}/{so_ng} | overkill {int(round(o * so_ok))}/{so_ok}")
+if e == 0:
+    print(f"  0 escape trên {so_ng} ô NG → escape thật có lẽ dưới ~{3 / so_ng:.1%} (quy tắc 3/n)")
+for k in TAP["test"]:
+    m = lo_test == k
+    print(f"  lô {k}: overkill {((s_test[m] &gt;= NGUONG) &amp; (y_test[m] == 0)).sum()}/{((y_test[m] == 0)).sum()}, "
+          f"escape {((s_test[m] &lt; NGUONG) &amp; (y_test[m] == 1)).sum()}/{(y_test[m] == 1).sum()}")</code></pre>
+<pre><code class="language-text">ngưỡng | escape val | overkill val
+  0.05 |      0.0% |      5.3%
+  0.10 |      0.0% |      2.4%
+  0.15 |      0.0% |      1.9%
+  0.20 |      0.0% |      1.0%
+  0.25 |      0.0% |      1.0%
+  0.30 |      0.0% |      0.5%
+  0.35 |      0.0% |      0.5%
+  0.40 |      0.0% |      0.5%
+  0.45 |      2.2% |      0.0%
+  0.50 |      2.2% |      0.0%
+  0.55 |      2.2% |      0.0%
+  0.60 |      2.2% |      0.0%
+  0.65 |      2.2% |      0.0%
+  0.70 |      2.2% |      0.0%
+  0.75 |      2.2% |      0.0%
+  0.80 |      4.3% |      0.0%
+  0.85 |      6.5% |      0.0%
+  0.90 |      6.5% |      0.0%
+  0.95 |      9.8% |      0.0%
+Điểm NG thấp nhất trên val: 0.434 | điểm OK cao nhất: 0.415
+→ Chọn ngưỡng 0.15
+TEST: escape 0/89 | overkill 0/211
+  0 escape trên 89 ô NG → escape thật có lẽ dưới ~3.4% (quy tắc 3/n)
+  lô 9: overkill 0/104, escape 0/46
+  lô 10: overkill 0/107, escape 0/43</code></pre>
+<p>Đọc bảng: ở ngưỡng mặc định 0,5 đã có 2,2% ô NG trên val bị lọt; với nhà máy đó là lỗi nghiêm trọng, dù "độ chính xác" vẫn trên 99%. Điểm NG thấp nhất (0,434) và điểm OK cao nhất (0,415) sát nhau: hai lớp chỉ tách được với biên rất mỏng. Ngưỡng 0,15 đổi lấy 1,9% overkill trên val để có biên an toàn lớn hơn cho escape. Trên hai lô test chưa từng thấy, không có escape và không có overkill; nhưng 0 trên 89 ô NG chỉ cho phép nói escape thật có lẽ dưới khoảng 3,4%. Muốn chứng minh tốt hơn cần nhiều mẫu NG hơn (bài tập 2).</p>
+<p><strong>Phần 3: xuất ONNX và kiểm tra sai số.</strong> Ở torch 2.14 (bản dùng trong bài), <code>torch.onnx.export</code> mặc định dùng exporter dựa trên <code>torch.export</code> (<code>dynamo=True</code>, cần gói <code>onnxscript</code>); exporter TorchScript cũ (<code>dynamo=False</code>) không còn được khuyến nghị. Chiều batch động khai báo bằng <code>dynamic_shapes</code>, với khóa là tên tham số của <code>forward()</code>. <code>external_data=False</code> giữ trọng số trong cùng một file; <code>verbose=False</code> tắt các dòng tiến trình mà exporter in ra.</p>
+<pre><code class="language-python"># ===== xuat_onnx.py — xuất ONNX (torch 2.14: exporter dynamo mặc định), kiểm tra sai số, ghi metadata =====
+import json
+import os
+from datetime import date
+
+import numpy as np
+import onnxruntime as ort
+import torch
+
+mo_hinh.eval()
+mau_vao = torch.from_numpy(tien_xu_ly(X[:1]))
+torch.onnx.export(mo_hinh, (mau_vao,), "mo_hinh.onnx", input_names=["anh"], output_names=["logit"],
+                  dynamic_shapes={"x": {0: torch.export.Dim("lo_anh")}},   # "x": tên tham số của forward()
+                  external_data=False, verbose=False)
+METADATA = {"phien_ban": 3, "ngay": date.today().isoformat(), "kich_thuoc": [S, S],
+            "tien_xu_ly": "anh_float - mean(anh); / 32.0", "nguong": NGUONG, "lo_train": TAP["train"],
+            "lo_val": TAP["val"], "torch": torch.__version__.split("+")[0], "onnxruntime": ort.__version__}
+with open("mo_hinh.json", "w", encoding="utf-8") as f:
+    json.dump(METADATA, f, ensure_ascii=False, indent=2)
+
+# Kiểm tra: ONNX Runtime cho cùng kết quả với PyTorch trên toàn bộ tập val + test (600 ô)
+tuy_chon = ort.SessionOptions()
+tuy_chon.intra_op_num_threads = 1
+phien = ort.InferenceSession("mo_hinh.onnx", tuy_chon, providers=["CPUExecutionProvider"])
+X_kt = X[chia["val"] | chia["test"]]
+logit_onnx = phien.run(None, {"anh": tien_xu_ly(X_kt)})[0]
+diem_onnx = 1 / (1 + np.exp(-logit_onnx))
+diem_torch = diem_ng(mo_hinh, X_kt)
+print("Vào:", [(i.name, i.shape) for i in phien.get_inputs()], "| ra:", [(o.name, o.shape) for o in phien.get_outputs()])
+print(f"Kích thước file: {os.path.getsize('mo_hinh.onnx') / 1024:.0f} KB | sai lệch điểm lớn nhất: "
+      f"{np.abs(diem_onnx - diem_torch).max():.1e}")
+print("Quyết định OK/NG khác nhau:", int(((diem_onnx &gt;= NGUONG) != (diem_torch &gt;= NGUONG)).sum()), "/", len(X_kt))
+print("Gần ngưỡng nhất:", f"{np.abs(diem_torch - NGUONG).min():.3f}", "(nếu rất nhỏ, sai số số học có thể lật quyết định)")</code></pre>
+<pre><code class="language-text">Vào: [('anh', ['lo_anh', 1, 48, 48])] | ra: [('logit', ['lo_anh'])]
+Kích thước file: 40 KB | sai lệch điểm lớn nhất: 4.2e-07
+Quyết định OK/NG khác nhau: 0 / 600
+Gần ngưỡng nhất: 0.028 (nếu rất nhỏ, sai số số học có thể lật quyết định)</code></pre>
+<p>Sai lệch cỡ 1e-7 là sai số làm tròn số thực 32 bit, không lật quyết định nào. Dòng cuối là kiểm tra hay bị quên: nếu có ô nằm cách ngưỡng chỉ 1e-6, một bản ONNX Runtime khác hay một CPU khác có thể cho quyết định khác. Khi tối ưu thêm (FP16, INT8 như bài tăng tốc suy luận), sai lệch lớn hơn nhiều và kiểm tra này trở thành bắt buộc.</p>
+<p><strong>Phần 4: trạm chạy thật với PLC giả.</strong> <code>BoSuyLuan</code> chỉ cần file ONNX và JSON, chạy "mồi" một lần khi khởi động (lần suy luận đầu tiên luôn chậm). Vòng lặp giống Capstone 1, thêm đo thời gian từng bước và lưu ảnh NG với điểm trong tên file. PLC giả chạy trên cổng 5035.</p>
+<pre><code class="language-python"># ===== tram_ai.py — trạm chạy ONNX Runtime: Modbus với PLC giả, lưu ảnh NG, đo thời gian từng bước =====
+import asyncio
+import json
+import sqlite3
+import threading
+import time
+from datetime import datetime
+from pathlib import Path
+
+import cv2
+import numpy as np
+import onnxruntime as ort
+from pymodbus.client import ModbusTcpClient
+from pymodbus.server import ModbusTcpServer
+from pymodbus.simulator import DataType, SimData, SimDevice
+
+TRIGGER, READY, BUSY, DONE = 0, 1, 2, 3                 # coil
+HR_MA_SP, HR_CHU_KY, HR_KQ = 0, 1, 10                   # HR 10 KQ, 11 chu kỳ, 12 mã lỗi, 13 phiên bản, 14–15 điểm
+KQ_OK, KQ_NG, KQ_LOI = 1, 2, 3
+
+
+class PlcGia:
+    """PLC giả (pymodbus 3.15, SimData/SimDevice) như bài Modbus TCP và Capstone 1."""
+
+    def __init__(self, port):
+        self.port = port
+
+    def bat(self):
+        self._da_nghe = threading.Event()
+        self._thread = threading.Thread(target=lambda: asyncio.run(self._main()), daemon=True)
+        self._thread.start()
+        if not self._da_nghe.wait(timeout=3):
+            raise RuntimeError("PLC giả không khởi động được")
+
+    async def _main(self):
+        self.loop = asyncio.get_running_loop()
+        bo_nho = SimDevice(id=1, simdata=(
+            [SimData(0, count=16, values=False, datatype=DataType.BITS)],
+            [SimData(0, count=16, values=False, datatype=DataType.BITS)],
+            [SimData(0, count=32, values=0, datatype=DataType.REGISTERS)],
+            [SimData(0, count=16, values=0, datatype=DataType.REGISTERS)],
+        ))
+        self.server = ModbusTcpServer(bo_nho, address=("127.0.0.1", self.port))
+        await self.server.serve_forever(background=True)
+        self._da_nghe.set()
+        await self.server.serving
+
+    def tat(self):
+        asyncio.run_coroutine_threadsafe(self.server.shutdown(), self.loop).result(timeout=3)
+        self._thread.join(timeout=3)
+
+    def _goi(self, coro):
+        return asyncio.run_coroutine_threadsafe(coro, self.loop).result(timeout=2)
+
+    def doc_coil(self, dc):
+        return self._goi(self.server.async_getValues(1, 1, dc, 1))[0]
+
+    def ghi_coil(self, dc, v):
+        self._goi(self.server.async_setValues(1, 5, dc, [bool(v)]))
+
+    def doc_hr(self, dc, n=1):
+        return self._goi(self.server.async_getValues(1, 3, dc, n))
+
+    def ghi_hr(self, dc, gia_tri):
+        self._goi(self.server.async_setValues(1, 16, dc, list(gia_tri)))
+
+
+def cho(dk, timeout):
+    han = time.monotonic() + timeout
+    while time.monotonic() &lt; han:
+        if dk():
+            return True
+        time.sleep(0.002)
+    return False
+
+
+def chuong_trinh_plc(plc, so_sp, nhan):
+    for k in range(1, so_sp + 1):
+        if not cho(lambda: plc.doc_coil(READY), 3.0):
+            nhan.append((k, "KHONG_READY", None))
+            continue
+        plc.ghi_hr(HR_MA_SP, [301, k])
+        plc.ghi_coil(TRIGGER, 1)
+        if cho(lambda: plc.doc_coil(DONE), 1.0):
+            r = plc.doc_hr(HR_KQ, 6)
+            diem = ModbusTcpClient.convert_from_registers(r[4:6], ModbusTcpClient.DATATYPE.FLOAT32)
+            nhan.append((k, r[0] if r[1] == k else "LECH", round(diem, 3)))
+        else:
+            nhan.append((k, "TIMEOUT", None))
+        plc.ghi_coil(TRIGGER, 0)
+        cho(lambda: not plc.doc_coil(DONE), 1.0)
+
+
+class BoSuyLuan:
+    """Chỉ phụ thuộc file .onnx + .json: KHÔNG import torch trên máy trạm."""
+
+    def __init__(self, file_onnx, file_json):
+        with open(file_json, encoding="utf-8") as f:
+            self.meta = json.load(f)
+        tc = ort.SessionOptions()
+        tc.intra_op_num_threads = 1
+        self.phien = ort.InferenceSession(file_onnx, tc, providers=["CPUExecutionProvider"])
+        self.phien.run(None, {"anh": np.zeros((1, 1, S, S), np.float32)})   # chạy mồi: lần đầu luôn chậm
+
+    def diem(self, cac_o):
+        x = cac_o.astype(np.float32)[:, None]
+        x = (x - x.mean(axis=(2, 3), keepdims=True)) / 32.0              # ĐÚNG như lúc huấn luyện
+        return 1 / (1 + np.exp(-self.phien.run(None, {"anh": x})[0]))
+
+
+class CameraGia:
+    """Lô 9; trạm không biết kịch bản: lỗi ở chu kỳ 7, 19, 33, 48; chu kỳ 25 camera không trả ảnh."""
+    KICH_BAN = {7: "xuoc", 19: "dom", 33: "xuoc", 48: "dom", 25: "camera_loi"}
+
+    def __init__(self):
+        self.rng, self.p = np.random.default_rng(77), thong_so_lo(9)
+
+    def chup(self, k):
+        loi = self.KICH_BAN.get(k)
+        return None if loi == "camera_loi" else ve_o(self.rng, self.p, loi)
+
+
+def chay_tram(so_sp, bo, cam, port, thu_muc="anh_ng"):
+    cli = ModbusTcpClient("127.0.0.1", port=port, timeout=0.5, retries=1)
+    if not cli.connect():
+        raise ConnectionError("Không kết nối được PLC")
+    con = sqlite3.connect("ket_qua_ai.db")
+    con.execute("CREATE TABLE IF NOT EXISTS kq (thoi_gian TEXT, chu_ky INT, ket_qua INT, diem REAL, "
+                "phien_ban INT, ms REAL, anh TEXT)")
+    nguong, pb = bo.meta["nguong"], bo.meta["phien_ban"]
+    tg = {k: [] for k in ("chup", "suy_luan", "plc", "luu")}
+    cli.write_coils(READY, [True, False, False], device_id=1)
+    truoc, xong, han = False, 0, time.monotonic() + 30
+    try:
+        while xong &lt; so_sp and time.monotonic() &lt; han:
+            trig = cli.read_coils(TRIGGER, count=1, device_id=1).bits[0]
+            if trig and not truoc:
+                t0 = time.perf_counter()
+                cli.write_coils(READY, [False, True, False], device_id=1)
+                k = cli.read_holding_registers(HR_CHU_KY, count=1, device_id=1).registers[0]
+                anh = cam.chup(k)
+                t1 = time.perf_counter()
+                if anh is None:
+                    kq, diem = KQ_LOI, -1.0                     # không có ảnh: LỖI, PLC xử lý như NG
+                else:
+                    diem = float(bo.diem(anh[None])[0])
+                    kq = KQ_NG if diem &gt;= nguong else KQ_OK
+                t2 = time.perf_counter()
+                regs = [kq, k, 256 if kq == KQ_LOI else int(kq == KQ_NG), pb]
+                regs += cli.convert_to_registers(diem, cli.DATATYPE.FLOAT32)
+                cli.write_registers(HR_KQ, regs, device_id=1)            # kết quả trước, một lệnh
+                cli.write_coils(READY, [False, False, True], device_id=1)  # rồi DONE
+                t3 = time.perf_counter()
+                duong_dan = None
+                if kq != KQ_OK:
+                    ts = datetime.now()
+                    duong_dan = f"{ts:%Y-%m-%d}/C{k:05d}_d{max(diem, 0):.2f}.png"
+                    (Path(thu_muc) / duong_dan).parent.mkdir(parents=True, exist_ok=True)
+                    if anh is not None:
+                        cv2.imwrite(str(Path(thu_muc) / duong_dan), anh)
+                    else:
+                        duong_dan = None
+                con.execute("INSERT INTO kq VALUES (?,?,?,?,?,?,?)", (datetime.now().isoformat(timespec="milliseconds"),
+                            k, kq, round(diem, 4), pb, round((t3 - t0) * 1000, 2), duong_dan))
+                con.commit()
+                t4 = time.perf_counter()
+                for ten, a, b in (("chup", t0, t1), ("suy_luan", t1, t2), ("plc", t2, t3), ("luu", t3, t4)):
+                    tg[ten].append((b - a) * 1000)
+                cho(lambda: not cli.read_coils(TRIGGER, count=1, device_id=1).bits[0], 1.0)
+                cli.write_coils(READY, [True, False, False], device_id=1)
+                trig, xong = False, xong + 1
+            truoc = trig
+            time.sleep(0.002)
+    finally:
+        cli.write_coils(READY, [False, False, False], device_id=1)
+        cli.close()
+        con.close()
+    return tg
+
+
+Path("ket_qua_ai.db").unlink(missing_ok=True)
+bo = BoSuyLuan("mo_hinh.onnx", "mo_hinh.json")
+plc = PlcGia(5035)
+plc.bat()
+nhan = []
+t_plc = threading.Thread(target=chuong_trinh_plc, args=(plc, 60, nhan), daemon=True)
+t_plc.start()
+try:
+    tg = chay_tram(60, bo, CameraGia(), 5035)
+finally:
+    t_plc.join(timeout=5)
+    plc.tat()
+
+ten_kq = {KQ_OK: "OK", KQ_NG: "NG", KQ_LOI: "LỖI"}
+print("PLC nhận:", len(nhan), "kết quả |", {v: sum(1 for _, kq, _ in nhan if kq == k) for k, v in ten_kq.items()})
+print("Chu kỳ không OK:", [(k, ten_kq.get(kq, kq), d) for k, kq, d in nhan if kq != KQ_OK])
+print("Ảnh NG đã lưu:", sorted(p.name for p in Path("anh_ng").rglob("*.png")))
+print("Thời gian từng bước, ms (tùy máy):")
+for ten, v in tg.items():
+    print(f"  {ten:8s} p50 {np.percentile(v, 50):6.2f} | p99 {np.percentile(v, 99):6.2f}")
+# Một sản phẩm thật được chia thành nhiều ô: đo suy luận theo LÔ 64 ô (batch)
+lo64 = np.stack([ve_o(np.random.default_rng(i), thong_so_lo(9)) for i in range(64)])
+t_lo = []
+for _ in range(30):
+    a = time.perf_counter()
+    bo.diem(lo64)
+    t_lo.append((time.perf_counter() - a) * 1000)
+print(f"Suy luận lô 64 ô: p50 {np.percentile(t_lo, 50):.1f} ms, p99 {np.percentile(t_lo, 99):.1f} ms (tùy máy)")</code></pre>
+<pre><code class="language-text">PLC nhận: 60 kết quả | {'OK': 55, 'NG': 4, 'LỖI': 1}
+Chu kỳ không OK: [(7, 'NG', 0.998), (19, 'NG', 1.0), (25, 'LỖI', -1.0), (33, 'NG', 0.999), (48, 'NG', 0.934)]
+Ảnh NG đã lưu: ['C00007_d1.00.png', 'C00019_d1.00.png', 'C00033_d1.00.png', 'C00048_d0.93.png']
+Thời gian từng bước, ms (tùy máy):
+  chup     p50   1.41 | p99   2.64
+  suy_luan p50   0.42 | p99   0.85
+  plc      p50   0.76 | p99   2.98
+  luu      p50   6.05 | p99  84.14
+Suy luận lô 64 ô: p50 7.3 ms, p99 8.5 ms (tùy máy)</code></pre>
+<p>PLC nhận đủ 60 kết quả: 4 ô lỗi đều NG với điểm từ 0,93 tới 1,0; chu kỳ 25 (camera không trả ảnh) là LỖI với điểm −1 và không có ảnh để lưu. Các con số thời gian tùy máy; bước suy luận một ô chưa tới 1 ms (p50) ở máy viết bài, còn một nắp thật 64 ô suy luận theo lô cũng chỉ mất cỡ 10 ms, rất xa ngân sách 500 ms. Ở trạm thật, phần tốn thời gian thường là chụp, truyền ảnh và ghi đĩa, không phải mô hình nhỏ.</p>
+</details>
+
+<h2 id="7-kiem-thu-va-nghiem-thu">7. Kiểm thử và nghiệm thu</h2>
+<h3 id="7-1-giam-sat-sau-trien-khai-kich-ban-camera-mat-net">7.1. Giám sát sau triển khai: kịch bản camera mất nét</h3>
+<p>Mô hình đạt mọi tiêu chí hôm nghiệm thu chưa chắc đạt sau ba tháng. Kịch bản thử: vòng chỉnh nét của ống kính bị lỏng do rung, ảnh mờ dần từ sản phẩm 1001 tới 2000. Trạm không có lỗi phần mềm nào, PLC vẫn nhận kết quả đều đặn. Ba bộ giám sát chạy song song:</p>
+<ul>
+  <li><strong>Độ sáng trung bình</strong> ảnh (EWMA, giới hạn 4σ học từ 200 sản phẩm đầu).</li>
+  <li><strong>Độ nét</strong>: log của phương sai Laplacian, cũng theo dõi bằng EWMA. Chỉ tính trên ảnh được chấm OK, vì vết lỗi làm tăng độ "nét" giả (thử nghiệm ban đầu tính trên mọi ảnh đã gây một cảnh báo nhầm ở giai đoạn bình thường).</li>
+  <li><strong>Tỉ lệ NG</strong> trong cửa sổ 300 sản phẩm, so với tỉ lệ bình thường 3%, kiểm <strong>cả hai phía</strong>: NG giảm bất thường cũng đáng ngờ như NG tăng.</li>
+</ul>
+<pre><code class="language-python"># ===== giam_sat.py — giám sát trôi dữ liệu đầu vào (drift) và tỉ lệ NG trong sản xuất =====
+from collections import deque
+
+import cv2
+import numpy as np
+
+
+class EWMA:
+    """Biểu đồ EWMA: học trung bình và độ lệch chuẩn ở giai đoạn tham chiếu, rồi báo khi trôi quá k·σ_EWMA."""
+
+    def __init__(self, so_tham_chieu=200, lam=0.1, k=4.0):
+        self.ref, self.n, self.lam, self.k, self.z = [], so_tham_chieu, lam, k, None
+
+    def cap_nhat(self, x):
+        if len(self.ref) &lt; self.n:
+            self.ref.append(x)
+            if len(self.ref) == self.n:
+                self.mu, sd = np.mean(self.ref), np.std(self.ref, ddof=1)
+                self.gioi_han = self.k * sd * np.sqrt(self.lam / (2 - self.lam))
+                self.z = self.mu
+            return None
+        self.z = self.lam * x + (1 - self.lam) * self.z
+        return abs(self.z - self.mu) &gt; self.gioi_han
+
+
+class GiamSat:
+    def __init__(self, p0=0.03, cua_so=300):
+        self.sang, self.net = EWMA(), EWMA()
+        self.kq, self.p0 = deque(maxlen=cua_so), p0      # p0: tỉ lệ NG bình thường của dây chuyền
+        self.lan_dau = {}
+
+    def cap_nhat(self, i, anh, ng):
+        self.kq.append(ng)
+        if ng:
+            return                         # thống kê đầu vào chỉ lấy trên ảnh OK: vết lỗi làm tăng độ "nét" giả
+        if self.sang.cap_nhat(float(anh.mean())):
+            self.lan_dau.setdefault("độ sáng", i)
+        do_net = float(cv2.Laplacian(anh, cv2.CV_32F).var())   # phương sai Laplacian: thước đo độ nét
+        if self.net.cap_nhat(np.log(do_net)):
+            self.lan_dau.setdefault("độ nét", i)
+        if len(self.kq) == self.kq.maxlen:                     # tỉ lệ NG, kiểm HAI phía
+            p, sai = np.mean(self.kq), 3 * np.sqrt(self.p0 * (1 - self.p0) / len(self.kq))
+            if p &gt; self.p0 + sai or p &lt; self.p0 - sai:
+                self.lan_dau.setdefault("tỉ lệ NG", i)
+
+
+# 2000 sản phẩm lô 10, tỉ lệ lỗi 3%. Từ sản phẩm 1001, ống kính mất nét dần (vòng chỉnh nét bị lỏng do rung):
+# độ mờ tăng tuyến tính tới σ = 1,2 px ở sản phẩm 2000. Trạm vẫn chạy, không báo lỗi gì.
+rng = np.random.default_rng(5)
+p10 = thong_so_lo(10)
+gs = GiamSat()
+that, du_doan, mo = [], [], []
+for i in range(1, 2001):
+    sigma = 0.0 if i &lt;= 1000 else 1.2 * (i - 1000) / 1000
+    loi = ("xuoc" if rng.random() &lt; 0.6 else "dom") if rng.random() &lt; 0.03 else None
+    anh = ve_o(rng, p10, loi)
+    if sigma &gt; 0.05:
+        anh = cv2.GaussianBlur(anh, (0, 0), sigma)
+    ng = bool(bo.diem(anh[None])[0] &gt;= bo.meta["nguong"])
+    gs.cap_nhat(i, anh, ng)
+    that.append(loi is not None), du_doan.append(ng), mo.append(sigma)
+that, du_doan, mo = map(np.array, (that, du_doan, mo))
+
+for ten in ("độ sáng", "độ nét", "tỉ lệ NG"):
+    i = gs.lan_dau.get(ten)
+    print(f"Giám sát {ten:8s}: " + (f"CẢNH BÁO tại sản phẩm {i} (độ mờ σ = {mo[i - 1]:.2f} px)" if i
+                                    else "không cảnh báo"))
+print("sản phẩm   | độ mờ σ (px) | lỗi thật | escape | overkill")
+for a, b in ((1, 1000), (1001, 1400), (1401, 1700), (1701, 2000)):
+    m = slice(a - 1, b)
+    print(f"{a:4d}–{b:&lt;4d} | {mo[m].min():.2f}–{mo[m].max():.2f}    | {that[m].sum():8d} | "
+          f"{(that[m] &amp; ~du_doan[m]).sum():6d} | {(~that[m] &amp; du_doan[m]).sum():8d}")</code></pre>
+<pre><code class="language-text">Giám sát độ sáng : không cảnh báo
+Giám sát độ nét  : CẢNH BÁO tại sản phẩm 1298 (độ mờ σ = 0.36 px)
+Giám sát tỉ lệ NG: không cảnh báo
+sản phẩm   | độ mờ σ (px) | lỗi thật | escape | overkill
+   1–1000 | 0.00–0.00    |       30 |      0 |        1
+1001–1400 | 0.00–0.48    |       13 |      0 |        0
+1401–1700 | 0.48–0.84    |       10 |      3 |        0
+1701–2000 | 0.84–1.20    |       11 |      6 |        0</code></pre>
+<p>Ba bài học từ bảng này:</p>
+<ol>
+  <li><strong>Mô hình hỏng một cách im lặng.</strong> Khi ảnh mờ, vết xước mảnh nhòe vào vân, điểm NG giảm, và trạm bắt đầu <em>cho qua</em> lỗi (escape tăng) chứ không loại nhầm. Không có exception, không có overkill để công nhân phàn nàn.</li>
+  <li><strong>Giám sát đầu ra đến quá muộn.</strong> Escape làm tỉ lệ NG giảm, nhưng với 3% lỗi và cửa sổ 300 sản phẩm, giới hạn dưới gần bằng 0: phải gần như không còn NG nào thì mới báo. Bộ giám sát tỉ lệ NG không báo gì trong cả 2000 sản phẩm.</li>
+  <li><strong>Giám sát đầu vào đến sớm.</strong> Độ nét báo ở độ mờ khoảng 0,36 px, trước escape đầu tiên. Độ sáng không đổi khi mất nét nên bộ giám sát độ sáng im lặng: mỗi loại trôi cần một thước đo riêng (độ sáng cho đèn yếu, độ nét cho lấy nét và kính bẩn, phân bố điểm cho thay đổi vật liệu).</li>
+</ol>
+<div class="tip"><strong>Mẫu kiểm tra định kỳ (golden sample)</strong>Bổ sung cho giám sát thống kê: đầu mỗi ca, cho 3–5 mẫu NG chuẩn và vài mẫu OK chuẩn chạy qua trạm; PLC chỉ cho chạy sản xuất khi trạm phân loại đúng hết. Đây là thực hành phổ biến trong nhà máy, rẻ và rất hiệu quả.</div>
+
+<h3 id="7-2-bien-ban-nghiem-thu">7.2. Biên bản nghiệm thu</h3>
+<pre><code class="language-python"># ===== bao_cao.py — bảng nghiệm thu trạm AI =====
+from pathlib import Path
+
+import numpy as np
+
+e_test, o_test = escape_overkill(s_test, y_test, NGUONG)
+lech_onnx = float(np.abs(diem_onnx - diem_torch).max())
+lat_onnx = int(((diem_onnx &gt;= NGUONG) != (diem_torch &gt;= NGUONG)).sum())
+p99_lo = float(np.percentile(t_lo, 99))
+dem_plc = {v: sum(1 for _, kq, _ in nhan if kq == k) for k, v in ((KQ_OK, "OK"), (KQ_NG, "NG"), (KQ_LOI, "LOI"))}
+escape_dau = int(np.argmax(that &amp; ~du_doan)) + 1 if (that &amp; ~du_doan).any() else None
+canh_bao_net = gs.lan_dau.get("độ nét")
+roi_nhau = len(set(TAP["train"]) | set(TAP["val"]) | set(TAP["test"])) == sum(len(v) for v in TAP.values())
+hang = [
+    ("R1", "Train/val/test không chung lô", "rời nhau", "rời nhau" if roi_nhau else "TRÙNG", roi_nhau),
+    ("R2", "Escape trên test (lô 9, 10)", "0", f"{int(round(e_test * so_ng))}/{so_ng}", e_test == 0),
+    ("R3", "Overkill trên test", "≤ 2 %", f"{o_test:.1%}", o_test &lt;= OVERKILL_TOI_DA),
+    ("R4", "ONNX = PyTorch (điểm / quyết định)", "≤ 1e-4 / 0", f"{lech_onnx:.0e} / {lat_onnx}",
+     lech_onnx &lt;= 1e-4 and lat_onnx == 0),
+    ("R5", "Suy luận lô 64 ô, p99 (*)", "≤ 50 ms", f"{p99_lo:.1f} ms", p99_lo &lt;= 50),
+    ("R6", "PLC nhận đúng kịch bản", "55/4/1", f"{dem_plc['OK']}/{dem_plc['NG']}/{dem_plc['LOI']}",
+     (dem_plc["OK"], dem_plc["NG"], dem_plc["LOI"]) == (55, 4, 1)),
+    ("R7", "Ảnh NG được lưu", "4", str(len(list(Path("anh_ng").rglob("*.png")))),
+     len(list(Path("anh_ng").rglob("*.png"))) == 4),
+    ("R8", "Cảnh báo drift trước escape đầu tiên", "có", f"SP {canh_bao_net} &lt; SP {escape_dau}",
+     canh_bao_net is not None and (escape_dau is None or canh_bao_net &lt; escape_dau)),
+    ("R9", "Metadata mô hình (phiên bản, ngưỡng)", "có", f"v{bo.meta['phien_ban']}, {bo.meta['nguong']}",
+     bo.meta["nguong"] == NGUONG),
+]
+for ma, muc, yc, kq, dat in hang:
+    print(f"{ma} {muc:37s} {yc:12s} {kq:18s} {'ĐẠT' if dat else 'KHÔNG ĐẠT'}")
+print(f"Kết luận: {'ĐẠT' if all(h[-1] for h in hang) else 'KHÔNG ĐẠT'} ({sum(h[-1] for h in hang)}/{len(hang)}),"
+      " (*) tùy máy")</code></pre>
+<pre><code class="language-text">R1 Train/val/test không chung lô         rời nhau     rời nhau           ĐẠT
+R2 Escape trên test (lô 9, 10)           0            0/89               ĐẠT
+R3 Overkill trên test                    ≤ 2 %        0.0%               ĐẠT
+R4 ONNX = PyTorch (điểm / quyết định)    ≤ 1e-4 / 0   4e-07 / 0          ĐẠT
+R5 Suy luận lô 64 ô, p99 (*)             ≤ 50 ms      8.5 ms             ĐẠT
+R6 PLC nhận đúng kịch bản                55/4/1       55/4/1             ĐẠT
+R7 Ảnh NG được lưu                       4            4                  ĐẠT
+R8 Cảnh báo drift trước escape đầu tiên  có           SP 1298 &lt; SP 1481  ĐẠT
+R9 Metadata mô hình (phiên bản, ngưỡng)  có           v3, 0.15           ĐẠT
+Kết luận: ĐẠT (9/9), (*) tùy máy</code></pre>
+<p>R5 tùy máy (đo trên CPU, 1 luồng). Như hai dự án trước, biên bản được sinh lại mỗi lần huấn luyện mô hình mới; một mô hình chỉ được đưa xuống trạm khi biên bản của nó đạt hết.</p>
+
+<h3 id="7-3-loi-thuong-gap">7.3. Lỗi thường gặp</h3>
+<table>
+  <tr><th>Triệu chứng</th><th>Nguyên nhân</th><th>Cách sửa</th></tr>
+  <tr><td>Đánh giá rất đẹp, xuống dây chuyền overkill cao</td><td>Chia ngẫu nhiên, cùng lô ở cả train và test; hoặc chỉnh ngưỡng theo test</td><td>Chia theo lô/ngày; chọn ngưỡng trên val; test chỉ dùng một lần</td></tr>
+  <tr><td>ONNX cho kết quả khác PyTorch</td><td>Tiền xử lý ở trạm khác lúc huấn luyện (chia 255, đổi kênh, resize khác), quên <code>eval()</code></td><td>Ghi tiền xử lý vào metadata, một hàm dùng chung, kiểm tra sai số trên dữ liệu thật</td></tr>
+  <tr><td>Chu kỳ đầu tiên sau khởi động bị timeout</td><td>Lần suy luận đầu khởi tạo bộ nhớ, tối ưu đồ thị</td><td>Chạy mồi khi khởi động, trước khi bật READY</td></tr>
+  <tr><td>Camera lỗi mà trạm báo OK</td><td>Ảnh rỗng hoặc ảnh cũ vẫn được đưa vào mô hình</td><td>Không có ảnh mới → LỖI, không bao giờ OK</td></tr>
+  <tr><td>Escape tăng dần mà không ai biết</td><td>Chỉ giám sát tỉ lệ NG một phía hoặc không giám sát</td><td>Giám sát đầu vào (sáng, nét), tỉ lệ NG hai phía, mẫu chuẩn mỗi ca</td></tr>
+  <tr><td>Không biết sản phẩm cũ được kiểm bằng mô hình nào</td><td>Không quản lý phiên bản</td><td>Phiên bản trong metadata, gửi PLC, lưu trong mỗi bản ghi</td></tr>
+</table>
+
+<h2 id="8-san-pham-ban-giao-cho-portfolio">8. Sản phẩm bàn giao cho portfolio</h2>
+<ul>
+  <li><strong>README</strong>: bài toán ("Kiểm tra xước/đốm trên nắp nhôm xước sợi, 30 nắp/phút, escape 0 trên lô mới"), sơ đồ hai thế giới huấn luyện/trạm, bảng nghiệm thu R1–R9, cách chạy từ đầu.</li>
+  <li><strong>Model card</strong> (<code>MODEL_CARD.md</code>): dữ liệu từ lô nào, cách chia, kiến trúc, tiền xử lý, ngưỡng và quy tắc chọn ngưỡng, kết quả val/test, <strong>giới hạn đã biết</strong> (vết xước song song vân khó thấy, chưa thử trên lô có màu khác), điều kiện phải huấn luyện lại.</li>
+  <li><strong>Hình</strong>: lưới ảnh các ô NG có điểm cao nhất và các ô OK có điểm cao nhất (gần ngưỡng); biểu đồ phân bố điểm val với vạch ngưỡng; biểu đồ EWMA độ nét có đường giới hạn và điểm báo động.</li>
+  <li><strong>Video 3 phút</strong>: chạy trạm với PLC giả, mở thư mục ảnh NG; chạy kịch bản mất nét, chỉ vào thời điểm cảnh báo và bảng escape.</li>
+  <li><strong>Phỏng vấn</strong>: nhà tuyển dụng nghe "mô hình đạt 99%" rất nhiều lần. Hãy nói "ngưỡng mặc định 0,5 lọt 2,2% lỗi nên tôi chọn lại ngưỡng theo escape, chấp nhận 1,9% overkill, và tôi phát hiện được camera mất nét trước khi trạm lọt lỗi". Đó là ngôn ngữ của người đã làm trạm thật.</li>
+</ul>
+
+<h2 id="9-tu-danh-gia">9. Tự đánh giá</h2>
+<table>
+  <tr><th>Tiêu chí</th><th>Chưa đạt</th><th>Đạt</th><th>Tốt</th></tr>
+  <tr><td>Dữ liệu</td><td>Chia ngẫu nhiên</td><td>Chia theo lô, test là lô mới nhất</td><td>Thống kê theo lô, loại lỗi; có kế hoạch thu thập thêm mẫu NG</td></tr>
+  <tr><td>Ngưỡng</td><td>Dùng 0,5</td><td>Chọn trên val theo escape và ngân sách overkill</td><td>Quy tắc viết trước, có biên an toàn, giải thích bằng giới hạn thống kê</td></tr>
+  <tr><td>Triển khai</td><td>Trạm chạy PyTorch từ notebook</td><td>ONNX + metadata, kiểm tra sai số, chạy mồi</td><td>Đo p50/p99 từng bước, quản lý phiên bản, chạy như dịch vụ 24/7</td></tr>
+  <tr><td>Tích hợp</td><td>In kết quả ra màn hình</td><td>PLC đúng bắt tay, LỖI khi không có ảnh, ảnh NG</td><td>Tự kết nối lại, ghi nền, log xoay vòng (như dự án trạm vision mô phỏng)</td></tr>
+  <tr><td>Giám sát</td><td>Không có</td><td>Tỉ lệ NG theo cửa sổ</td><td>Giám sát đầu vào + tỉ lệ NG hai phía + mẫu chuẩn mỗi ca, đã thử bằng kịch bản drift</td></tr>
+  <tr><td>Tài liệu</td><td>Không README</td><td>README + biên bản</td><td>Model card, video, nêu rõ giới hạn</td></tr>
+</table>
+
+<h2 id="10-mo-rong">10. Mở rộng</h2>
+<ul>
+  <li><strong>Anomaly detection</strong>: khi gần như không có ảnh lỗi, thay bộ phân loại bằng mô hình học từ ảnh OK (PatchCore, như dự án anomaly detection của chặng 12); giữ nguyên quy trình ngưỡng trên val, ONNX, PLC, giám sát.</li>
+  <li><strong>Backbone đã huấn luyện sẵn</strong>: trên máy bạn (có mạng), thay <code>MangNho</code> bằng <code>resnet18(weights=ResNet18_Weights.DEFAULT)</code> với ảnh 3 kênh như bài transfer learning, so sánh escape/overkill và thời gian.</li>
+  <li><strong>Bản đồ vị trí lỗi</strong>: trả về ô có điểm cao nhất và vẽ khung lên ảnh nắp cho HMI; hoặc chuyển sang segmentation để đo kích thước vết lỗi.</li>
+  <li><strong>Tăng tốc</strong>: thử OpenVINO hoặc lượng tử hóa INT8, kiểm tra lại sai số và R2–R4 trước khi dùng.</li>
+  <li><strong>Vòng đời mô hình</strong>: thư mục ảnh NG và ảnh gần ngưỡng là dữ liệu cho lần huấn luyện sau; viết quy trình duyệt nhãn, huấn luyện lại, sinh biên bản, đổi phiên bản.</li>
+</ul>
+<div class="ex"><p><strong>Bài 1.</strong> Mỗi nắp có 64 ô. Overkill theo ô là 0,1%, các ô độc lập. Overkill theo nắp là bao nhiêu? Muốn overkill theo nắp ≤ 1% thì overkill theo ô phải nhỏ hơn bao nhiêu?</p><details><summary>Xem đáp án</summary><p>P(nắp OK bị loại) = 1 − (1 − 0,001)<sup>64</sup> ≈ 6,2%. Muốn ≤ 1%: 1 − (1 − p)<sup>64</sup> ≤ 0,01 → p ≤ 1 − 0,99<sup>1/64</sup> ≈ 0,016% theo ô. Đây là lý do tiêu chí phải viết theo <strong>sản phẩm</strong>, và đánh giá phải tính lại từ ô sang sản phẩm.</p></details></div>
+<div class="ex"><p><strong>Bài 2.</strong> Khách hàng yêu cầu chứng minh escape dưới 1% với độ tin cậy khoảng 95%. Theo quy tắc 3/n, cần bao nhiêu mẫu NG (độc lập) chạy qua trạm mà không lọt cái nào?</p><details><summary>Xem đáp án</summary><p>3/n ≤ 0,01 → n ≥ 300 mẫu NG không lọt mẫu nào. Tập test của bài chỉ có 89 ô NG, nên chỉ chứng minh được dưới khoảng 3,4%. Cần thu thập thêm mẫu NG thật (hoặc nhiều lần chạy của các mẫu khác nhau, cẩn thận với giả định độc lập).</p></details></div>
+<div class="ex"><p><strong>Bài 3.</strong> Sau khi nhà cung cấp nhôm đổi, ảnh lô mới sáng hơn 15% và vân thô hơn. Bộ giám sát độ sáng báo ngay. Bạn làm gì, theo thứ tự?</p><details><summary>Xem đáp án</summary><p>(1) Không tắt cảnh báo; chạy mẫu chuẩn OK/NG của ca để biết trạm còn phân loại đúng không. (2) Lấy mẫu vài trăm sản phẩm lô mới, QC gán nhãn, đánh giá escape/overkill của mô hình hiện tại trên đó. (3) Nếu không đạt: thêm dữ liệu lô mới vào train (giữ một phần làm test), huấn luyện lại, chọn ngưỡng, sinh biên bản, tăng phiên bản. (4) Cập nhật giai đoạn tham chiếu của bộ giám sát cho vật liệu mới. Trong lúc chờ, tăng tần suất kiểm tra thủ công lô đó.</p></details></div>
+
+<h2 id="tom-tat">Tóm tắt</h2>
+<ul>
+  <li>Chia dữ liệu theo lô; chọn ngưỡng trên val bằng quy tắc viết trước (escape trước, overkill trong ngân sách); test chỉ dùng một lần.</li>
+  <li>Ngưỡng 0,5 và "độ chính xác" không phải tiêu chí nhà máy: hãy báo escape, overkill và giới hạn thống kê của chúng.</li>
+  <li>Triển khai bằng ONNX + metadata (phiên bản, ngưỡng, tiền xử lý), kiểm tra sai số và khoảng cách tới ngưỡng, chạy mồi, đo p50/p99 từng bước.</li>
+  <li>Tích hợp như mọi trạm: ghi kết quả trước DONE, không có ảnh thì LỖI, lưu ảnh NG có điểm và phiên bản.</li>
+  <li>Mô hình hỏng im lặng: giám sát đầu vào (độ sáng, độ nét) phát hiện drift sớm hơn tỉ lệ NG; kiểm hai phía và dùng mẫu chuẩn mỗi ca.</li>
+  <li>Ba capstone cùng một khung: đặc tả bằng con số, lõi kỹ thuật có đáp án, tích hợp PLC, biên bản tự sinh.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Viết tài liệu cho dự án Vision: README, đặc tả, hướng dẫn vận hành</strong>, nơi bạn biến ba dự án này thành tài liệu mà khách hàng và đồng nghiệp đọc được.</p>
+
+      </div>
+      <div class="lesson-done" data-course="vision-engineer"><button type="button" class="lesson-done-btn" data-lesson-done="capstone-3-kiem-tra-loi-be-mat-ai-plc" aria-pressed="false"><span class="box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></span><span class="off">Đánh dấu đã học xong</span><span class="on">Đã học xong bài này</span></button><a class="btn lg" href="../tai-nguyen/viet-tai-lieu-ky-thuat-du-an-vision.html">Bài tiếp theo<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a></div>
+      <footer class="article-foot">
+        <div class="tags"><a class="tag" href="../search.html?q=AI Vision">#AI Vision</a><a class="tag" href="../search.html?q=PLC">#PLC</a><a class="tag" href="../search.html?q=Industrial Vision">#Industrial Vision</a></div>
+        <div class="share">
+      <span>Chia sẻ:</span>
+      <a class="share-btn fb" href="https://www.facebook.com/sharer/sharer.php?u=https://hocfree.vn/hoc/capstone-3-kiem-tra-loi-be-mat-ai-plc.html" target="_blank" rel="noopener" aria-label="Chia sẻ Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8z"/></svg></a>
+      <a class="share-btn x" href="https://twitter.com/intent/tweet?url=https://hocfree.vn/hoc/capstone-3-kiem-tra-loi-be-mat-ai-plc.html" target="_blank" rel="noopener" aria-label="Chia sẻ X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+      <button class="share-btn copy-link" data-url="https://hocfree.vn/hoc/capstone-3-kiem-tra-loi-be-mat-ai-plc.html" aria-label="Sao chép liên kết"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+    </div>
+      </footer>
+      <div class="author-box">
+        <span class="avatar lg" aria-hidden="true">HF</span>
+        <div>
+          <strong>Ban biên tập HọcFree</strong>
+          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và ngoại ngữ, hoàn toàn miễn phí.</p>
+        </div>
+      </div>
+      <nav class="pager lesson-pager" aria-label="Bài học trước/sau"><a class="prev" href="../hoc/capstone-2-tram-doc-ma-va-ocr.html"><span>← Bài trước · Bài 2</span>Capstone 2: trạm đọc DataMatrix và số seri</a><a class="next" href="../tai-nguyen/viet-tai-lieu-ky-thuat-du-an-vision.html"><span>Bài tiếp → · Bài 4</span>Viết tài liệu dự án Vision</a></nav>
+    </article>
+    <aside class="sidebar course-side" data-course="vision-engineer">
+      <section class="widget course-toc">
+        <p class="widget-title">Chặng 14/14 · Vision Engineer</p>
+        <a class="course-toc-title" href="../lo-trinh/vision-engineer/real-world-projects.html">Real-world Projects</a>
+        <div class="lc" data-lesson-count="capstone-1-tram-do-kich-thuoc capstone-2-tram-doc-ma-va-ocr capstone-3-kiem-tra-loi-be-mat-ai-plc viet-tai-lieu-ky-thuat-du-an-vision xay-portfolio-du-an-ai-vision"><div class="lc-bar"><span data-lc-bar></span></div><span data-lc-text>0/5 bài</span></div>
+        <ol class="toc-lessons"><li data-lesson="capstone-1-tram-do-kich-thuoc"><a href="../hoc/capstone-1-tram-do-kich-thuoc.html"><span class="tn">1</span><span class="tt">Capstone 1: trạm đo kích thước hoàn chỉnh</span></a></li><li data-lesson="capstone-2-tram-doc-ma-va-ocr"><a href="../hoc/capstone-2-tram-doc-ma-va-ocr.html"><span class="tn">2</span><span class="tt">Capstone 2: trạm đọc DataMatrix và số seri</span></a></li><li data-lesson="capstone-3-kiem-tra-loi-be-mat-ai-plc" class="is-current"><a href="../hoc/capstone-3-kiem-tra-loi-be-mat-ai-plc.html" aria-current="page"><span class="tn">3</span><span class="tt">Capstone 3: kiểm tra lỗi bề mặt bằng AI, trả kết quả PLC</span></a></li><li data-lesson="viet-tai-lieu-ky-thuat-du-an-vision"><a href="../tai-nguyen/viet-tai-lieu-ky-thuat-du-an-vision.html"><span class="tn">4</span><span class="tt">Viết tài liệu dự án Vision</span></a></li><li data-lesson="xay-portfolio-du-an-ai-vision"><a href="../kien-thuc/xay-portfolio-du-an-ai-vision.html"><span class="tn">5</span><span class="tt">Xây portfolio để ứng tuyển Vision Engineer</span></a></li></ol>
+        <a class="more" href="../lo-trinh/vision-engineer.html">Xem toàn bộ lộ trình<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a>
+      </section>
+    </aside>
+  </div>
+  <section class="band">
+    <div class="container">
+      <div class="section-title"><h2>Có thể bạn quan tâm</h2></div>
+      <div class="card-grid"><article class="card">
+  <a class="thumb" href="../hoc/pytest-kiem-thu-ham-xu-ly-anh.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/pytest-kiem-thu-ham-xu-ly-anh.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/pytest-kiem-thu-ham-xu-ly-anh.html">Kiểm thử hàm xử lý ảnh với pytest: bắt lỗi trước khi lên máy</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-10">10/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/csharp-system-text-json-luu-recipe.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/csharp-system-text-json-luu-recipe.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/csharp-system-text-json-luu-recipe.html">C#: lưu và nạp recipe trạm vision bằng System.Text.Json</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-10">10/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/cross-validation-pipeline-gridsearchcv.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/cross-validation-pipeline-gridsearchcv.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/cross-validation-pipeline-gridsearchcv.html">Cross-validation, Pipeline, GridSearchCV: đánh giá mô hình trung thực</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-10">10/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article></div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <a class="logo" href="../"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+      <p>HọcFree.vn – nền tảng học miễn phí về AI, lập trình, Computer Vision, Machine Vision, tin tức AI và ngoại ngữ dành cho người Việt.</p>
+    </div>
+    <div><h3>Học &amp; thực hành</h3><ul><li><a href="../hoc/">Học AI &amp; Lập trình</a></li><li><a href="../projects/">Projects</a></li><li><a href="../lo-trinh/">Learning Paths</a></li></ul></div>
+    <div><h3>Khám phá</h3><ul><li><a href="../kien-thuc/">Kiến thức</a></li><li><a href="../tin-tuc-ai/">Tin tức AI</a></li><li><a href="../ngoai-ngu/">Ngoại ngữ</a></li><li><a href="../tai-nguyen/">Tài nguyên</a></li></ul></div>
+    <div><h3>Bài mới</h3><ul><li><a href="../hoc/pytest-kiem-thu-ham-xu-ly-anh.html">Kiểm thử hàm xử lý ảnh với pytest: bắt lỗi trước khi lên máy</a></li><li><a href="../hoc/csharp-system-text-json-luu-recipe.html">C#: lưu và nạp recipe trạm vision bằng System.Text.Json</a></li><li><a href="../hoc/cross-validation-pipeline-gridsearchcv.html">Cross-validation, Pipeline, GridSearchCV: đánh giá mô hình trung thực</a></li><li><a href="../hoc/ham-mat-mat-cross-entropy-focal-loss.html">Hàm mất mát cho phân loại: cross-entropy, class weight, focal loss</a></li></ul></div>
+    <div>
+      <h3>HọcFree</h3>
+      <ul>
+        <li><a href="../gioi-thieu.html">Giới thiệu</a></li>
+        <li><a href="../search.html">Tìm kiếm</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">© 2026 HọcFree.vn · Kiến thức là để chia sẻ.</div>
+  </div>
+</footer>
+<button class="to-top" aria-label="Lên đầu trang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<script src="../assets/js/search-data.js?v=20261009" defer></script>
+<script src="../assets/js/main.js?v=20261009" defer></script>
+</body>
+</html>

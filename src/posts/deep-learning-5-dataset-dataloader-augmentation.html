@@ -1,0 +1,490 @@
+<p>Ở bài "PyTorch cơ bản: tensor, autograd và vòng lặp huấn luyện", dữ liệu là tensor ngẫu nhiên tạo sẵn trong bộ nhớ. Dữ liệu thật của bạn là <strong>hàng nghìn file ảnh trong thư mục</strong>, đọc bằng OpenCV ra mảng <code>uint8</code> dạng BGR, thứ tự trục <code>(H, W, C)</code>, trong khi mạng cần tensor <code>float32</code>, RGB, chuẩn hóa, <code>(N, C, H, W)</code>. Bài này xây đường ống nạp dữ liệu đó: lớp <strong>Dataset</strong> đọc một ảnh, <strong>DataLoader</strong> gom ảnh thành batch, <strong>sampler</strong> xử lý mất cân bằng OK/NG, và <strong>augmentation</strong> tạo biến thể ảnh để chống học thuộc, kèm phần quan trọng nhất cho kỹ sư nhà máy: augmentation nào an toàn và augmentation nào âm thầm làm <em>sai nhãn</em> dữ liệu công nghiệp. Bài sau, "Overfitting và cách chia train/validation/test đúng", dùng đường ống này để chia tập không rò rỉ.</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Viết được lớp Dataset đọc ảnh từ thư mục bằng OpenCV, chuyển đúng BGR→RGB, uint8→float, chuẩn hóa, HWC→CHW; so sánh với <code>ImageFolder</code>; dùng DataLoader với batch, shuffle, drop_last, num_workers đúng cách trên Windows; cân bằng lớp bằng <code>WeightedRandomSampler</code>; chọn augmentation an toàn cho ảnh công nghiệp và kiểm tra batch bằng mắt. Các ví dụ dùng PyTorch 2.14 và torchvision 0.29 (<code>torchvision.transforms.v2</code>).</div>
+
+<h2>1. Tạo bộ dữ liệu mẫu OK/NG</h2>
+<p>Để mọi đoạn code chạy được ngay, ta tự sinh một bộ ảnh nhỏ: tấm nhôm chải xước (vân ngang), kích thước 64×64, có một chấm định hướng ở góc trái trên (như dấu chuẩn trên chi tiết thật). Ảnh NG có thêm vết xước tối hoặc vết lõm. Cố ý để <strong>mất cân bằng</strong>: 40 OK, 10 NG ở tập train, đúng tình trạng thường gặp ở nhà máy. Cấu trúc thư mục giống hệt bạn sẽ dùng cho dữ liệu thật:</p>
+<pre><code class="language-text">dataset/
+  train/OK/*.png   train/NG/*.png
+  val/OK/*.png     val/NG/*.png</code></pre>
+<pre><code class="language-python">from pathlib import Path
+
+import cv2
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+
+def tam_nhom(rng):
+    """Tấm nhôm chải xước 64×64, màu bạc hơi xanh, có chấm định hướng ở góc trái trên."""
+    van = rng.normal(0, 6, (64, 1)) + rng.normal(0, 2, (64, 64))     # vân ngang + nhiễu
+    xam = np.clip(150 + van + rng.normal(0, 4), 0, 255)              # mỗi tấm sáng khác nhau chút ít
+    anh = np.stack([xam + 8, xam + 2, xam - 4], axis=-1)             # B, G, R: bạc hơi xanh
+    anh = np.clip(anh, 0, 255).astype(np.uint8)
+    cv2.circle(anh, (7, 7), 3, (230, 230, 230), -1)                  # chấm định hướng
+    return anh
+
+
+def them_loi(anh, rng):
+    anh = anh.copy()
+    if rng.random() &lt; 0.6:                                           # vết xước tối
+        x1, y1 = rng.integers(10, 54, 2)
+        goc = rng.uniform(0, np.pi)
+        dai = rng.integers(10, 25)
+        x2, y2 = int(x1 + dai * np.cos(goc)), int(y1 + dai * np.sin(goc))
+        cv2.line(anh, (int(x1), int(y1)), (x2, y2), (70, 70, 70), 1, cv2.LINE_AA)
+    else:                                                            # vết lõm: đốm tối mờ
+        c = tuple(int(v) for v in rng.integers(12, 52, 2))
+        cv2.circle(anh, c, int(rng.integers(3, 6)), (95, 95, 95), -1, cv2.LINE_AA)
+        anh = cv2.GaussianBlur(anh, (3, 3), 0)
+    return anh
+
+
+so_luong = {"train": {"OK": 40, "NG": 10}, "val": {"OK": 10, "NG": 4}}
+for tap, lop_sl in so_luong.items():
+    for lop, n in lop_sl.items():
+        thu_muc = Path("dataset", tap, lop)
+        thu_muc.mkdir(parents=True, exist_ok=True)
+        for i in range(n):
+            anh = tam_nhom(rng)
+            if lop == "NG":
+                anh = them_loi(anh, rng)
+            cv2.imwrite(str(thu_muc / f"{lop.lower()}_{i:03d}.png"), anh)
+
+for p in sorted(Path("dataset").glob("*/*")):
+    print(p, len(list(p.glob("*.png"))), "ảnh")</code></pre>
+<pre><code class="language-text">dataset/train/NG 10 ảnh
+dataset/train/OK 40 ảnh
+dataset/val/NG 4 ảnh
+dataset/val/OK 10 ảnh</code></pre>
+
+<h2>2. Từ file ảnh đến tensor: bốn bước chuyển đổi</h2>
+<p>Trước khi viết lớp Dataset, làm từng bước bằng tay với một ảnh để thấy mỗi bước đổi cái gì:</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+import torch
+
+bgr = cv2.imread("dataset/train/OK/ok_000.png", cv2.IMREAD_COLOR)
+print("1. cv2.imread   :", bgr.shape, bgr.dtype, "pixel (0,20) BGR =", bgr[0, 20])
+rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+print("2. BGR → RGB    :", rgb.shape, "pixel (0,20) RGB =", rgb[0, 20])
+f = rgb.astype(np.float32) / 255.0
+print("3. uint8 → float:", f.dtype, f"khoảng [{f.min():.3f}, {f.max():.3f}]")
+chw = np.transpose(f, (2, 0, 1))                       # (H, W, C) → (C, H, W)
+x = torch.from_numpy(np.ascontiguousarray(chw))
+print("4. HWC → CHW    :", tuple(x.shape), x.dtype)
+mean = torch.tensor([0.5, 0.5, 0.5]).view(3, 1, 1)
+std = torch.tensor([0.25, 0.25, 0.25]).view(3, 1, 1)
+xn = (x - mean) / std
+print("5. chuẩn hóa    :", f"trung bình {xn.mean():.3f}, độ lệch chuẩn {xn.std():.3f}")
+print("thêm trục batch :", tuple(xn.unsqueeze(0).shape))</code></pre>
+<pre><code class="language-text">1. cv2.imread   : (64, 64, 3) uint8 pixel (0,20) BGR = [150 144 138]
+2. BGR → RGB    : (64, 64, 3) pixel (0,20) RGB = [138 144 150]
+3. uint8 → float: float32 khoảng [0.482, 0.902]
+4. HWC → CHW    : (3, 64, 64) torch.float32
+5. chuẩn hóa    : trung bình 0.309, độ lệch chuẩn 0.162
+thêm trục batch : (1, 3, 64, 64)</code></pre>
+<table>
+  <tr><th>Bước</th><th>Vì sao</th><th>Hậu quả nếu quên</th></tr>
+  <tr><td>BGR → RGB</td><td>OpenCV đọc theo thứ tự BGR; mô hình pretrained (ImageNet) và <code>ImageFolder</code> dùng RGB</td><td>Mô hình vẫn chạy nhưng kênh đỏ và xanh bị tráo. Tệ nhất: huấn luyện bằng PIL (RGB) rồi triển khai bằng OpenCV (BGR), độ chính xác giảm mà không báo lỗi</td></tr>
+  <tr><td>uint8 → float, chia 255</td><td>Phép tính trong mạng là số thực; giá trị nhỏ giúp huấn luyện ổn định</td><td>Phép tính trên uint8 bị tràn số; quên chia 255 khiến đầu vào lớn gấp 255 lần so với lúc huấn luyện</td></tr>
+  <tr><td>Chuẩn hóa mean/std</td><td>Đưa dữ liệu về quanh 0. Mô hình pretrained bắt buộc dùng đúng mean/std ImageNet <code>[0.485, 0.456, 0.406]</code>, <code>[0.229, 0.224, 0.225]</code></td><td>Huấn luyện chậm hơn; với mô hình pretrained thì kém chính xác rõ rệt</td></tr>
+  <tr><td>HWC → CHW</td><td>Conv2d của PyTorch nhận <code>(N, C, H, W)</code></td><td>Lỗi số kênh, hoặc chạy được với ảnh sai hoàn toàn nếu kích thước tình cờ khớp</td></tr>
+</table>
+<div class="warn"><strong>Tiền xử lý là một phần của mô hình</strong>Bốn bước này phải giống <strong>hệt</strong> nhau khi huấn luyện và khi chạy trên trạm (Python, C#, C++). Ghi chúng vào tài liệu mô hình: thứ tự kênh, kích thước resize, phương pháp nội suy, mean/std. Đa số lỗi "mô hình tốt ở máy dev, kém trên dây chuyền" nằm ở đây.</div>
+
+<h2>3. Lớp Dataset đọc ảnh từ thư mục</h2>
+<p>Một <code>Dataset</code> trong PyTorch chỉ cần hai phương thức: <code>__len__</code> trả về số mẫu, <code>__getitem__(i)</code> trả về mẫu thứ <code>i</code> dưới dạng <code>(ảnh, nhãn)</code>. Dataset <strong>không</strong> đọc hết ảnh vào bộ nhớ lúc khởi tạo; nó chỉ lưu danh sách đường dẫn và đọc từng ảnh khi được yêu cầu, nhờ vậy dùng được với hàng trăm nghìn ảnh.</p>
+<pre><code class="language-python">from pathlib import Path
+
+import cv2
+import torch
+from torch.utils.data import Dataset
+
+
+class ThuMucAnh(Dataset):
+    """Đọc ảnh từ root/&lt;tên lớp&gt;/*.png. Thứ tự lớp do ta chỉ định: OK = 0, NG = 1."""
+
+    def __init__(self, root, lop=("OK", "NG"), transform=None,
+                 mean=(0.5, 0.5, 0.5), std=(0.25, 0.25, 0.25)):
+        self.lop = list(lop)
+        self.transform = transform                    # augmentation trên ảnh uint8 (C, H, W)
+        self.mean = torch.tensor(mean).view(3, 1, 1)
+        self.std = torch.tensor(std).view(3, 1, 1)
+        self.mau = []                                 # danh sách (đường dẫn, nhãn)
+        for nhan, ten in enumerate(self.lop):
+            duong_dan = sorted(Path(root, ten).glob("*.png"))
+            if not duong_dan:
+                raise FileNotFoundError(f"Không có ảnh nào trong {Path(root, ten)}")
+            self.mau += [(p, nhan) for p in duong_dan]
+
+    def __len__(self):
+        return len(self.mau)
+
+    def __getitem__(self, i):
+        p, nhan = self.mau[i]
+        bgr = cv2.imread(str(p), cv2.IMREAD_COLOR)
+        if bgr is None:                               # file hỏng: báo rõ tên file
+            raise IOError(f"Không đọc được ảnh {p}")
+        rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+        x = torch.from_numpy(rgb).permute(2, 0, 1).contiguous()   # uint8 (C, H, W)
+        if self.transform is not None:
+            x = self.transform(x)
+        x = x.float() / 255.0
+        x = (x - self.mean) / self.std
+        return x, nhan
+
+
+ds = ThuMucAnh("dataset/train")
+x, y = ds[0]
+print("số mẫu:", len(ds), "| lớp:", ds.lop)
+print("mẫu 0:", tuple(x.shape), x.dtype, "nhãn", y, "| file", ds.mau[0][0].name)
+print("mẫu cuối: nhãn", ds[len(ds) - 1][1], "| file", ds.mau[-1][0].name)
+dem = torch.bincount(torch.tensor([n for _, n in ds.mau]))
+print("số ảnh mỗi lớp:", dict(zip(ds.lop, dem.tolist())))</code></pre>
+<pre><code class="language-text">số mẫu: 50 | lớp: ['OK', 'NG']
+mẫu 0: (3, 64, 64) torch.float32 nhãn 0 | file ok_000.png
+mẫu cuối: nhãn 1 | file ng_009.png
+số ảnh mỗi lớp: {'OK': 40, 'NG': 10}</code></pre>
+<p>Vài quyết định thiết kế đáng chú ý:</p>
+<ul>
+  <li><strong>Thứ tự lớp được viết rõ</strong> (<code>OK = 0, NG = 1</code>) thay vì để chương trình tự sắp theo tên. Khi tính "xác suất NG" ở trạm, bạn biết chắc đó là cột 1.</li>
+  <li><strong>Kiểm tra lỗi sớm</strong>: thư mục rỗng hoặc file hỏng báo ngay kèm tên file, thay vì lỗi khó hiểu ở giữa epoch thứ 7.</li>
+  <li><strong>Augmentation áp lên ảnh uint8</strong> trước khi chuẩn hóa: các phép đổi độ sáng, tương phản hoạt động trên khoảng 0–255 tự nhiên.</li>
+  <li>Mean/std ở đây là giá trị đơn giản cho ví dụ. Với mạng tự huấn luyện, tính mean/std <strong>chỉ trên tập train</strong>; với mạng pretrained, dùng mean/std ImageNet.</li>
+</ul>
+
+<div class="tip"><strong>Dùng lại lớp ThuMucAnh ở các mục sau</strong>Các đoạn code từ đây trở đi dùng lớp <code>ThuMucAnh</code> vừa viết. Chạy chúng trong cùng một notebook (Jupyter, VS Code Interactive), hoặc lưu lớp này vào file <code>du_lieu.py</code> cạnh script của bạn và thêm dòng <code>from du_lieu import ThuMucAnh</code> ở đầu mỗi đoạn. Cách thứ hai là cách nên dùng cho dự án thật, và là điều kiện để <code>num_workers &gt; 0</code> chạy được trên Windows (mục 5).</div>
+
+<h2>4. So sánh với torchvision.datasets.ImageFolder</h2>
+<p>torchvision có sẵn <code>ImageFolder</code> làm đúng việc trên cho cấu trúc <code>root/&lt;lớp&gt;/ảnh</code>. Nó đọc bằng Pillow (RGB), nên chỉ cần thêm phép chuyển thành tensor và chuẩn hóa:</p>
+<pre><code class="language-python">import torch
+from torchvision import datasets
+from torchvision.transforms import v2
+
+tf = v2.Compose([
+    v2.ToImage(),                                 # PIL → tensor uint8 (C, H, W)
+    v2.ToDtype(torch.float32, scale=True),        # → float, chia 255
+    v2.Normalize([0.5, 0.5, 0.5], [0.25, 0.25, 0.25]),
+])
+imf = datasets.ImageFolder("dataset/train", transform=tf)
+print("classes:", imf.classes, "| class_to_idx:", imf.class_to_idx)
+
+ds = ThuMucAnh("dataset/train")                  # lớp tự viết ở mục 3
+p0, nhan0 = ds.mau[0]                             # ok_000.png, nhãn 0 trong Dataset của ta
+j = [str(p) for p, _ in imf.samples].index(str(p0))
+x_imf, y_imf = imf[j]
+x_ta, y_ta = ds[0]
+print(f"{p0.name}: ImageFolder nhãn {y_imf} | ThuMucAnh nhãn {y_ta}")
+print("cùng giá trị pixel:", torch.allclose(x_imf, x_ta, atol=1e-6))</code></pre>
+<pre><code class="language-text">classes: ['NG', 'OK'] | class_to_idx: {'NG': 0, 'OK': 1}
+ok_000.png: ImageFolder nhãn 1 | ThuMucAnh nhãn 0
+cùng giá trị pixel: True</code></pre>
+<p>Hai đường ống cho <strong>cùng giá trị pixel</strong>, nhưng <strong>khác nhãn</strong>: <code>ImageFolder</code> sắp lớp theo thứ tự chữ cái, nên <code>NG = 0, OK = 1</code>. Nếu bạn huấn luyện bằng ImageFolder rồi viết code trạm với giả định "cột 1 là NG", trạm sẽ loại hàng tốt và cho qua hàng lỗi. Luôn lưu <code>class_to_idx</code> cùng file mô hình.</p>
+<table>
+  <tr><th></th><th>ImageFolder</th><th>Dataset tự viết</th></tr>
+  <tr><td>Tốc độ viết</td><td>Một dòng</td><td>30 dòng</td></tr>
+  <tr><td>Thư viện đọc ảnh</td><td>Pillow (RGB)</td><td>OpenCV, giống code trạm; đọc được ảnh 16 bit, ảnh mono đặc biệt</td></tr>
+  <tr><td>Thứ tự lớp</td><td>Chữ cái</td><td>Tùy bạn</td></tr>
+  <tr><td>Nhãn từ nguồn khác (CSV, cơ sở dữ liệu, mã lô)</td><td>Không</td><td>Có: đọc metadata, trả thêm đường dẫn, mã lô để chia tập theo lô</td></tr>
+  <tr><td>Cắt ROI theo vị trí định vị trước</td><td>Không</td><td>Có</td></tr>
+</table>
+
+<h2>5. DataLoader: batch, shuffle, drop_last</h2>
+<p><code>DataLoader</code> lấy các mẫu từ Dataset, gom thành batch và trả về theo vòng lặp. Hàm <strong>collate</strong> mặc định xếp chồng (stack) các tensor ảnh <code>(C, H, W)</code> thành <code>(B, C, H, W)</code> và gom nhãn thành tensor <code>(B,)</code>.</p>
+<pre><code class="language-python">import torch
+from torch.utils.data import DataLoader
+
+ds = ThuMucAnh("dataset/train")
+g = torch.Generator().manual_seed(0)              # cố định thứ tự xáo trộn để tái lập được
+dl = DataLoader(ds, batch_size=16, shuffle=True, num_workers=0, generator=g)
+print("số batch mỗi epoch:", len(dl))
+for xb, yb in dl:
+    print("ảnh", tuple(xb.shape), xb.dtype, "| nhãn", yb.tolist())
+
+dl2 = DataLoader(ds, batch_size=16, shuffle=True, drop_last=True)
+print("drop_last=True:", [len(yb) for _, yb in dl2])</code></pre>
+<pre><code class="language-text">số batch mỗi epoch: 4
+ảnh (16, 3, 64, 64) torch.float32 | nhãn [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0]
+ảnh (16, 3, 64, 64) torch.float32 | nhãn [0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1]
+ảnh (16, 3, 64, 64) torch.float32 | nhãn [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0]
+ảnh (2, 3, 64, 64) torch.float32 | nhãn [1, 0]
+drop_last=True: [16, 16, 16]</code></pre>
+<ul>
+  <li><strong>shuffle=True cho train</strong>: nếu không xáo, mỗi batch toàn OK rồi toàn NG (thứ tự thư mục), gradient dao động mạnh và mô hình học kém. <strong>shuffle=False cho val/test</strong>: thứ tự cố định giúp so sánh kết quả từng ảnh giữa các lần chạy.</li>
+  <li><strong>Batch cuối</strong> chỉ có 2 ảnh (50 = 3·16 + 2). Batch rất nhỏ có thể làm BatchNorm không ổn định; <code>drop_last=True</code> bỏ batch lẻ này ở tập train. Không dùng drop_last cho val/test vì sẽ mất ảnh khi đánh giá.</li>
+  <li><strong>batch_size</strong> bị giới hạn bởi bộ nhớ GPU; với ảnh công nghiệp 224–640 px thường là 8–64.</li>
+</ul>
+<p>Collate mặc định yêu cầu mọi ảnh trong batch <strong>cùng kích thước</strong>. Nếu thư mục lẫn ảnh khác cỡ (đổi camera, ROI cắt tay), lỗi xuất hiện khi gom batch:</p>
+<pre><code class="language-python">import torch
+from torch.utils.data import DataLoader
+
+lan_kich_thuoc = [(torch.zeros(3, 64, 64), 0), (torch.zeros(3, 80, 80), 1)]
+try:
+    next(iter(DataLoader(lan_kich_thuoc, batch_size=2)))
+except RuntimeError as e:
+    print("RuntimeError:", str(e).splitlines()[0])</code></pre>
+<pre><code class="language-text">RuntimeError: stack expects each tensor to be equal size, but got [3, 64, 64] at entry 0 and [3, 80, 80] at entry 1</code></pre>
+<p>Cách sửa: resize hoặc cắt về cùng kích thước <em>trong</em> Dataset (cùng một phép như ở trạm), và kiểm tra kích thước ảnh ngay khi xây dataset.</p>
+
+<h3>num_workers và bẫy trên Windows</h3>
+<p>Với <code>num_workers=0</code>, ảnh được đọc và augment trong chính tiến trình huấn luyện, GPU phải chờ CPU. Với <code>num_workers=4</code>, PyTorch chạy 4 tiến trình con đọc ảnh song song trong khi GPU tính. Trên Windows (và macOS), tiến trình con được tạo bằng cách <strong>chạy lại file script từ đầu</strong>; nếu code huấn luyện nằm ở cấp ngoài cùng của file, mỗi tiến trình con lại khởi động huấn luyện và chương trình báo lỗi hoặc treo. Quy tắc:</p>
+<ol>
+  <li>Đặt lớp Dataset ở cấp ngoài cùng của module (không định nghĩa bên trong hàm), để tiến trình con import được.</li>
+  <li>Đặt mọi code chạy (tạo DataLoader, vòng lặp huấn luyện) trong hàm <code>main()</code> và gọi qua <code>if __name__ == "__main__":</code>.</li>
+  <li>Trong Jupyter Notebook trên Windows, nếu gặp lỗi với <code>num_workers &gt; 0</code>, hãy chuyển Dataset sang file <code>.py</code> riêng rồi import, hoặc dùng <code>num_workers=0</code>.</li>
+</ol>
+<pre><code class="language-python">import torch
+from torch.utils.data import DataLoader
+
+NUM_WORKERS = 0            # trên máy bạn: thử 2, 4, 8 và đo thời gian; ví dụ trên web để 0
+
+
+def main():
+    ds = ThuMucAnh("dataset/train")
+    dl = DataLoader(ds, batch_size=16, shuffle=True, num_workers=NUM_WORKERS,
+                    persistent_workers=NUM_WORKERS &gt; 0,       # không tạo lại worker mỗi epoch
+                    pin_memory=torch.cuda.is_available())     # chép sang GPU nhanh hơn
+    for epoch in range(2):
+        so_anh = sum(len(yb) for _, yb in dl)
+    print(f"2 epoch, {so_anh} ảnh/epoch, num_workers={NUM_WORKERS}")
+
+
+if __name__ == "__main__":          # BẮT BUỘC trên Windows khi num_workers &gt; 0
+    main()</code></pre>
+<pre><code class="language-text">2 epoch, 50 ảnh/epoch, num_workers=0</code></pre>
+<p>Cách chọn <code>num_workers</code>: tăng dần từ 0 và đo thời gian một epoch; dừng khi không nhanh thêm. Nếu GPU dùng dưới 50% (xem bằng <code>nvidia-smi</code>) trong lúc huấn luyện, thường là do nạp dữ liệu chậm.</p>
+
+<h2>6. Mất cân bằng OK/NG: WeightedRandomSampler</h2>
+<p>Tập train có 40 OK và 10 NG. Với shuffle thường, mỗi epoch mô hình thấy NG 10 lần và OK 40 lần; mô hình "lười" có thể đạt 80% chỉ bằng cách luôn trả lời OK. <code>WeightedRandomSampler</code> rút mẫu <strong>có hoàn lại</strong> với xác suất tỉ lệ nghịch với số mẫu của lớp, nên trung bình mỗi lớp xuất hiện ngang nhau:</p>
+<pre><code class="language-python">import torch
+from torch.utils.data import DataLoader, WeightedRandomSampler
+
+ds = ThuMucAnh("dataset/train")
+nhan = torch.tensor([n for _, n in ds.mau])
+dem = torch.bincount(nhan)                         # [40, 10]
+w_lop = 1.0 / dem.float()                          # trọng số mỗi lớp: 1/40, 1/10
+w_mau = w_lop[nhan]                                # trọng số của từng ảnh
+print("trọng số lớp:", [round(v, 4) for v in w_lop.tolist()])
+
+g = torch.Generator().manual_seed(0)
+sampler = WeightedRandomSampler(w_mau, num_samples=len(ds), replacement=True, generator=g)
+dl_can_bang = DataLoader(ds, batch_size=10, sampler=sampler)   # có sampler thì KHÔNG đặt shuffle
+dl_thuong = DataLoader(ds, batch_size=10, shuffle=True, generator=torch.Generator().manual_seed(0))
+
+for epoch in range(3):
+    ng_thuong = sum(int(yb.sum()) for _, yb in dl_thuong)
+    chi_so = list(sampler)                         # các chỉ số sampler rút ra trong epoch này
+    ng_cb = sum(int(nhan[i]) for i in chi_so)
+    ng_khac_nhau = len({i for i in chi_so if nhan[i] == 1})
+    print(f"epoch {epoch}: shuffle thường {ng_thuong} NG/50 | sampler {ng_cb} NG/50 "
+          f"(chỉ từ {ng_khac_nhau} ảnh NG khác nhau)")</code></pre>
+<pre><code class="language-text">trọng số lớp: [0.025, 0.1]
+epoch 0: shuffle thường 10 NG/50 | sampler 25 NG/50 (chỉ từ 10 ảnh NG khác nhau)
+epoch 1: shuffle thường 10 NG/50 | sampler 22 NG/50 (chỉ từ 10 ảnh NG khác nhau)
+epoch 2: shuffle thường 10 NG/50 | sampler 26 NG/50 (chỉ từ 8 ảnh NG khác nhau)</code></pre>
+<p>Sampler đưa tỉ lệ NG lên khoảng một nửa, nhưng lưu ý cột cuối: các lượt NG đó chỉ đến từ <strong>10 ảnh NG</strong>, mỗi ảnh lặp lại trung bình 2–3 lần mỗi epoch, và có epoch còn bỏ sót 2 ảnh NG vì rút ngẫu nhiên có hoàn lại. Mô hình rất dễ học thuộc 10 ảnh này, nên sampler gần như luôn phải đi kèm augmentation (mục 7). Ba lưu ý khác:</p>
+<ul>
+  <li>Chỉ dùng sampler cho <strong>train</strong>. Tập val/test phải giữ tỉ lệ tự nhiên, hoặc ít nhất bạn phải biết tỉ lệ của nó khi đọc precision.</li>
+  <li>Cách thay thế là giữ shuffle thường và đặt trọng số cho hàm loss: <code>nn.CrossEntropyLoss(weight=torch.tensor([1.0, 4.0]))</code> làm mỗi lỗi trên ảnh NG "đắt" gấp 4. Hai cách có tác dụng tương tự; thử cả hai và so trên val.</li>
+  <li>Cân bằng lớp làm điểm số đầu ra của mô hình bị "đẩy" về phía NG so với tỉ lệ thật trên dây chuyền. Không sao, vì ngưỡng OK/NG sẽ được chọn lại trên tập val theo escape và overkill (chặng 11).</li>
+</ul>
+
+<h2>7. Augmentation với torchvision.transforms.v2</h2>
+<p><strong>Augmentation</strong> (tăng cường dữ liệu) tạo biến thể ngẫu nhiên của ảnh mỗi lần ảnh được đọc: lệch vị trí một chút, sáng hơn một chút. Mô hình không bao giờ thấy hai lần cùng một ảnh y hệt, nên khó học thuộc. Augmentation áp dụng <strong>khi đọc</strong>, không tạo thêm file trên đĩa. Truyền pipeline vào tham số <code>transform</code> của Dataset ở mục 3:</p>
+<pre><code class="language-python">import torch
+from torchvision.transforms import v2
+
+torch.manual_seed(0)
+tf_train = v2.Compose([
+    v2.RandomAffine(degrees=3, translate=(0.04, 0.04)),     # lệch ±3°, ±2–3 px: như sai số định vị thật
+    v2.ColorJitter(brightness=0.1, contrast=0.1),           # đèn yếu đi, lô vật liệu khác: ±10%
+])
+ds_train = ThuMucAnh("dataset/train", transform=tf_train)
+ds_val = ThuMucAnh("dataset/train", transform=None)        # cùng ảnh, không augmentation
+
+a, b = ds_train[0][0], ds_train[0][0]
+print("train: hai lần đọc cùng ảnh giống nhau?", torch.equal(a, b),
+      f"| chênh lệch trung bình {(a - b).abs().mean():.3f}")
+c, d = ds_val[0][0], ds_val[0][0]
+print("val  : hai lần đọc cùng ảnh giống nhau?", torch.equal(c, d))</code></pre>
+<pre><code class="language-text">train: hai lần đọc cùng ảnh giống nhau? False | chênh lệch trung bình 0.159
+val  : hai lần đọc cùng ảnh giống nhau? True</code></pre>
+
+<h3>Augmentation an toàn và nguy hiểm cho ảnh công nghiệp</h3>
+<p>Nguyên tắc duy nhất: <strong>chỉ dùng biến đổi có thể xảy ra thật trên trạm, và không làm thay đổi nhãn</strong>. Augmentation lấy từ ví dụ phân loại chó mèo (lật, xoay mạnh, cắt ngẫu nhiên, đổi màu) thường vi phạm nguyên tắc thứ hai với ảnh công nghiệp.</p>
+<table>
+  <tr><th>Augmentation</th><th>An toàn khi</th><th>Nguy hiểm khi</th></tr>
+  <tr><td>Lật ngang/dọc</td><td>Bề mặt không có hướng (tấm kim loại, vải, gỗ ván), chi tiết đối xứng</td><td>Chi tiết có hướng mà "lắp ngược" là lỗi; có chữ, mã in; vết xước có hướng đặc trưng theo quy trình (theo chiều cán, chiều mài)</td></tr>
+  <tr><td>Xoay nhỏ, dịch vài pixel</td><td>Mô phỏng đúng sai số định vị thật của trạm (đo từ dữ liệu: ±2°, ±3 px…)</td><td>Xoay lớn hoặc 90° khi vật luôn đúng chiều; góc đen sinh ra ở mép bị mô hình học thành đặc trưng</td></tr>
+  <tr><td>Độ sáng, tương phản nhẹ</td><td>Mô phỏng đèn lão hóa, khác lô vật liệu, trong biên độ đã đo</td><td>Lỗi định nghĩa bằng độ sáng hoặc màu: bạc màu, cháy, ố vàng, thiếu lớp phủ</td></tr>
+  <tr><td>Hue, saturation</td><td>Hiếm khi cần</td><td>Mọi lỗi về màu (sai màu, loang màu); camera mono thì vô nghĩa</td></tr>
+  <tr><td>Random crop, RandomResizedCrop</td><td>Lỗi chiếm phần lớn ảnh, hoặc cắt theo cách luôn giữ vùng lỗi (cần mặt nạ lỗi)</td><td>Lỗi nhỏ, nằm gần mép: cắt mất lỗi nhưng nhãn vẫn NG</td></tr>
+  <tr><td>Phóng to, thu nhỏ (scale)</td><td>Khoảng cách camera thay đổi thật</td><td>Tiêu chí NG theo kích thước ("vết ≥ 0,3 mm²"): phóng to một vết OK nhỏ thành vết cỡ NG mà nhãn vẫn OK</td></tr>
+  <tr><td>Làm mờ, nhiễu Gaussian nhẹ</td><td>Mô phỏng rung, lệch nét nhẹ, tăng gain</td><td>Lỗi chỉ vài pixel (bụi, lỗ kim): làm mờ xóa mất lỗi</td></tr>
+  <tr><td>Random erasing, cutout</td><td>Bài toán có vật che khuất thật</td><td>Che đúng vào vết lỗi: ảnh "sạch" mang nhãn NG</td></tr>
+</table>
+<p>Hai thí nghiệm nhỏ cho thấy mức độ nguy hiểm bằng con số. Thứ nhất, <strong>RandomResizedCrop cắt mất lỗi</strong>. Dùng <code>tv_tensors.Mask</code> để v2 cắt ảnh và mặt nạ lỗi cùng một cách, rồi đếm số lần vùng lỗi biến mất hoàn toàn:</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+import torch
+from torchvision import tv_tensors
+from torchvision.transforms import v2
+
+anh = np.full((64, 64, 3), 150, np.uint8)
+mask = np.zeros((64, 64), np.uint8)
+cv2.line(anh, (52, 6), (60, 14), (70, 70, 70), 1)       # vết xước ngắn gần góc phải trên
+cv2.line(mask, (52, 6), (60, 14), 1, 1)
+img_t = tv_tensors.Image(torch.from_numpy(anh).permute(2, 0, 1))
+mask_t = tv_tensors.Mask(torch.from_numpy(mask))
+
+torch.manual_seed(0)
+for scale in [(0.5, 1.0), (0.08, 1.0)]:                 # (0.08, 1.0) là giá trị mặc định
+    crop = v2.RandomResizedCrop(64, scale=scale, antialias=True)
+    mat_loi = 0
+    for _ in range(1000):
+        _, m = crop(img_t, mask_t)
+        mat_loi += int(m.sum() == 0)
+    print(f"RandomResizedCrop scale={scale}: {mat_loi / 10:.1f}% ảnh NG không còn vết lỗi nào")</code></pre>
+<pre><code class="language-text">RandomResizedCrop scale=(0.5, 1.0): 19.9% ảnh NG không còn vết lỗi nào
+RandomResizedCrop scale=(0.08, 1.0): 54.3% ảnh NG không còn vết lỗi nào</code></pre>
+<p>Với tham số mặc định, khoảng <strong>một nửa</strong> số ảnh NG sinh ra không còn vết lỗi nào nhưng vẫn mang nhãn NG. Mô hình bị dạy rằng "ảnh sạch cũng có thể là NG", điều khiến nó báo NG lung tung (overkill) hoặc mất tự tin với lỗi nhỏ. Ngay cả <code>scale=(0.5, 1.0)</code> vẫn cắt mất lỗi ở khoảng 1/5 số ảnh. Con số cụ thể phụ thuộc vị trí lỗi; lỗi càng gần mép càng dễ bị cắt.</p>
+<p>Thứ hai, <strong>đổi độ sáng với lỗi bạc màu</strong>. Giả sử chi tiết anod hóa OK có độ sáng trung bình khoảng 100, lỗi "bạc màu" là khi độ sáng từ 115 trở lên. Áp <code>ColorJitter(brightness=b)</code> lên ảnh OK và đếm bao nhiêu ảnh OK bị biến thành sáng như NG mà vẫn mang nhãn OK:</p>
+<pre><code class="language-python">import torch
+from torchvision.transforms import v2
+
+torch.manual_seed(0)
+ok = (100 + 3 * torch.randn(500, 1, 1, 1)).clamp(0, 255) * torch.ones(500, 3, 16, 16)
+ok = ok.to(torch.uint8)                              # 500 ảnh OK, độ sáng 100 ± 3
+NGUONG_BAC_MAU = 115
+for b in (0.05, 0.1, 0.2, 0.3):
+    jitter = v2.ColorJitter(brightness=b)
+    sang = torch.stack([jitter(a).float().mean() for a in ok])
+    print(f"brightness={b:.2f}: {(sang &gt;= NGUONG_BAC_MAU).float().mean():.1%} ảnh OK trông như NG bạc màu")</code></pre>
+<pre><code class="language-text">brightness=0.05: 0.0% ảnh OK trông như NG bạc màu
+brightness=0.10: 0.8% ảnh OK trông như NG bạc màu
+brightness=0.20: 10.2% ảnh OK trông như NG bạc màu
+brightness=0.30: 23.8% ảnh OK trông như NG bạc màu</code></pre>
+<p>Biên độ ±5% an toàn, ±10% gần như an toàn (dưới 1%); ±20–30%, giá trị hay gặp trong ví dụ trên mạng, biến 10–24% ảnh OK thành "NG mang nhãn OK", dạy mô hình bỏ qua đúng loại lỗi bạn cần bắt (escape). Biên độ augmentation nên lấy từ <strong>dữ liệu đo thật</strong>: độ sáng trung bình của ảnh OK dao động bao nhiêu giữa các ca, các lô, trong 3 tháng.</p>
+<div class="tip"><strong>Augmentation cho detection và segmentation</strong>Khi nhãn là khung bao hoặc mặt nạ, mọi phép hình học phải áp cùng lúc cho ảnh và nhãn. <code>transforms.v2</code> làm việc này tự động nếu bạn bọc nhãn bằng <code>tv_tensors.BoundingBoxes</code> hoặc <code>tv_tensors.Mask</code> như ví dụ trên. Bài "U-Net cho phân đoạn ảnh" ở chặng 12 dùng lại kỹ thuật này.</div>
+
+<h2>8. Augmentation chỉ cho tập train</h2>
+<p>Tập val và test dùng để đo hiệu năng trên ảnh <em>như trạm sẽ thấy</em>, nên không được augment. Lỗi hay gặp: chia một Dataset duy nhất bằng <code>random_split</code>, rồi gán transform cho Dataset gốc, vô tình augment cả val. Cách an toàn: tạo <strong>hai</strong> đối tượng Dataset trên cùng danh sách ảnh, một có augmentation và một không, rồi lấy tập con theo chỉ số:</p>
+<pre><code class="language-python">import numpy as np
+import torch
+from torch.utils.data import DataLoader, Subset
+from torchvision.transforms import v2
+
+tf_train = v2.Compose([v2.RandomAffine(degrees=3, translate=(0.04, 0.04)),
+                       v2.ColorJitter(brightness=0.1, contrast=0.1)])
+ds_aug = ThuMucAnh("dataset/train", transform=tf_train)
+ds_sach = ThuMucAnh("dataset/train", transform=None)
+
+rng = np.random.default_rng(0)
+chi_so = rng.permutation(len(ds_sach))
+# Ví dụ đơn giản: chia ngẫu nhiên. Dữ liệu thật: chia theo lô/ngày (bài "Overfitting và cách chia train/validation/test đúng")
+idx_train, idx_val = chi_so[:40].tolist(), chi_so[40:].tolist()
+train_set = Subset(ds_aug, idx_train)
+val_set = Subset(ds_sach, idx_val)
+print("train:", len(train_set), "ảnh (có augmentation) | val:", len(val_set), "ảnh (không)")
+print("val lặp lại giống hệt:", torch.equal(val_set[0][0], val_set[0][0]))
+print("train có biến đổi    :", not torch.equal(train_set[0][0], train_set[0][0]))
+train_dl = DataLoader(train_set, batch_size=16, shuffle=True, drop_last=True)
+val_dl = DataLoader(val_set, batch_size=32, shuffle=False)
+print("batch train:", len(train_dl), "| batch val:", len(val_dl))</code></pre>
+<pre><code class="language-text">train: 40 ảnh (có augmentation) | val: 10 ảnh (không)
+val lặp lại giống hệt: True
+train có biến đổi    : True
+batch train: 2 | batch val: 1</code></pre>
+<p>Trong dự án này, thư mục <code>dataset/val</code> đã tách sẵn nên đơn giản là <code>ThuMucAnh("dataset/train", transform=tf_train)</code> và <code>ThuMucAnh("dataset/val")</code>. Cách dùng <code>Subset</code> ở trên cần khi bạn chia tập bằng code (theo lô, theo ngày).</p>
+
+<h2>9. Kiểm tra batch bằng mắt trước khi huấn luyện</h2>
+<p>Một phút nhìn batch có thể tiết kiệm một ngày huấn luyện sai: ảnh bị tráo kênh màu, augmentation quá mạnh, nhãn lệch, ảnh đen do đọc lỗi. Ghép một batch thành lưới, đảo chuẩn hóa, ghi nhãn lên từng ô và lưu ra file:</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+import torch
+from torch.utils.data import DataLoader
+from torchvision.transforms import v2
+from torchvision.utils import make_grid
+
+torch.manual_seed(0)
+tf_train = v2.Compose([v2.RandomAffine(degrees=3, translate=(0.04, 0.04)),
+                       v2.ColorJitter(brightness=0.1, contrast=0.1)])
+ds = ThuMucAnh("dataset/train", transform=tf_train)
+xb, yb = next(iter(DataLoader(ds, batch_size=16, shuffle=True)))
+
+anh = xb * ds.std + ds.mean                         # đảo chuẩn hóa về [0, 1]
+anh = (anh.clamp(0, 1) * 255).to(torch.uint8)
+anh = torch.nn.functional.interpolate(anh.float(), scale_factor=2, mode="nearest").to(torch.uint8)
+luoi = make_grid(anh, nrow=8, padding=4, pad_value=255)   # (3, H, W) RGB
+luoi = cv2.cvtColor(luoi.permute(1, 2, 0).numpy(), cv2.COLOR_RGB2BGR)
+luoi = np.ascontiguousarray(luoi)
+for k, nhan in enumerate(yb.tolist()):
+    x0, y0 = 4 + (k % 8) * 132, 4 + (k // 8) * 132   # mỗi ô 128 px + 4 px viền
+    mau = (0, 0, 255) if nhan == 1 else (0, 160, 0)
+    cv2.putText(luoi, ds.lop[nhan], (x0 + 3, y0 + 124), cv2.FONT_HERSHEY_SIMPLEX, 0.5, mau, 1, cv2.LINE_AA)
+cv2.imwrite("kiem_tra_batch.png", luoi)
+print("lưới:", luoi.shape, "| nhãn batch:", yb.tolist())</code></pre>
+<pre><code class="language-text">lưới: (268, 1060, 3) | nhãn batch: [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0]</code></pre>
+<p>Mở <code>kiem_tra_batch.png</code> và tự hỏi: màu có giống ảnh gốc không (nếu tấm nhôm "hơi xanh" thành "hơi cam" là đã tráo kênh)? Vết lỗi trên ảnh NG còn nhìn thấy không? Chấm định hướng có luôn ở góc trái trên không? Có ảnh OK nào trông như NG không?</p>
+<p>Với bộ dữ liệu mẫu, lưới ảnh cho thấy ngay một vấn đề: <strong>viền đen</strong> ở mép nhiều ô, do <code>RandomAffine</code> dịch và xoay ảnh rồi lấp phần trống bằng 0. Trạm thật không bao giờ cho ảnh có viền đen như vậy, và mô hình có thể học "viền đen" thành một đặc trưng. Hai cách sửa: cắt ROI <em>rộng hơn</em> kích thước cần dùng vài pixel, augment, rồi cắt giữa (<code>v2.CenterCrop</code>) để bỏ phần viền; hoặc đặt tham số <code>fill</code> của <code>RandomAffine</code> gần màu nền. Đây đúng là loại lỗi chỉ phát hiện được khi nhìn batch.</p>
+
+<h2>10. Sai lầm thường gặp</h2>
+<ul>
+  <li><strong>Quên chuyển BGR → RGB</strong> ở một trong hai phía (huấn luyện hoặc trạm). Không có lỗi nào được báo; chỉ có độ chính xác giảm.</li>
+  <li><strong>Không lưu thứ tự lớp</strong>: ImageFolder tự sắp <code>NG = 0, OK = 1</code>; code trạm giả định ngược lại.</li>
+  <li><strong>Augment cả tập val/test</strong>, khiến số đo dao động mỗi lần chạy và không phản ánh ảnh thật.</li>
+  <li><strong>Copy augmentation từ ví dụ ảnh tự nhiên</strong>: lật, xoay 90°, crop mạnh, đổi màu ±30% với ảnh công nghiệp có hướng, có lỗi màu, có lỗi nhỏ.</li>
+  <li><strong>Lưu ảnh augment ra đĩa</strong> rồi chia train/val: biến thể của cùng một ảnh rơi vào cả hai tập, kết quả val đẹp giả tạo (rò rỉ dữ liệu).</li>
+  <li><strong>Dùng num_workers &gt; 0 trên Windows mà không có <code>if __name__ == "__main__":</code></strong>, chương trình treo hoặc báo lỗi tiến trình con.</li>
+  <li><strong>Không bao giờ nhìn batch</strong>. Hãy lưu lưới ảnh ít nhất một lần mỗi khi đổi đường ống dữ liệu.</li>
+</ul>
+
+<h2>11. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Sửa Dataset để trả thêm đường dẫn file: <code>(ảnh, nhãn, đường dẫn)</code>. Khi đánh giá, bạn cần biết <em>file nào</em> bị phân loại sai để mở ra xem. DataLoader gom đường dẫn thành gì?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">from torch.utils.data import DataLoader
+
+
+class ThuMucAnhCoTen(ThuMucAnh):
+    def __getitem__(self, i):
+        x, nhan = super().__getitem__(i)
+        return x, nhan, str(self.mau[i][0])
+
+
+dl = DataLoader(ThuMucAnhCoTen("dataset/val"), batch_size=8, shuffle=False)
+xb, yb, ten = next(iter(dl))
+print(tuple(xb.shape), yb.tolist())
+print(type(ten).__name__, ten[:2])</code></pre>
+<pre><code class="language-text">(8, 3, 64, 64) [0, 0, 0, 0, 0, 0, 0, 0]
+tuple ('dataset/val/OK/ok_000.png', 'dataset/val/OK/ok_001.png')</code></pre>
+<p>Collate mặc định không xếp chồng được chuỗi thành tensor, nên trả về một <strong>tuple</strong> các chuỗi, cùng thứ tự với ảnh trong batch. Khi đánh giá, ghi các cặp (đường dẫn, nhãn thật, điểm NG) ra CSV, rồi lọc những dòng sai để xem lại ảnh.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Tập train có 900 OK và 100 NG. Bạn dùng <code>WeightedRandomSampler</code> với trọng số 1/số mẫu của lớp và <code>num_samples=1000</code>. Mỗi epoch trung bình có bao nhiêu lượt NG? Mỗi ảnh NG xuất hiện trung bình bao nhiêu lần mỗi epoch, và mỗi ảnh OK? Rủi ro là gì?</p>
+<details><summary>Xem đáp án</summary>
+<p>Tổng trọng số của mỗi lớp bằng nhau (900·1/900 = 100·1/100 = 1), nên trung bình 500 lượt NG và 500 lượt OK mỗi epoch. Mỗi ảnh NG xuất hiện khoảng 500/100 = <strong>5 lần</strong>, mỗi ảnh OK khoảng 500/900 ≈ <strong>0,56 lần</strong> (gần một nửa số ảnh OK không được thấy trong một epoch). Rủi ro: học thuộc 100 ảnh NG. Giảm bằng augmentation an toàn, hoặc dùng trọng số trung gian (ví dụ NG gấp 3 thay vì gấp 9), hoặc dùng trọng số trong hàm loss thay cho sampler. Quyết định cuối cùng dựa trên escape/overkill đo trên tập val.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Chọn augmentation (và biên độ) cho ba trạm: (a) tấm thép cán nguội, camera mono, vết xước theo mọi hướng, sản phẩm chạy liên tục dưới camera line-scan; (b) nhãn in trên chai, kiểm tra lỗi in mờ, mất nét chữ; (c) nắp nhựa màu đỏ, lỗi "ố vàng" và "sai màu", ROI đã căn chỉnh bằng template matching (sai số ±1 px, ±0,5°).</p>
+<details><summary>Xem đáp án</summary>
+<table>
+  <tr><th>Trạm</th><th>Nên dùng</th><th>Tránh</th></tr>
+  <tr><td>(a) Thép cán</td><td>Lật ngang và dọc (bề mặt không có hướng, nếu vết xước không theo chiều cán đặc trưng); dịch; độ sáng/tương phản nhỏ theo biến động đo được; nhiễu nhẹ</td><td>Phóng to/thu nhỏ nếu tiêu chí theo chiều dài vết; crop mạnh; làm mờ mạnh</td></tr>
+  <tr><td>(b) Nhãn in</td><td>Dịch, xoay rất nhỏ trong sai số định vị; độ sáng/tương phản nhẹ</td><td>Lật (chữ bị ngược thành ảnh không thể xảy ra); làm mờ (đúng là loại lỗi cần bắt: "in mờ"); crop cắt mất ký tự</td></tr>
+  <tr><td>(c) Nắp đỏ</td><td>Dịch ±1 px, xoay ±0,5° (đúng sai số định vị); nhiễu nhẹ</td><td>Hue, saturation (đổi màu chính là lỗi); độ sáng lớn (ố vàng thay đổi độ sáng kênh); lật nếu nắp có chữ, gân định hướng</td></tr>
+</table>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Dataset trả về một mẫu <code>(ảnh, nhãn)</code> qua <code>__len__</code> và <code>__getitem__</code>, đọc ảnh khi cần. Chuyển đổi chuẩn: BGR→RGB, uint8→float chia 255, chuẩn hóa mean/std, HWC→CHW; giống hệt nhau ở huấn luyện và ở trạm.</li>
+  <li><code>ImageFolder</code> tiện nhưng sắp lớp theo chữ cái (<code>NG = 0</code>); luôn lưu <code>class_to_idx</code>. Dataset tự viết linh hoạt hơn (OpenCV, metadata, ROI).</li>
+  <li>DataLoader gom batch <code>(B, C, H, W)</code>; shuffle và drop_last cho train, không cho val/test; num_workers &gt; 0 cần <code>if __name__ == "__main__":</code> trên Windows.</li>
+  <li><code>WeightedRandomSampler</code> cân bằng OK/NG bằng cách lặp lại ảnh NG; đi kèm augmentation và chỉ dùng cho train.</li>
+  <li>Augmentation chỉ mô phỏng biến động có thật và không được đổi nhãn: cẩn thận với lật (chi tiết có hướng), đổi màu/độ sáng (lỗi màu), crop (lỗi nhỏ ở mép), phóng to (tiêu chí theo kích thước). Lưu lưới batch để kiểm tra bằng mắt.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Overfitting và cách chia train/validation/test đúng</strong>, cách nhận biết mô hình học thuộc và chia dữ liệu theo lô để không rò rỉ.</p>

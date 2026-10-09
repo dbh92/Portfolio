@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="vi" data-root="../">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Xuất mô hình PyTorch sang ONNX và kiểm tra kết quả khớp PyTorch</title>
+<meta name="description" content="Xuất PyTorch và YOLO sang ONNX, chạy bằng ONNX Runtime, đo sai số trên nhiều ảnh, bắt lỗi tiền xử lý và lưu thẻ mô hình có mã băm.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://hocfree.vn/hoc/deploy-1-xuat-onnx-va-kiem-tra-sai-so.html">
+<meta property="og:site_name" content="HọcFree">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Xuất mô hình PyTorch sang ONNX và kiểm tra kết quả khớp PyTorch">
+<meta property="og:description" content="Xuất PyTorch và YOLO sang ONNX, chạy bằng ONNX Runtime, đo sai số trên nhiều ảnh, bắt lỗi tiền xử lý và lưu thẻ mô hình có mã băm.">
+<meta property="og:url" content="https://hocfree.vn/hoc/deploy-1-xuat-onnx-va-kiem-tra-sai-so.html">
+<meta property="og:image" content="https://hocfree.vn/assets/images/posts/deploy-1-xuat-onnx-va-kiem-tra-sai-so.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="Xuất mô hình PyTorch sang ONNX và kiểm tra kết quả khớp PyTorch">
+<meta property="og:locale" content="vi_VN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Xuất mô hình PyTorch sang ONNX và kiểm tra kết quả khớp PyTorch">
+<meta name="twitter:description" content="Xuất PyTorch và YOLO sang ONNX, chạy bằng ONNX Runtime, đo sai số trên nhiều ảnh, bắt lỗi tiền xử lý và lưu thẻ mô hình có mã băm.">
+<meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/deploy-1-xuat-onnx-va-kiem-tra-sai-so.jpg">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/fonts.css?v=20261009">
+<link rel="stylesheet" href="../assets/css/style.css?v=20261009">
+<script>try{var t=localStorage.getItem('hf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
+<meta property="article:published_time" content="2026-10-09">
+<meta property="article:section" content="Học AI &amp; Lập trình">
+<meta property="article:tag" content="Deployment">
+<meta property="article:tag" content="PyTorch">
+<meta property="article:tag" content="Python">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "Xuất mô hình PyTorch sang ONNX và kiểm tra kết quả khớp PyTorch", "description": "Xuất PyTorch và YOLO sang ONNX, chạy bằng ONNX Runtime, đo sai số trên nhiều ảnh, bắt lỗi tiền xử lý và lưu thẻ mô hình có mã băm.", "image": ["https://hocfree.vn/assets/images/posts/deploy-1-xuat-onnx-va-kiem-tra-sai-so.jpg"], "datePublished": "2026-10-09", "dateModified": "2026-10-09", "inLanguage": "vi", "articleSection": "Học AI & Lập trình", "keywords": "Deployment, PyTorch, Python", "wordCount": 5944, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/hoc/deploy-1-xuat-onnx-va-kiem-tra-sai-so.html"}, "isPartOf": {"@type": "Course", "name": "Trở thành Vision Engineer", "url": "https://hocfree.vn/lo-trinh/vision-engineer.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Learning Paths", "item": "https://hocfree.vn/lo-trinh/"}, {"@type": "ListItem", "position": 3, "name": "Trở thành Vision Engineer", "item": "https://hocfree.vn/lo-trinh/vision-engineer.html"}, {"@type": "ListItem", "position": 4, "name": "Chặng 13: Deployment", "item": "https://hocfree.vn/lo-trinh/vision-engineer/deployment.html"}, {"@type": "ListItem", "position": 5, "name": "Xuất mô hình PyTorch sang ONNX và kiểm tra kết quả khớp PyTorch"}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div class="progress" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="container wide header-top">
+    <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="nav-scrim" hidden></div>
+    <a class="logo" href="../" aria-label="HọcFree – Trang chủ"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+    <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
+    <div class="header-actions">
+      <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="login-link" href="../dang-nhap.html">Đăng nhập</a>
+      <a class="btn start-btn" href="../lo-trinh/">Bắt đầu học</a>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="container wide">
+      <nav class="site-nav" id="site-nav" aria-label="Menu chính">
+        <div class="drawer-head">
+          <a class="logo" href="../" tabindex="-1"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+          <button class="icon-btn nav-close" aria-label="Đóng menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <button type="button" class="drawer-search search-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Tìm bài học, chủ đề…</span></button>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="../">Trang chủ</a></li><li class="nav-item has-panel is-mega"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-hoc">Học AI &amp; Lập trình<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel mega" id="nav-panel-hoc">
+  <div class="container wide mega-inner">
+    <div class="mega-groups"><div class="mega-group"><a class="mega-group-title" href="../hoc/#programming">Programming</a><ul><li><a href="../hoc/python.html">Python</a></li><li><a href="../hoc/csharp.html">C#</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#ai-machine-learning">AI &amp; Machine Learning</a><ul><li><a href="../hoc/machine-learning.html">Machine Learning</a></li><li><a href="../hoc/deep-learning.html">Deep Learning</a></li><li><a href="../hoc/pytorch.html">PyTorch</a></li><li><a href="../hoc/generative-ai.html">Generative AI</a></li><li><a href="../hoc/llm-ai-agents.html">LLM / AI Agents</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#computer-vision">Computer Vision</a><ul><li><a href="../hoc/opencv.html">OpenCV</a></li><li><a href="../hoc/image-processing.html">Image Processing</a></li><li><a href="../hoc/computer-vision.html">Computer Vision</a></li><li><a href="../hoc/ocr.html">OCR</a></li><li><a href="../hoc/object-detection.html">Object Detection</a></li><li><a href="../hoc/segmentation.html">Segmentation</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#vision-engineering">Vision Engineering</a><ul><li><a href="../hoc/machine-vision.html">Machine Vision</a></li><li><a href="../hoc/ai-vision.html">AI Vision</a></li><li><a href="../hoc/industrial-vision.html">Industrial Vision</a></li><li><a href="../hoc/camera-lens.html">Camera &amp; Lens</a></li><li><a href="../hoc/lighting.html">Lighting</a></li><li><a href="../hoc/calibration.html">Calibration</a></li><li><a href="../hoc/plc-robot-mes.html">PLC / Robot / MES</a></li><li><a href="../hoc/vision-deployment.html">Vision Deployment</a></li></ul></div></div>
+    <a class="feature-card" href="../lo-trinh/vision-engineer.html">
+  <span class="feature-eyebrow">⭐ Learning Path nổi bật</span>
+  <span class="feature-title">Trở thành Vision Engineer</span>
+  <span class="feature-sub">Machine Vision + AI Vision + Industrial Automation</span>
+  <span class="feature-desc">Lộ trình thực chiến từ Python, OpenCV và Machine Vision đến Deep Learning, AI Vision, Camera, PLC, Robot và triển khai hệ thống Vision trong nhà máy.</span>
+  <span class="feature-chain" aria-label="Các chặng chính"><span>Python</span><i aria-hidden="true">→</i><span>OpenCV</span><i aria-hidden="true">→</i><span>Machine Vision</span><i aria-hidden="true">→</i><span>AI Vision</span><i aria-hidden="true">→</i><span class="chain-goal">🎯 Vision Engineer</span></span>
+  <span class="feature-meta">14 chặng · 5 giai đoạn · ~12 tháng</span>
+  <span class="feature-cta">Xem lộ trình →</span>
+</a>
+  </div>
+  <div class="mega-foot"><div class="container wide mega-foot-inner"><ol class="journey compact" aria-label="Học, thực hành, trở thành kỹ sư"><li><a href="../hoc/" aria-current="step"><span class="journey-n">1</span><span class="journey-t"><b>Học</b><small>Học AI &amp; Lập trình</small></span></a></li><li><a href="../projects/"><span class="journey-n">2</span><span class="journey-t"><b>Thực hành</b><small>Projects</small></span></a></li><li><a href="../lo-trinh/"><span class="journey-n">3</span><span class="journey-t"><b>Trở thành kỹ sư</b><small>Learning Paths</small></span></a></li></ol><a class="panel-all" href="../hoc/">Xem tất cả Học AI &amp; Lập trình →</a></div></div>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-projects">Projects<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-projects">
+  <p class="panel-kicker"><span>Bước 2 · Thực hành</span>Áp dụng vào dự án thật</p>
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../projects/ai-projects.html"><span class="drop-label">AI Projects</span><span class="drop-desc">Ứng dụng ML và LLM, từ ý tưởng đến bản demo</span></a></li><li><a class="drop-link" href="../projects/computer-vision-projects.html"><span class="drop-label">Computer Vision Projects</span><span class="drop-desc">Phát hiện, nhận dạng và theo dõi đối tượng</span></a></li><li><a class="drop-link" href="../projects/industrial-vision-projects.html"><span class="drop-label">Industrial Vision Projects</span><span class="drop-desc">Đo kích thước, kiểm tra lỗi, đọc mã trên dây chuyền</span></a></li></ul></div></div>
+  <a class="panel-all" href="../projects/">Xem tất cả Projects →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger is-active" aria-expanded="false" aria-controls="nav-panel-lo-trinh" aria-current="true">Learning Paths<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-lo-trinh">
+  <p class="panel-kicker"><span>Bước 3 · Trở thành kỹ sư</span>Định hướng nghề nghiệp</p>
+  <ul class="drop-list"><li><a class="drop-link is-flagship" href="../lo-trinh/vision-engineer.html"><span class="drop-label">⭐ Trở thành Vision Engineer</span><span class="drop-desc">Machine Vision + AI Vision + Industrial Automation · 14 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/#python-developer"><span class="drop-label">Python Developer<span class="badge-soon">Sắp ra mắt</span></span><span class="drop-desc">Python, công cụ, tự động hóa</span></a></li></ul>
+  <a class="panel-all" href="../lo-trinh/">Xem tất cả lộ trình →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-kien-thuc">Kiến thức<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-kien-thuc">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Lĩnh vực</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/programming.html"><span class="drop-label">Programming</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-machine-learning.html"><span class="drop-label">AI / Machine Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/deep-learning.html"><span class="drop-label">Deep Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/machine-vision.html"><span class="drop-label">Machine Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-vision.html"><span class="drop-label">AI Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/industrial-automation.html"><span class="drop-label">Industrial Automation</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Công cụ &amp; mẹo</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/tools-frameworks.html"><span class="drop-label">Tools &amp; Frameworks</span></a></li><li><a class="drop-link" href="../kien-thuc/tips-tricks.html"><span class="drop-label">Tips &amp; Tricks</span></a></li></ul></div></div>
+  <a class="panel-all" href="../kien-thuc/">Xem tất cả Kiến thức →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tin-tuc-ai">Tin tức AI<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tin-tuc-ai">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tin-tuc-ai/ai-news.html"><span class="drop-label">AI News</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-models.html"><span class="drop-label">AI Models</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/technology.html"><span class="drop-label">Technology</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/robotics.html"><span class="drop-label">Robotics</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-industry.html"><span class="drop-label">AI Industry</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tin-tuc-ai/">Xem tất cả Tin tức AI →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-ngoai-ngu">Ngoại ngữ<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-ngoai-ngu">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/english.html"><span class="drop-label">English</span><span class="drop-desc">Lộ trình 700 TOEIC, phương pháp học, giáo trình HF-700TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chinese.html"><span class="drop-label">Chinese</span><span class="drop-desc">Lộ trình HSK3, phương pháp học, giáo trình HF-HSK3</span></a></li></ul></div></div>
+  <a class="panel-all" href="../ngoai-ngu/">Xem tất cả Ngoại ngữ →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tai-nguyen">Tài nguyên<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tai-nguyen">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tai-nguyen/source-code.html"><span class="drop-label">Source Code</span><span class="drop-desc">Mã nguồn mẫu đi kèm bài học</span></a></li><li><a class="drop-link" href="../tai-nguyen/dataset.html"><span class="drop-label">Dataset</span><span class="drop-desc">Bộ dữ liệu ảnh để luyện tập</span></a></li><li><a class="drop-link" href="../tai-nguyen/cheat-sheets.html"><span class="drop-label">Cheat Sheets</span><span class="drop-desc">Tóm tắt nhanh trong một trang</span></a></li><li><a class="drop-link" href="../tai-nguyen/documentation.html"><span class="drop-label">Documentation</span><span class="drop-desc">Tài liệu tra cứu thư viện, API</span></a></li><li><a class="drop-link" href="../tai-nguyen/ebook.html"><span class="drop-label">Ebook / Tài liệu</span><span class="drop-desc">Sách và tài liệu tham khảo</span></a></li><li><a class="drop-link" href="../tai-nguyen/ai-tools.html"><span class="drop-label">AI Tools</span><span class="drop-desc">Công cụ AI hữu ích cho việc học</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tai-nguyen/">Xem tất cả Tài nguyên →</a>
+</div></li></ul>
+        <div class="drawer-foot">
+          <a class="btn ghost" href="../dang-nhap.html">Đăng nhập</a>
+          <a class="btn" href="../lo-trinh/">Bắt đầu học</a>
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+<div class="search-dialog" hidden>
+  <div class="search-scrim"></div>
+  <div class="search-box" role="dialog" aria-modal="true" aria-label="Tìm kiếm">
+    <form class="search-form" action="../search.html" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" placeholder="Tìm bài học, chủ đề, bài viết…" autocomplete="off" aria-label="Từ khóa tìm kiếm" aria-controls="search-suggest">
+      <button type="button" class="icon-btn search-close" aria-label="Đóng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </form>
+    <div class="search-suggest" id="search-suggest" aria-live="polite">
+      <div class="search-empty">
+        <p class="search-group-title">Chủ đề phổ biến</p>
+        <div class="chips"><a class="chip" href="../hoc/python.html">Python</a><a class="chip" href="../hoc/opencv.html">OpenCV</a><a class="chip" href="../hoc/machine-vision.html">Machine Vision</a><a class="chip" href="../hoc/deep-learning.html">Deep Learning</a><a class="chip" href="../hoc/ai-vision.html">AI Vision</a><a class="chip" href="../hoc/object-detection.html">Object Detection</a><a class="chip" href="../hoc/pytorch.html">PyTorch</a><a class="chip" href="../ngoai-ngu/english.html">English</a></div>
+        <p class="search-group-title">Lộ trình nổi bật</p>
+        <a class="search-item" href="../lo-trinh/vision-engineer.html"><span class="search-ico" aria-hidden="true">⭐</span><span>Trở thành Vision Engineer<small>Learning Path · Machine Vision + AI Vision + Industrial Automation</small></span></a>
+      </div>
+    </div>
+    <div class="search-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> chọn</span><span><kbd>Enter</kbd> mở</span><span><kbd>Esc</kbd> đóng</span></div>
+  </div>
+</div>
+<main id="main">
+  <div class="container layout article-layout">
+    <article class="article">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../lo-trinh/">Learning Paths</a><span>/</span><a href="../lo-trinh/vision-engineer.html">Vision Engineer</a><span>/</span><a href="../lo-trinh/vision-engineer/deployment.html">Chặng 13: Deployment</a></nav>
+      <header class="article-head">
+        <div class="course-bar" data-course="vision-engineer"><a class="course-chip" href="../lo-trinh/vision-engineer/deployment.html">⭐ Vision Engineer · Chặng 13</a><span class="lesson-no">Bài 1/6</span><span class="kind kind-lesson">Bài học</span><span class="lesson-min"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></svg>~75 phút</span></div>
+        <h1>Xuất mô hình PyTorch sang ONNX và kiểm tra kết quả khớp PyTorch</h1>
+        <p class="lead">Xuất PyTorch và YOLO sang ONNX, chạy bằng ONNX Runtime, đo sai số trên nhiều ảnh, bắt lỗi tiền xử lý và lưu thẻ mô hình có mã băm.</p>
+        <div class="article-meta">
+          <span class="avatar" aria-hidden="true">HF</span>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>34 phút đọc</span></div>
+        </div>
+      </header>
+      <figure class="article-cover">
+        <img src="../assets/images/posts/deploy-1-xuat-onnx-va-kiem-tra-sai-so.webp" alt="Xuất mô hình PyTorch sang ONNX và kiểm tra kết quả khớp PyTorch" width="1200" height="675" fetchpriority="high" decoding="async">
+      </figure>
+      <section class="lesson-goals" aria-label="Mục tiêu bài học"><h2>Học xong bài này, bạn sẽ</h2><ul><li>Xuất mô hình PyTorch, YOLO sang ONNX</li><li>Chạy suy luận bằng ONNX Runtime trong Python</li><li>So sánh sai số đầu ra với PyTorch</li></ul><p class="goals-before">Nên học trước: <a href="../projects/phat-hien-loi-be-mat-anomaly-detection.html">Dự án chặng 12: phát hiện lỗi bề mặt bằng PatchCore</a></p></section>
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol class="toc-plain"><li><a href="#1-quy-trinh-tu-file-pt-toi-file-onnx-da-kiem-chung">1. Quy trình: từ file .pt tới file .onnx &quot;đã kiểm chứng&quot;</a></li><li><a href="#2-chuan-bi-du-lieu-tien-xu-ly-va-mot-mo-hinh-nho">2. Chuẩn bị: dữ liệu, tiền xử lý và một mô hình nhỏ</a></li><li><a href="#3-model-eval-mot-dong-quyet-dinh-ket-qua">3. model.eval(): một dòng quyết định kết quả</a></li><li><a href="#4-xuat-onnx-bang-torch-onnx-export">4. Xuất ONNX bằng torch.onnx.export</a></li><li><a href="#5-kiem-tra-file-onnx-checker-va-dau-vao-dau-ra">5. Kiểm tra file: onnx.checker và đầu vào/đầu ra</a></li><li><a href="#6-chay-suy-luan-bang-onnx-runtime-trong-python">6. Chạy suy luận bằng ONNX Runtime trong Python</a></li><li><a href="#7-so-sanh-voi-pytorch-tren-n-anh">7. So sánh với PyTorch trên N ảnh</a></li><li><a href="#8-tien-xu-ly-nguon-sai-lech-so-mot">8. Tiền xử lý: nguồn sai lệch số một</a></li><li><a href="#9-xuat-yolo-sang-onnx">9. Xuất YOLO sang ONNX</a></li><li><a href="#10-the-mo-hinh-model-card-va-ma-bam">10. Thẻ mô hình (model card) và mã băm</a></li><li><a href="#11-loi-thuong-gap">11. Lỗi thường gặp</a></li><li><a href="#12-bai-tap">12. Bài tập</a></li><li><a href="#tom-tat">Tóm tắt</a></li></ol></details>
+      <div class="prose">
+<p>Ở dự án "Phân loại ảnh OK/NG bằng transfer learning với PyTorch", bước cuối là một dòng <code>torch.onnx.export</code>. Dòng đó tạo ra file, nhưng <strong>chưa chứng minh</strong> file đó cho cùng kết quả với mô hình bạn đã đánh giá. Trên máy tính công nghiệp, mô hình sẽ chạy bằng ONNX Runtime (trong Python, C# hay C++), với một đoạn tiền xử lý viết lại ở nơi khác. Chỉ cần một chi tiết lệch (quên <code>model.eval()</code>, đảo kênh màu, quên chuẩn hóa) là tỷ lệ lọt lỗi tăng vọt mà không có thông báo lỗi nào. Bài này dạy quy trình xuất ONNX <em>có kiểm chứng</em>: xuất, kiểm tra file, chạy bằng ONNX Runtime, so sánh số với PyTorch trên nhiều ảnh, và lưu một "thẻ mô hình" (model card) đi kèm file. Đây là bài mở đầu chặng Deployment; bài sau đưa đúng file này vào ứng dụng C#.</p>
+
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Xuất được mô hình PyTorch (và YOLO) sang ONNX với batch động; chạy suy luận bằng ONNX Runtime trong Python; chứng minh bằng số rằng ONNX cho cùng kết quả với PyTorch trên N ảnh; đóng gói file ONNX kèm thẻ mô hình JSON (đặc tả đầu vào, opset, mã băm).</div>
+
+<h2 id="1-quy-trinh-tu-file-pt-toi-file-onnx-da-kiem-chung">1. Quy trình: từ file .pt tới file .onnx "đã kiểm chứng"</h2>
+<p><strong>ONNX</strong> (Open Neural Network Exchange) là định dạng file mô tả đồ thị tính toán của mạng nơ-ron (các phép Conv, Relu, Gemm…) cùng trọng số. Nhiều runtime đọc được ONNX: ONNX Runtime (CPU, GPU, DirectML), OpenVINO, TensorRT. Mỗi phiên bản bộ phép toán gọi là một <strong>opset</strong>; runtime cũ chỉ hiểu tới một opset nhất định, nên opset là thông tin bắt buộc phải ghi lại.</p>
+<pre><code class="language-text">Mô hình đã huấn luyện (.pt)
+   │ 1. model.eval()
+   │ 2. torch.onnx.export(...)            → ok_ng.onnx
+   │ 3. onnx.checker + in đầu vào/đầu ra   → đúng tên, shape, kiểu?
+   │ 4. ONNX Runtime chạy N ảnh thật       → so với PyTorch: sai số, tỷ lệ khớp quyết định
+   │ 5. Lưu bộ ảnh vàng + kết quả mong đợi → để kiểm tra phía C#/C++
+   └ 6. Thẻ mô hình JSON (opset, tiền xử lý, ngưỡng, SHA-256)
+→ Chỉ file đã qua đủ 6 bước mới được chép sang máy trạm.</code></pre>
+<pre><code class="language-bash">pip install torch onnx onnxruntime onnxscript opencv-python numpy
+# Bài viết chạy với torch 2.14.1 (CPU), onnx 1.23.2, onnxruntime 1.31.0, onnxscript 0.7.2.
+# onnxscript là bắt buộc: exporter mặc định của torch (dynamo) dùng nó để dịch sang ONNX.</code></pre>
+
+<h2 id="2-chuan-bi-du-lieu-tien-xu-ly-va-mot-mo-hinh-nho">2. Chuẩn bị: dữ liệu, tiền xử lý và một mô hình nhỏ</h2>
+<p>Để bài chạy trong vài giây trên mọi máy, ta tạo dữ liệu giả: tấm kim loại xám 96×96 pixel. Ảnh <strong>OK</strong> có thể có chấm mực xanh dương do QC đánh dấu (hợp lệ); ảnh <strong>NG</strong> có vết gỉ màu cam. Hai loại chỉ khác nhau ở <em>màu</em>, nên thứ tự kênh màu rất quan trọng, giống hệt nhiều bài toán thật (dây điện sai màu, nhãn sai màu, vết cháy).</p>
+<p>Điểm quan trọng nhất của mục này là hàm <code>tien_xu_ly()</code>: mọi nơi chạy mô hình (huấn luyện, kiểm tra ONNX, ứng dụng trạm) phải làm <strong>đúng y</strong> các bước này.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+import torch
+import torch.nn as nn
+
+torch.manual_seed(0)
+torch.set_num_threads(4)
+
+
+def tao_anh(ng, rng):
+    """Tấm kim loại 96x96 (BGR). OK có thể có chấm mực xanh của QC, NG có vết gỉ màu cam."""
+    anh = np.full((96, 96, 3), 128, np.float32) + rng.normal(0, 8, (96, 96, 3))
+    anh += np.linspace(-15, 15, 96)[None, :, None]            # ánh sáng không đều trái-phải
+    tam = tuple(int(v) for v in rng.integers(20, 76, 2))
+    r = int(rng.integers(5, 10))
+    if ng:
+        cv2.circle(anh, tam, r, (40, 110, 200), -1)           # gỉ: cam (B thấp, R cao)
+    elif rng.random() &lt; 0.6:
+        cv2.circle(anh, tam, r, (200, 120, 40), -1)           # mực QC: xanh dương
+    return np.clip(anh, 0, 255).astype(np.uint8)
+
+
+KICH_THUOC = 64
+MEAN = np.array([0.485, 0.456, 0.406], np.float32)           # mean/std ImageNet, theo thứ tự R, G, B
+STD = np.array([0.229, 0.224, 0.225], np.float32)
+
+
+def tien_xu_ly(anh_bgr):
+    """Ảnh BGR uint8 (H, W, 3) -&gt; float32 (3, 64, 64), đúng như lúc huấn luyện."""
+    anh = cv2.resize(anh_bgr, (KICH_THUOC, KICH_THUOC), interpolation=cv2.INTER_AREA)
+    anh = cv2.cvtColor(anh, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
+    anh = (anh - MEAN) / STD
+    return np.ascontiguousarray(anh.transpose(2, 0, 1))      # HWC -&gt; CHW
+
+
+rng = np.random.default_rng(0)
+nhan = np.array([i % 2 for i in range(800)])                 # 0 = OK, 1 = NG
+anh_goc = [tao_anh(n, rng) for n in nhan]
+X = torch.from_numpy(np.stack([tien_xu_ly(a) for a in anh_goc]))
+y = torch.from_numpy(nhan).long()
+cv2.imwrite("vi_du_ok.png", anh_goc[2])
+cv2.imwrite("vi_du_ng.png", anh_goc[1])
+print(X.shape, X.dtype, y[:6].tolist())</code></pre>
+<pre><code class="language-text">torch.Size([800, 3, 64, 64]) torch.float32 [0, 1, 0, 1, 0, 1]</code></pre>
+<p>Mô hình: 3 khối Conv + <strong>BatchNorm</strong> + ReLU, rồi <strong>Dropout</strong> và một lớp Linear ra 2 logit (OK, NG). Hai lớp BatchNorm và Dropout được chọn có chủ ý: chúng là lý do số một khiến người mới quên <code>model.eval()</code> mà gặp rắc rối. Huấn luyện 4 epoch trên 600 ảnh, giữ 200 ảnh làm tập kiểm tra:</p>
+<pre><code class="language-python">class MangOkNg(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.dac_trung = nn.Sequential(
+            nn.Conv2d(3, 16, 3, padding=1), nn.BatchNorm2d(16), nn.ReLU(), nn.MaxPool2d(2),
+            nn.Conv2d(16, 32, 3, padding=1), nn.BatchNorm2d(32), nn.ReLU(), nn.MaxPool2d(2),
+            nn.Conv2d(32, 32, 3, padding=1), nn.BatchNorm2d(32), nn.ReLU(),
+            nn.AdaptiveAvgPool2d(1), nn.Flatten())
+        self.dau = nn.Sequential(nn.Dropout(0.3), nn.Linear(32, 2))
+
+    def forward(self, x):
+        return self.dau(self.dac_trung(x))
+
+
+model = MangOkNg()
+opt = torch.optim.Adam(model.parameters(), lr=3e-3)
+for ep in range(4):
+    model.train()
+    perm = torch.randperm(600)
+    for i in range(0, 600, 32):
+        idx = perm[i:i + 32]
+        loss = nn.functional.cross_entropy(model(X[idx]), y[idx])
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+    model.eval()
+    with torch.no_grad():
+        acc = (model(X[600:]).argmax(1) == y[600:]).float().mean().item()
+    print(f"epoch {ep + 1}: loss {loss.item():.3f}, val acc {acc:.3f}")
+
+torch.save(model.state_dict(), "ok_ng.pt")</code></pre>
+<pre><code class="language-text">epoch 1: loss 0.308, val acc 1.000
+epoch 2: loss 0.158, val acc 1.000
+epoch 3: loss 0.240, val acc 1.000
+epoch 4: loss 0.093, val acc 1.000</code></pre>
+<p>Giá trị loss có thể lệch chút ít trên CPU hoặc phiên bản thư viện khác. Bài toán giả này dễ nên độ chính xác đạt 100%; với mô hình thật của bạn (ví dụ ResNet18 ở dự án transfer learning), quy trình phía dưới giữ nguyên, chỉ thay <code>MangOkNg</code> và <code>tien_xu_ly</code>.</p>
+
+<h2 id="3-model-eval-mot-dong-quyet-dinh-ket-qua">3. model.eval(): một dòng quyết định kết quả</h2>
+<p>Hai loại lớp hoạt động <strong>khác nhau</strong> giữa lúc huấn luyện (<code>train()</code>) và lúc suy luận (<code>eval()</code>):</p>
+<table>
+  <tr><th>Lớp</th><th>Chế độ train</th><th>Chế độ eval</th></tr>
+  <tr><td>BatchNorm</td><td>Chuẩn hóa bằng mean/var <em>của batch hiện tại</em>, đồng thời cập nhật <code>running_mean</code>/<code>running_var</code></td><td>Dùng <code>running_mean</code>/<code>running_var</code> đã học, cố định</td></tr>
+  <tr><td>Dropout</td><td>Ngẫu nhiên tắt 30% nơ-ron mỗi lần chạy</td><td>Không làm gì (cho qua)</td></tr>
+</table>
+<p>Hãy xem điều gì xảy ra nếu chạy suy luận ở chế độ train. Dùng một bản sao để không làm hỏng <code>model</code>:</p>
+<pre><code class="language-python">import copy
+
+torch.manual_seed(0)                      # để Dropout cho cùng kết quả mỗi lần chạy bài
+anh_ok = X[600:601]                       # ảnh 600 là ảnh OK (nhãn 0)
+ban_sao = copy.deepcopy(model)
+
+with torch.no_grad():
+    ban_sao.eval()
+    print("eval , lần 1:", ban_sao(anh_ok).numpy().round(3))
+    print("eval , lần 2:", ban_sao(anh_ok).numpy().round(3))
+    ban_sao.train()
+    print("train, lần 1:", ban_sao(anh_ok).numpy().round(3))
+    print("train, lần 2:", ban_sao(anh_ok).numpy().round(3))
+    ban_sao.eval()
+    print("eval sau khi lỡ chạy train:", ban_sao(anh_ok).numpy().round(3))</code></pre>
+<pre><code class="language-text">eval , lần 1: [[ 1.399 -1.744]]
+eval , lần 2: [[ 1.399 -1.744]]
+train, lần 1: [[-1.322  0.97 ]]
+train, lần 2: [[-0.014 -0.372]]
+eval sau khi lỡ chạy train: [[ 1.326 -1.66 ]]</code></pre>
+<p>Ba bài học từ năm dòng này:</p>
+<ul>
+  <li>Ở chế độ train, lần chạy đầu <strong>phân loại ảnh OK thành NG</strong> (logit NG lớn hơn logit OK): BatchNorm chuẩn hóa bằng thống kê của đúng một ảnh, hoàn toàn khác thống kê đã học.</li>
+  <li>Cùng một ảnh, hai lần chạy cho hai kết quả khác hẳn nhau (lần hai lại ra OK): Dropout ngẫu nhiên. Mô hình kiểm tra mà không tái lập được kết quả là không thể nghiệm thu.</li>
+  <li>Chỉ <em>chạy</em> ở chế độ train (kể cả trong <code>torch.no_grad()</code>) cũng đã <strong>sửa</strong> <code>running_mean</code>/<code>running_var</code>: dòng cuối khác dòng đầu. Nếu sau đó bạn lưu mô hình, bạn lưu một mô hình đã bị làm hỏng.</li>
+</ul>
+<div class="warn"><strong>Quên eval() khi xuất và khi so sánh</strong>Nếu gọi <code>torch.onnx.export</code> khi mô hình đang ở chế độ train, torch 2.14 in cảnh báo <code>UserWarning: Exporting a model while it is in training mode... Calling model.eval() before export is recommended.</code> Trong thử nghiệm với torch 2.14, file ONNX tạo ra vẫn dùng thống kê đã học, nhưng hành vi này phụ thuộc phiên bản và exporter, đừng dựa vào nó. Bẫy hay gặp hơn nằm ở phía <em>so sánh</em>: chạy PyTorch tham chiếu ở chế độ train, thấy sai khác lớn rồi kết luận nhầm là "ONNX bị lỗi". Quy tắc: gọi <code>model.eval()</code> ngay sau khi nạp trọng số, trước mọi việc khác.</div>
+
+<h2 id="4-xuat-onnx-bang-torch-onnx-export">4. Xuất ONNX bằng torch.onnx.export</h2>
+<p>Từ PyTorch 2.9, <code>torch.onnx.export</code> mặc định dùng exporter mới dựa trên <code>torch.export</code> (tham số <code>dynamo=True</code>). Exporter này cần gói <code>onnxscript</code>, trả về một đối tượng <code>ONNXProgram</code> và, nếu bạn truyền tên file, ghi luôn file. Lệnh xuất đầy đủ cho mô hình phân loại:</p>
+<pre><code class="language-python">model = MangOkNg()
+model.load_state_dict(torch.load("ok_ng.pt", weights_only=True))
+model.eval()                                            # luôn luôn, trước khi xuất
+
+vi_du = torch.from_numpy(tien_xu_ly(anh_goc[0]))[None]  # (1, 3, 64, 64), đi qua đúng tiền xử lý
+chuong_trinh = torch.onnx.export(
+    model, (vi_du,), "ok_ng.onnx",
+    input_names=["images"], output_names=["logits"],
+    dynamic_shapes={"x": {0: "batch"}},                 # "x" = tên tham số của forward(); trục 0 động
+    opset_version=18,
+    external_data=False,                                # trọng số nằm luôn trong file .onnx
+    verbose=False,                                      # tắt các dòng tiến trình [torch.onnx] ...
+)
+print(type(chuong_trinh).__name__)
+
+from pathlib import Path
+for p in sorted(Path(".").glob("ok_ng*")):
+    print(p.name, p.stat().st_size, "byte")</code></pre>
+<pre><code class="language-text">ONNXProgram
+ok_ng.onnx 75657 byte
+ok_ng.pt 65572 byte</code></pre>
+<p>Ý nghĩa từng tham số (đã kiểm tra trên mã nguồn torch 2.14.1):</p>
+<table>
+  <tr><th>Tham số</th><th>Giá trị trong bài</th><th>Ghi chú</th></tr>
+  <tr><td><code>args</code></td><td><code>(vi_du,)</code></td><td>Tuple đầu vào mẫu. Dùng một ảnh thật đã qua tiền xử lý, không cần đúng batch bạn sẽ chạy.</td></tr>
+  <tr><td><code>input_names</code>, <code>output_names</code></td><td><code>images</code>, <code>logits</code></td><td>Tên mà ứng dụng C#/Python sẽ dùng khi gọi <code>run</code>. Đặt tên rõ ràng, ghi vào thẻ mô hình.</td></tr>
+  <tr><td><code>dynamic_shapes</code></td><td><code>{"x": {0: "batch"}}</code></td><td>Cách khai báo trục động của exporter mới. Khóa là <em>tên tham số của <code>forward</code></em>, giá trị là <code>{chỉ số trục: tên trục}</code>. Không khai báo thì mọi trục cố định theo ví dụ (batch = 1).</td></tr>
+  <tr><td><code>dynamic_axes</code></td><td>(không dùng)</td><td>Cách cũ, khóa là <em>tên đầu vào/đầu ra</em>. Với exporter mới vẫn chạy nhưng in <code>UserWarning</code> và tự chuyển sang <code>dynamic_shapes</code>; chỉ nên dùng với <code>dynamo=False</code>.</td></tr>
+  <tr><td><code>opset_version</code></td><td>18</td><td>Mặc định là 20 trong torch 2.14. Chọn theo runtime <em>đích</em>: runtime cũ trên máy trạm có thể chưa hỗ trợ opset mới. Exporter mới làm việc ở opset 18; chọn thấp hơn 18 thì nó in cảnh báo và thử chuyển đổi phiên bản, có thể không thành công.</td></tr>
+  <tr><td><code>external_data</code></td><td><code>False</code></td><td>Mặc định là <code>True</code>: trọng số được ghi ra file riêng <code>ok_ng.onnx.data</code> cạnh file <code>.onnx</code>. Với mô hình dưới 2 GB (gần như mọi mô hình vision), đặt <code>False</code> để có một file duy nhất.</td></tr>
+  <tr><td><code>dynamo</code></td><td>(mặc định <code>True</code>)</td><td><code>dynamo=False</code> dùng exporter TorchScript cũ, đã bị đánh dấu deprecated (in <code>DeprecationWarning</code>).</td></tr>
+  <tr><td><code>verify</code></td><td>(không dùng)</td><td><code>verify=True</code> cho exporter tự chạy thử bằng ONNX Runtime trên đầu vào mẫu. Tiện, nhưng chỉ một đầu vào; không thay được phép so sánh trên N ảnh ở mục 7.</td></tr>
+</table>
+<div class="warn"><strong>Bẫy file .onnx.data</strong>Với cài đặt mặc định (<code>external_data=True</code>), exporter tạo <em>hai</em> file. Chép mỗi <code>model.onnx</code> sang máy trạm thì ONNX Runtime báo lỗi không tìm thấy dữ liệu trọng số. Hoặc đặt <code>external_data=False</code>, hoặc luôn chép cả hai file và ghi cả hai mã băm vào thẻ mô hình.</div>
+<p>Để so sánh, đây là cách viết cho exporter cũ mà bạn sẽ gặp trong nhiều hướng dẫn trên mạng. Nó vẫn chạy trong torch 2.14 (kèm cảnh báo deprecated), cho cùng đồ thị đầu vào với batch động:</p>
+<pre><code class="language-python">import warnings
+
+import onnx
+
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", DeprecationWarning)
+    torch.onnx.export(model, (vi_du,), "ok_ng_cu.onnx", dynamo=False,
+                      input_names=["images"], output_names=["logits"],
+                      dynamic_axes={"images": {0: "batch"}, "logits": {0: "batch"}},
+                      opset_version=18)
+
+dau_vao = onnx.load("ok_ng_cu.onnx").graph.input[0]
+print(dau_vao.name, [d.dim_param or d.dim_value for d in dau_vao.type.tensor_type.shape.dim])</code></pre>
+<pre><code class="language-text">images ['batch', 3, 64, 64]</code></pre>
+<p>Mã mới nên dùng exporter mặc định với <code>dynamic_shapes</code>. Giữ cách cũ chỉ khi exporter mới thất bại với một mô hình có cấu trúc đặc biệt, và ghi rõ điều đó trong thẻ mô hình.</p>
+
+<h2 id="5-kiem-tra-file-onnx-checker-va-dau-vao-dau-ra">5. Kiểm tra file: onnx.checker và đầu vào/đầu ra</h2>
+<p>Trước khi chạy, hãy kiểm tra file hợp lệ theo chuẩn ONNX và in "hợp đồng" của nó: tên, shape, kiểu dữ liệu của đầu vào và đầu ra. Đây chính là những gì ứng dụng phía C# phải tuân theo.</p>
+<pre><code class="language-python">import onnx
+import onnxruntime as ort
+
+mo_hinh_onnx = onnx.load("ok_ng.onnx")
+onnx.checker.check_model(mo_hinh_onnx, full_check=True)   # lỗi cấu trúc -&gt; ném exception
+print("opset:", mo_hinh_onnx.opset_import[0].version, "| ir_version:", mo_hinh_onnx.ir_version,
+      "| producer:", mo_hinh_onnx.producer_name, mo_hinh_onnx.producer_version)
+print("số node:", len(mo_hinh_onnx.graph.node), sorted({n.op_type for n in mo_hinh_onnx.graph.node}))
+
+sess = ort.InferenceSession("ok_ng.onnx", providers=["CPUExecutionProvider"])
+for i in sess.get_inputs():
+    print("input ", i.name, i.shape, i.type)
+for o in sess.get_outputs():
+    print("output", o.name, o.shape, o.type)
+print("onnxruntime", ort.__version__, sess.get_providers())</code></pre>
+<pre><code class="language-text">opset: 18 | ir_version: 10 | producer: pytorch 2.14.1+cu130
+số node: 11 ['Conv', 'Gemm', 'MaxPool', 'ReduceMean', 'Relu', 'Reshape']
+input  images ['batch', 3, 64, 64] tensor(float)
+output logits ['batch', 2] tensor(float)
+onnxruntime 1.31.0 ['CPUExecutionProvider']</code></pre>
+<p>Đọc kết quả:</p>
+<ul>
+  <li>Trục đầu là <code>'batch'</code> (chuỗi) nghĩa là trục động; các trục còn lại cố định 3×64×64. Kiểu <code>tensor(float)</code> là float32.</li>
+  <li>Đồ thị <strong>không còn</strong> node <code>BatchNormalization</code> và <code>Dropout</code>: exporter đã gộp BatchNorm vào trọng số Conv (dùng thống kê đã học) và bỏ Dropout vì đây là đồ thị suy luận. Nếu bạn thấy <code>Dropout</code> hay <code>BatchNormalization</code> có thuộc tính <code>training_mode</code> trong đồ thị, hãy nghi ngờ mô hình chưa ở chế độ eval.</li>
+  <li><code>check_model</code> chỉ kiểm tra cấu trúc hợp lệ, <strong>không</strong> kiểm tra kết quả đúng. Một file ONNX hoàn toàn hợp lệ vẫn có thể cho kết quả sai nếu tiền xử lý sai.</li>
+</ul>
+
+<h2 id="6-chay-suy-luan-bang-onnx-runtime-trong-python">6. Chạy suy luận bằng ONNX Runtime trong Python</h2>
+<p>Ba quy tắc: tạo <code>InferenceSession</code> <strong>một lần</strong> khi khởi động; đầu vào là mảng NumPy float32, layout NCHW, liên tục trong bộ nhớ; đầu ra là list các mảng NumPy theo thứ tự <code>output_names</code>.</p>
+<pre><code class="language-python">def softmax(z):
+    e = np.exp(z - z.max(axis=1, keepdims=True))
+    return e / e.sum(axis=1, keepdims=True)
+
+
+anh = cv2.imread("vi_du_ng.png")                    # ảnh BGR như từ camera
+x = tien_xu_ly(anh)[None]                           # (1, 3, 64, 64) float32
+logits = sess.run(["logits"], {"images": x})[0]
+print("logits:", logits.round(3), "| P(NG) =", softmax(logits)[0, 1].round(4))
+
+lo = np.stack([tien_xu_ly(a) for a in anh_goc[600:608]])     # batch 8 nhờ trục động
+print("batch 8 ->", sess.run(None, {"images": lo})[0].shape)
+
+for sai, ten in [(x.astype(np.float64), "float64"), (x[:, :, :32, :32], "ảnh 32x32")]:
+    try:
+        sess.run(None, {"images": sai})
+    except Exception as e:
+        thong_bao = " ".join(str(e).split())             # gộp nhiều dòng thành một
+        print(ten, "-&gt;", type(e).__name__, ":", thong_bao.split("INVALID_ARGUMENT : ")[-1][:100])</code></pre>
+<pre><code class="language-text">logits: [[-1.455  0.904]] | P(NG) = 0.9136
+batch 8 -&gt; (8, 2)
+float64 -&gt; InvalidArgument : Unexpected input data type. Actual: (tensor(double)) , expected: (tensor(float))
+ảnh 32x32 -&gt; InvalidArgument : Got invalid dimensions for input: images for the following indices index: 2 Got: 32 Expected: 64 ind</code></pre>
+<p>ONNX Runtime <strong>không</strong> tự đổi float64 sang float32 hay tự resize: nó báo lỗi ngay. Đây là điều tốt. Lỗi nguy hiểm là những lỗi <em>không</em> báo gì, như ở mục 8. Lưu ý <code>tien_xu_ly</code> trả về float32 vì <code>MEAN</code>, <code>STD</code> khai báo float32; nếu bạn viết <code>np.array([0.485, ...])</code> không ghi kiểu, NumPy tạo float64 và bạn sẽ gặp đúng lỗi trên.</p>
+
+<h2 id="7-so-sanh-voi-pytorch-tren-n-anh">7. So sánh với PyTorch trên N ảnh</h2>
+<p>Một ảnh khớp chưa nói lên điều gì. Hãy tạo một bộ kiểm tra <strong>mới</strong> (200 ảnh, chưa dùng khi huấn luyện), chạy cả hai phía trên <em>cùng một tensor đầu vào</em>, rồi đo bốn con số:</p>
+<pre><code class="language-python">rng_kt = np.random.default_rng(1)
+nhan_kt = np.array([i % 2 for i in range(200)])
+anh_kt = [tao_anh(n, rng_kt) for n in nhan_kt]
+dau_vao = np.stack([tien_xu_ly(a) for a in anh_kt])           # (200, 3, 64, 64)
+
+with torch.no_grad():
+    ref = model(torch.from_numpy(dau_vao)).numpy()             # PyTorch, model đã eval()
+out = sess.run(None, {"images": dau_vao})[0]                   # ONNX Runtime
+
+sai = np.abs(out - ref)
+p_ref, p_out = softmax(ref)[:, 1], softmax(out)[:, 1]
+print(f"sai khác logit : lớn nhất {sai.max():.2e}, trung bình {sai.mean():.2e}")
+print(f"sai khác P(NG) : lớn nhất {np.abs(p_out - p_ref).max():.2e}")
+print(f"khớp quyết định: {(out.argmax(1) == ref.argmax(1)).mean() * 100:.1f}% trên {len(out)} ảnh")
+print(f"độ chính xác ONNX: {(out.argmax(1) == nhan_kt).mean() * 100:.1f}%")
+
+np.testing.assert_allclose(out, ref, rtol=1e-3, atol=1e-5)    # không đạt -&gt; AssertionError
+print("assert_allclose(rtol=1e-3, atol=1e-5): ĐẠT")</code></pre>
+<pre><code class="language-text">sai khác logit : lớn nhất 7.15e-07, trung bình 9.66e-08
+sai khác P(NG) : lớn nhất 1.19e-07
+khớp quyết định: 100.0% trên 200 ảnh
+độ chính xác ONNX: 100.0%
+assert_allclose(rtol=1e-3, atol=1e-5): ĐẠT</code></pre>
+<p>Sai khác cỡ 10<sup>-7</sup> là bình thường: hai thư viện cộng các số float32 theo thứ tự khác nhau (và ONNX đã gộp BatchNorm vào Conv), nên làm tròn khác nhau ở chữ số thứ 7. <code>assert_allclose</code> đạt khi <code>|out - ref| ≤ atol + rtol × |ref|</code> với <em>mọi</em> phần tử; khi không đạt, nó in số phần tử lệch và vị trí lệch lớn nhất, rất tiện để đưa vào script kiểm thử tự động.</p>
+<p>Ngưỡng chấp nhận tham khảo (logit/xác suất, cùng đầu vào):</p>
+<table>
+  <tr><th>Tình huống</th><th>Sai khác lớn nhất thường gặp</th><th>Tiêu chí nên dùng</th></tr>
+  <tr><td>FP32, ONNX Runtime CPU</td><td>10<sup>-7</sup> – 10<sup>-5</sup></td><td><code>assert_allclose(rtol=1e-3, atol=1e-5)</code> + khớp quyết định 100%</td></tr>
+  <tr><td>FP32 trên GPU (CUDA, TensorRT, DirectML)</td><td>10<sup>-5</sup> – 10<sup>-3</sup></td><td><code>atol</code> cỡ 1e-3 + khớp quyết định ≥ 99,9%</td></tr>
+  <tr><td>FP16</td><td>10<sup>-3</sup> – 10<sup>-2</sup></td><td>So quyết định và chỉ số nghiệm thu (lọt lỗi, loại nhầm) trên tập test</td></tr>
+  <tr><td>INT8 (lượng tử hóa)</td><td>có thể tới 10<sup>-1</sup></td><td>Chỉ so ở mức quyết định và chỉ số nghiệm thu; bắt buộc đánh giá lại trên ảnh lỗi thật</td></tr>
+  <tr><td>Sai khác ≥ 0,1 ở FP32</td><td colspan="2">Không phải sai số làm tròn: đó là lỗi (tiền xử lý, eval, sai phiên bản trọng số). Dừng lại và tìm nguyên nhân.</td></tr>
+</table>
+<p>"Khớp quyết định" quan trọng hơn sai khác số: điều PLC nhận được là OK/NG. Nhưng chỉ nhìn khớp quyết định thì dễ bỏ sót lỗi tiền xử lý nhỏ đang âm thầm đẩy điểm tin cậy về gần ngưỡng. Vì vậy luôn báo cả hai.</p>
+<div class="tip"><strong>Ảnh sát ngưỡng</strong>Với FP16/INT8, ảnh có P(NG) nằm sát ngưỡng (ví dụ 0,45–0,55) có thể đổi quyết định. Đếm riêng số ảnh như vậy trong tập test; nếu nhiều, cần thêm dữ liệu hoặc xem lại ngưỡng, không phải lỗi của ONNX.</div>
+
+<h2 id="8-tien-xu-ly-nguon-sai-lech-so-mot">8. Tiền xử lý: nguồn sai lệch số một</h2>
+<p>Khi kết quả ở trạm khác kết quả lúc phát triển, 9/10 trường hợp nguyên nhân nằm ở tiền xử lý, không phải ở mô hình. Thí nghiệm dưới đây chạy <strong>cùng file ONNX</strong> trên cùng 200 ảnh, chỉ thay đổi một chi tiết tiền xử lý mỗi lần, rồi so với kết quả tham chiếu <code>ref</code>:</p>
+<pre><code class="language-python">def tien_xu_ly_sai(anh_bgr, loi):
+    noi_suy = cv2.INTER_LINEAR if loi == "resize INTER_LINEAR" else cv2.INTER_AREA
+    a = cv2.resize(anh_bgr, (KICH_THUOC, KICH_THUOC), interpolation=noi_suy)
+    if loi != "quên BGR-&gt;RGB":
+        a = cv2.cvtColor(a, cv2.COLOR_BGR2RGB)
+    a = a.astype(np.float32)
+    if loi != "quên chia 255":
+        a = a / 255.0
+    if loi != "quên mean/std":
+        a = (a - MEAN) / STD
+    if loi == "reshape thay transpose":
+        return a.reshape(3, KICH_THUOC, KICH_THUOC)          # sai: chỉ đổi shape, không đổi thứ tự dữ liệu
+    return a.transpose(2, 0, 1)
+
+
+print(f"{'Biến thể':24s} {'sai khác max':&gt;12s} {'khớp ref':&gt;9s} {'đúng nhãn':&gt;10s}")
+for loi in ["đúng như huấn luyện", "resize INTER_LINEAR", "quên mean/std",
+            "quên BGR-&gt;RGB", "quên chia 255", "reshape thay transpose"]:
+    xs = np.ascontiguousarray(np.stack([tien_xu_ly_sai(a, loi) for a in anh_kt]), dtype=np.float32)
+    o = sess.run(None, {"images": xs})[0]
+    print(f"{loi:24s} {np.abs(o - ref).max():12.3f} {(o.argmax(1) == ref.argmax(1)).mean() * 100:8.1f}%"
+          f" {(o.argmax(1) == nhan_kt).mean() * 100:9.1f}%")</code></pre>
+<pre><code class="language-text">Biến thể                 sai khác max  khớp ref  đúng nhãn
+đúng như huấn luyện             0.000    100.0%     100.0%
+resize INTER_LINEAR             0.092    100.0%     100.0%
+quên mean/std                   2.940     59.0%      59.0%
+quên BGR-&gt;RGB                   5.411     21.0%      21.0%
+quên chia 255                4512.459     50.0%      50.0%
+reshape thay transpose         12.898     50.0%      50.0%</code></pre>
+<p>Không dòng nào báo lỗi: ONNX Runtime vui vẻ chạy mọi biến thể vì shape và kiểu dữ liệu vẫn đúng. Phân tích:</p>
+<ul>
+  <li><strong>Quên BGR→RGB</strong>: OpenCV đọc ảnh theo thứ tự BGR, còn PyTorch/torchvision (PIL) quen với RGB. Ở bài này, đảo kênh biến chấm mực xanh (hợp lệ) thành màu cam giống vết gỉ và ngược lại, nên độ đúng rơi xuống 21%, <em>tệ hơn đoán ngẫu nhiên</em>. Trong thực tế, mô hình đọc vết lỗi theo độ sáng ít bị ảnh hưởng hơn, nên lỗi này có thể chỉ làm tăng lọt lỗi vài phần trăm và tồn tại hàng tháng không ai biết.</li>
+  <li><strong>Quên chia 255 / quên mean-std</strong>: mô hình nhận dải giá trị nó chưa từng thấy. Kết quả gần như hằng số (một lớp cho mọi ảnh), độ đúng ≈ tỷ lệ của lớp đó.</li>
+  <li><strong>reshape thay transpose</strong>: ảnh từ OpenCV có layout HWC (cao, rộng, kênh); mô hình cần CHW. <code>reshape(3, 64, 64)</code> chỉ đổi shape mà không sắp xếp lại dữ liệu, nên mỗi "kênh" là một mớ pixel trộn lẫn. Phải dùng <code>transpose(2, 0, 1)</code>.</li>
+  <li><strong>Đổi phép nội suy khi resize</strong>: sai khác nhỏ (0,09) nhưng khác 0. Với ảnh sát ngưỡng, nó đủ đổi quyết định. Ghi rõ phép nội suy trong thẻ mô hình; và lưu ý <code>cv2.resize</code>, PIL và torchvision cho kết quả hơi khác nhau ngay cả khi cùng tên "bilinear".</li>
+</ul>
+<p>Cách phòng: (1) một hàm <code>tien_xu_ly</code> duy nhất, dùng chung cho huấn luyện, đánh giá và ứng dụng Python; (2) ghi đặc tả tiền xử lý vào thẻ mô hình; (3) xuất một <strong>bộ ảnh vàng</strong> kèm đầu ra mong đợi để phía C#/C++ tự kiểm tra code tiền xử lý của mình:</p>
+<pre><code class="language-python">import json
+from pathlib import Path
+
+vang = Path("bo_anh_vang")
+vang.mkdir(exist_ok=True)
+mong_doi = []
+for i in range(8):                                        # 4 OK + 4 NG
+    ten = f"anh_{i:02d}_{'NG' if nhan_kt[i] else 'OK'}.png"
+    cv2.imwrite(str(vang / ten), anh_kt[i])               # ảnh gốc BGR, PNG không nén mất dữ liệu
+    lg = sess.run(None, {"images": tien_xu_ly(anh_kt[i])[None]})[0][0]
+    tong_kenh = tien_xu_ly(anh_kt[i]).sum(axis=(1, 2))      # tổng từng kênh R, G, B của tensor
+    mong_doi.append({"file": ten, "logits": [round(float(v), 5) for v in lg],
+                     "tong_kenh": [round(float(v), 2) for v in tong_kenh]})
+(vang / "mong_doi.json").write_text(json.dumps(mong_doi, indent=1, ensure_ascii=False), encoding="utf-8")
+print(len(list(vang.glob("*.png"))), "ảnh;", mong_doi[1])</code></pre>
+<pre><code class="language-text">8 ảnh; {'file': 'anh_01_NG.png', 'logits': [-2.43758, 1.78449], 'tong_kenh': [374.83, 780.43, 1579.52]}</code></pre>
+<p>Trường <code>tong_kenh</code> (tổng các phần tử của từng kênh trong tensor đầu vào) là mẹo gỡ lỗi rẻ mà hiệu quả: nếu phía C# ra logit khác, so <code>tong_kenh</code> trước. Khác tổng → lỗi ở tiền xử lý (và kênh nào lệch gợi ý lỗi gì); cùng tổng mà khác logit → lỗi ở cách gọi mô hình. Dùng tổng <em>từng kênh</em> chứ không phải tổng cả tensor: ảnh gần xám có tổng ba kênh gần bằng nhau, nên lỗi đảo kênh gần như không làm đổi tổng chung. Phải lưu ảnh PNG; JPEG nén mất dữ liệu sẽ làm hai phía nhận pixel khác nhau.</p>
+
+<h2 id="9-xuat-yolo-sang-onnx">9. Xuất YOLO sang ONNX</h2>
+<p>Với mô hình Ultralytics (YOLO26 và các đời trước), thư viện đã gói sẵn toàn bộ bước xuất. Trên máy của bạn (cần <code>pip install ultralytics</code> và file trọng số), đoạn sau chạy được; trong môi trường viết bài không tải được trọng số nên chỉ để minh họa:</p>
+<pre><code class="language-python"># (minh họa) cần ultralytics và file trọng số best.pt từ bài huấn luyện YOLO26
+from ultralytics import YOLO
+import onnxruntime as ort
+
+duong_dan = YOLO("best.pt").export(format="onnx", imgsz=640)   # trả về đường dẫn file .onnx
+sess_yolo = ort.InferenceSession(duong_dan, providers=["CPUExecutionProvider"])
+print([(i.name, i.shape) for i in sess_yolo.get_inputs()])
+print([(o.name, o.shape) for o in sess_yolo.get_outputs()])
+
+# So sánh cách nhanh: Ultralytics nạp được cả .pt lẫn .onnx với CÙNG tiền xử lý (letterbox, RGB, /255)
+kq_pt = YOLO("best.pt").predict("anh_test.png", conf=0.25, verbose=False)[0].boxes
+kq_onnx = YOLO(duong_dan).predict("anh_test.png", conf=0.25, verbose=False)[0].boxes
+print(len(kq_pt), len(kq_onnx))</code></pre>
+<p>Những điểm cần biết khi xuất YOLO:</p>
+<ul>
+  <li><strong>Kích thước đầu vào cố định</strong> theo <code>imgsz</code> (mặc định cố định, thêm <code>dynamic=True</code> nếu cần batch/kích thước động). Ghi <code>imgsz</code> vào thẻ mô hình; ứng dụng phải letterbox (thu nhỏ giữ tỷ lệ, đệm viền) về đúng kích thước đó.</li>
+  <li><strong>Định dạng đầu ra khác nhau theo đời mô hình</strong>: YOLOv8/YOLO11 xuất tensor thô cần NMS; YOLO26 là end-to-end nên đầu ra đã là danh sách khung cuối cùng (tọa độ, điểm tin cậy, lớp). Luôn in <code>get_outputs()</code> như trên trước khi viết code giải mã, đừng chép code giải mã của đời khác.</li>
+  <li><strong>So sánh theo khung, không theo mảng</strong>: hai phía có thể trả khung theo thứ tự khác nhau. Ghép cặp khung theo IoU (Intersection over Union, tỷ lệ diện tích giao trên diện tích hợp) rồi so lớp và điểm tin cậy.</li>
+</ul>
+<p>Hàm ghép cặp khung dưới đây chạy được ngay, dùng cho mọi mô hình phát hiện vật (YOLO, hay mô hình của bạn):</p>
+<pre><code class="language-python">def iou(a, b):
+    """a, b: [x1, y1, x2, y2]"""
+    rong = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
+    cao = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    giao = rong * cao
+    hop = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - giao
+    return giao / hop if hop &gt; 0 else 0.0
+
+
+def so_khop_khung(ds_ref, ds_moi, iou_min=0.9, lech_diem_max=0.02):
+    """Mỗi phần tử: (x1, y1, x2, y2, diem, lop). Trả về danh sách vấn đề (rỗng = khớp)."""
+    van_de, da_dung = [], set()
+    for i, r in enumerate(ds_ref):
+        tot, j_tot = 0.0, None
+        for j, m in enumerate(ds_moi):
+            if j not in da_dung and m[5] == r[5] and iou(r, m) &gt; tot:
+                tot, j_tot = iou(r, m), j
+        if j_tot is None or tot &lt; iou_min:
+            van_de.append(f"khung ref {i} (lớp {r[5]}) không có cặp, IoU tốt nhất {tot:.2f}")
+            continue
+        da_dung.add(j_tot)
+        if abs(ds_moi[j_tot][4] - r[4]) &gt; lech_diem_max:
+            van_de.append(f"khung ref {i}: điểm {r[4]:.3f} vs {ds_moi[j_tot][4]:.3f}")
+    van_de += [f"khung mới {j} thừa" for j in range(len(ds_moi)) if j not in da_dung]
+    return van_de
+
+
+ref_khung = [(100, 50, 180, 120, 0.91, 0), (300, 200, 340, 260, 0.62, 1)]
+onnx_khung = [(300.4, 199.8, 340.1, 260.2, 0.618, 1), (100.2, 50.1, 179.9, 120.3, 0.909, 0)]
+print(so_khop_khung(ref_khung, onnx_khung) or "Khớp hoàn toàn")
+print(so_khop_khung(ref_khung, onnx_khung[:1] + [(500, 10, 520, 30, 0.3, 0)]))</code></pre>
+<pre><code class="language-text">Khớp hoàn toàn
+['khung ref 0 (lớp 0) không có cặp, IoU tốt nhất 0.00', 'khung mới 1 thừa']</code></pre>
+<p>Với FP32, tọa độ khung giữa PyTorch và ONNX thường lệch dưới 1 pixel, điểm tin cậy lệch dưới 0,01. Khung nằm sát ngưỡng <code>conf</code> có thể xuất hiện ở phía này mà không ở phía kia; đó là lý do so trên nhiều ảnh và xem xét từng trường hợp lệch, thay vì đòi "khớp 100%" một cách máy móc.</p>
+
+<h2 id="10-the-mo-hinh-model-card-va-ma-bam">10. Thẻ mô hình (model card) và mã băm</h2>
+<p>Sáu tháng sau, ai đó hỏi: "file <code>ok_ng.onnx</code> trên máy trạm 3 là bản nào, huấn luyện ngày nào, tiền xử lý ra sao, đã kiểm chứng chưa?". Câu trả lời phải nằm trong một file JSON đi cùng mô hình. Mã băm <strong>SHA-256</strong> (dấu vân tay 64 ký tự hex của nội dung file) cho phép kiểm tra file không bị chép nhầm phiên bản hay hỏng khi truyền.</p>
+<pre><code class="language-python">import hashlib
+import platform
+from datetime import datetime
+
+
+def sha256(duong_dan):
+    h = hashlib.sha256()
+    with open(duong_dan, "rb") as f:
+        for khoi in iter(lambda: f.read(1 &lt;&lt; 20), b""):    # đọc từng 1 MB, không nạp cả file vào RAM
+            h.update(khoi)
+    return h.hexdigest()
+
+
+the_mo_hinh = {
+    "ten": "ok_ng_gi_set",
+    "phien_ban": "1.0.0",
+    "ngay_xuat": datetime.now().isoformat(timespec="seconds"),
+    "file": "ok_ng.onnx",
+    "sha256": sha256("ok_ng.onnx"),
+    "nguon": {"file_pt": "ok_ng.pt", "sha256_pt": sha256("ok_ng.pt")},
+    "moi_truong": {"python": platform.python_version(), "torch": torch.__version__,
+                   "onnx": onnx.__version__, "onnxruntime": ort.__version__},
+    "onnx": {"opset": mo_hinh_onnx.opset_import[0].version, "exporter": "torch.onnx.export(dynamo=True)"},
+    "dau_vao": {"ten": "images", "shape": ["batch", 3, KICH_THUOC, KICH_THUOC], "kieu": "float32",
+                "layout": "NCHW"},
+    "tien_xu_ly": {"doc_anh": "BGR uint8 (OpenCV)", "resize": [KICH_THUOC, KICH_THUOC],
+                   "noi_suy": "INTER_AREA", "thu_tu_kenh": "RGB", "chia": 255.0,
+                   "mean": MEAN.tolist(), "std": STD.tolist()},
+    "dau_ra": {"ten": "logits", "shape": ["batch", 2], "lop": ["OK", "NG"],
+               "ghi_chu": "logit chưa softmax"},
+    "nguong_ng": 0.5,
+    "kiem_chung": {"so_anh": int(len(out)), "sai_khac_logit_max": float(sai.max()),
+                   "khop_quyet_dinh": float((out.argmax(1) == ref.argmax(1)).mean()),
+                   "bo_anh_vang": "bo_anh_vang/mong_doi.json"},
+}
+Path("ok_ng.model.json").write_text(json.dumps(the_mo_hinh, indent=2, ensure_ascii=False), encoding="utf-8")
+print(the_mo_hinh["sha256"][:16], "...", the_mo_hinh["onnx"], the_mo_hinh["kiem_chung"]["khop_quyet_dinh"])</code></pre>
+<pre><code class="language-text">716384f304a7c57b ... {'opset': 18, 'exporter': 'torch.onnx.export(dynamo=True)'} 1.0</code></pre>
+<p>Mã băm của bạn sẽ khác (trọng số phụ thuộc máy, và file ONNX chứa cả phiên bản exporter). Phía ứng dụng, <strong>trước khi</strong> tạo session, đọc thẻ mô hình và từ chối chạy nếu mã băm hoặc đặc tả đầu vào không khớp. Lỗi phát hiện lúc khởi động rẻ hơn rất nhiều so với một ca sản xuất phân loại sai:</p>
+<pre><code class="language-python">def nap_mo_hinh(duong_dan_the):
+    the = json.loads(Path(duong_dan_the).read_text(encoding="utf-8"))
+    file_onnx = Path(duong_dan_the).parent / the["file"]
+    if sha256(file_onnx) != the["sha256"]:
+        raise RuntimeError(f"{file_onnx.name}: SHA-256 không khớp thẻ mô hình, từ chối nạp")
+    s = ort.InferenceSession(str(file_onnx), providers=["CPUExecutionProvider"])
+    vao = s.get_inputs()[0]
+    if vao.name != the["dau_vao"]["ten"] or vao.shape[1:] != the["dau_vao"]["shape"][1:]:
+        raise RuntimeError(f"Đầu vào {vao.name} {vao.shape} khác thẻ mô hình")
+    return s, the
+
+
+s2, the2 = nap_mo_hinh("ok_ng.model.json")
+print("Nạp OK:", the2["ten"], the2["phien_ban"])
+
+with open("ok_ng.onnx", "ab") as f:          # giả lập file bị chép nhầm/hỏng: thêm 1 byte
+    f.write(b"\0")
+try:
+    nap_mo_hinh("ok_ng.model.json")
+except RuntimeError as e:
+    print("Lỗi:", e)</code></pre>
+<pre><code class="language-text">Nạp OK: ok_ng_gi_set 1.0.0
+Lỗi: ok_ng.onnx: SHA-256 không khớp thẻ mô hình, từ chối nạp</code></pre>
+<p>Chỉ một byte khác là mã băm khác hoàn toàn. Dự án cuối chặng sẽ dùng đúng cơ chế này để cập nhật mô hình an toàn trên máy trạm.</p>
+
+<h2 id="11-loi-thuong-gap">11. Lỗi thường gặp</h2>
+<table>
+  <tr><th>Triệu chứng</th><th>Nguyên nhân hay gặp</th><th>Cách xử lý</th></tr>
+  <tr><td>ONNX khác PyTorch nhiều, kết quả PyTorch thay đổi mỗi lần chạy</td><td>PyTorch tham chiếu đang ở chế độ train</td><td><code>model.eval()</code> ngay sau khi nạp trọng số</td></tr>
+  <tr><td>Python khớp, C# lệch nhiều</td><td>Tiền xử lý khác: BGR/RGB, chia 255, mean/std, HWC/CHW</td><td>So <code>tong_kenh</code> với bộ ảnh vàng; viết lại từ thẻ mô hình</td></tr>
+  <tr><td>Chạy batch 1 được, batch 8 báo lỗi dimension</td><td>Xuất không khai báo trục động</td><td><code>dynamic_shapes={"x": {0: "batch"}}</code>, kiểm tra bằng <code>get_inputs()</code></td></tr>
+  <tr><td>Máy trạm báo không tìm thấy dữ liệu trọng số</td><td>Thiếu file <code>.onnx.data</code></td><td><code>external_data=False</code> hoặc chép đủ hai file</td></tr>
+  <tr><td>Runtime trên máy trạm báo opset không hỗ trợ</td><td>Opset mới hơn khả năng của runtime</td><td>Nâng runtime, hoặc xuất lại với <code>opset_version</code> thấp hơn và kiểm chứng lại</td></tr>
+  <tr><td>Khớp trên ảnh tổng hợp, lệch trên ảnh thật</td><td>Ảnh thật qua JPEG/khác cỡ, nội suy khác</td><td>Bộ ảnh vàng là ảnh thật dạng PNG, đúng kích thước camera</td></tr>
+  <tr><td>Không biết file trên máy trạm là bản nào</td><td>Không có thẻ mô hình, không có mã băm</td><td>Thẻ mô hình JSON + kiểm tra SHA-256 khi nạp</td></tr>
+</table>
+
+<h2 id="12-bai-tap">12. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Xuất <code>model</code> sang <code>ok_ng_b1.onnx</code> nhưng <em>không</em> khai báo <code>dynamic_shapes</code>. In shape đầu vào bằng ONNX Runtime và thử chạy batch 8. Sau đó viết hàm <code>chay_tung_anh(sess, lo)</code> chạy lần lượt từng ảnh để vẫn xử lý được batch 8. Khi nào cách này chấp nhận được?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">torch.onnx.export(model, (vi_du,), "ok_ng_b1.onnx", input_names=["images"], output_names=["logits"],
+                  opset_version=18, external_data=False, verbose=False)
+s_b1 = ort.InferenceSession("ok_ng_b1.onnx", providers=["CPUExecutionProvider"])
+print(s_b1.get_inputs()[0].shape)
+lo8 = dau_vao[:8]
+try:
+    s_b1.run(None, {"images": lo8})
+except Exception as e:
+    print("batch 8:", str(e).splitlines()[0][:70])
+
+
+def chay_tung_anh(sess, lo):
+    return np.concatenate([sess.run(None, {"images": lo[i:i + 1]})[0] for i in range(len(lo))])
+
+
+print(np.abs(chay_tung_anh(s_b1, lo8) - ref[:8]).max() &lt; 1e-5)</code></pre>
+<pre><code class="language-text">[1, 3, 64, 64]
+batch 8: [ONNXRuntimeError] : 2 : INVALID_ARGUMENT : Got invalid dimensions for 
+True</code></pre>
+<p>Đầu vào cố định <code>[1, 3, 64, 64]</code>. Chạy từng ảnh chấp nhận được khi trạm chỉ có một camera, mỗi chu kỳ một ảnh (trường hợp phổ biến nhất). Khi có nhiều camera hoặc cắt nhiều ROI trong một ảnh, batch động giúp chạy một lần cho tất cả, nhanh hơn rõ rệt trên GPU. Trục cố định đôi khi lại được ưu tiên vì một số runtime (TensorRT, NPU) tối ưu tốt hơn khi biết trước shape.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Đồng nghiệp viết tiền xử lý phía C# và gửi bạn tổng từng kênh của tensor đầu vào cho <code>anh_01_NG.png</code>: <code>[138.9, 780.43, 1819.64]</code>, trong khi bộ ảnh vàng ghi <code>[374.83, 780.43, 1579.52]</code>. Logit của họ cũng lệch. Viết code Python thử các giả thuyết (quên BGR→RGB, áp mean/std theo thứ tự ngược, quên mean/std, quên chia 255) để tìm lỗi.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">a = cv2.imread("bo_anh_vang/anh_01_NG.png")
+nho = cv2.resize(a, (KICH_THUOC, KICH_THUOC), interpolation=cv2.INTER_AREA)
+rgb = cv2.cvtColor(nho, cv2.COLOR_BGR2RGB).astype(np.float32)
+bgr = nho.astype(np.float32)
+gia_thuyet = {
+    "đúng": (rgb / 255 - MEAN) / STD,
+    "quên BGR-&gt;RGB": (bgr / 255 - MEAN) / STD,
+    "mean/std thứ tự ngược": (rgb / 255 - MEAN[::-1]) / STD[::-1],
+    "quên mean/std": rgb / 255,
+    "quên chia 255": (rgb - MEAN) / STD,
+}
+bao_cao = np.array([138.9, 780.43, 1819.64])
+for ten, t in gia_thuyet.items():
+    tong = t.transpose(2, 0, 1).sum(axis=(1, 2))
+    print(f"{ten:22s} {np.array2string(tong, precision=2, suppress_small=True):34s}"
+          f" lệch {np.abs(tong - bao_cao).max():.2f}")</code></pre>
+<pre><code class="language-text">đúng                   [ 374.83  780.43 1579.52]          lệch 240.12
+quên BGR-&gt;RGB          [ 138.9   780.43 1819.64]          lệch 0.00
+mean/std thứ tự ngược  [1819.64  780.43  138.9 ]          lệch 1680.74
+quên mean/std          [2072.39 2042.59 2018.37]          lệch 1933.49
+quên chia 255          [2.30e+06 2.32e+06 2.28e+06]       lệch 2316153.82</code></pre>
+<p>Chỉ giả thuyết "quên BGR→RGB" cho đúng ba con số. Kênh G (giữa) giống nhau ở mọi giả thuyết đảo kênh vì G nằm giữa trong cả BGR và RGB; kênh 0 và 2 bị tráo dữ liệu nhưng vẫn chuẩn hóa bằng hằng số R và B. Giả thuyết "mean/std thứ tự ngược" cho ba con số giống hệt nhưng theo thứ tự ngược lại, vì thế phải so <em>từng kênh</em> theo đúng thứ tự. Bài học: thẻ mô hình phải ghi rõ thứ tự kênh và mean/std theo thứ tự đó (ở đây là R, G, B).</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Viết hàm <code>kiem_chung(sess, model, ds_anh, atol=1e-5)</code> trả về dict gồm sai khác logit lớn nhất, tỷ lệ khớp quyết định, số ảnh có P(NG) trong vùng 0,4–0,6, và <code>"dat": True/False</code> (đạt khi sai khác ≤ atol và khớp 100%). Chạy với <code>sess</code> và với một model "lỡ chạy train" (bản sao đã chạy forward ở chế độ train rồi eval lại).</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">def kiem_chung(sess, model, ds_anh, atol=1e-5):
+    model.eval()
+    vao = np.stack([tien_xu_ly(a) for a in ds_anh])
+    with torch.no_grad():
+        r = model(torch.from_numpy(vao)).numpy()
+    o = sess.run(None, {"images": vao})[0]
+    p = softmax(o)[:, 1]
+    kq = {"sai_khac_max": float(np.abs(o - r).max()),
+          "khop": float((o.argmax(1) == r.argmax(1)).mean()),
+          "sat_nguong": int(((p &gt; 0.4) &amp; (p &lt; 0.6)).sum())}
+    kq["dat"] = kq["sai_khac_max"] &lt;= atol and kq["khop"] == 1.0
+    return kq
+
+
+print(kiem_chung(sess, model, anh_kt[:50]))
+
+hong = copy.deepcopy(model).train()
+with torch.no_grad():
+    hong(torch.from_numpy(dau_vao[:16]))         # một lần forward ở chế độ train là đủ làm lệch BN
+print(kiem_chung(sess, hong, anh_kt[:50]))</code></pre>
+<pre><code class="language-text">{'sai_khac_max': 4.76837158203125e-07, 'khop': 1.0, 'sat_nguong': 0, 'dat': True}
+{'sai_khac_max': 0.07642316818237305, 'khop': 1.0, 'sat_nguong': 0, 'dat': False}</code></pre>
+<p><code>sess</code> vẫn dùng được dù file <code>ok_ng.onnx</code> trên đĩa đã bị ta cố tình làm hỏng ở mục 10: session đã nạp mô hình vào bộ nhớ từ trước. Trường hợp thứ hai: quyết định vẫn khớp 100% nhưng logit lệch gần 0,08 (gấp hàng trăm nghìn lần sai số làm tròn), đúng loại lỗi "âm thầm" mà chỉ nhìn tỷ lệ khớp sẽ bỏ qua. Hàm này nên chạy trong script xuất mô hình, và kết quả của nó ghi thẳng vào mục <code>kiem_chung</code> của thẻ mô hình.</p>
+</details>
+</div>
+
+<h2 id="tom-tat">Tóm tắt</h2>
+<ul>
+  <li><code>model.eval()</code> trước khi xuất và trước khi so sánh; chạy forward ở chế độ train làm hỏng thống kê BatchNorm ngay cả trong <code>no_grad()</code>.</li>
+  <li>torch 2.14: <code>torch.onnx.export</code> mặc định <code>dynamo=True</code> (cần <code>onnxscript</code>), trục động khai báo bằng <code>dynamic_shapes</code> theo tên tham số <code>forward</code>, opset mặc định 20, <code>external_data=True</code> tạo thêm file <code>.onnx.data</code>.</li>
+  <li><code>onnx.checker</code> chỉ kiểm tra cấu trúc; in <code>get_inputs()</code>/<code>get_outputs()</code> để biết "hợp đồng" của mô hình.</li>
+  <li>ONNX Runtime: tạo session một lần, đầu vào float32 NCHW; sai kiểu/shape thì báo lỗi, sai tiền xử lý thì <strong>không</strong>.</li>
+  <li>So sánh trên N ảnh: sai khác lớn nhất (FP32 CPU cỡ 10<sup>-6</sup>), <code>assert_allclose</code>, tỷ lệ khớp quyết định, số ảnh sát ngưỡng.</li>
+  <li>Tiền xử lý là nguồn sai lệch số một: một hàm dùng chung, đặc tả trong thẻ mô hình, bộ ảnh vàng PNG + logit mong đợi + tổng từng kênh.</li>
+  <li>YOLO: <code>model.export(format="onnx")</code>, in shape đầu ra trước khi giải mã, so khung bằng ghép cặp IoU.</li>
+  <li>Thẻ mô hình JSON (phiên bản, opset, đặc tả vào/ra, tiền xử lý, ngưỡng, SHA-256, kết quả kiểm chứng) đi cùng file ONNX; ứng dụng kiểm tra mã băm trước khi nạp.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Chạy mô hình ONNX trong C#</strong>, nơi bạn dùng chính bộ ảnh vàng này để kiểm tra phía C#.</p>
+
+      </div>
+      <div class="lesson-done" data-course="vision-engineer"><button type="button" class="lesson-done-btn" data-lesson-done="deploy-1-xuat-onnx-va-kiem-tra-sai-so" aria-pressed="false"><span class="box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></span><span class="off">Đánh dấu đã học xong</span><span class="on">Đã học xong bài này</span></button><a class="btn lg" href="../hoc/onnx-runtime-csharp-chay-mo-hinh-ai.html">Bài tiếp theo<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a></div>
+      <footer class="article-foot">
+        <div class="tags"><a class="tag" href="../search.html?q=Deployment">#Deployment</a><a class="tag" href="../search.html?q=PyTorch">#PyTorch</a><a class="tag" href="../search.html?q=Python">#Python</a></div>
+        <div class="share">
+      <span>Chia sẻ:</span>
+      <a class="share-btn fb" href="https://www.facebook.com/sharer/sharer.php?u=https://hocfree.vn/hoc/deploy-1-xuat-onnx-va-kiem-tra-sai-so.html" target="_blank" rel="noopener" aria-label="Chia sẻ Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8z"/></svg></a>
+      <a class="share-btn x" href="https://twitter.com/intent/tweet?url=https://hocfree.vn/hoc/deploy-1-xuat-onnx-va-kiem-tra-sai-so.html" target="_blank" rel="noopener" aria-label="Chia sẻ X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+      <button class="share-btn copy-link" data-url="https://hocfree.vn/hoc/deploy-1-xuat-onnx-va-kiem-tra-sai-so.html" aria-label="Sao chép liên kết"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+    </div>
+      </footer>
+      <div class="author-box">
+        <span class="avatar lg" aria-hidden="true">HF</span>
+        <div>
+          <strong>Ban biên tập HọcFree</strong>
+          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và ngoại ngữ, hoàn toàn miễn phí.</p>
+        </div>
+      </div>
+      <nav class="pager lesson-pager" aria-label="Bài học trước/sau"><a class="prev" href="../projects/phat-hien-loi-be-mat-anomaly-detection.html"><span>← Bài trước · Bài 7 · Chặng 12</span>Dự án chặng 12: phát hiện lỗi bề mặt bằng PatchCore</a><a class="next" href="../hoc/onnx-runtime-csharp-chay-mo-hinh-ai.html"><span>Bài tiếp → · Bài 2</span>Chạy mô hình ONNX trong C#</a></nav>
+    </article>
+    <aside class="sidebar course-side" data-course="vision-engineer">
+      <section class="widget course-toc">
+        <p class="widget-title">Chặng 13/14 · Vision Engineer</p>
+        <a class="course-toc-title" href="../lo-trinh/vision-engineer/deployment.html">Deployment</a>
+        <div class="lc" data-lesson-count="deploy-1-xuat-onnx-va-kiem-tra-sai-so onnx-runtime-csharp-chay-mo-hinh-ai toi-uu-toc-do-suy-luan-onnx-tensorrt-openvino deploy-4-do-latency-logging-giam-sat docker-cho-ky-su-ai deploy-6-dong-goi-ung-dung-chay-24-7"><div class="lc-bar"><span data-lc-bar></span></div><span data-lc-text>0/6 bài</span></div>
+        <ol class="toc-lessons"><li data-lesson="deploy-1-xuat-onnx-va-kiem-tra-sai-so" class="is-current"><a href="../hoc/deploy-1-xuat-onnx-va-kiem-tra-sai-so.html" aria-current="page"><span class="tn">1</span><span class="tt">Xuất ONNX và kiểm tra kết quả khớp PyTorch</span></a></li><li data-lesson="onnx-runtime-csharp-chay-mo-hinh-ai"><a href="../hoc/onnx-runtime-csharp-chay-mo-hinh-ai.html"><span class="tn">2</span><span class="tt">Chạy mô hình ONNX trong C#</span></a></li><li data-lesson="toi-uu-toc-do-suy-luan-onnx-tensorrt-openvino"><a href="../hoc/toi-uu-toc-do-suy-luan-onnx-tensorrt-openvino.html"><span class="tn">3</span><span class="tt">Tăng tốc suy luận: OpenVINO, TensorRT, FP16, INT8</span></a></li><li data-lesson="deploy-4-do-latency-logging-giam-sat"><a href="../hoc/deploy-4-do-latency-logging-giam-sat.html"><span class="tn">4</span><span class="tt">Đo latency, logging và giám sát mô hình</span></a></li><li data-lesson="docker-cho-ky-su-ai"><a href="../kien-thuc/docker-cho-ky-su-ai.html"><span class="tn">5</span><span class="tt">Docker cho kỹ sư AI</span></a></li><li data-lesson="deploy-6-dong-goi-ung-dung-chay-24-7"><a href="../hoc/deploy-6-dong-goi-ung-dung-chay-24-7.html"><span class="tn">6</span><span class="tt">Dự án chặng 13: đóng gói ứng dụng vision chạy 24/7</span></a></li></ol>
+        <a class="more" href="../lo-trinh/vision-engineer.html">Xem toàn bộ lộ trình<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a>
+      </section>
+    </aside>
+  </div>
+  <section class="band">
+    <div class="container">
+      <div class="section-title"><h2>Có thể bạn quan tâm</h2></div>
+      <div class="card-grid"><article class="card">
+  <a class="thumb" href="../hoc/pytest-kiem-thu-ham-xu-ly-anh.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/pytest-kiem-thu-ham-xu-ly-anh.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/pytest-kiem-thu-ham-xu-ly-anh.html">Kiểm thử hàm xử lý ảnh với pytest: bắt lỗi trước khi lên máy</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-10">10/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/csharp-system-text-json-luu-recipe.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/csharp-system-text-json-luu-recipe.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/csharp-system-text-json-luu-recipe.html">C#: lưu và nạp recipe trạm vision bằng System.Text.Json</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-10">10/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/cross-validation-pipeline-gridsearchcv.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/cross-validation-pipeline-gridsearchcv.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/cross-validation-pipeline-gridsearchcv.html">Cross-validation, Pipeline, GridSearchCV: đánh giá mô hình trung thực</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-10">10/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article></div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <a class="logo" href="../"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+      <p>HọcFree.vn – nền tảng học miễn phí về AI, lập trình, Computer Vision, Machine Vision, tin tức AI và ngoại ngữ dành cho người Việt.</p>
+    </div>
+    <div><h3>Học &amp; thực hành</h3><ul><li><a href="../hoc/">Học AI &amp; Lập trình</a></li><li><a href="../projects/">Projects</a></li><li><a href="../lo-trinh/">Learning Paths</a></li></ul></div>
+    <div><h3>Khám phá</h3><ul><li><a href="../kien-thuc/">Kiến thức</a></li><li><a href="../tin-tuc-ai/">Tin tức AI</a></li><li><a href="../ngoai-ngu/">Ngoại ngữ</a></li><li><a href="../tai-nguyen/">Tài nguyên</a></li></ul></div>
+    <div><h3>Bài mới</h3><ul><li><a href="../hoc/pytest-kiem-thu-ham-xu-ly-anh.html">Kiểm thử hàm xử lý ảnh với pytest: bắt lỗi trước khi lên máy</a></li><li><a href="../hoc/csharp-system-text-json-luu-recipe.html">C#: lưu và nạp recipe trạm vision bằng System.Text.Json</a></li><li><a href="../hoc/cross-validation-pipeline-gridsearchcv.html">Cross-validation, Pipeline, GridSearchCV: đánh giá mô hình trung thực</a></li><li><a href="../hoc/ham-mat-mat-cross-entropy-focal-loss.html">Hàm mất mát cho phân loại: cross-entropy, class weight, focal loss</a></li></ul></div>
+    <div>
+      <h3>HọcFree</h3>
+      <ul>
+        <li><a href="../gioi-thieu.html">Giới thiệu</a></li>
+        <li><a href="../search.html">Tìm kiếm</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">© 2026 HọcFree.vn · Kiến thức là để chia sẻ.</div>
+  </div>
+</footer>
+<button class="to-top" aria-label="Lên đầu trang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<script src="../assets/js/search-data.js?v=20261009" defer></script>
+<script src="../assets/js/main.js?v=20261009" defer></script>
+</body>
+</html>

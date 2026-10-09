@@ -1,0 +1,532 @@
+<p>Mô hình AI không trả lời "OK" hay "NG". Nó trả về một <strong>điểm số</strong>, ví dụ xác suất NG 0,37. Biến điểm số thành quyết định cần một <strong>ngưỡng</strong>, và chọn ngưỡng là quyết định quan trọng nhất của cả dự án: cùng một mô hình, ngưỡng 0,2 có thể lọt 0 lỗi nhưng loại nhầm 6% hàng tốt, ngưỡng 0,5 loại nhầm 2% nhưng lọt lỗi gấp nhiều lần. Ở chặng 5, bài "Tiêu chí OK/NG, escape và overkill: chọn ngưỡng theo chi phí" đã dạy bạn ngôn ngữ của nhà máy cho một phép đo cổ điển; bài "Precision, Recall, F1 và ma trận nhầm lẫn" nối nó với chỉ số học máy. Bài này áp dụng cả hai cho <strong>mô hình AI</strong>: vẽ đường precision–recall và ROC, chọn ngưỡng theo ràng buộc escape rồi tối thiểu overkill, hiểu con số đó chắc chắn đến đâu, xây <strong>bộ ảnh vàng</strong> (golden set) để nghiệm thu mọi phiên bản mô hình, và <strong>đo cycle time</strong> theo cách khách hàng sẽ đo. Đây là bộ công cụ bạn dùng ngay trong bài tập cuối chặng.</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Tính escape và overkill theo mọi ngưỡng bằng tay và bằng scikit-learn; vẽ đường PR và ROC bằng OpenCV; chọn ngưỡng theo ràng buộc "lọt tối đa N ảnh NG" rồi tối thiểu overkill; tính cận trên tin cậy của tỉ lệ lọt; xây và quản lý phiên bản golden set, so sánh hai phiên bản mô hình trên đó; đo cycle time đầu cuối với warm-up và percentile p50/p99/max.</div>
+
+<h2>1. Dữ liệu: điểm số của mô hình trên tập validation</h2>
+<p>Để tập trung vào việc chọn ngưỡng, ta mô phỏng điểm số mô hình bằng NumPy thay vì huấn luyện thật. Mô phỏng có những đặc điểm giống thực tế: đa số ảnh OK có điểm rất thấp nhưng có khoảng 4% ảnh OK "khó" (phản xạ, bụi được phép, vân lạ) điểm cao hơn; đa số ảnh NG điểm rất cao nhưng khoảng 15% là lỗi mờ, nhỏ, điểm lưng chừng. Tập validation có 2000 ảnh OK và 200 ảnh NG.</p>
+<pre><code class="language-python">import numpy as np
+
+rng = np.random.default_rng(42)
+n_ok, n_ng = 2000, 200
+diem_ok = np.where(rng.random(n_ok) &lt; 0.04, rng.beta(3, 5, n_ok), rng.beta(1.2, 18, n_ok))
+diem_ng = np.where(rng.random(n_ng) &lt; 0.15, rng.beta(3, 3.5, n_ng), rng.beta(10, 1.8, n_ng))
+y = np.r_[np.zeros(n_ok, int), np.ones(n_ng, int)]       # 1 = NG (lớp dương)
+diem = np.r_[diem_ok, diem_ng]                             # "xác suất NG" mô hình trả về
+np.savez("diem_val.npz", y=y, diem=diem)
+
+print(f"OK: trung vị {np.median(diem_ok):.3f}, 99% ảnh OK có điểm dưới {np.percentile(diem_ok, 99):.3f}")
+print(f"NG: trung vị {np.median(diem_ng):.3f}, 5% ảnh NG có điểm dưới {np.percentile(diem_ng, 5):.3f}")
+print("ảnh NG có điểm thấp nhất:", np.round(np.sort(diem_ng)[:5], 3))</code></pre>
+<pre><code class="language-text">OK: trung vị 0.051, 99% ảnh OK có điểm dưới 0.442
+NG: trung vị 0.834, 5% ảnh NG có điểm dưới 0.399
+ảnh NG có điểm thấp nhất: [0.197 0.253 0.284 0.296 0.308]</code></pre>
+<p>Hai phân bố chồng lên nhau: một số ảnh NG có điểm thấp hơn một số ảnh OK. Không ngưỡng nào tách hoàn hảo, và việc của bạn là chọn chỗ cắt theo yêu cầu của nhà máy.</p>
+
+<h2>2. Escape và overkill theo ngưỡng: tính bằng tay</h2>
+<p>Quy ước: điểm <code>≥ T</code> là NG. Với mỗi ngưỡng, đếm bốn ô của ma trận nhầm lẫn và đổi sang ngôn ngữ nhà máy:</p>
+<table>
+  <tr><th>Chỉ số học máy</th><th>Công thức</th><th>Ngôn ngữ nhà máy</th></tr>
+  <tr><td>Recall (TPR)</td><td>TP / (TP + FN)</td><td>1 − escape: tỉ lệ NG bắt được</td></tr>
+  <tr><td>FPR</td><td>FP / (FP + TN)</td><td>Overkill: tỉ lệ OK bị loại</td></tr>
+  <tr><td>Precision</td><td>TP / (TP + FP)</td><td>Trong thùng NG, bao nhiêu phần thật sự NG</td></tr>
+</table>
+<pre><code class="language-python">import numpy as np
+
+d = np.load("diem_val.npz")
+y, diem = d["y"], d["diem"]
+
+
+def danh_gia(T):
+    bao_ng = diem &gt;= T
+    tp = int(np.sum(bao_ng &amp; (y == 1)))
+    fn = int(np.sum(~bao_ng &amp; (y == 1)))
+    fp = int(np.sum(bao_ng &amp; (y == 0)))
+    tn = int(np.sum(~bao_ng &amp; (y == 0)))
+    return tp, fn, fp, tn
+
+
+print("ngưỡng |  TP  FN |   FP   TN | escape | overkill | precision")
+for T in (0.1, 0.2, 0.3, 0.4, 0.5, 0.7):
+    tp, fn, fp, tn = danh_gia(T)
+    print(f"  {T:.1f}  | {tp:3d} {fn:3d} | {fp:4d} {tn:4d} | {fn / (tp + fn):6.1%} | "
+          f"{fp / (fp + tn):8.2%} | {tp / (tp + fp):8.1%}")</code></pre>
+<pre><code class="language-text">ngưỡng |  TP  FN |   FP   TN | escape | overkill | precision
+  0.1  | 200   0 |  464 1536 |   0.0% |   23.20% |    30.1%
+  0.2  | 199   1 |  116 1884 |   0.5% |    5.80% |    63.2%
+  0.3  | 196   4 |   45 1955 |   2.0% |    2.25% |    81.3%
+  0.4  | 189  11 |   24 1976 |   5.5% |    1.20% |    88.7%
+  0.5  | 184  16 |   15 1985 |   8.0% |    0.75% |    92.5%
+  0.7  | 157  43 |    4 1996 |  21.5% |    0.20% |    97.5%</code></pre>
+<p>Đọc bảng như kỹ sư nhà máy: ngưỡng 0,5 (giá trị mặc định nhiều người dùng mà không nghĩ) lọt 16 trong 200 ảnh NG, tức 8%. Hạ xuống 0,2 thì chỉ lọt 1 nhưng loại nhầm 5,8% hàng tốt. Không có ngưỡng "đúng" nếu chưa có yêu cầu cụ thể từ khách hàng.</p>
+
+<h3>Toàn bộ đường cong: tự tính và so với scikit-learn</h3>
+<p>Thay vì vài ngưỡng, xét <em>mọi</em> ngưỡng có thể: sắp điểm giảm dần, mỗi điểm là một ngưỡng; cộng dồn số NG và OK phía trên ngưỡng.</p>
+<pre><code class="language-python">import numpy as np
+from sklearn.metrics import (average_precision_score, precision_recall_curve,
+                             roc_auc_score, roc_curve)
+
+d = np.load("diem_val.npz")
+y, diem = d["y"], d["diem"]
+
+thu_tu = np.argsort(-diem)                 # điểm giảm dần
+y_s, nguong = y[thu_tu], diem[thu_tu]
+tp = np.cumsum(y_s)                        # số NG có điểm ≥ ngưỡng thứ i
+fp = np.cumsum(1 - y_s)                    # số OK có điểm ≥ ngưỡng thứ i
+recall = tp / tp[-1]
+precision = tp / (tp + fp)
+fpr = fp / fp[-1]
+auc_tay = np.trapezoid(np.r_[0, recall], np.r_[0, fpr])
+
+p_sk, r_sk, t_sk = precision_recall_curve(y, diem)
+fpr_sk, tpr_sk, _ = roc_curve(y, diem)
+print(f"AUROC tự tính {auc_tay:.4f} | sklearn {roc_auc_score(y, diem):.4f}")
+print(f"Average precision (diện tích dưới đường PR) sklearn: {average_precision_score(y, diem):.4f}")
+i = np.searchsorted(-nguong, -0.3, side="right") - 1      # ngưỡng thấp nhất còn ≥ 0.3
+j = np.searchsorted(t_sk, 0.3)                              # sklearn: ngưỡng tăng dần
+print(f"tại ngưỡng 0.3: tự tính P={precision[i]:.3f} R={recall[i]:.3f} | sklearn P={p_sk[j]:.3f} R={r_sk[j]:.3f}")</code></pre>
+<pre><code class="language-text">AUROC tự tính 0.9978 | sklearn 0.9978
+Average precision (diện tích dưới đường PR) sklearn: 0.9799
+tại ngưỡng 0.3: tự tính P=0.813 R=0.980 | sklearn P=0.813 R=0.980</code></pre>
+<p>AUROC 0,998 nghe gần như hoàn hảo, nhưng bảng ở trên cho thấy vẫn phải đánh đổi hàng chục ảnh OK lấy từng ảnh NG. Với dữ liệu nhà máy, AUROC và AP hữu ích để <strong>so sánh hai mô hình</strong>, còn nghiệm thu luôn phải nói bằng escape và overkill tại <strong>một ngưỡng cụ thể</strong>.</p>
+<div class="tip"><strong>ROC chính là đường escape–overkill</strong>Trục ngang của ROC là FPR = overkill; trục dọc là TPR = 1 − escape. Đường ROC vì vậy không phụ thuộc tỉ lệ NG trong tập dữ liệu và là cách tự nhiên để nói chuyện với nhà máy. Đường PR thì phụ thuộc tỉ lệ NG (mục 4), nhưng nó cho thấy "thùng NG" sẽ chứa bao nhiêu hàng tốt, điều bộ phận kiểm lại quan tâm.</div>
+
+<h2>3. Vẽ đường PR và ROC</h2>
+<p>Nếu đã cài matplotlib (<code>pip install matplotlib</code>), chỉ cần <code>plt.plot(r_sk, p_sk)</code>. Môi trường của bài này chỉ có OpenCV, và vẽ bằng OpenCV cũng có ích: đó là cách bạn vẽ biểu đồ lên giao diện trạm mà không cần thêm thư viện.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+from sklearn.metrics import precision_recall_curve, roc_curve
+
+d = np.load("diem_val.npz")
+y, diem = d["y"], d["diem"]
+
+
+def khung_do_thi(tieu_de, nhan_x, x_max=1.0, W=420, H=420, le=50):
+    """Khung đồ thị trắng có lưới; trả về ảnh và hàm đổi (giá trị x, y) → pixel."""
+    img = np.full((H, W, 3), 255, np.uint8)
+    for k in range(11):                                  # lưới 10 ô mỗi trục
+        x = le + k * (W - 2 * le) // 10
+        yy = H - le - k * (H - 2 * le) // 10
+        cv2.line(img, (x, le), (x, H - le), (230, 230, 230), 1)
+        cv2.line(img, (le, yy), (W - le, yy), (230, 230, 230), 1)
+        if k % 5 == 0:
+            cv2.putText(img, f"{k / 10 * x_max:g}", (x - 10, H - le + 18), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
+            cv2.putText(img, f"{k / 10:.1f}", (le - 32, yy + 4), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
+    cv2.rectangle(img, (le, le), (W - le, H - le), (0, 0, 0), 1)
+    cv2.putText(img, tieu_de, (le, le - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 0), 1, cv2.LINE_AA)
+    cv2.putText(img, nhan_x, (W // 2 - 50, H - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 0), 1, cv2.LINE_AA)
+    return img, (lambda vx, vy: (int(le + vx / x_max * (W - 2 * le)), int(H - le - vy * (H - 2 * le))))
+
+
+def ve(img, doi, xs, ys, mau):
+    pts = np.array([doi(a, b) for a, b in zip(xs, ys)], np.int32)
+    cv2.polylines(img, [pts], False, mau, 2, cv2.LINE_AA)
+
+
+T_CHON = 0.283                                           # ngưỡng sẽ chọn ở mục 4
+p, r, t = precision_recall_curve(y, diem)
+fpr, tpr, t_roc = roc_curve(y, diem, drop_intermediate=False)   # giữ mọi ngưỡng
+
+pr, doi_pr = khung_do_thi("Precision (y) - Recall (x)", "recall")
+ve(pr, doi_pr, r, p, (200, 80, 0))
+k = np.searchsorted(t, T_CHON)
+cv2.circle(pr, doi_pr(r[k], p[k]), 6, (0, 0, 255), 2)
+
+roc, doi_roc = khung_do_thi("ROC: y = 1 - escape", "overkill (FPR)", x_max=0.2)   # chỉ vẽ overkill 0-20%
+x_luoi = np.linspace(0, 0.2, 400)
+ve(roc, doi_roc, x_luoi, np.interp(x_luoi, fpr, tpr), (200, 80, 0))
+kk = np.searchsorted(-t_roc, -T_CHON, side="right") - 1      # điểm ROC ứng với ngưỡng thấp nhất ≥ T_CHON
+cv2.circle(roc, doi_roc(fpr[kk], tpr[kk]), 6, (0, 0, 255), 2)
+
+cv2.imwrite("duong_cong_pr_roc.png", cv2.hconcat([pr, roc]))
+print(f"đã lưu duong_cong_pr_roc.png; điểm đỏ = ngưỡng {T_CHON}: "
+      f"recall {r[k]:.3f}, precision {p[k]:.3f}, overkill {fpr[kk]:.3%}")</code></pre>
+<pre><code class="language-text">đã lưu duong_cong_pr_roc.png; điểm đỏ = ngưỡng 0.283: recall 0.990, precision 0.802, overkill 2.450%</code></pre>
+<p>Hai mẹo khi vẽ cho nhà máy: <strong>phóng trục overkill</strong> về vùng 0–10% hoặc 0–20% (vùng quan tâm thật; phần còn lại của ROC luôn dính sát góc trên), và <strong>đánh dấu ngưỡng đang chạy</strong> trên đồ thị để mọi người thấy mình đang đứng ở đâu trên đường đánh đổi.</p>
+
+<h2>4. Chọn ngưỡng theo ràng buộc escape, rồi tối thiểu overkill</h2>
+<p>Yêu cầu nghiệm thu điển hình: "lọt không quá 1% ảnh NG trên tập đánh giá". Với 200 ảnh NG, nghĩa là được lọt tối đa N = 2 ảnh. Trong mọi ngưỡng thỏa ràng buộc này, chọn ngưỡng <strong>cao nhất</strong>, vì ngưỡng càng cao càng ít overkill. Cách tính trực tiếp: sắp điểm các ảnh NG tăng dần; nếu đặt ngưỡng bằng điểm của ảnh NG thứ N+1 (tính từ thấp nhất), đúng N ảnh NG nằm dưới ngưỡng.</p>
+<pre><code class="language-python">import numpy as np
+
+d = np.load("diem_val.npz")
+y, diem = d["y"], d["diem"]
+ng = np.sort(diem[y == 1])
+ok = diem[y == 0]
+
+
+def nguong_theo_escape(n_lot_toi_da):
+    T = ng[n_lot_toi_da]                       # ảnh NG thứ N+1 từ dưới lên
+    lot = int(np.sum(ng &lt; T))
+    loai_nham = int(np.sum(ok &gt;= T))
+    return T, lot, loai_nham
+
+
+print("lọt tối đa | ngưỡng  | lọt thực tế | loại nhầm (trên 2000 OK)")
+for N in (0, 1, 2, 4, 10):
+    T, lot, nham = nguong_theo_escape(N)
+    print(f"{N:10d} | {T:.4f} | {lot:3d}/200 ({lot / 2:.1f}%) | {nham:4d} ({nham / 20:.2f}%)")</code></pre>
+<pre><code class="language-text">lọt tối đa | ngưỡng  | lọt thực tế | loại nhầm (trên 2000 OK)
+         0 | 0.1967 |   0/200 (0.0%) |  122 (6.10%)
+         1 | 0.2528 |   1/200 (0.5%) |   65 (3.25%)
+         2 | 0.2839 |   2/200 (1.0%) |   48 (2.40%)
+         4 | 0.3081 |   4/200 (2.0%) |   42 (2.10%)
+        10 | 0.4000 |  10/200 (5.0%) |   24 (1.20%)</code></pre>
+<p>Đường cong đánh đổi rất dốc ở đầu: đòi "không lọt ảnh nào" trên tập val tốn 6,1% overkill, chấp nhận lọt 2 ảnh (1%) thì overkill còn 2,4%, tức giảm 60% hàng tốt bị loại. Hai ảnh NG bị lọt đó là gì? <strong>Luôn mở ra xem</strong>: nếu là lỗi rất nhỏ nằm sát giới hạn đặc tả, có thể chấp nhận; nếu là một loại lỗi nghiêm trọng mà mô hình chưa từng thấy, ngưỡng không cứu được, phải bổ sung dữ liệu.</p>
+<p>Ngưỡng làm tròn để ghi vào cấu hình: chọn <code>T = 0.283</code> (≤ 0,2839…, không làm tăng số lọt, chỉ thêm 1 ảnh OK bị loại). Bây giờ dịch con số sang <strong>một ca sản xuất</strong>: 30.000 sản phẩm/ca, tỉ lệ NG thật trên dây chuyền 0,5%.</p>
+<pre><code class="language-python">import numpy as np
+
+d = np.load("diem_val.npz")
+y, diem = d["y"], d["diem"]
+T = 0.283
+escape = np.mean(diem[y == 1] &lt; T)
+overkill = np.mean(diem[y == 0] &gt;= T)
+
+SP_CA, TI_LE_NG = 30_000, 0.005
+ng_ca = SP_CA * TI_LE_NG
+ok_ca = SP_CA - ng_ca
+lot_ca = ng_ca * escape
+nham_ca = ok_ca * overkill
+bat_ca = ng_ca - lot_ca
+print(f"escape {escape:.1%}, overkill {overkill:.2%}")
+print(f"mỗi ca: {ng_ca:.0f} NG thật → lọt {lot_ca:.1f}, bắt {bat_ca:.1f}; loại nhầm {nham_ca:.0f} sản phẩm OK")
+print(f"ppm lọt ra khách hàng ≈ {lot_ca / (SP_CA - bat_ca - nham_ca) * 1e6:.0f}")
+print(f"precision trên tập val (9,1% NG)   : {np.mean(y[diem &gt;= T]):.1%}")
+print(f"precision trên dây chuyền (0,5% NG): {bat_ca / (bat_ca + nham_ca):.1%}")</code></pre>
+<pre><code class="language-text">escape 1.0%, overkill 2.45%
+mỗi ca: 150 NG thật → lọt 1.5, bắt 148.5; loại nhầm 731 sản phẩm OK
+ppm lọt ra khách hàng ≈ 52
+precision trên tập val (9,1% NG)   : 80.2%
+precision trên dây chuyền (0,5% NG): 16.9%</code></pre>
+<p>Bài học quan trọng nhất của mục này nằm ở hai dòng cuối. Trên tập val, cứ 10 sản phẩm bị loại thì khoảng 8 là NG thật. Trên dây chuyền, nơi NG chỉ chiếm 0,5%, cùng mô hình cùng ngưỡng cho precision chỉ khoảng 17%: <strong>thùng NG chứa hơn 80% hàng tốt</strong>. Escape và overkill (tính theo từng lớp) không đổi khi tỉ lệ NG thay đổi; precision thì đổi mạnh. Đó là lý do báo cáo cho nhà máy dùng escape và overkill, rồi quy ra số sản phẩm mỗi ca với tỉ lệ NG thật của dây chuyền.</p>
+
+<h2>5. Chọn ngưỡng theo chi phí</h2>
+<p>Khi nhà máy cho biết chi phí, bạn có thể chọn ngưỡng tối thiểu tổng chi phí mỗi ca, đúng như cách làm ở bài "Tiêu chí OK/NG, escape và overkill: chọn ngưỡng theo chi phí" ở chặng 5. Điểm khác duy nhất: escape và overkill giờ lấy từ điểm số mô hình trên tập val, và chi phí phải tính với <strong>tỉ lệ NG của dây chuyền</strong>, không phải tỉ lệ NG của tập val.</p>
+<pre><code class="language-python">import numpy as np
+
+d = np.load("diem_val.npz")
+y, diem = d["y"], d["diem"]
+SP_CA, TI_LE_NG = 30_000, 0.005
+CP_NHAM = 2                          # chi phí (đơn vị giả định) một sản phẩm tốt bị loại nhầm
+
+
+def chi_phi_ca(T, cp_lot):
+    esc = np.mean(diem[y == 1] &lt; T)
+    ovk = np.mean(diem[y == 0] &gt;= T)
+    lot = SP_CA * TI_LE_NG * esc                 # số NG lọt mỗi ca
+    nham = SP_CA * (1 - TI_LE_NG) * ovk          # số OK bị loại mỗi ca
+    return lot * cp_lot + nham * CP_NHAM, lot, nham
+
+
+ung_vien = np.unique(diem)                       # mọi ngưỡng có nghĩa: chính các điểm số
+cp, lot, nham = chi_phi_ca(0.5, 200)
+print(f"ngưỡng 0.5 mặc định, chi phí lọt 200 : lọt {lot:5.2f}/ca, loại nhầm {nham:4.0f}/ca, chi phí {cp:5.0f}")
+for cp_lot in (50, 200, 1000):
+    T = min(ung_vien, key=lambda t: chi_phi_ca(t, cp_lot)[0])
+    cp, lot, nham = chi_phi_ca(T, cp_lot)
+    print(f"chi phí lọt {cp_lot:4d} (tỉ lệ {cp_lot // CP_NHAM:3d}:1) → T tối ưu {T:.4f}: "
+          f"lọt {lot:5.2f}/ca, loại nhầm {nham:4.0f}/ca, chi phí {cp:5.0f}")</code></pre>
+<pre><code class="language-text">ngưỡng 0.5 mặc định, chi phí lọt 200 : lọt 12.00/ca, loại nhầm  224/ca, chi phí  2848
+chi phí lọt   50 (tỉ lệ  25:1) → T tối ưu 0.5062: lọt 12.00/ca, loại nhầm  209/ca, chi phí  1018
+chi phí lọt  200 (tỉ lệ 100:1) → T tối ưu 0.2839: lọt  1.50/ca, loại nhầm  716/ca, chi phí  1733
+chi phí lọt 1000 (tỉ lệ 500:1) → T tối ưu 0.2528: lọt  0.75/ca, loại nhầm  970/ca, chi phí  2690</code></pre>
+<p>Với tỉ lệ 100:1, ngưỡng tối ưu chi phí trùng với ngưỡng chọn theo ràng buộc escape ở mục 4 (0,2839), và rẻ hơn ngưỡng 0,5 khoảng 40%. Khi lọt đắt hơn (500:1, ví dụ linh kiện an toàn), ngưỡng lùi xuống 0,253, chấp nhận loại nhầm gần 1000 sản phẩm/ca để lọt ít hơn; khi lọt rẻ (25:1), ngưỡng tăng lên khoảng 0,5. Chú ý cách tìm: thử <strong>mọi</strong> điểm số làm ngưỡng thay vì một lưới bước 0,005, vì tổng chi phí chỉ thay đổi tại đúng các điểm số và một lưới thô có thể bỏ qua điểm tối ưu. Trong thực tế, ràng buộc escape trong hợp đồng là điều kiện cứng, còn chi phí dùng để chọn trong vùng thỏa ràng buộc. Nếu hai yêu cầu không gặp nhau, đừng ép ngưỡng: hãy cải thiện chất lượng ảnh, dữ liệu, hoặc thêm vùng xám kiểm lại như ở chặng 5.</p>
+
+<h2>6. Con số đó chắc chắn đến đâu?</h2>
+<p>"Lọt 2/200 = 1%" chỉ là <strong>ước lượng</strong> từ 200 mẫu. Tỉ lệ lọt thật có thể cao hơn nhiều. Cận trên tin cậy 95% một phía (phương pháp Clopper–Pearson, dựa trên phân phối nhị thức) cho biết tỉ lệ thật "gần như chắc chắn" không vượt quá bao nhiêu. Với 0 lần lọt, cận này xấp xỉ <strong>3/n</strong> (quy tắc số 3 đã gặp ở chặng 5).</p>
+<pre><code class="language-python">from scipy.stats import beta
+
+
+def can_tren_95(k, n):
+    """Cận trên một phía 95% của tỉ lệ khi quan sát k lần lọt trong n mẫu NG."""
+    return 1.0 if k &gt;= n else float(beta.ppf(0.95, k + 1, n - k))
+
+
+print("  n  | lọt | ước lượng | cận trên 95% | 3/n")
+for n, k in [(50, 0), (150, 0), (300, 0), (200, 2), (1000, 2), (3000, 3)]:
+    print(f"{n:5d} | {k:3d} | {k / n:9.2%} | {can_tren_95(k, n):12.2%} | {3 / n:.2%}")
+
+ti_le_ng = 0.005
+print(f"escape ≤ {can_tren_95(2, 200):.2%} với 0,5% NG → lọt ≤ {can_tren_95(2, 200) * ti_le_ng * 1e6:.0f} ppm sản lượng")</code></pre>
+<pre><code class="language-text">  n  | lọt | ước lượng | cận trên 95% | 3/n
+   50 |   0 |     0.00% |        5.82% | 6.00%
+  150 |   0 |     0.00% |        1.98% | 2.00%
+  300 |   0 |     0.00% |        0.99% | 1.00%
+  200 |   2 |     1.00% |        3.11% | 1.50%
+ 1000 |   2 |     0.20% |        0.63% | 0.30%
+ 3000 |   3 |     0.10% |        0.26% | 0.10%
+escape ≤ 3.11% với 0,5% NG → lọt ≤ 156 ppm sản lượng</code></pre>
+<ul>
+  <li>Thấy 2/200 lọt, điều bạn có thể khẳng định với 95% tin cậy chỉ là "escape dưới khoảng 3,1%", không phải "escape 1%". Muốn khẳng định chặt hơn, cần nhiều ảnh NG hơn.</li>
+  <li><strong>0 lọt trên 300 ảnh NG không chứng minh escape bằng 0</strong>; nó chứng minh escape dưới khoảng 1%. Đừng bao giờ viết "mô hình không lọt lỗi" trong báo cáo.</li>
+  <li>Ngưỡng ở mục 4 được <strong>chọn</strong> trên chính tập val, nên escape 1% trên tập này là ước lượng lạc quan. Con số dùng để nghiệm thu phải đo trên một bộ ảnh khác, chưa từng dùng để chọn bất cứ thứ gì: golden set.</li>
+</ul>
+
+<h2>7. Bộ ảnh vàng (golden set) để nghiệm thu</h2>
+<p><strong>Golden set</strong> là bộ ảnh cố định, nhãn đã được QA xác nhận, dùng để nghiệm thu <em>mọi</em> phiên bản mô hình, giống bộ mẫu chuẩn vật lý dùng cho FAT/SAT ở chặng 5 nhưng ở dạng ảnh. Nó trả lời câu hỏi: "phiên bản mới có tốt hơn phiên bản đang chạy không, và có làm hỏng điều gì không?"</p>
+<h3>Thành phần</h3>
+<table>
+  <tr><th>Nhóm</th><th>Nội dung</th><th>Số lượng gợi ý</th></tr>
+  <tr><td>OK điển hình</td><td>Trải đều các mã sản phẩm, lô vật liệu, ca ngày/đêm, các tháng khác nhau</td><td>Vài trăm</td></tr>
+  <tr><td>OK khó</td><td>Đặc điểm được phép nhưng dễ nhầm: phản xạ, bụi cho phép, vân vật liệu lạ, vết sát dưới giới hạn; đây là nguồn overkill</td><td>50–100</td></tr>
+  <tr><td>NG theo từng loại lỗi</td><td>Mỗi loại lỗi, mỗi vị trí, nhiều mức độ; đánh dấu loại <strong>nghiêm trọng</strong> (an toàn, chức năng)</td><td>Ít nhất 30–50 mỗi loại nếu có thể</td></tr>
+  <tr><td>Mẫu giới hạn</td><td>Ảnh của limit sample đã ký, ngay trên và ngay dưới ranh giới OK/NG</td><td>Mỗi tiêu chí vài ảnh</td></tr>
+  <tr><td>Tình huống bất thường</td><td>Khay trống, sai mã sản phẩm, ảnh mờ, thiếu sáng, cháy sáng; trạm phải báo NG hoặc lỗi hệ thống, không được báo OK</td><td>Vài chục</td></tr>
+</table>
+<h3>Quy tắc quản lý</h3>
+<ul>
+  <li><strong>Không bao giờ dùng để huấn luyện hay chọn ngưỡng.</strong> Ảnh golden không nằm trong train/val; nếu một ảnh golden lỡ được đưa vào train, phải thay ảnh khác và tăng phiên bản.</li>
+  <li><strong>Đóng băng và đánh phiên bản</strong>: <code>golden_v1</code>, <code>golden_v2</code>… kèm file manifest liệt kê từng ảnh, nhãn, loại lỗi và mã băm (hash) SHA-256. Hash phát hiện ảnh bị sửa, ghi đè hoặc thiếu.</li>
+  <li><strong>Nhãn do hai người</strong> (thường là QA và kỹ sư vision) xác nhận độc lập; ảnh còn tranh cãi thì đưa vào nhóm "mẫu giới hạn" hoặc loại ra, không để nhãn mơ hồ.</li>
+  <li><strong>Chạy lại sau mỗi lần cập nhật</strong>: mô hình mới, ngưỡng mới, đổi tiền xử lý, đổi phiên bản thư viện, đổi phần cứng suy luận (CPU sang GPU, FP32 sang FP16). Báo cáo so với phiên bản đang chạy, đến từng ảnh.</li>
+  <li><strong>Bổ sung có kiểm soát</strong>: lỗi mới gặp trong sản xuất được thêm vào phiên bản kế tiếp; giữ nguyên phiên bản cũ để so sánh lịch sử.</li>
+</ul>
+<p>Tạo một golden set nhỏ minh họa với manifest có hash:</p>
+<pre><code class="language-python">import hashlib
+import json
+from pathlib import Path
+
+import cv2
+import numpy as np
+
+rng = np.random.default_rng(3)
+goc = Path("golden_v1")
+nhom = [("OK", "binh_thuong", 40), ("OK", "kho_phan_xa", 10),
+        ("NG", "xuoc", 12), ("NG", "lom", 8), ("NG", "thieu_son", 6)]
+NGHIEM_TRONG = {"thieu_son"}                     # loại lỗi không được phép lọt
+danh_sach = []
+for nhan, loai, n in nhom:
+    (goc / nhan).mkdir(parents=True, exist_ok=True)
+    for i in range(n):
+        anh = np.clip(rng.normal(140, 5, (48, 48)), 0, 255).astype(np.uint8)
+        if loai == "kho_phan_xa":
+            cv2.ellipse(anh, (24, 24), (14, 4), 30, 0, 360, 230, -1)
+        elif loai == "xuoc":
+            cv2.line(anh, (8, 10 + i), (40, 30), 70, 1)
+        elif loai == "lom":
+            cv2.circle(anh, (20 + i, 24), 4, 90, -1)
+        elif loai == "thieu_son":
+            anh[10:30, 10:30] = 200
+        p = goc / nhan / f"{loai}_{i:03d}.png"
+        cv2.imwrite(str(p), anh)
+        danh_sach.append({"file": p.as_posix(), "nhan": nhan, "loai": loai,
+                          "nghiem_trong": loai in NGHIEM_TRONG,
+                          "sha256": hashlib.sha256(p.read_bytes()).hexdigest()})
+
+manifest = {"phien_ban": "golden_v1", "ngay_dong_bang": "2026-10-01",
+            "nguoi_xac_nhan": ["QA", "Vision"], "anh": danh_sach}
+Path("golden_v1.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=1), encoding="utf-8")
+ma_bo = hashlib.sha256(Path("golden_v1.json").read_bytes()).hexdigest()[:12]
+dem = {}
+for a in danh_sach:
+    dem[(a["nhan"], a["loai"])] = dem.get((a["nhan"], a["loai"]), 0) + 1
+print("golden_v1:", len(danh_sach), "ảnh |", dem)
+print("mã nhận dạng bộ (12 ký tự đầu SHA-256 của manifest):", ma_bo)
+
+
+def kiem_tra_toan_ven(file_manifest):
+    m = json.loads(Path(file_manifest).read_text(encoding="utf-8"))
+    loi = [a["file"] for a in m["anh"]
+           if not Path(a["file"]).exists() or hashlib.sha256(Path(a["file"]).read_bytes()).hexdigest() != a["sha256"]]
+    return loi
+
+
+cv2.imwrite("golden_v1/OK/binh_thuong_000.png", np.zeros((48, 48), np.uint8))   # ai đó vô tình ghi đè
+print("ảnh bị thay đổi:", kiem_tra_toan_ven("golden_v1.json"))</code></pre>
+<pre><code class="language-text">golden_v1: 76 ảnh | {('OK', 'binh_thuong'): 40, ('OK', 'kho_phan_xa'): 10, ('NG', 'xuoc'): 12, ('NG', 'lom'): 8, ('NG', 'thieu_son'): 6}
+mã nhận dạng bộ (12 ký tự đầu SHA-256 của manifest): a24fe6a49e1b
+ảnh bị thay đổi: ['golden_v1/OK/binh_thuong_000.png']</code></pre>
+<p>Ghi mã nhận dạng bộ (ở đây 12 ký tự đầu của hash manifest) vào mọi báo cáo nghiệm thu: "mô hình v2.3, ngưỡng 0,283, golden_v1 (mã …), escape 0/26, overkill 1/50". Ai đọc báo cáo cũng biết chính xác điều gì đã được kiểm tra.</p>
+
+<h3>So sánh hai phiên bản mô hình trên golden set</h3>
+<p>Giả sử mô hình đang chạy là v1, bạn huấn luyện lại thành v2 với thêm dữ liệu. Tổng thể v2 tốt hơn, nhưng cổng nghiệm thu phải xét <strong>từng ảnh</strong>: có ảnh NG nào v1 bắt được mà v2 bỏ lọt không? Điểm số dưới đây được mô phỏng cho hai phiên bản:</p>
+<pre><code class="language-python">import json
+from pathlib import Path
+
+import numpy as np
+
+m = json.loads(Path("golden_v1.json").read_text(encoding="utf-8"))
+anh = m["anh"]
+rng = np.random.default_rng(5)
+la_ng = np.array([a["nhan"] == "NG" for a in anh])
+kho = np.array([a["loai"] == "kho_phan_xa" for a in anh])
+# điểm mô phỏng: v1 hay báo nhầm ảnh phản xạ; v2 sửa được điều đó nhưng làm yếu đi một ảnh thiếu sơn
+v1 = np.where(la_ng, rng.uniform(0.45, 0.99, len(anh)), np.where(kho, rng.uniform(0.15, 0.4, len(anh)), rng.uniform(0, 0.15, len(anh))))
+v2 = np.where(la_ng, rng.uniform(0.5, 0.99, len(anh)), np.where(kho, rng.uniform(0.05, 0.3, len(anh)), rng.uniform(0, 0.12, len(anh))))
+v2[[i for i, a in enumerate(anh) if a["loai"] == "thieu_son"][2]] = 0.21
+
+T = 0.283
+# golden set cố ý chứa nhiều OK khó (10/50) nên overkill trên nó cao hơn trên dây chuyền
+CONG = {"escape_nghiem_trong_toi_da": 0, "escape_toi_da": 1, "overkill_toi_da": 0.12}
+
+
+def bao_cao(ten, diem):
+    lot = [a for a, s in zip(anh, diem) if a["nhan"] == "NG" and s &lt; T]
+    nham = [a for a, s in zip(anh, diem) if a["nhan"] == "OK" and s &gt;= T]
+    n_ok = sum(a["nhan"] == "OK" for a in anh)
+    lot_nt = [a for a in lot if a["nghiem_trong"]]
+    dat = (len(lot_nt) &lt;= CONG["escape_nghiem_trong_toi_da"] and len(lot) &lt;= CONG["escape_toi_da"]
+           and len(nham) / n_ok &lt;= CONG["overkill_toi_da"])
+    print(f"{ten}: lọt {len(lot)}/{int(la_ng.sum())} (nghiêm trọng {len(lot_nt)}), "
+          f"loại nhầm {len(nham)}/{n_ok} ({len(nham) / n_ok:.0%}) → {'ĐẠT' if dat else 'KHÔNG ĐẠT'}")
+    return {a["file"] for a in lot}, {a["file"] for a in nham}
+
+
+lot1, nham1 = bao_cao("v1 (đang chạy)", v1)
+lot2, nham2 = bao_cao("v2 (ứng viên) ", v2)
+print("NG mới bị lọt ở v2 :", sorted(lot2 - lot1))
+print("OK hết bị loại nhầm:", len(nham1 - nham2), "| OK mới bị loại nhầm:", sorted(nham2 - nham1))</code></pre>
+<pre><code class="language-text">v1 (đang chạy): lọt 0/26 (nghiêm trọng 0), loại nhầm 6/50 (12%) → ĐẠT
+v2 (ứng viên) : lọt 1/26 (nghiêm trọng 1), loại nhầm 1/50 (2%) → KHÔNG ĐẠT
+NG mới bị lọt ở v2 : ['golden_v1/NG/thieu_son_002.png']
+OK hết bị loại nhầm: 6 | OK mới bị loại nhầm: ['golden_v1/OK/kho_phan_xa_001.png']</code></pre>
+<p>Nếu chỉ nhìn tổng, v2 có vẻ hấp dẫn: overkill giảm mạnh, chỉ lọt 1 ảnh, vẫn trong giới hạn "lọt tối đa 1". Nhưng ảnh lọt đó là <strong>thiếu sơn</strong>, loại lỗi nghiêm trọng, và v1 bắt được nó. Cổng nghiệm thu từ chối v2. Bước tiếp theo không phải hạ ngưỡng cho qua, mà là tìm hiểu vì sao v2 yếu đi với ảnh này (thiếu ảnh thiếu sơn trong dữ liệu mới? augmentation làm mờ lỗi?) rồi huấn luyện lại.</p>
+
+<h2>8. Đo cycle time đúng cách</h2>
+<p>Ở bài "Trigger, encoder và cycle time" (chặng 5), bạn đã tính ngân sách thời gian xử lý từ tốc độ dây chuyền. Câu hỏi bây giờ: mô hình có nằm trong ngân sách đó <strong>mọi lần</strong> không? Khách hàng không quan tâm thời gian trung bình; một lần xử lý quá hạn chót là một sản phẩm không có kết quả, thường bị loại hoặc làm dừng dây chuyền. Năm nguyên tắc đo:</p>
+<table>
+  <tr><th>Nguyên tắc</th><th>Vì sao</th></tr>
+  <tr><td>Đo <strong>đầu cuối</strong>: từ lúc có ảnh đến lúc có quyết định</td><td>Cắt ROI, resize, chuẩn hóa, chuyển tensor, hậu xử lý có thể tốn ngang mô hình</td></tr>
+  <tr><td><strong>Warm-up</strong> trước khi đo, nhưng ghi riêng lần chạy đầu tiên</td><td>Lần đầu chậm hơn nhiều (cấp phát bộ nhớ, khởi tạo, tối ưu đồ thị). Trạm phải chạy warm-up lúc khởi động, không để sản phẩm đầu tiên gánh</td></tr>
+  <tr><td>Báo <strong>p50, p99 và max</strong>, không chỉ trung bình</td><td>Hạn chót bị vi phạm bởi các lần chậm hiếm gặp, không phải lần trung bình</td></tr>
+  <tr><td>Dùng <code>time.perf_counter()</code></td><td>Đồng hồ đơn điệu, độ phân giải cao; <code>time.time()</code> có thể nhảy khi đồng bộ giờ hệ thống</td></tr>
+  <tr><td>Đo trên <strong>phần cứng đích</strong>, đủ lâu, với tải thật</td><td>Máy dev khác PC công nghiệp; chạy kèm giao diện, ghi log, lưu ảnh; máy nóng lên sau 30 phút. Với GPU phải gọi <code>torch.cuda.synchronize()</code> trước khi bấm giờ, vì lệnh GPU chạy bất đồng bộ</td></tr>
+</table>
+<p>Đoạn code sau đo một đường ống hoàn chỉnh trên CPU với một CNN nhỏ: nhận ảnh 1280×1024 (giải mã PNG để mô phỏng việc nhận ảnh), cắt ROI, resize về 224×224, chuẩn hóa, chạy mô hình, softmax, so ngưỡng. Thời gian trên máy bạn sẽ khác; điều quan trọng là cách đo và cách đọc.</p>
+<pre><code class="language-python">import time
+
+import cv2
+import numpy as np
+import torch
+from torch import nn
+
+torch.manual_seed(0)
+torch.set_num_threads(2)            # số luồng suy luận: một tham số cần đo, không phải "càng nhiều càng tốt"
+mo_hinh = nn.Sequential(
+    nn.Conv2d(3, 16, 3, stride=2, padding=1), nn.ReLU(),
+    nn.Conv2d(16, 32, 3, stride=2, padding=1), nn.ReLU(),
+    nn.Conv2d(32, 64, 3, stride=2, padding=1), nn.ReLU(),
+    nn.Conv2d(64, 64, 3, stride=2, padding=1), nn.ReLU(),
+    nn.AdaptiveAvgPool2d(1), nn.Flatten(), nn.Linear(64, 2),
+).eval()
+MEAN = np.array([0.485, 0.456, 0.406], np.float32)
+STD = np.array([0.229, 0.224, 0.225], np.float32)
+
+rng = np.random.default_rng(0)
+khung = rng.integers(0, 255, (1024, 1280, 3), dtype=np.uint8)
+ok, png = cv2.imencode(".png", khung)                 # mô phỏng dữ liệu ảnh nhận được
+
+
+def xu_ly(png_bytes, ghi):
+    t0 = time.perf_counter()
+    img = cv2.imdecode(png_bytes, cv2.IMREAD_COLOR)                      # nhận ảnh
+    t1 = time.perf_counter()
+    roi = img[200:712, 300:812]                                          # cắt ROI 512×512
+    roi = cv2.resize(roi, (224, 224), interpolation=cv2.INTER_AREA)
+    x = (cv2.cvtColor(roi, cv2.COLOR_BGR2RGB).astype(np.float32) / 255 - MEAN) / STD
+    x = torch.from_numpy(x.transpose(2, 0, 1).copy()).unsqueeze(0)
+    t2 = time.perf_counter()
+    with torch.inference_mode():
+        logit = mo_hinh(x)
+    t3 = time.perf_counter()
+    p_ng = torch.softmax(logit, 1)[0, 1].item()
+    ket_qua = "NG" if p_ng &gt;= 0.283 else "OK"
+    t4 = time.perf_counter()
+    ghi.append((t1 - t0, t2 - t1, t3 - t2, t4 - t3, t4 - t0))
+    return ket_qua
+
+
+lan_dau = []
+xu_ly(png, lan_dau)                                    # lần chạy đầu tiên (cold)
+for _ in range(30):                                    # warm-up, không tính
+    xu_ly(png, [])
+do = []
+for _ in range(500):
+    xu_ly(png, do)
+do = np.array(do) * 1000                               # ms
+
+print(f"lần đầu tiên (cold): {lan_dau[0][4] * 1000:.1f} ms")
+print("giai đoạn      |  p50  |  p99  |  max  (ms)")
+for k, ten in enumerate(["nhận ảnh", "tiền xử lý", "mô hình", "hậu xử lý", "ĐẦU CUỐI"]):
+    p50, p99 = np.percentile(do[:, k], [50, 99])
+    print(f"{ten:14s} | {p50:5.2f} | {p99:5.2f} | {do[:, k].max():5.2f}")
+print(f"trung bình chỉ riêng mô hình: {do[:, 2].mean():.2f} ms  ← con số hay bị báo cáo nhầm")</code></pre>
+<pre><code class="language-text">lần đầu tiên (cold): 33.6 ms
+giai đoạn      |  p50  |  p99  |  max  (ms)
+nhận ảnh       |  9.25 | 13.72 | 15.72
+tiền xử lý     |  3.28 |  5.88 | 10.68
+mô hình        |  3.11 |  5.96 |  8.22
+hậu xử lý      |  0.06 |  0.17 |  0.31
+ĐẦU CUỐI       | 15.86 | 24.26 | 28.57
+trung bình chỉ riêng mô hình: 3.24 ms  ← con số hay bị báo cáo nhầm</code></pre>
+<p>(Kết quả trên đo trên một máy 4 lõi CPU với 2 luồng suy luận; máy của bạn sẽ cho số khác, và mỗi lần chạy cũng hơi khác.) Cách đọc:</p>
+<ul>
+  <li><strong>Mô hình chỉ là một phần</strong> thời gian đầu cuối. Nhận và giải mã ảnh lớn thường tốn hơn cả mô hình nhỏ. Tối ưu sai chỗ (đổi mô hình nhanh hơn) sẽ không giải quyết được.</li>
+  <li><strong>p99 và max cao hơn p50</strong> rõ rệt: hệ điều hành chen tác vụ khác, bộ nhớ, bộ đệm. So <strong>max</strong> (hoặc p99,9 khi đo đủ lâu) với ngân sách, có biên an toàn; ví dụ yêu cầu "p99 ≤ 50% ngân sách và max ≤ 80% ngân sách".</li>
+  <li><strong>Lần đầu</strong> chậm hơn nhiều: trạm phải tự chạy vài ảnh giả lúc khởi động trước khi báo "sẵn sàng" cho PLC.</li>
+  <li><strong>Số luồng</strong> ảnh hưởng mạnh đến các lần chậm. Khi chúng tôi đổi sang <code>torch.set_num_threads(4)</code> trên chính máy 4 lõi đó trong lúc có tiến trình khác đang chạy, p50 của mô hình gần như không đổi (khoảng 3 ms) nhưng max nhảy lên hơn 130 ms: các luồng tranh CPU với nhau và với tiến trình khác. Trên trạm thật cũng có giao diện, ghi log, giao tiếp PLC chạy song song; hãy thử vài giá trị số luồng và chọn theo max, không theo p50.</li>
+  <li>500 lần đo cho p99 chỉ dựa trên 5 giá trị lớn nhất. Khi nghiệm thu, đo hàng nghìn đến hàng chục nghìn lần, tốt nhất là đọc từ log thời gian của chính trạm trong ca chạy thử (bài "Lưu kết quả vào SQLite và ảnh NG" ở chặng 9 đã lưu thời gian xử lý cho từng sản phẩm).</li>
+</ul>
+
+<h2>9. Sai lầm thường gặp</h2>
+<ul>
+  <li><strong>Dùng ngưỡng 0,5 mặc định</strong> mà không xem đường cong. Ngưỡng là quyết định có số liệu, ghi trong cấu hình và tài liệu.</li>
+  <li><strong>Chọn ngưỡng trên tập test hoặc golden set</strong>, rồi báo cáo kết quả trên chính tập đó. Chọn trên val, nghiệm thu trên golden.</li>
+  <li><strong>Báo cáo precision của tập val</strong> như thể là của dây chuyền. Tỉ lệ NG khác nhau thì precision khác hẳn; dùng escape, overkill và quy ra số sản phẩm mỗi ca.</li>
+  <li><strong>Nói "0 lọt"</strong> mà không kèm số mẫu và cận trên tin cậy.</li>
+  <li><strong>Golden set "sống"</strong>: thêm bớt ảnh mỗi tuần không ghi phiên bản, nên không so sánh được mô hình tháng này với tháng trước.</li>
+  <li><strong>Đo thời gian chỉ riêng mô hình, lấy trung bình</strong>, trên máy dev có GPU mạnh, trong khi trạm chạy CPU công nghiệp và hạn chót bị vi phạm bởi các lần chậm nhất.</li>
+</ul>
+
+<h2>10. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Golden set có 150 ảnh NG. Mô hình mới không lọt ảnh nào. Khách hàng hỏi: "Vậy escape bằng 0 phải không?" Trả lời bằng con số. Cần bao nhiêu ảnh NG (không lọt ảnh nào) để khẳng định escape dưới 0,5% với 95% tin cậy?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import math
+
+from scipy.stats import beta
+
+print(f"0/150 lọt → escape &lt; {beta.ppf(0.95, 1, 150):.2%} (quy tắc số 3: {3 / 150:.2%})")
+print("cần", math.ceil(math.log(0.05) / math.log(1 - 0.005)), "ảnh NG, 0 lọt, để khẳng định escape &lt; 0,5%")</code></pre>
+<pre><code class="language-text">0/150 lọt → escape &lt; 1.98% (quy tắc số 3: 2.00%)
+cần 598 ảnh NG, 0 lọt, để khẳng định escape &lt; 0,5%</code></pre>
+<p>Trả lời: "Trên 150 ảnh NG của golden_v1, mô hình không lọt ảnh nào; với 95% tin cậy, tỉ lệ lọt thật dưới khoảng 2%. Để khẳng định dưới 0,5% cần khoảng 600 ảnh NG độc lập; chúng tôi đề xuất theo dõi tiếp trong sản xuất." Không bao giờ trả lời "bằng 0".</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Trên tập val (10% NG), mô hình đạt recall 98% và overkill 1,5% tại ngưỡng đang dùng. Dây chuyền có 0,2% NG và chạy 50.000 sản phẩm/ca. Tính số NG bắt được, số NG lọt, số OK bị loại mỗi ca, và precision trên dây chuyền.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">sp, ti_le_ng, recall, overkill = 50_000, 0.002, 0.98, 0.015
+ng = sp * ti_le_ng
+bat, lot = ng * recall, ng * (1 - recall)
+nham = (sp - ng) * overkill
+print(f"NG thật {ng:.0f}: bắt {bat:.0f}, lọt {lot:.0f}; loại nhầm {nham:.0f}; precision {bat / (bat + nham):.1%}")</code></pre>
+<pre><code class="language-text">NG thật 100: bắt 98, lọt 2; loại nhầm 748; precision 11.6%</code></pre>
+<p>Thùng NG mỗi ca có khoảng 846 sản phẩm, chỉ 98 là lỗi thật. Nếu nhà máy không có người kiểm lại thùng NG, overkill 1,5% là quá đắt; cần giảm overkill (ngưỡng, dữ liệu OK khó, vùng xám) trước khi bàn đến chuyện thay QC.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Ngân sách xử lý của trạm là 80 ms. Kết quả đo 2000 lần đầu cuối được mô phỏng trong code dưới đây (phần lớn quanh 30 ms, thỉnh thoảng có lần chậm do hệ điều hành). Trạm có đạt yêu cầu "p99 ≤ 50% ngân sách và max ≤ 80% ngân sách" không? Nếu chỉ báo cáo trung bình thì sao?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import numpy as np
+
+rng = np.random.default_rng(1)
+t = rng.normal(30, 2, 2000)
+cham = rng.random(2000) &lt; 0.004                    # 0,4% số lần bị chen ngang
+t[cham] += rng.uniform(20, 45, cham.sum())
+NGAN_SACH = 80
+p50, p99 = np.percentile(t, [50, 99])
+print(f"trung bình {t.mean():.1f} | p50 {p50:.1f} | p99 {p99:.1f} | max {t.max():.1f} ms")
+print("p99 ≤ 40 ms:", p99 &lt;= 0.5 * NGAN_SACH, "| max ≤ 64 ms:", t.max() &lt;= 0.8 * NGAN_SACH)</code></pre>
+<pre><code class="language-text">trung bình 30.1 | p50 30.0 | p99 35.1 | max 72.2 ms
+p99 ≤ 40 ms: True | max ≤ 64 ms: False</code></pre>
+<p>Trung bình và p50 đẹp, p99 cũng đạt, nhưng <strong>max vượt 64 ms</strong>: thỉnh thoảng trạm dùng gần hết ngân sách, chỉ một lần chậm hơn chút nữa là sản phẩm không có kết quả. Cần tìm nguyên nhân các lần chậm (ghi log ảnh, tác vụ nền, phần mềm diệt virus, bộ nhớ) hoặc tách các tác vụ không thời gian thực ra luồng riêng, rồi đo lại. Chỉ báo cáo trung bình 30 ms sẽ che mất hoàn toàn vấn đề này.</p>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Mô hình cho điểm số; ngưỡng biến điểm số thành OK/NG. Escape = 1 − recall, overkill = FPR; ROC chính là đường escape–overkill.</li>
+  <li>Chọn ngưỡng: thỏa ràng buộc escape trước (lọt tối đa N ảnh NG trên val), rồi chọn ngưỡng cao nhất để tối thiểu overkill; có số liệu chi phí thì so thêm phương án tối thiểu chi phí. Quy ra số sản phẩm mỗi ca với tỉ lệ NG thật của dây chuyền; precision thay đổi mạnh theo tỉ lệ NG.</li>
+  <li>Báo cáo kèm số mẫu và cận trên tin cậy (0 lọt trên n ảnh NG chỉ chứng minh escape dưới khoảng 3/n).</li>
+  <li>Golden set: cố định, nhãn được xác nhận, có phiên bản và hash, không dùng để huấn luyện hay chọn ngưỡng; chạy lại sau mọi thay đổi và so sánh từng ảnh, đặc biệt các lỗi nghiêm trọng.</li>
+  <li>Cycle time: đo đầu cuối, warm-up, ghi lần chạy đầu, báo p50/p99/max bằng <code>time.perf_counter()</code> trên phần cứng đích, so max với ngân sách có biên an toàn.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Bài tập chặng 11: thiết kế chiến lược AI cho một bài toán lỗi</strong>, nơi bạn dùng mọi công cụ của chặng để lập kế hoạch cho một dự án thật.</p>
