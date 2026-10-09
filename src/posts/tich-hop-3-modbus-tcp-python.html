@@ -1,0 +1,460 @@
+<p>I/O số chỉ gửi được vài bit. Khi PLC cần biết <em>đường kính đo được là bao nhiêu</em>, mã lỗi nào, hay trạm đang chạy công thức (recipe) nào, bạn cần một giao thức mạng. <strong>Modbus TCP</strong> là lựa chọn đơn giản và phổ biến nhất: gần như PLC nào cũng hỗ trợ, đặc tả mở, và Python có thư viện <code>pymodbus</code> rất đầy đủ. Bài này dùng lại đúng trình tự bắt tay ở bài "I/O số và handshake với PLC", nhưng thay dây điện bằng các ô nhớ Modbus; bài "Các chuẩn giao tiếp: Modbus TCP, EtherNet/IP, PROFINET" đã cho bạn bức tranh tổng quát, ở đây là code chạy được. Mọi ví dụ đều chạy trên máy bạn với một <strong>PLC giả</strong> khởi động ngay trong script.</p>
+
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Đọc/ghi coil và holding register bằng pymodbus; gửi một số thực 32 bit qua hai thanh ghi đúng thứ tự byte và tự kiểm tra bằng <code>struct</code>; viết vòng lặp chờ trigger từ PLC có bắt sườn, timeout và tự kết nối lại.</div>
+
+<h2>1. Modbus TCP trong năm phút</h2>
+<ul>
+  <li><strong>Client / server</strong> (tài liệu cũ gọi là master / slave). Client gửi yêu cầu, server trả lời. Server không bao giờ tự gửi gì. Trong trạm vision, PLC thường là <strong>server</strong>, PC vision là <strong>client</strong> và phải <strong>hỏi vòng (polling)</strong> liên tục: "có trigger chưa?".</li>
+  <li>Chạy trên TCP, cổng mặc định <strong>502</strong>. Trên Linux, mở cổng dưới 1024 cần quyền root, nên các ví dụ dùng cổng 5020.</li>
+  <li>Mỗi yêu cầu mang một <strong>Unit ID</strong> (pymodbus gọi là <code>device_id</code>). Với PLC nối thẳng Ethernet, giá trị này thường bị bỏ qua hoặc phải là 1 hay 255 tùy hãng; nó chỉ thực sự quan trọng khi đi qua gateway Modbus TCP → RTU.</li>
+  <li>Không có kiểu dữ liệu: mọi thứ là <strong>bit</strong> hoặc <strong>thanh ghi 16 bit</strong>. Số thực, số 32 bit, chuỗi… là do hai bên tự thống nhất cách ghép.</li>
+</ul>
+
+<h2>2. Mô hình dữ liệu và cách đánh địa chỉ</h2>
+<table>
+  <tr><th>Vùng</th><th>Kích thước</th><th>Client được</th><th>Mã hàm</th><th>Ký hiệu "5 chữ số"</th></tr>
+  <tr><td>Coil</td><td>1 bit</td><td>đọc, ghi</td><td>01 đọc; 05 ghi một; 15 ghi nhiều</td><td>00001–09999</td></tr>
+  <tr><td>Discrete input</td><td>1 bit</td><td>chỉ đọc</td><td>02</td><td>10001–19999</td></tr>
+  <tr><td>Input register</td><td>16 bit</td><td>chỉ đọc</td><td>04</td><td>30001–39999</td></tr>
+  <tr><td>Holding register</td><td>16 bit</td><td>đọc, ghi</td><td>03 đọc; 06 ghi một; 16 ghi nhiều</td><td>40001–49999</td></tr>
+</table>
+<p>Một lần đọc được tối đa 125 thanh ghi hoặc 2000 bit; một lần ghi nhiều tối đa 123 thanh ghi. Mỗi PLC ánh xạ các vùng này vào bộ nhớ riêng của nó (thanh ghi D, khối DB, vùng %MW…): hãy xin kỹ sư PLC bảng ánh xạ cụ thể.</p>
+<p><strong>Bẫy kinh điển: 0 hay 1?</strong> Trên dây, địa chỉ luôn bắt đầu từ 0. Ký hiệu "40001" là cách viết của tài liệu: chữ số đầu chỉ vùng, phần còn lại đếm từ 1. Vì vậy:</p>
+<table>
+  <tr><th>Tài liệu ghi</th><th>Vùng</th><th>Địa chỉ truyền cho pymodbus</th></tr>
+  <tr><td>40001</td><td>holding register</td><td><code>read_holding_registers(0, ...)</code></td></tr>
+  <tr><td>40101–40102</td><td>holding register</td><td><code>read_holding_registers(100, count=2, ...)</code></td></tr>
+  <tr><td>00005</td><td>coil</td><td><code>read_coils(4, ...)</code></td></tr>
+  <tr><td>"HR 100" hoặc "%MW100"</td><td>tùy hãng</td><td>Hỏi lại! Có tài liệu đã đếm từ 0, có tài liệu đếm từ 1</td></tr>
+</table>
+<p>Lệch một địa chỉ là lỗi rất khó thấy: bạn vẫn đọc/ghi thành công, chỉ là vào <em>ô bên cạnh</em>. Cách kiểm tra khi chạy thử: nhờ kỹ sư PLC ghi một giá trị "lạ" (ví dụ 1234) vào đúng ô, bạn đọc ra phải thấy 1234.</p>
+
+<h2>3. Cài đặt và lưu ý phiên bản</h2>
+<pre><code class="language-bash">pip install pymodbus
+python -c "import pymodbus; print(pymodbus.__version__)"</code></pre>
+<p>Bài viết dùng <strong>pymodbus 3.15.0</strong>. Thư viện này đổi API khá thường xuyên, nên nếu bạn đọc code trên mạng hãy để ý:</p>
+<ul>
+  <li>Tham số chọn thiết bị hiện là <code>device_id=</code>. Các bản 3.x cũ dùng <code>slave=</code>, bản rất cũ dùng <code>unit=</code>. Gặp <code>TypeError: ... unexpected keyword argument 'slave'</code> là dấu hiệu code viết cho bản cũ.</li>
+  <li>Phía server, bản 3.15 dùng <code>SimData</code> / <code>SimDevice</code> để khai báo bộ nhớ. Các lớp cũ <code>ModbusSequentialDataBlock</code>, <code>ModbusDeviceContext</code> (trước nữa là <code>ModbusSlaveContext</code>) vẫn chạy nhưng in cảnh báo "deprecated" và sẽ bị bỏ ở bản 4.</li>
+  <li>Các tham số sau địa chỉ (<code>count</code>, <code>device_id</code>) phải truyền theo tên: <code>read_coils(0, count=4, device_id=1)</code>.</li>
+</ul>
+
+<h2>4. PLC giả và các lệnh đọc/ghi cơ bản</h2>
+<p>Lớp <code>PlcGia</code> chạy một Modbus TCP server trong thread riêng (pymodbus server dùng <code>asyncio</code>), với bộ nhớ gồm 16 coil, 16 discrete input, 32 holding register, 16 input register, đều bắt đầu từ địa chỉ 0. Hàm <code>doc_coil</code>, <code>ghi_hr</code>… đóng vai "chương trình PLC" tự đọc/ghi bộ nhớ của nó; phía vision chỉ dùng <code>ModbusTcpClient</code> như với PLC thật.</p>
+<pre><code class="language-python">import asyncio
+import threading
+import time
+
+from pymodbus.client import ModbusTcpClient
+from pymodbus.server import ModbusTcpServer
+from pymodbus.simulator import DataType, SimData, SimDevice
+
+
+class PlcGia:
+    """PLC giả: một Modbus TCP server chạy trong thread riêng, có hàm đọc/ghi bộ nhớ của chính nó."""
+
+    def __init__(self, port=5020):
+        self.port = port
+
+    def bat(self):
+        self._da_nghe = threading.Event()
+        self._thread = threading.Thread(target=lambda: asyncio.run(self._main()), daemon=True)
+        self._thread.start()
+        if not self._da_nghe.wait(timeout=3):
+            raise RuntimeError("PLC giả không khởi động được")
+
+    async def _main(self):
+        self.loop = asyncio.get_running_loop()
+        bo_nho = SimDevice(id=1, simdata=(
+            [SimData(0, count=16, values=False, datatype=DataType.BITS)],   # coils 0..15
+            [SimData(0, count=16, values=False, datatype=DataType.BITS)],   # discrete inputs 0..15
+            [SimData(0, count=32, values=0, datatype=DataType.REGISTERS)],  # holding registers 0..31
+            [SimData(0, count=16, values=0, datatype=DataType.REGISTERS)],  # input registers 0..15
+        ))
+        self.server = ModbusTcpServer(bo_nho, address=("127.0.0.1", self.port))
+        await self.server.serve_forever(background=True)          # mở cổng rồi trả về ngay
+        self._da_nghe.set()
+        await self.server.serving                                 # chờ tới khi shutdown()
+
+    def tat(self):
+        asyncio.run_coroutine_threadsafe(self.server.shutdown(), self.loop).result(timeout=3)
+        self._thread.join(timeout=3)
+
+    # "Chương trình PLC" đọc/ghi bộ nhớ của chính nó (mã hàm 1 = coil, 3 = holding register)
+    def _goi(self, coro):
+        return asyncio.run_coroutine_threadsafe(coro, self.loop).result(timeout=2)
+
+    def doc_coil(self, dia_chi):
+        return self._goi(self.server.async_getValues(1, 1, dia_chi, 1))[0]
+
+    def ghi_coil(self, dia_chi, gia_tri):
+        self._goi(self.server.async_setValues(1, 5, dia_chi, [bool(gia_tri)]))
+
+    def doc_hr(self, dia_chi, so_luong=1):
+        return self._goi(self.server.async_getValues(1, 3, dia_chi, so_luong))
+
+    def ghi_hr(self, dia_chi, gia_tri):
+        self._goi(self.server.async_setValues(1, 16, dia_chi, list(gia_tri)))
+
+
+plc = PlcGia(port=5020)
+plc.bat()
+plc.ghi_hr(0, [7, 1])                 # "chương trình PLC": mã sản phẩm 7, chu kỳ số 1
+
+client = ModbusTcpClient("127.0.0.1", port=5020, timeout=1)
+print("Kết nối:", client.connect())
+
+# Đọc 2 holding register từ địa chỉ 0 (= 40001, 40002)
+rr = client.read_holding_registers(0, count=2, device_id=1)
+print("HR[0..1] =", rr.registers)
+
+# Ghi coil 1 (READY) và đọc lại 4 coil đầu
+client.write_coil(1, True, device_id=1)
+rr = client.read_coils(0, count=4, device_id=1)
+print("Coil[0..3] =", rr.bits[:4], "(nhận về", len(rr.bits), "bit)")
+
+# Ghi một và nhiều holding register (mã hàm 06 và 16)
+client.write_register(10, 1, device_id=1)
+client.write_registers(11, [42, 500], device_id=1)
+print("PLC thấy HR[10..12] =", plc.doc_hr(10, 3))
+
+# Đọc địa chỉ không tồn tại: KHÔNG có exception, mà là một phản hồi lỗi
+rr = client.read_holding_registers(100, count=1, device_id=1)
+print("Đọc HR 100:", rr.isError(), rr)</code></pre>
+<pre><code class="language-text">Kết nối: True
+HR[0..1] = [7, 1]
+Coil[0..3] = [False, True, False, False] (nhận về 8 bit)
+PLC thấy HR[10..12] = [1, 42, 500]
+Đọc HR 100: True ExceptionResponse(dev_id=1, function_code=131, exception_code=2)</code></pre>
+<p>Ba điều cần nhớ từ kết quả trên:</p>
+<ul>
+  <li><code>read_coils(0, count=4)</code> trả về <strong>8</strong> bit: các bit được đóng gói theo byte, phần dư là 0. Luôn cắt <code>bits[:count]</code>.</li>
+  <li>Đọc sai địa chỉ <strong>không</strong> ném exception: pymodbus trả về <code>ExceptionResponse</code>. Mã hàm 131 = 0x80 + 3 (lỗi của lệnh đọc holding register), <code>exception_code=2</code> là ILLEGAL DATA ADDRESS. Phải kiểm tra <code>rr.isError()</code> sau mỗi lệnh. Ngược lại, mất kết nối thì có exception (<code>ConnectionException</code>).</li>
+  <li>pymodbus tự ghi log lỗi kết nối ra stderr (ví dụ "Connection refused"). Đó là log của thư viện, không phải lỗi của code; trong dự án bạn sẽ chuyển chúng vào file log.</li>
+</ul>
+
+<h2>5. Số thực 32 bit qua hai thanh ghi</h2>
+<p>Một số <code>float32</code> theo chuẩn IEEE 754 chiếm 4 byte, gọi là A B C D (A chứa bit dấu). Modbus chỉ quy định <em>trong một thanh ghi</em> byte cao đi trước; còn thanh ghi nào chứa nửa nào của số thực thì chuẩn không nói. Vì vậy ngoài thực tế có bốn kiểu:</p>
+<pre><code class="language-python">import struct
+
+gia_tri = 123.456
+b = struct.pack("&gt;f", gia_tri)                     # 4 byte IEEE 754, big-endian: A B C D
+print("Byte:", b.hex(" ").upper())
+
+def thanh_ghi(bon_byte):
+    """Ghép 4 byte thành 2 thanh ghi 16 bit (mỗi thanh ghi big-endian như chuẩn Modbus)."""
+    return [int.from_bytes(bon_byte[0:2], "big"), int.from_bytes(bon_byte[2:4], "big")]
+
+A, B, C, D = b
+thu_tu = {
+    "ABCD (big-endian)":     bytes([A, B, C, D]),
+    "CDAB (đảo word)":       bytes([C, D, A, B]),
+    "BADC (đảo byte)":       bytes([B, A, D, C]),
+    "DCBA (little-endian)":  bytes([D, C, B, A]),
+}
+for ten, bb in thu_tu.items():
+    regs = thanh_ghi(bb)
+    hieu_sai = struct.unpack("&gt;f", bb)[0]           # nếu bên nhận cứ đọc như ABCD
+    print(f"{ten:&lt;22} thanh ghi = [0x{regs[0]:04X}, 0x{regs[1]:04X}]   đọc như ABCD = {hieu_sai:.6g}")</code></pre>
+<pre><code class="language-text">Byte: 42 F6 E9 79
+ABCD (big-endian)      thanh ghi = [0x42F6, 0xE979]   đọc như ABCD = 123.456
+CDAB (đảo word)        thanh ghi = [0xE979, 0x42F6]   đọc như ABCD = -1.88337e+25
+BADC (đảo byte)        thanh ghi = [0xF642, 0x79E9]   đọc như ABCD = -9.86112e+32
+DCBA (little-endian)   thanh ghi = [0x79E9, 0xF642]   đọc như ABCD = 1.5185e+35</code></pre>
+<p>Hãy nhìn cột cuối: đọc sai thứ tự không báo lỗi gì, chỉ ra một con số vô lý (hoặc tệ hơn, một con số trông hợp lý nếu giá trị nhỏ). Hai kiểu hay gặp nhất là <strong>ABCD</strong> (big-endian, nhiều tài liệu gọi là "float, big endian") và <strong>CDAB</strong> ("word swap", thường gặp ở PLC lưu dữ liệu little-endian theo word). pymodbus hỗ trợ trực tiếp hai kiểu này qua <code>word_order</code>; kiểu đảo byte (BADC, DCBA) phải tự xử lý bằng <code>struct</code> như trên.</p>
+<pre><code class="language-python">F32 = client.DATATYPE.FLOAT32
+
+regs_big = client.convert_to_registers(123.456, F32)                          # ABCD
+regs_swap = client.convert_to_registers(123.456, F32, word_order="little")   # CDAB
+print("big   :", [hex(r) for r in regs_big])
+print("little:", [hex(r) for r in regs_swap])
+
+# Gửi số đo lên HR 12-13 trong MỘT lệnh ghi (mã hàm 16)
+client.write_registers(12, regs_big, device_id=1)
+tren_plc = plc.doc_hr(12, 2)
+print("PLC nhận:", tren_plc)
+print("Giải mã đúng thứ tự :", round(client.convert_from_registers(tren_plc, F32), 4))
+print("Giải mã sai thứ tự  :", client.convert_from_registers(tren_plc, F32, word_order="little"))
+
+# Kiểm tra chéo bằng struct: không phụ thuộc thư viện
+raw = b"".join(r.to_bytes(2, "big") for r in tren_plc)
+print("struct &gt;f           :", round(struct.unpack("&gt;f", raw)[0], 4))
+
+client.close()
+plc.tat()</code></pre>
+<pre><code class="language-text">big   : ['0x42f6', '0xe979']
+little: ['0xe979', '0x42f6']
+PLC nhận: [17142, 59769]
+Giải mã đúng thứ tự : 123.456
+Giải mã sai thứ tự  : -1.8833671448184637e+25
+struct &gt;f           : 123.456</code></pre>
+<div class="warn"><strong>Ghi số 32 bit bằng một lệnh</strong>Luôn ghi cả hai thanh ghi bằng <code>write_registers</code> (mã hàm 16), không ghi lần lượt hai lệnh <code>write_register</code>. Nếu PLC đọc đúng lúc giữa hai lệnh, nó thấy nửa số mới ghép với nửa số cũ: một giá trị hoàn toàn vô nghĩa.</div>
+<p><strong>Cách thống nhất thứ tự byte khi chạy thử</strong>: vision gửi một "giá trị mồi" dễ nhận ra như 123.456 hoặc 1.0 (0x3F800000) vào ô số thực, kỹ sư PLC xem trên màn hình giám sát. Nếu thấy 123.456 là xong; nếu thấy số khổng lồ, thử đổi <code>word_order</code>. Một cách khác được nhiều đội chọn để tránh hẳn vấn đề: gửi <strong>số nguyên đã nhân hệ số</strong>, ví dụ đường kính 10.004 mm gửi thành 10004 (đơn vị µm) trong một thanh ghi INT16 hoặc hai thanh ghi INT32. PLC nào cũng hiểu số nguyên và dễ hiển thị trên HMI.</p>
+
+<h2>6. Bảng địa chỉ cho trạm vision</h2>
+<p>Bảng dưới đây là "hợp đồng" giữa bạn và kỹ sư PLC, dùng cho phần còn lại của bài và cho dự án cuối chặng. Nguyên tắc vàng: <strong>mỗi ô nhớ chỉ có một bên ghi</strong>.</p>
+<table>
+  <tr><th>Địa chỉ (giao thức)</th><th>Tài liệu</th><th>Bên ghi</th><th>Nội dung</th></tr>
+  <tr><td>coil 0</td><td>00001</td><td>PLC</td><td>TRIGGER</td></tr>
+  <tr><td>coil 1, 2, 3</td><td>00002–00004</td><td>Vision</td><td>READY, BUSY, DONE</td></tr>
+  <tr><td>HR 0</td><td>40001</td><td>PLC</td><td>Mã sản phẩm / số công thức</td></tr>
+  <tr><td>HR 1</td><td>40002</td><td>PLC</td><td>Số thứ tự chu kỳ (tăng mỗi sản phẩm)</td></tr>
+  <tr><td>HR 10</td><td>40011</td><td>Vision</td><td>Kết quả: 1 = OK, 2 = NG (0 = chưa có kết quả nào từ lúc khởi động)</td></tr>
+  <tr><td>HR 11</td><td>40012</td><td>Vision</td><td>Số chu kỳ mà kết quả này thuộc về (trả lại HR 1)</td></tr>
+  <tr><td>HR 12–13</td><td>40013–40014</td><td>Vision</td><td>Đường kính đo được, float32 ABCD, đơn vị mm</td></tr>
+</table>
+<p>HR 11 là chi tiết đáng giá: PLC so HR 11 với số chu kỳ nó đã gửi. Nếu khác, kết quả thuộc về sản phẩm khác, xử lý như NG. Đây là bản mạng của quy tắc "bỏ kết quả muộn" ở bài trước.</p>
+<pre><code class="language-python"># Bảng địa chỉ thống nhất với kỹ sư PLC (địa chỉ giao thức, bắt đầu từ 0)
+TRIGGER, READY, BUSY, DONE = 0, 1, 2, 3        # coil 00001..00004
+HR_MA_SP, HR_CHU_KY = 0, 1                     # 40001, 40002  (PLC ghi)
+HR_KET_QUA = 10                                # 40011: 1 = OK, 2 = NG (vision ghi)
+HR_CHU_KY_TRA = 11                             # 40012: vision trả lại số chu kỳ đã xử lý
+HR_DO = 12                                     # 40013-40014: đường kính (float32, ABCD)
+TB = 1                                         # device_id (Unit ID)
+
+for ten, dc in [("TRIGGER", TRIGGER), ("DONE", DONE)]:
+    print(f"coil {ten:&lt;8} địa chỉ {dc} = {dc + 1:05d}")
+for ten, dc in [("HR_KET_QUA", HR_KET_QUA), ("HR_DO", HR_DO)]:
+    print(f"HR   {ten:&lt;10} địa chỉ {dc} = {40001 + dc}")</code></pre>
+<pre><code class="language-text">coil TRIGGER  địa chỉ 0 = 00001
+coil DONE     địa chỉ 3 = 00004
+HR   HR_KET_QUA địa chỉ 10 = 40011
+HR   HR_DO      địa chỉ 12 = 40013</code></pre>
+
+<h2>7. Vòng lặp chờ trigger</h2>
+<p>Vòng lặp phía vision làm đúng trình tự bắt tay 4 pha, chỉ khác là "đọc dây" thành <code>read_coils</code> và "bật dây" thành <code>write_coils</code>:</p>
+<ol>
+  <li>Đọc coil TRIGGER mỗi 10 ms. Chỉ bắt đầu chu kỳ khi thấy <strong>sườn lên</strong>.</li>
+  <li>BUSY = 1, đọc mã sản phẩm và số chu kỳ, chụp, xử lý.</li>
+  <li>Ghi kết quả + số chu kỳ + số thực trong <strong>một</strong> lệnh <code>write_registers</code>; chờ server xác nhận <em>rồi</em> mới bật DONE.</li>
+  <li>Chờ PLC tắt TRIGGER (có timeout), rồi DONE = 0, READY = 1.</li>
+  <li>Mất kết nối: đóng socket, chờ 0,5 s, kết nối lại; sau khi kết nối lại <strong>ghi lại trạng thái READY</strong> vì PLC có thể đã khởi động lại và mất bộ nhớ.</li>
+</ol>
+<p>Để thử phần kết nối lại, chương trình PLC giả sẽ "mất điện" 1 giây sau sản phẩm thứ 2 (tắt server rồi bật lại với bộ nhớ trắng). Code dùng tiếp lớp <code>PlcGia</code> và bảng địa chỉ ở trên.</p>
+<pre><code class="language-python">import threading
+import time
+
+import cv2
+import numpy as np
+from pymodbus.client import ModbusTcpClient
+from pymodbus.exceptions import ModbusException
+
+MM_MOI_PX = 0.05
+
+
+def chup_anh_gia(chu_ky):
+    """Ảnh giả: một vòng đệm, bán kính thay đổi theo chu kỳ (chu kỳ 3 bị to)."""
+    ban_kinh = {3: 104}.get(chu_ky, 100)
+    anh = np.full((300, 300), 30, np.uint8)
+    cv2.circle(anh, (150, 150), ban_kinh, 220, -1)
+    return anh
+
+
+def do_duong_kinh(anh):
+    _, nhi_phan = cv2.threshold(anh, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    cs, _ = cv2.findContours(nhi_phan, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    (_, _), r = cv2.minEnclosingCircle(max(cs, key=cv2.contourArea))
+    return 2 * r * MM_MOI_PX
+
+
+def kiem(rr):
+    """pymodbus trả phản hồi lỗi chứ không ném exception: tự đổi thành exception."""
+    if rr.isError():
+        raise ModbusException(f"PLC trả lỗi: {rr}")
+    return rr
+
+
+class TramVision:
+    def __init__(self, host, port, timeout_trigger_tat=2.0, chu_ky_doc=0.01):
+        self.client = ModbusTcpClient(host, port=port, timeout=0.5, retries=1)
+        self.timeout_trigger_tat = timeout_trigger_tat
+        self.chu_ky_doc = chu_ky_doc
+        self.da_xu_ly = 0
+
+    def doc_bit(self, dia_chi):
+        return kiem(self.client.read_coils(dia_chi, count=1, device_id=TB)).bits[0]
+
+    def trang_thai(self, ready, busy, done):
+        kiem(self.client.write_coils(READY, [ready, busy, done], device_id=TB))  # coil 1..3 một lệnh
+
+    def mot_chu_ky(self):
+        self.trang_thai(ready=False, busy=True, done=False)
+        ma_sp, chu_ky = kiem(self.client.read_holding_registers(HR_MA_SP, count=2, device_id=TB)).registers
+        d = do_duong_kinh(chup_anh_gia(chu_ky))
+        ok = 9.90 &lt;= d &lt;= 10.10
+        regs = [1 if ok else 2, chu_ky] + self.client.convert_to_registers(d, self.client.DATATYPE.FLOAT32)
+        kiem(self.client.write_registers(HR_KET_QUA, regs, device_id=TB))   # 1) kết quả TRƯỚC
+        self.trang_thai(ready=False, busy=False, done=True)                  # 2) rồi mới DONE
+        han = time.monotonic() + self.timeout_trigger_tat
+        trigger = True
+        while trigger:                                                       # 3) chờ PLC tắt TRIGGER
+            if time.monotonic() &gt; han:
+                print("  ! PLC không tắt TRIGGER, tự xóa DONE")
+                break
+            time.sleep(self.chu_ky_doc)
+            trigger = self.doc_bit(TRIGGER)
+        self.trang_thai(ready=True, busy=False, done=False)                  # 4) sẵn sàng lại
+        self.da_xu_ly += 1
+        print(f"Chu kỳ {chu_ky}: SP mã {ma_sp}, d = {d:.3f} mm → {'OK' if ok else 'NG'}")
+        return trigger                    # mức TRIGGER thấy lần cuối (thường là False)
+
+    def chay(self, so_chu_ky, thoi_han_s=20):
+        trigger_truoc = False
+        het_han = time.monotonic() + thoi_han_s
+        while self.da_xu_ly &lt; so_chu_ky and time.monotonic() &lt; het_han:
+            if not self.client.connected:
+                if not self.client.connect():
+                    time.sleep(0.5)                      # PLC chưa lên: thử lại sau
+                    continue
+                print("Đã kết nối PLC, ghi lại READY")
+                self.trang_thai(ready=True, busy=False, done=False)
+                trigger_truoc = False
+            try:
+                trigger = self.doc_bit(TRIGGER)
+                if trigger and not trigger_truoc:        # chỉ bắt SƯỜN LÊN
+                    trigger = self.mot_chu_ky()          # cập nhật mức đã thấy SAU chu kỳ
+                trigger_truoc = trigger
+                time.sleep(self.chu_ky_doc)
+            except ModbusException as e:                 # gồm cả ConnectionException
+                print(f"Mất kết nối PLC ({type(e).__name__}), sẽ kết nối lại")
+                self.client.close()
+                time.sleep(0.5)
+        self.client.close()
+
+
+def chuong_trinh_plc(plc, so_sp, nhat_ky):
+    """Logic PLC giả: bật trigger, chờ DONE, đọc kết quả. Sau SP2 thì 'khởi động lại'."""
+    def cho(dieu_kien, timeout):
+        han = time.monotonic() + timeout
+        while not dieu_kien():
+            if time.monotonic() &gt; han:
+                return False
+            time.sleep(0.005)
+        return True
+
+    for k in range(1, so_sp + 1):
+        if not cho(lambda: plc.doc_coil(READY), 5):
+            nhat_ky.append(f"SP{k}: vision không READY")
+            continue
+        plc.ghi_hr(HR_MA_SP, [7, k])
+        plc.ghi_coil(TRIGGER, 1)
+        if cho(lambda: plc.doc_coil(DONE), 2.0):
+            kq, k_tra, *f = plc.doc_hr(HR_KET_QUA, 4)
+            d = ModbusTcpClient.convert_from_registers(f, ModbusTcpClient.DATATYPE.FLOAT32)
+            khop = "khớp" if k_tra == k else "LỆCH"
+            nhat_ky.append(f"SP{k}: {'OK' if kq == 1 else 'NG'}, d={d:.3f}, số chu kỳ {khop}")
+        else:
+            nhat_ky.append(f"SP{k}: TIMEOUT → loại")
+        plc.ghi_coil(TRIGGER, 0)
+        cho(lambda: not plc.doc_coil(DONE), 2.0)
+        if k == 2:                                   # mô phỏng PLC mất điện 1 giây
+            plc.tat()
+            time.sleep(1.0)
+            plc.bat()                                # bộ nhớ khởi tạo lại về 0
+
+
+plc = PlcGia(port=5020)
+plc.bat()
+nhat_ky_plc = []
+t_plc = threading.Thread(target=chuong_trinh_plc, args=(plc, 4, nhat_ky_plc), daemon=True)
+t_plc.start()
+
+tram = TramVision("127.0.0.1", 5020)
+tram.chay(so_chu_ky=4)
+t_plc.join(timeout=5)
+plc.tat()
+print("Nhật ký PLC:", *nhat_ky_plc, sep="\n  ")</code></pre>
+<pre><code class="language-text">Đã kết nối PLC, ghi lại READY
+Chu kỳ 1: SP mã 7, d = 10.000 mm → OK
+Chu kỳ 2: SP mã 7, d = 10.000 mm → OK
+Mất kết nối PLC (ConnectionException), sẽ kết nối lại
+Đã kết nối PLC, ghi lại READY
+Chu kỳ 3: SP mã 7, d = 10.400 mm → NG
+Chu kỳ 4: SP mã 7, d = 10.000 mm → OK
+Nhật ký PLC:
+  SP1: OK, d=10.000, số chu kỳ khớp
+  SP2: OK, d=10.000, số chu kỳ khớp
+  SP3: NG, d=10.400, số chu kỳ khớp
+  SP4: OK, d=10.000, số chu kỳ khớp</code></pre>
+<p>Chu kỳ 3 có đường kính 10,4 mm nằm ngoài dung sai 10,00 ± 0,10 mm nên NG; nhật ký phía PLC xác nhận nó nhận đúng số thực và số chu kỳ khớp. Khi PLC "mất điện", lệnh đọc kế tiếp ném <code>ConnectionException</code>, vòng lặp thử lại đến khi PLC lên, ghi lại READY và chạy tiếp như chưa có gì xảy ra. Trên stderr bạn sẽ thấy vài dòng log "Connection refused" của pymodbus trong lúc PLC tắt: đó là bình thường.</p>
+<div class="warn"><strong>Lỗi bắt sườn rất dễ mắc</strong>Bản đầu tiên của vòng lặp gán <code>trigger_truoc = trigger</code> với giá trị đọc <em>trước</em> chu kỳ (True). Trong lúc vision chờ TRIGGER tắt, PLC đã tắt rồi bật lại TRIGGER cho sản phẩm sau; vòng lặp đọc thấy True, so với True cũ, kết luận "không có sườn" và bỏ qua sản phẩm: PLC báo TIMEOUT ở mọi sản phẩm chẵn. Cách sửa: sau mỗi chu kỳ, cập nhật <code>trigger_truoc</code> bằng mức TRIGGER thấy <strong>lần cuối</strong> (hàm <code>mot_chu_ky</code> trả về giá trị đó).</div>
+
+<h3>Một vài con số về thời gian</h3>
+<p>Mỗi lệnh Modbus TCP trên mạng LAN công nghiệp thường mất cỡ vài ms (phụ thuộc chu kỳ xử lý truyền thông của PLC). Hỏi vòng mỗi 10 ms tức là khoảng 100 yêu cầu mỗi giây: đa số PLC xử lý thoải mái, nhưng đừng hạ xuống 1 ms "cho nhanh" vì PLC có thể phải dành thời gian cho truyền thông thay vì chạy chương trình. Độ trễ phát hiện trigger trung bình bằng nửa chu kỳ hỏi vòng cộng thời gian một lệnh. Nếu ứng dụng cần phản ứng dưới 1 ms (chụp vật đang chạy nhanh), dùng <strong>trigger phần cứng</strong> vào camera như bài trước, còn Modbus chỉ dùng để trả kết quả.</p>
+
+<h2>8. Chạy với PLC thật</h2>
+<ul>
+  <li>Thay <code>"127.0.0.1", 5020</code> bằng IP của PLC và cổng 502. Đặt IP tĩnh cho PC vision cùng dải mạng, kiểm tra bằng <code>ping</code> trước.</li>
+  <li>Thử bằng một công cụ "Modbus poll / Modbus master" có giao diện trước khi chạy code: nếu công cụ đọc được đúng ô, code của bạn cũng sẽ đọc được.</li>
+  <li>Bật Modbus server trên PLC (nhiều PLC phải khai báo khối chức năng hoặc tùy chọn trong phần mềm cấu hình) và hỏi kỹ sư PLC giới hạn số kết nối đồng thời.</li>
+  <li>Wireshark với bộ lọc <code>mbtcp</code> cho bạn xem từng gói: mã hàm, địa chỉ, giá trị. Đây là bằng chứng khách quan nhất khi hai bên tranh luận "ai gửi sai".</li>
+</ul>
+
+<h2>9. Lỗi thường gặp</h2>
+<table>
+  <tr><th>Hiện tượng</th><th>Nguyên nhân</th><th>Cách xử lý</th></tr>
+  <tr><td>Đọc được nhưng giá trị "của ô bên cạnh"</td><td>Lệch 0/1 khi đổi từ ký hiệu 4xxxx</td><td>Kiểm tra bằng giá trị mồi do PLC ghi</td></tr>
+  <tr><td>Số thực ra 1e+35, -9e+32…</td><td>Sai thứ tự word/byte</td><td>Thử <code>word_order="little"</code>; kiểm tra bằng <code>struct</code></td></tr>
+  <tr><td>Số thực thỉnh thoảng nhảy giá trị lạ</td><td>Ghi hai thanh ghi bằng hai lệnh riêng</td><td>Một lệnh <code>write_registers</code></td></tr>
+  <tr><td>Code chạy "êm" nhưng PLC không nhận gì</td><td>Không kiểm tra <code>isError()</code>, lệnh ghi thực ra bị từ chối</td><td>Bọc mọi phản hồi bằng hàm <code>kiem()</code></td></tr>
+  <tr><td>Sau khi PLC khởi động lại, dây chuyền đứng</td><td>Vision không ghi lại READY sau khi kết nối lại</td><td>Khởi tạo lại mọi tín hiệu của mình sau mỗi lần kết nối</td></tr>
+  <tr><td><code>TypeError: unexpected keyword 'slave'</code></td><td>Code viết cho pymodbus cũ</td><td>Đổi thành <code>device_id=</code></td></tr>
+  <tr><td>Hai bên cùng ghi một ô, giá trị "tự nhảy"</td><td>Bảng địa chỉ không rõ bên ghi</td><td>Mỗi ô một bên ghi, ghi rõ trong bảng</td></tr>
+</table>
+
+<h2>10. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Tài liệu PLC ghi: "Đường kính đo: 40101–40102, kiểu REAL, word swap". Bạn gọi hàm đọc với địa chỉ nào, <code>count</code> bao nhiêu và giải mã thế nào? Giả sử đọc được <code>[0xE979, 0x42F6]</code>.</p>
+<details><summary>Xem đáp án</summary>
+<p>Địa chỉ giao thức = 40101 − 40001 = 100, <code>count=2</code>. "Word swap" là CDAB, tương ứng <code>word_order="little"</code>:</p>
+<pre><code class="language-python">from pymodbus.client import ModbusTcpClient
+
+# Tài liệu: "Đường kính: 40101–40102, REAL, word swap" → địa chỉ giao thức 100, word_order="little"
+regs_doc_duoc = [0xE979, 0x42F6]                  # giả sử read_holding_registers(100, count=2) trả về
+d = ModbusTcpClient.convert_from_registers(regs_doc_duoc, ModbusTcpClient.DATATYPE.FLOAT32,
+                                           word_order="little")
+print(round(d, 3))</code></pre>
+<pre><code class="language-text">123.456</code></pre>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Khi chạy thử, bạn nhờ PLC ghi giá trị mồi 123.456 và đọc về hai thanh ghi <code>[0x79E9, 0xF642]</code>. Viết đoạn code thử cả bốn thứ tự để xác định PLC dùng kiểu nào.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import struct
+
+regs = [0x79E9, 0xF642]
+raw = b"".join(r.to_bytes(2, "big") for r in regs)          # đúng thứ tự trên dây
+cach_doc = {
+    "ABCD": raw,
+    "CDAB": raw[2:4] + raw[0:2],
+    "BADC": bytes([raw[1], raw[0], raw[3], raw[2]]),
+    "DCBA": raw[::-1],
+}
+for ten, bb in cach_doc.items():
+    print(ten, f"{struct.unpack('&gt;f', bb)[0]:.6g}")</code></pre>
+<pre><code class="language-text">ABCD 1.5185e+35
+CDAB -9.86112e+32
+BADC -1.88337e+25
+DCBA 123.456</code></pre>
+<p>Chỉ DCBA cho ra 123.456: PLC này lưu số thực little-endian hoàn toàn (đảo cả byte lẫn word). pymodbus không có tùy chọn sẵn cho kiểu này, bạn ghi chú vào bảng địa chỉ và dùng <code>struct</code> như trên cho cả chiều gửi.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Kỹ sư PLC đề nghị thêm thanh ghi HR 15 "heartbeat": vision tăng giá trị lên 1 mỗi giây, PLC báo lỗi nếu 3 giây không thấy đổi. Kết nối TCP đã có rồi, sao còn cần heartbeat? Bạn sửa vòng lặp ở mục 7 thế nào?</p>
+<details><summary>Xem đáp án</summary>
+<ul>
+  <li>Kết nối TCP còn sống không có nghĩa chương trình vision còn chạy đúng: vòng lặp có thể kẹt trong một hàm xử lý ảnh, camera mất ảnh, hoặc client bị treo trong khi hệ điều hành vẫn giữ socket. Không có heartbeat, PLC chỉ phát hiện khi một sản phẩm thật bị TIMEOUT; có heartbeat, PLC báo lỗi <em>trước</em> khi sản phẩm tới.</li>
+  <li>Sửa vòng lặp: giữ biến <code>t_heartbeat</code>; trong vòng lặp chính, nếu <code>time.monotonic() - t_heartbeat &gt;= 1.0</code> thì <code>dem = (dem + 1) % 65536</code> và <code>write_register(15, dem, device_id=1)</code>. Đặt việc này trong vòng lặp chính (không phải thread riêng) để heartbeat dừng đúng khi vòng lặp chính bị kẹt; đó chính là điều PLC cần phát hiện.</li>
+</ul>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Modbus TCP: PC vision là client hỏi vòng, PLC là server; cổng 502; dữ liệu chỉ là bit và thanh ghi 16 bit.</li>
+  <li>Bốn vùng: coil (đọc/ghi bit), discrete input (chỉ đọc bit), input register (chỉ đọc), holding register (đọc/ghi). 40001 trong tài liệu = địa chỉ 0 trên dây.</li>
+  <li>pymodbus 3.15: <code>device_id=</code> (không còn <code>slave=</code>), server khai báo bằng <code>SimData</code>/<code>SimDevice</code>; luôn kiểm tra <code>isError()</code>, bắt <code>ModbusException</code> khi mất kết nối.</li>
+  <li>float32 = 2 thanh ghi; thống nhất ABCD/CDAB/BADC/DCBA bằng giá trị mồi, kiểm tra bằng <code>struct</code>, ghi trong một lệnh.</li>
+  <li>Vòng lặp: bắt sườn lên TRIGGER, ghi kết quả trước rồi DONE, chờ TRIGGER tắt có timeout, trả lại số chu kỳ, kết nối lại và khởi tạo lại tín hiệu sau sự cố.</li>
+</ul>
+<p>Bài tiếp theo: <strong>OPC UA cho kỹ sư Vision</strong>, chuẩn giao tiếp có kiểu dữ liệu và tên biến rõ ràng, so sánh trực tiếp với Modbus TCP bạn vừa học.</p>

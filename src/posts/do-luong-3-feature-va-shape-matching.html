@@ -1,0 +1,587 @@
+<p>Ở bài template matching bạn đã đo được giới hạn: chip xoay 10° thì điểm NCC tụt từ 0,99 xuống 0,65, xoay 20° chỉ còn 0,50, gần bằng điểm của nền. Nhưng rất nhiều bài toán thực tế có vật xoay tự do: linh kiện đổ trên băng tải cho robot gắp, nhãn dán lệch, chi tiết cơ khí trong khay không có đồ gá. Bài này giới thiệu ba hướng giải quyết: <strong>feature matching</strong> (ORB + homography) cho vật có nhiều chi tiết bề mặt, <strong>so khớp hình dạng contour</strong> (Hu moments) cho vật tách nền tốt, và <strong>shape-based matching</strong> dựa trên hướng gradient, thứ làm nên sức mạnh của các thư viện thương mại. Bạn sẽ tự cài đặt một phiên bản thu nhỏ của nó để hiểu vì sao nó bền vững.</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Định vị vật xoay bất kỳ góc nào bằng ORB, lấy được góc và tâm để dời ROI; so sánh hình dạng bằng <code>cv2.matchShapes</code>; nhận ra khi nào ORB thất bại; hiểu và tự viết được phép đo độ tương đồng theo hướng gradient của shape-based matching.</div>
+
+<h2>1. Ảnh mẫu: nhãn có nhiều chi tiết, xoay 37°</h2>
+<p>Template là một nhãn sản phẩm có ô in, vòng tròn, chữ. Ảnh hiện trường đặt nhãn trên băng tải, <strong>xoay 37° theo chiều kim đồng hồ</strong> và tâm nhãn ở (380, 230). Quy ước góc giống bài đặc trưng contour: trục y hướng xuống, góc dương là xoay theo chiều kim đồng hồ trên màn hình.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+
+def ve_nhan(rng):
+    m = np.full((150, 220), 200, np.uint8)
+    cv2.rectangle(m, (0, 0), (219, 149), 60, 3)
+    for _ in range(14):                                         # ô in đậm nhạt khác nhau
+        x, y = int(rng.integers(8, 190)), int(rng.integers(8, 120))
+        cv2.rectangle(m, (x, y), (x + int(rng.integers(8, 30)), y + int(rng.integers(6, 25))),
+                      int(rng.integers(20, 120)), -1)
+    for _ in range(8):
+        cv2.circle(m, (int(rng.integers(15, 205)), int(rng.integers(15, 135))),
+                   int(rng.integers(4, 12)), int(rng.integers(0, 100)), 2)
+    cv2.putText(m, "LOT 2417", (20, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.5, 30, 1, cv2.LINE_AA)
+    cv2.putText(m, "VN-A5", (120, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.6, 30, 2, cv2.LINE_AA)
+    return m
+
+
+def dat_vao_canh(mau, goc, tam, ti_le=1.0, nen=90, seed=0):
+    """Đặt `mau` lên băng tải 640×480: xoay `goc` độ theo chiều kim đồng hồ, tâm tại `tam`."""
+    h, w = mau.shape
+    M = cv2.getRotationMatrix2D((w / 2, h / 2), -goc, ti_le)   # OpenCV: góc dương = ngược chiều kim đồng hồ
+    M[0, 2] += tam[0] - w / 2
+    M[1, 2] += tam[1] - h / 2
+    vat = cv2.warpAffine(mau, M, (640, 480), flags=cv2.INTER_LINEAR).astype(np.float32)
+    k = cv2.warpAffine(np.full_like(mau, 255), M, (640, 480), flags=cv2.INTER_LINEAR) / 255.0
+    r = np.random.default_rng(seed)
+    anh = (nen + r.normal(0, 3, (480, 640))) * (1 - k) + vat * k
+    return np.clip(anh, 0, 255).astype(np.uint8)
+
+
+nhan = ve_nhan(np.random.default_rng(4))
+cv2.imwrite("nhan_mau.png", nhan)
+cv2.imwrite("canh_nhan.png", dat_vao_canh(nhan, 37, (380, 230)))
+print("template", nhan.shape, "| thật: góc 37°, tâm (380, 230)")</code></pre>
+<pre><code class="language-text">TODO</code></pre>
+
+<h2>2. ORB: điểm đặc trưng và mô tả nhị phân</h2>
+<p><strong>Feature matching</strong> không so cả khối pixel mà chỉ so các <strong>điểm đặc trưng</strong> (keypoint): góc, đầu mút, chỗ giao nhau, những nơi tìm lại được dù ảnh xoay. Mỗi điểm có một <strong>mô tả</strong> (descriptor), là "dấu vân tay" của vùng quanh nó. ORB (Oriented FAST and Rotated BRIEF) là lựa chọn miễn phí, nhanh và có sẵn trong OpenCV:</p>
+<ul>
+  <li><strong>FAST</strong> tìm góc: so một vòng 16 pixel quanh điểm với pixel trung tâm. ORB chạy FAST trên nhiều tầng kim tự tháp ảnh nên chịu được đổi tỉ lệ ở mức vừa phải.</li>
+  <li>Mỗi keypoint được gán <strong>hướng</strong> từ trọng tâm cường độ của vùng lân cận. Mô tả được tính trong hệ tọa độ đã xoay theo hướng này, nhờ đó bất biến với xoay.</li>
+  <li><strong>BRIEF</strong>: so sánh 256 cặp pixel trong vùng 31×31, mỗi cặp cho 1 bit, tổng 32 byte. So hai mô tả bằng <strong>khoảng cách Hamming</strong> (số bit khác nhau), rất nhanh.</li>
+</ul>
+<pre><code class="language-python">import cv2
+
+nhan = cv2.imread("nhan_mau.png", cv2.IMREAD_GRAYSCALE)
+canh = cv2.imread("canh_nhan.png", cv2.IMREAD_GRAYSCALE)
+orb = cv2.ORB_create(nfeatures=1000)
+
+kp, des = orb.detectAndCompute(nhan, None)
+print("template gốc      :", len(kp), "keypoint")
+nhan_dem = cv2.copyMakeBorder(nhan, 32, 32, 32, 32, cv2.BORDER_CONSTANT, value=90)   # thêm viền
+kp_m, des_m = orb.detectAndCompute(nhan_dem, None)
+print("template thêm viền:", len(kp_m), "keypoint")
+kp_c, des_c = orb.detectAndCompute(canh, None)
+print("ảnh hiện trường   :", len(kp_c), "keypoint")
+print("mô tả:", des_m.shape, des_m.dtype, "→ mỗi điểm", des_m.shape[1] * 8, "bit")
+k = kp_m[0]
+print(f"ví dụ keypoint: vị trí ({k.pt[0]:.1f}, {k.pt[1]:.1f}), hướng {k.angle:.1f}°, tầng {k.octave}")</code></pre>
+<pre><code class="language-text">TODO</code></pre>
+<div class="warn"><strong>Template nhỏ thì phải thêm viền</strong>ORB bỏ qua các điểm cách mép ảnh dưới khoảng 31 pixel (tham số <code>edgeThreshold</code>, vì cần đủ vùng 31×31 để tính mô tả). Với template 220×150, phần lớn chi tiết gần mép bị bỏ. Thêm viền 32 px bằng màu nền (<code>cv2.copyMakeBorder</code>) làm số keypoint tăng nhiều lần như trên. Nhớ cộng/trừ 32 khi quy đổi tọa độ về template gốc.</div>
+
+<h2>3. So khớp mô tả: ratio test</h2>
+<p>Với mỗi mô tả của template, tìm mô tả gần nhất trong ảnh hiện trường. Vấn đề: điểm nào cũng có "gần nhất", kể cả điểm không thực sự tồn tại trong ảnh. Hai cách lọc phổ biến:</p>
+<ul>
+  <li><strong>Ratio test</strong> (của Lowe): lấy 2 ứng viên gần nhất, chỉ giữ nếu khoảng cách tốt nhất nhỏ hơn rõ rệt so với thứ hai, ví dụ &lt; 0,75 lần. Một điểm mơ hồ (giống nhiều chỗ) bị loại.</li>
+  <li><strong>Cross check</strong>: giữ cặp (a, b) chỉ khi a là gần nhất của b <em>và</em> b là gần nhất của a.</li>
+</ul>
+<pre><code class="language-python">import cv2
+
+nhan = cv2.imread("nhan_mau.png", cv2.IMREAD_GRAYSCALE)
+canh = cv2.imread("canh_nhan.png", cv2.IMREAD_GRAYSCALE)
+orb = cv2.ORB_create(nfeatures=1000)
+nhan_dem = cv2.copyMakeBorder(nhan, 32, 32, 32, 32, cv2.BORDER_CONSTANT, value=90)
+kp_m, des_m = orb.detectAndCompute(nhan_dem, None)
+kp_c, des_c = orb.detectAndCompute(canh, None)
+
+bf = cv2.BFMatcher(cv2.NORM_HAMMING)
+cap2 = bf.knnMatch(des_m, des_c, k=2)
+tot = [m for m, n in cap2 if m.distance &lt; 0.75 * n.distance]
+print("tất cả cặp gần nhất:", len(cap2), "| qua ratio test 0.75:", len(tot))
+
+bf_cc = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+cc = bf_cc.match(des_m, des_c)
+print("cross check:", len(cc))
+print("khoảng cách Hamming của 5 cặp tốt nhất:", sorted(int(m.distance) for m in tot)[:5])</code></pre>
+<pre><code class="language-text">TODO</code></pre>
+<p>Ngay cả sau khi lọc vẫn còn một tỉ lệ cặp sai. Bước tiếp theo sẽ loại nốt chúng bằng RANSAC.</p>
+
+<h2>4. Từ các cặp điểm đến vị trí và góc: homography và RANSAC</h2>
+<p>Mỗi cặp nói "điểm (x, y) trên template nằm ở (x', y') trên ảnh". Ta tìm một phép biến đổi khớp với nhiều cặp nhất:</p>
+<ul>
+  <li><code>cv2.findHomography</code>: homography 3×3 (8 bậc tự do), mô tả cả phối cảnh khi mặt phẳng nghiêng so với camera. Bạn sẽ gặp lại nó ở bài đo trên mặt phẳng.</li>
+  <li><code>cv2.estimateAffinePartial2D</code>: chỉ xoay + tịnh tiến + một tỉ lệ đều (4 bậc tự do). Khi camera nhìn vuông góc và vật nằm phẳng trên băng tải, đây là mô hình <strong>đúng vật lý</strong> hơn, ít bậc tự do nên ổn định hơn.</li>
+</ul>
+<p>Cả hai dùng <strong>RANSAC</strong>: chọn ngẫu nhiên vài cặp tối thiểu, tính phép biến đổi, đếm số cặp khớp trong sai số 3 px (inlier), lặp nhiều lần, giữ mô hình có nhiều inlier nhất. Cặp sai bị loại tự động.</p>
+<pre><code class="language-python">import math
+
+import cv2
+import numpy as np
+
+nhan = cv2.imread("nhan_mau.png", cv2.IMREAD_GRAYSCALE)
+canh = cv2.imread("canh_nhan.png", cv2.IMREAD_GRAYSCALE)
+orb = cv2.ORB_create(nfeatures=1000)
+VIEN = 32
+nhan_dem = cv2.copyMakeBorder(nhan, VIEN, VIEN, VIEN, VIEN, cv2.BORDER_CONSTANT, value=90)
+kp_m, des_m = orb.detectAndCompute(nhan_dem, None)
+kp_c, des_c = orb.detectAndCompute(canh, None)
+tot = [m for m, n in cv2.BFMatcher(cv2.NORM_HAMMING).knnMatch(des_m, des_c, k=2) if m.distance &lt; 0.75 * n.distance]
+
+src = np.float32([kp_m[m.queryIdx].pt for m in tot]) - VIEN      # về tọa độ template gốc
+dst = np.float32([kp_c[m.trainIdx].pt for m in tot])
+h, w = nhan.shape
+tam_mau = np.float32([[[w / 2, h / 2]]])
+
+H, inl = cv2.findHomography(src.reshape(-1, 1, 2), dst.reshape(-1, 1, 2), cv2.RANSAC, 3.0)
+tam = cv2.perspectiveTransform(tam_mau, H)[0, 0]
+print(f"homography : {int(inl.sum())}/{len(tot)} inlier, góc {math.degrees(math.atan2(H[1, 0], H[0, 0])):.2f}°, "
+      f"tâm ({tam[0]:.2f}, {tam[1]:.2f})")
+
+A, inl = cv2.estimateAffinePartial2D(src, dst, method=cv2.RANSAC, ransacReprojThreshold=3.0)
+goc = math.degrees(math.atan2(A[1, 0], A[0, 0]))
+ti_le = math.hypot(A[0, 0], A[1, 0])
+tam = A @ [w / 2, h / 2, 1]
+print(f"affine 4DOF: {int(inl.sum())}/{len(tot)} inlier, góc {goc:.2f}°, tỉ lệ {ti_le:.4f}, "
+      f"tâm ({tam[0]:.2f}, {tam[1]:.2f})")
+print("thật       : góc 37.00°, tâm (380.00, 230.00)")
+
+goc4 = cv2.transform(np.float32([[[0, 0], [w, 0], [w, h], [0, h]]]), A)   # 4 góc template trên ảnh
+ve = cv2.cvtColor(canh, cv2.COLOR_GRAY2BGR)
+cv2.polylines(ve, [np.int32(goc4)], True, (0, 255, 0), 2)
+cv2.imwrite("orb_ket_qua.png", ve)</code></pre>
+<pre><code class="language-text">TODO</code></pre>
+<p>Góc sai khoảng 0,1–0,2°, tâm sai dưới 1 px. Đủ tốt để dời ROI và cho robot gắp thô. Vị trí keypoint ORB chỉ chính xác cỡ pixel (nhiều điểm được phát hiện ở tầng kim tự tháp thu nhỏ), nên khi cần đo, hãy dùng tư thế này để đặt caliper rồi đo cạnh subpixel như bài đo cạnh.</p>
+<div class="tip"><strong>Góc từ ma trận</strong>Với phép xoay + tỉ lệ, ma trận có dạng [[s·cosθ, −s·sinθ], [s·sinθ, s·cosθ]]. Vì vậy θ = atan2(A[1,0], A[0,0]) và tỉ lệ s = √(A[0,0]² + A[1,0]²). Nếu tỉ lệ khác 1 đáng kể trong khi camera và băng tải cố định, đó là dấu hiệu khớp sai (hoặc nhầm sản phẩm), hãy dùng nó làm điều kiện kiểm tra.</div>
+
+<h2>5. ORB chịu được những gì?</h2>
+<p>Gom thành một hàm và thử nhiều tình huống: góc bất kỳ, đổi tỉ lệ, ảnh tối đi kèm một vật che mất khoảng một phần ba nhãn.</p>
+<pre><code class="language-python">import math
+
+import cv2
+import numpy as np
+
+
+def dat_vao_canh(mau, goc, tam, ti_le=1.0, nen=90, seed=0):
+    h, w = mau.shape
+    M = cv2.getRotationMatrix2D((w / 2, h / 2), -goc, ti_le)
+    M[0, 2] += tam[0] - w / 2
+    M[1, 2] += tam[1] - h / 2
+    vat = cv2.warpAffine(mau, M, (640, 480), flags=cv2.INTER_LINEAR).astype(np.float32)
+    k = cv2.warpAffine(np.full_like(mau, 255), M, (640, 480), flags=cv2.INTER_LINEAR) / 255.0
+    r = np.random.default_rng(seed)
+    anh = (nen + r.normal(0, 3, (480, 640))) * (1 - k) + vat * k
+    return np.clip(anh, 0, 255).astype(np.uint8)
+
+
+class DinhViORB:
+    def __init__(self, mau, vien=32, nen=90):
+        self.h, self.w = mau.shape
+        self.vien = vien
+        self.orb = cv2.ORB_create(nfeatures=1000)
+        dem = cv2.copyMakeBorder(mau, vien, vien, vien, vien, cv2.BORDER_CONSTANT, value=nen)
+        self.kp, self.des = self.orb.detectAndCompute(dem, None)
+        self.bf = cv2.BFMatcher(cv2.NORM_HAMMING)
+
+    def tim(self, anh, it_nhat=10):
+        kp, des = self.orb.detectAndCompute(anh, None)
+        if des is None or len(kp) &lt; 2:
+            return None
+        tot = [p[0] for p in self.bf.knnMatch(self.des, des, k=2)
+               if len(p) == 2 and p[0].distance &lt; 0.75 * p[1].distance]
+        if len(tot) &lt; it_nhat:
+            return None
+        src = np.float32([self.kp[m.queryIdx].pt for m in tot]) - self.vien
+        dst = np.float32([kp[m.trainIdx].pt for m in tot])
+        A, inl = cv2.estimateAffinePartial2D(src, dst, method=cv2.RANSAC, ransacReprojThreshold=3.0)
+        if A is None or inl.sum() &lt; it_nhat:
+            return None
+        cx, cy = A @ [self.w / 2, self.h / 2, 1]
+        return math.degrees(math.atan2(A[1, 0], A[0, 0])), math.hypot(A[0, 0], A[1, 0]), cx, cy, int(inl.sum())
+
+
+nhan = cv2.imread("nhan_mau.png", cv2.IMREAD_GRAYSCALE)
+dv = DinhViORB(nhan)
+print(" tình huống                 thật (góc, tâm)        ORB tìm được")
+for goc, tam, tl, kho in ((0, (320, 240), 1.0, False), (37, (380, 230), 1.0, False),
+                          (120, (250, 260), 1.0, False), (-75, (400, 200), 1.0, False),
+                          (37, (380, 230), 0.8, False), (37, (380, 230), 1.3, False),
+                          (37, (380, 230), 1.0, True)):
+    anh = dat_vao_canh(nhan, goc, tam, tl)
+    if kho:
+        anh = np.clip(anh * 0.6 + 20, 0, 255).astype(np.uint8)          # đèn yếu
+        cv2.rectangle(anh, (380, 150), (470, 330), 90, -1)              # vật che
+    kq = dv.tim(anh)
+    ten = f"góc {goc}°, ×{tl}" + (", tối + che" if kho else "")
+    if kq is None:
+        print(f" {ten:26s} ({goc:4d}°, {tam})   không tìm thấy")
+    else:
+        g, s, cx, cy, n = kq
+        print(f" {ten:26s} ({goc:4d}°, {tam})   {g:7.1f}°, ×{s:.2f}, ({cx:.1f}, {cy:.1f}), {n} inlier")</code></pre>
+<pre><code class="language-text">TODO</code></pre>
+<p>ORB tìm đúng ở mọi góc, chịu đổi tỉ lệ 0,8–1,3 lần, chịu ảnh tối và che khuất một phần: chỉ cần còn đủ keypoint khớp đúng là RANSAC dựng lại được tư thế. Đây là thế mạnh của phương pháp dựa trên đặc trưng cục bộ. Số inlier giảm khi điều kiện khó hơn, nên hãy đặt ngưỡng số inlier tối thiểu (ví dụ 10–15) làm điều kiện "tìm thấy".</p>
+
+<h2>6. Khi ORB thất bại: chi tiết trơn, tương phản thấp</h2>
+<p>Bây giờ thử với một chi tiết cơ khí điển hình: tay quay bằng kim loại, chỉ có các cạnh cong trơn và hai lỗ, tương phản với nền thấp (150 so với 200) và hơi mờ. Không có chữ, không có góc nhọn: ORB gần như không có gì để bám.</p>
+<pre><code class="language-python">import math
+
+import cv2
+import numpy as np
+
+
+def ve_tay_quay(sang=200, toi=150, mo=1.5):
+    """Tay quay 200×160: hai đầu tròn nối tiếp tuyến, hai lỗ. Tâm ảnh mẫu là (100, 80)."""
+    k = np.zeros((160, 200), np.uint8)
+    cv2.circle(k, (55, 80), 45, 255, -1)
+    cv2.circle(k, (150, 80), 28, 255, -1)
+    cs, _ = cv2.findContours(k, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    cv2.fillPoly(k, [cv2.convexHull(np.vstack(cs))], 255)
+    cv2.circle(k, (55, 80), 20, 0, -1)
+    cv2.circle(k, (150, 80), 10, 0, -1)
+    anh = np.where(k &gt; 0, toi, sang).astype(np.float32)
+    return cv2.GaussianBlur(anh, (0, 0), mo)
+
+
+def dat(mau, goc, tam, kho=False, seed=0):
+    h, w = mau.shape
+    M = cv2.getRotationMatrix2D((w / 2, h / 2), -goc, 1.0)
+    M[0, 2] += tam[0] - w / 2
+    M[1, 2] += tam[1] - h / 2
+    anh = cv2.warpAffine(mau, M, (640, 480), flags=cv2.INTER_LINEAR, borderValue=200)
+    if kho:
+        x = np.arange(640, dtype=np.float32)
+        anh = anh * (0.55 + 0.45 * x / 640)                     # đèn chiếu lệch: trái tối hơn phải
+        cv2.rectangle(anh, (395, 150), (520, 260), 120, -1)     # vật khác che một phần
+        cv2.circle(anh, (150, 380), 40, 90, -1)                 # vật lạ trên băng tải
+    anh = anh + np.random.default_rng(seed).normal(0, 3, anh.shape)
+    return np.clip(anh, 0, 255).astype(np.uint8)
+
+
+mau = ve_tay_quay()
+cv2.imwrite("tq_mau.png", np.clip(mau, 0, 255).astype(np.uint8))
+cv2.imwrite("tq_37.png", dat(mau, 37, (380, 230)))
+cv2.imwrite("tq_kho.png", dat(mau, 37, (380, 230), kho=True))
+
+orb = cv2.ORB_create(nfeatures=1000)
+mau8 = cv2.imread("tq_mau.png", cv2.IMREAD_GRAYSCALE)
+kp_m, des_m = orb.detectAndCompute(cv2.copyMakeBorder(mau8, 32, 32, 32, 32, cv2.BORDER_CONSTANT, value=200), None)
+print("keypoint trên template tay quay:", len(kp_m))
+for goc in (37, 120, -75):
+    anh = dat(mau, goc, (380, 230))
+    kp, des = orb.detectAndCompute(anh, None)
+    tot = [] if des is None or des_m is None else [
+        p[0] for p in cv2.BFMatcher(cv2.NORM_HAMMING).knnMatch(des_m, des, k=2)
+        if len(p) == 2 and p[0].distance &lt; 0.75 * p[1].distance]
+    kq = "không đủ cặp để tính"
+    if len(tot) &gt;= 3:
+        src = np.float32([kp_m[m.queryIdx].pt for m in tot]) - 32
+        dst = np.float32([kp[m.trainIdx].pt for m in tot])
+        A, inl = cv2.estimateAffinePartial2D(src, dst, method=cv2.RANSAC, ransacReprojThreshold=3.0)
+        if A is not None:
+            cx, cy = A @ [100, 80, 1]
+            kq = f"góc {math.degrees(math.atan2(A[1, 0], A[0, 0])):7.1f}°, tâm ({cx:.0f}, {cy:.0f}), {int(inl.sum())} inlier"
+    print(f"thật {goc:4d}°, (380, 230): {len(kp):3d} keypoint, {len(tot):2d} cặp tốt → {kq}")</code></pre>
+<pre><code class="language-text">TODO</code></pre>
+<p>Kết quả này nguy hiểm hơn cả "không tìm thấy": ORB trả về tư thế <strong>sai</strong> với vài inlier, trông như hợp lệ. Lý do: các cạnh cong trơn cho rất ít keypoint ổn định, và các điểm trên hai vòng tròn trông giống nhau ở mọi vị trí, nên RANSAC dễ tìm được một nhóm nhỏ cặp sai nhưng "khớp" nhau. Ngưỡng tối thiểu 10–15 inlier như mục 5 sẽ chặn được phần lớn trường hợp này, nhưng khi đó bạn không có kết quả nào. Chi tiết gia công, dập, đúc (kim loại trơn, nhựa đúc một màu) chính là nhóm chiếm đa số trong nhà máy, và cần một phương pháp dựa trên <strong>hình dạng</strong> thay vì kết cấu bề mặt.</p>
+
+<h2>7. So khớp hình dạng contour: cv2.matchShapes</h2>
+<p>Nếu tách được vật khỏi nền thành ảnh nhị phân sạch (đèn nền, tương phản tốt), ta có thể so <strong>đường viền</strong>. <code>cv2.matchShapes</code> so sánh 7 <strong>Hu moments</strong>: các tổ hợp của moment chuẩn hóa, bất biến với tịnh tiến, xoay và tỉ lệ. Điểm càng nhỏ càng giống, 0 là giống hệt. Có 3 cách tính (<code>CONTOURS_MATCH_I1</code>, <code>I2</code>, <code>I3</code>), khác nhau ở cách so log của Hu moments.</p>
+<pre><code class="language-python">import math
+
+import cv2
+import numpy as np
+
+L = np.array([[0, 0], [40, 0], [40, 80], [100, 80], [100, 120], [0, 120]], np.float32)   # ke chữ L
+L_SUT = np.array([[0, 0], [40, 0], [40, 80], [100, 80], [100, 120], [15, 120], [0, 105]], np.float32)
+T = np.array([[0, 0], [100, 0], [100, 35], [65, 35], [65, 120], [35, 120], [35, 35], [0, 35]], np.float32)
+
+
+def dat(poly, goc, tl, tam, lat=False):
+    P = poly - poly.mean(axis=0)
+    if lat:
+        P[:, 0] *= -1                                          # lật gương (lắp ngược mặt)
+    c, s = math.cos(math.radians(goc)), math.sin(math.radians(goc))
+    return np.round(P @ np.array([[c, -s], [s, c]]).T * tl + tam).astype(np.int32)
+
+
+hinh = [("mẫu L", dat(L, 0, 1, (80, 100))),
+        ("L xoay 45°", dat(L, 45, 1, (240, 100))),
+        ("L xoay 120°, ×0.6", dat(L, 120, 0.6, (390, 100))),
+        ("L lật gương", dat(L, 0, 1, (520, 100), lat=True)),
+        ("chữ nhật", np.array([[600, 40], [720, 40], [720, 90], [600, 90]], np.int32)),
+        ("L sứt góc", dat(L_SUT, 0, 1, (80, 300))),
+        ("chữ T xoay 30°", dat(T, 30, 1, (240, 300)))]
+anh = np.zeros((420, 760), np.uint8)
+for _, p in hinh:
+    cv2.fillPoly(anh, [p], 255)
+cv2.circle(anh, (400, 300), 50, 255, -1)
+hinh.append(("tròn", None))
+cv2.imwrite("hinh_dang.png", anh)
+
+cs, _ = cv2.findContours(anh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+cs = sorted(cs, key=lambda c: (cv2.boundingRect(c)[1] // 200, cv2.boundingRect(c)[0]))   # theo hàng, cột
+ten_theo_vi_tri = ["mẫu L", "L xoay 45°", "L xoay 120°, ×0.6", "L lật gương", "chữ nhật",
+                   "L sứt góc", "chữ T xoay 30°", "tròn"]
+mau = cs[0]
+print(f"{'hình':20s} {'I1':&gt;8s} {'I2':&gt;8s} {'I3':&gt;8s}")
+for ten, c in zip(ten_theo_vi_tri, cs):
+    d = [cv2.matchShapes(mau, c, m, 0) for m in
+         (cv2.CONTOURS_MATCH_I1, cv2.CONTOURS_MATCH_I2, cv2.CONTOURS_MATCH_I3)]
+    print(f"{ten:20s} {d[0]:8.4f} {d[1]:8.4f} {d[2]:8.4f}")</code></pre>
+<pre><code class="language-text">TODO</code></pre>
+<p>Nhận xét quan trọng:</p>
+<ul>
+  <li>Hình L xoay và thu nhỏ có điểm rất nhỏ (cỡ 0,01), các hình khác loại lớn hơn hàng chục lần: phân loại "đúng chi tiết / sai chi tiết" rất dễ.</li>
+  <li>Hình L lật gương: Hu moments chỉ khác nhau ở <strong>dấu</strong> của thành phần thứ 7, nên điểm của nó chỉ lớn cỡ hình L sứt góc. Nếu lỗi bạn cần bắt là "lắp ngược mặt", đừng dựa vào ngưỡng matchShapes, hãy kiểm tra thêm bằng đặc trưng khác (vị trí lỗ so với trục chính chẳng hạn).</li>
+  <li>Hình sứt một góc nhỏ có điểm chỉ gấp vài lần hình L xoay. Hu moments là đặc trưng <strong>toàn cục</strong>, khuyết tật nhỏ chỉ thay đổi nó chút ít. matchShapes dùng để <em>phân loại</em> chi tiết, không dùng để <em>phát hiện lỗi nhỏ</em>.</li>
+  <li>matchShapes chỉ nói "giống hay không", <strong>không cho góc và vị trí</strong>. Vị trí lấy từ trọng tâm, góc lấy từ trục chính của moment (bài tập 2), có nhập nhằng 180° với hình gần đối xứng.</li>
+  <li>Điều kiện tiên quyết là contour sạch: vật dính nhau, che khuất, bóng đổ làm contour sai và matchShapes sai theo.</li>
+</ul>
+
+<h2>8. Template matching xoay: vét cạn theo góc</h2>
+<p>Cách "chân tay" để xử lý xoay là xoay template qua nhiều góc và chạy <code>matchTemplate</code> cho mỗi góc. Template xoay cần <strong>mask</strong> vì các góc của hình chữ nhật mới sinh ra không thuộc template. Để giảm chi phí, tìm thô trên ảnh thu nhỏ một nửa với bước 6°, rồi tinh chỉnh trên ảnh gốc với bước 1° quanh góc tốt nhất:</p>
+<pre><code class="language-python">import time
+
+import cv2
+import numpy as np
+
+mau = cv2.imread("tq_mau.png", cv2.IMREAD_GRAYSCALE)
+
+
+def xoay_mau(mau, goc):
+    """Xoay template quanh tâm theo chiều kim đồng hồ, khung đủ lớn để không bị cắt; trả về (ảnh, mask)."""
+    h, w = mau.shape
+    D = int(np.ceil(np.hypot(w, h))) | 1
+    M = cv2.getRotationMatrix2D((w / 2, h / 2), -goc, 1.0)
+    M[0, 2] += D / 2 - w / 2
+    M[1, 2] += D / 2 - h / 2
+    t = cv2.warpAffine(mau, M, (D, D), flags=cv2.INTER_LINEAR)
+    m = cv2.warpAffine(np.full_like(mau, 255), M, (D, D), flags=cv2.INTER_NEAREST)
+    return t, m
+
+
+def tim(anh, mau, cac_goc, vung=None):
+    tot = (-2.0, None, None)
+    for g in cac_goc:
+        t, m = xoay_mau(mau, g)
+        kq = np.nan_to_num(cv2.matchTemplate(anh, t, cv2.TM_CCOEFF_NORMED, mask=m), nan=-1, posinf=-1, neginf=-1)
+        if vung is not None:                                   # chỉ xét quanh vị trí thô
+            x0, y0, r = vung
+            ngoai = np.ones_like(kq, bool)
+            ngoai[max(0, y0 - r):y0 + r + 1, max(0, x0 - r):x0 + r + 1] = False
+            kq[ngoai] = -1
+        _, s, _, (x, y) = cv2.minMaxLoc(kq)
+        if s &gt; tot[0]:
+            tot = (s, g, (x + t.shape[1] / 2, y + t.shape[0] / 2))
+    return tot
+
+
+for ten in ("tq_37.png", "tq_kho.png"):
+    anh = cv2.imread(ten, cv2.IMREAD_GRAYSCALE)
+    t0 = time.perf_counter()
+    s, g, (cx, cy) = tim(cv2.pyrDown(anh), cv2.pyrDown(mau), range(0, 360, 6))          # thô: 60 góc
+    D = int(np.ceil(np.hypot(*mau.shape))) | 1
+    vung = (int(round(cx * 2 - D / 2)), int(round(cy * 2 - D / 2)), 6)
+    s, g, (cx, cy) = tim(anh, mau, range(g - 5, g + 6), vung)                            # tinh: 11 góc
+    ms = (time.perf_counter() - t0) * 1000
+    print(f"{ten}: góc {g}°, tâm ({cx:.1f}, {cy:.1f}), điểm {s:.3f}, {ms:.0f} ms (thật: 37°, (380, 230))")</code></pre>
+<pre><code class="language-text">TODO</code></pre>
+<p>Thời gian là trên máy tác giả, máy bạn sẽ khác. Trên ảnh dễ, cách vét cạn tìm đúng với điểm cao. Trên ảnh khó (đèn lệch, bị che, có vật lạ), điểm NCC giảm mạnh vì phần bị che kéo hệ số tương quan xuống, và một vật tối bất kỳ có thể cạnh tranh. Chi phí tỉ lệ với số góc: muốn thêm tìm theo tỉ lệ thì nhân thêm số bước tỉ lệ. Đây là lý do các thư viện chuyên nghiệp không làm theo cách này.</p>
+
+<h2>9. Shape-based matching: so khớp theo hướng gradient</h2>
+<p>Ý tưởng cốt lõi của shape-based matching (được công bố trong các bài báo của C. Steger đầu những năm 2000 và là nền tảng của công cụ "shape-based matching" trong MVTec HALCON; Cognex PatMax cũng là một công cụ khớp hình học dựa trên đường biên, chi tiết thuật toán của nó không công bố):</p>
+<ol>
+  <li><strong>Mô hình</strong> không phải là ảnh, mà là tập các điểm cạnh của template, mỗi điểm có <strong>vector hướng gradient</strong> d<sub>i</sub> (pháp tuyến của cạnh).</li>
+  <li>Tại một tư thế (vị trí, góc) thử, đặt các điểm mô hình lên ảnh, lấy vector gradient của ảnh e tại mỗi điểm, <strong>chuẩn hóa về độ dài 1</strong>.</li>
+  <li>Điểm số = trung bình tích vô hướng: <strong>s = (1/n) Σ d<sub>i</sub>·e<sub>i</sub> / (|d<sub>i</sub>|·|e<sub>i</sub>|)</strong>, tức trung bình cos của góc lệch giữa hướng cạnh mô hình và hướng cạnh ảnh.</li>
+</ol>
+<p>Vì sao phép đo này mạnh:</p>
+<ul>
+  <li><strong>Bất biến độ sáng</strong>: chỉ dùng <em>hướng</em> gradient, không dùng độ lớn, nên tương phản thấp, đèn lệch, thay đổi độ sáng không tuyến tính đều không ảnh hưởng (miễn là cạnh còn thấy được).</li>
+  <li><strong>Chịu che khuất</strong>: điểm bị che chỉ đóng góp khoảng 0 thay vì kéo điểm số âm; che 30% thì điểm còn khoảng 0,7. Ngưỡng điểm tối thiểu chính là "phần trăm đường viền phải nhìn thấy".</li>
+  <li><strong>Chịu vật lạ</strong>: cạnh của vật khác chỉ được tính khi trùng vị trí <em>và</em> hướng với mô hình, xác suất rất thấp.</li>
+  <li><strong>Cực tính</strong>: dùng tích vô hướng có dấu thì phân biệt vật tối trên nền sáng và ngược lại; lấy trị tuyệt đối từng điểm thì bỏ qua cực tính (hữu ích khi bề mặt đổi màu cục bộ).</li>
+</ul>
+<p>Cài đặt thu nhỏ dưới đây: với mỗi góc thử, xoay các điểm mô hình, dựng hai kernel thưa chứa thành phần x và y của hướng mô hình, rồi <code>cv2.filter2D</code> trên ảnh hướng gradient đơn vị cho ra điểm số tại <em>mọi</em> vị trí cùng lúc. Tìm thô trên ảnh nửa kích thước (bước 4°), tinh chỉnh trên ảnh gốc (bước 0,5°).</p>
+<pre><code class="language-python">import math
+import time
+
+import cv2
+import numpy as np
+
+
+def huong_gradient(anh, nguong):
+    """Vector gradient đơn vị (ex, ey); bằng 0 ở nơi gradient yếu hơn `nguong`."""
+    a = anh.astype(np.float32)
+    gx = cv2.Sobel(a, cv2.CV_32F, 1, 0, ksize=3)
+    gy = cv2.Sobel(a, cv2.CV_32F, 0, 1, ksize=3)
+    do_lon = np.hypot(gx, gy)
+    ok = do_lon &gt; nguong
+    chia = np.maximum(do_lon, 1e-6)
+    return np.where(ok, gx / chia, 0).astype(np.float32), np.where(ok, gy / chia, 0).astype(np.float32)
+
+
+def tao_mo_hinh(mau, buoc=1):
+    """Điểm cạnh (Canny) so với tâm template và hướng gradient đơn vị tại đó."""
+    ex, ey = huong_gradient(mau, 0)
+    ys, xs = np.nonzero(cv2.Canny(mau, 20, 40))
+    ys, xs = ys[::buoc], xs[::buoc]
+    h, w = mau.shape
+    P = np.column_stack([xs - w / 2, ys - h / 2]).astype(np.float32)
+    D = np.column_stack([ex[ys, xs], ey[ys, xs]]).astype(np.float32)
+    return P, D
+
+
+def ban_do_diem(EX, EY, P, D, goc):
+    """Điểm số tương đồng hướng tại mọi vị trí tâm, cho mô hình xoay `goc` độ (chiều kim đồng hồ)."""
+    c, s = math.cos(math.radians(goc)), math.sin(math.radians(goc))
+    R = np.array([[c, -s], [s, c]], np.float32)
+    Q, Dq = P @ R.T, D @ R.T                                  # xoay cả vị trí lẫn hướng
+    r = int(np.ceil(np.abs(Q).max())) + 1
+    Kx = np.zeros((2 * r + 1, 2 * r + 1), np.float32)
+    Ky = np.zeros_like(Kx)
+    qi = np.round(Q).astype(int) + r
+    np.add.at(Kx, (qi[:, 1], qi[:, 0]), Dq[:, 0])
+    np.add.at(Ky, (qi[:, 1], qi[:, 0]), Dq[:, 1])
+    S = cv2.filter2D(EX, -1, Kx, anchor=(r, r), borderType=cv2.BORDER_CONSTANT)
+    S += cv2.filter2D(EY, -1, Ky, anchor=(r, r), borderType=cv2.BORDER_CONSTANT)
+    return S / len(P)
+
+
+mau = cv2.imread("tq_mau.png", cv2.IMREAD_GRAYSCALE)
+P0, D0 = tao_mo_hinh(mau, buoc=2)                            # mô hình ở ảnh gốc
+P1, D1 = tao_mo_hinh(cv2.pyrDown(mau))                       # mô hình ở ảnh nửa kích thước
+print("số điểm mô hình:", len(P0), "(gốc),", len(P1), "(thô)")
+
+for ten in ("tq_37.png", "tq_kho.png"):
+    anh = cv2.imread(ten, cv2.IMREAD_GRAYSCALE)
+    t0 = time.perf_counter()
+    EX, EY = huong_gradient(cv2.pyrDown(anh), 5)
+    tot = (-1.0, 0, (0, 0))
+    for g in range(0, 360, 4):                               # thô: 90 góc
+        _, s, _, loc = cv2.minMaxLoc(ban_do_diem(EX, EY, P1, D1, g))
+        if s &gt; tot[0]:
+            tot = (s, g, loc)
+    _, g0, (x0, y0) = tot
+    EX, EY = huong_gradient(anh, 10)
+    tot = (-1.0, 0, (0, 0))
+    for g in np.arange(g0 - 4, g0 + 4.01, 0.5):              # tinh: 17 góc, chỉ xét quanh vị trí thô
+        S = ban_do_diem(EX, EY, P0, D0, g)[2 * y0 - 6:2 * y0 + 7, 2 * x0 - 6:2 * x0 + 7]
+        _, s, _, (x, y) = cv2.minMaxLoc(S)
+        if s &gt; tot[0]:
+            tot = (s, g, (2 * x0 - 6 + x, 2 * y0 - 6 + y))
+    s, g, (cx, cy) = tot
+    ms = (time.perf_counter() - t0) * 1000
+    print(f"{ten}: góc {g:.1f}°, tâm ({cx}, {cy}), điểm {s:.3f}, {ms:.0f} ms (thật: 37°, (380, 230))")</code></pre>
+<pre><code class="language-text">TODO</code></pre>
+<p>Trên ảnh khó, điểm hướng gradient giảm từ khoảng 0,99 xuống khoảng 0,8: đúng bằng tỉ lệ đường viền còn nhìn thấy, không bị đèn lệch hay vật lạ ảnh hưởng. Bản Python này chậm (vài trăm mili giây đến hơn một giây) và chỉ chính xác tới bước góc, vị trí tới pixel. Đó là phần mà thư viện thương mại đầu tư nhiều năm.</p>
+
+<h2>10. Vì sao thư viện thương mại mạnh ở shape-based matching</h2>
+<p>Ý tưởng điểm số trên là công khai và đơn giản. Sự khác biệt của các công cụ thương mại (HALCON, VisionPro, các phần mềm của Keyence, Cognex, Matrox, Basler…) nằm ở kỹ thuật triển khai, nhìn chung gồm:</p>
+<table>
+  <tr><th>Thành phần</th><th>Bản thu nhỏ ở mục 9</th><th>Công cụ thương mại (nguyên lý chung)</th></tr>
+  <tr><td>Kim tự tháp</td><td>2 tầng, cố định</td><td>Nhiều tầng, tự chọn số tầng và số điểm mô hình mỗi tầng theo kích thước vật</td></tr>
+  <tr><td>Bước góc / tỉ lệ</td><td>Chọn tay (4°, 0,5°)</td><td>Tự tính từ bán kính mô hình để không bỏ sót; hỗ trợ cả dải tỉ lệ, đôi khi cả tỉ lệ khác nhau theo x, y</td></tr>
+  <tr><td>Độ chính xác tư thế</td><td>Tới bước góc, pixel nguyên</td><td>Subpixel và phần nhỏ của độ, nhờ tinh chỉnh bình phương tối thiểu trên điểm cạnh</td></tr>
+  <tr><td>Tốc độ</td><td>Hàng trăm ms bằng Python</td><td>Thường vài ms đến vài chục ms: SIMD, đa luồng, dừng sớm khi điểm tạm tính không thể vượt ngưỡng (greediness), bảng mô hình tính trước</td></tr>
+  <tr><td>Tính năng</td><td>Một vật</td><td>Nhiều vật, nhiều mô hình, chồng lấn, cực tính, vùng loại trừ, mô hình từ CAD/DXF, chấm điểm và chẩn đoán</td></tr>
+  <tr><td>Kiểm chứng</td><td>Không</td><td>Đã chạy trên hàng triệu ảnh công nghiệp, có hỗ trợ kỹ thuật</td></tr>
+</table>
+<p>Với Python và OpenCV, bạn vẫn có lựa chọn: tự viết như mục 9 rồi tối ưu (giới hạn ROI, tầng thô nhỏ, ít điểm), hoặc dùng các thư viện mã nguồn mở cài đặt ý tưởng tương tự (ví dụ module <code>linemod</code> trong opencv_contrib, hoặc các dự án shape-based matching trên GitHub; hãy kiểm tra giấy phép và chất lượng trước khi dùng sản xuất). Khi bài toán khó và cycle time chặt, chi phí bản quyền thư viện thương mại thường rẻ hơn nhiều so với thời gian kỹ sư và rủi ro dừng chuyền.</p>
+
+<h2>11. Chọn phương pháp nào?</h2>
+<table>
+  <tr><th>Tình huống</th><th>Phương pháp nên dùng</th></tr>
+  <tr><td>Vật không xoay (có đồ gá), chỉ lệch vị trí</td><td>Template matching NCC + kim tự tháp</td></tr>
+  <tr><td>Vật xoay, bề mặt nhiều chi tiết (nhãn, bao bì, bo mạch)</td><td>ORB/AKAZE + RANSAC, kiểm tra số inlier và tỉ lệ</td></tr>
+  <tr><td>Vật tách nền tốt bằng đèn nền, cần phân loại kiểu chi tiết</td><td>Contour + matchShapes + đặc trưng blob</td></tr>
+  <tr><td>Chi tiết cơ khí trơn, xoay tự do, đèn thay đổi, có che khuất</td><td>Shape-based matching theo gradient (thư viện thương mại hoặc tự cài đặt)</td></tr>
+  <tr><td>Vật biến dạng, chủng loại thay đổi nhiều, nền rất phức tạp</td><td>Phát hiện vật bằng Deep Learning (giai đoạn sau), rồi tinh chỉnh bằng phương pháp hình học</td></tr>
+</table>
+
+<h2>12. Lỗi thường gặp</h2>
+<table>
+  <tr><th>Lỗi</th><th>Hậu quả</th><th>Cách tránh</th></tr>
+  <tr><td>Tin kết quả RANSAC khi chỉ có 4–6 inlier</td><td>Tư thế sai hoàn toàn nhưng không báo lỗi</td><td>Ngưỡng inlier tối thiểu, kiểm tra tỉ lệ ≈ 1, kiểm tra điểm NCC tại tư thế tìm được</td></tr>
+  <tr><td>Dùng homography 8 bậc tự do cho vật phẳng dưới camera vuông góc</td><td>Mô hình "quá tự do", dễ méo khi ít điểm</td><td>Dùng <code>estimateAffinePartial2D</code></td></tr>
+  <tr><td>Template ORB không có viền</td><td>Mất keypoint ở mép, khớp kém</td><td><code>copyMakeBorder</code> bằng màu nền</td></tr>
+  <tr><td>Dùng matchShapes để phát hiện sứt mẻ nhỏ hoặc lắp ngược</td><td>Bỏ sót lỗi (escape)</td><td>Dùng độ đặc, so cạnh với mô hình, hoặc kiểm tra đặc trưng bất đối xứng</td></tr>
+  <tr><td>Quên vật đối xứng</td><td>Góc nhảy 180° (hoặc 90°, 60°…) giữa các lần chạy</td><td>Giới hạn dải góc, hoặc thêm chi tiết bất đối xứng (lỗ định vị) vào mô hình</td></tr>
+</table>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Với lớp <code>DinhViORB</code> ở mục 5, hãy thêm bước kiểm tra: sau khi có tư thế, dùng <code>cv2.warpAffine</code> với ma trận nghịch đảo để "duỗi thẳng" vùng ảnh về đúng hướng template, rồi tính NCC (<code>TM_CCOEFF_NORMED</code>) giữa vùng đã duỗi và template. Chỉ chấp nhận khi NCC ≥ 0,8. Vì sao bước này hữu ích?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+
+def dat_vao_canh(mau, goc, tam, nen=90, seed=0):
+    h, w = mau.shape
+    M = cv2.getRotationMatrix2D((w / 2, h / 2), -goc, 1.0)
+    M[0, 2] += tam[0] - w / 2
+    M[1, 2] += tam[1] - h / 2
+    vat = cv2.warpAffine(mau, M, (640, 480)).astype(np.float32)
+    k = cv2.warpAffine(np.full_like(mau, 255), M, (640, 480)) / 255.0
+    anh = (nen + np.random.default_rng(seed).normal(0, 3, (480, 640))) * (1 - k) + vat * k
+    return np.clip(anh, 0, 255).astype(np.uint8)
+
+
+def kiem_tra_ncc(anh, mau, A):
+    """A: ma trận 2×3 template → ảnh. Duỗi ảnh về khung template rồi tính NCC."""
+    h, w = mau.shape
+    duoi = cv2.warpAffine(anh, A, (w, h), flags=cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP)
+    return float(cv2.matchTemplate(duoi, mau, cv2.TM_CCOEFF_NORMED)[0, 0])
+
+
+nhan = cv2.imread("nhan_mau.png", cv2.IMREAD_GRAYSCALE)
+anh = dat_vao_canh(nhan, 37, (380, 230))
+orb = cv2.ORB_create(1000)
+kp_m, des_m = orb.detectAndCompute(cv2.copyMakeBorder(nhan, 32, 32, 32, 32, cv2.BORDER_CONSTANT, value=90), None)
+kp, des = orb.detectAndCompute(anh, None)
+tot = [m for m, n in cv2.BFMatcher(cv2.NORM_HAMMING).knnMatch(des_m, des, k=2) if m.distance &lt; 0.75 * n.distance]
+src = np.float32([kp_m[m.queryIdx].pt for m in tot]) - 32
+dst = np.float32([kp[m.trainIdx].pt for m in tot])
+A, _ = cv2.estimateAffinePartial2D(src, dst, method=cv2.RANSAC, ransacReprojThreshold=3.0)
+print(f"NCC tại tư thế ORB tìm được: {kiem_tra_ncc(anh, nhan, A):.3f}")
+A_sai = A.copy()
+A_sai[:, 2] += (25, -10)                                     # giả lập tư thế sai
+print(f"NCC tại tư thế sai          : {kiem_tra_ncc(anh, nhan, A_sai):.3f}")</code></pre>
+<pre><code class="language-text">TODO</code></pre>
+<p>RANSAC chỉ đảm bảo các cặp điểm nhất quán với nhau, không đảm bảo toàn bộ vật thực sự ở đó. Kiểm tra NCC sau khi duỗi là phép xác minh độc lập trên toàn bộ vùng: tư thế đúng cho NCC cao, tư thế sai cho NCC thấp. Đây là mô hình "tìm nhanh bằng đặc trưng, xác minh chắc bằng so khớp vùng" dùng rất phổ biến.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Tính góc trục chính của các hình L trong <code>hinh_dang.png</code> từ moment trung tâm: θ = ½·atan2(2·μ11, μ20 − μ02). So độ chênh góc giữa "mẫu L" và "L xoay 45°" với 45°. Vì sao cách này có nhập nhằng 180°?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import math
+
+import cv2
+
+anh = cv2.imread("hinh_dang.png", cv2.IMREAD_GRAYSCALE)
+cs, _ = cv2.findContours(anh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+cs = sorted(cs, key=lambda c: (cv2.boundingRect(c)[1] // 200, cv2.boundingRect(c)[0]))
+
+
+def goc_truc_chinh(c):
+    M = cv2.moments(c)
+    return math.degrees(0.5 * math.atan2(2 * M["mu11"], M["mu20"] - M["mu02"]))
+
+
+g0, g1, g2 = (goc_truc_chinh(c) for c in cs[:3])
+print(f"mẫu L {g0:.2f}°, L xoay 45° {g1:.2f}°, L xoay 120° {g2:.2f}°")
+print(f"chênh lệch: {g1 - g0:.2f}° và {(g2 - g0) % 180:.2f}°")</code></pre>
+<pre><code class="language-text">TODO</code></pre>
+<p>Trục chính là một <em>đường thẳng</em>, không có chiều: xoay vật 180° thì trục chính không đổi. Vì vậy góc chỉ xác định trong khoảng 180° (hình L xoay 120° cho chênh 120° mod 180). Để phân biệt 0° và 180° cần thêm thông tin bất đối xứng, ví dụ moment bậc ba (độ lệch phân bố khối lượng dọc trục chính) hoặc vị trí một lỗ so với trọng tâm.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Một khách hàng muốn robot gắp các chi tiết nhôm đúc màu xám bạc, đổ ngẫu nhiên trên băng tải, mỗi phút 60 chi tiết, có lúc hai chi tiết chạm nhau. Phân tích và đề xuất phương pháp định vị.</p>
+<details><summary>Xem đáp án</summary>
+<ul>
+  <li>Nhôm đúc trơn, ít kết cấu, phản xạ không đều: ORB sẽ có ít keypoint và không ổn định (như mục 6). Loại.</li>
+  <li>Template matching thường: vật xoay tự do, cần vét cạn góc, chậm và kém khi bị che. Chỉ dùng nếu dải góc hẹp.</li>
+  <li>Contour + matchShapes với đèn nền: tốt khi chi tiết tách rời, nhưng khi hai chi tiết chạm nhau contour bị dính, matchShapes sai. Có thể dùng làm phương án phụ.</li>
+  <li>Đề xuất: đèn nền (backlight) để có biên rõ, cộng shape-based matching theo gradient, cho phép che khuất khoảng 20–30% để xử lý vật chạm nhau, đặt ngưỡng điểm và dải góc 0–360°. Cycle time 1 giây/chi tiết là đủ rộng cho một thư viện tối ưu; với bản tự viết bằng Python cần đo thực tế và giới hạn ROI. Sau khi có tư thế, chuyển sang tọa độ robot bằng hiệu chuẩn tay–mắt (chặng Calibration).</li>
+</ul>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>ORB: keypoint FAST có hướng + mô tả nhị phân 256 bit, so bằng Hamming. Lọc cặp bằng ratio test 0,75; thêm viền cho template nhỏ.</li>
+  <li>RANSAC + <code>estimateAffinePartial2D</code> (hoặc <code>findHomography</code>) cho góc, tâm, tỉ lệ; góc = atan2(A[1,0], A[0,0]). Luôn đặt ngưỡng inlier và xác minh bằng NCC.</li>
+  <li>ORB mạnh với vật nhiều chi tiết bề mặt, thất bại với chi tiết trơn, tương phản thấp, đôi khi trả về tư thế sai mà không báo.</li>
+  <li><code>cv2.matchShapes</code> (Hu moments) bất biến xoay và tỉ lệ, tốt để phân loại hình dạng; không cho góc, kém với lỗi nhỏ, gần như không phân biệt lật gương, cần contour sạch.</li>
+  <li>Template matching xoay vét cạn được nhưng chi phí tăng theo số góc và kém khi bị che.</li>
+  <li>Shape-based matching: điểm số = trung bình cos góc lệch giữa hướng gradient mô hình và ảnh; bất biến độ sáng, chịu che khuất và vật lạ. Thư viện thương mại mạnh nhờ kim tự tháp, tinh chỉnh subpixel, tối ưu tốc độ và độ chín muồi.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Đọc mã QR và DataMatrix</strong>, nơi việc định vị và chuẩn hóa vùng mã là bước đầu tiên trước khi giải mã.</p>

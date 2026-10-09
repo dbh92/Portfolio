@@ -1,0 +1,309 @@
+<p>Ở chặng 4 "Machine Vision" bạn đã phân tích một yêu cầu kiểm tra và chọn hướng giải. Chặng 5 "Industrial Vision" đưa trạm vào dây chuyền thật, nơi mọi thứ bị chi phối bởi <strong>thời gian</strong>: sản phẩm không chờ chương trình của bạn. Ảnh phải được chụp đúng lúc sản phẩm ở giữa khung hình, kết quả phải tới PLC trước khi sản phẩm tới van loại, và van phải thổi đúng sản phẩm dù băng tải đang tăng hay giảm tốc. Bài này dạy chuỗi thời gian từ cảm biến đến kết quả, cách tính thời gian xử lý tối đa từ tốc độ dây chuyền, và cách dùng encoder để theo dõi sản phẩm theo quãng đường thay vì theo đồng hồ.</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Vẽ được chuỗi cảm biến → trigger → chụp → xử lý → kết quả → loại hàng với thời gian từng bước; tính được thời gian xử lý tối đa theo hai ràng buộc (nhịp và hạn chót); tính được độ phân giải encoder, số xung từ camera tới van, và giải thích bằng mô phỏng vì sao loại hàng theo hẹn giờ thất bại khi tốc độ băng tải thay đổi.</div>
+
+<h2>1. Chuỗi sự kiện và bốn khái niệm thời gian</h2>
+<pre><code class="language-text">Sản phẩm tới ─▶ Cảm biến ─▶ Trigger ─▶ Phơi sáng ─▶ Đọc + truyền ảnh ─▶ Xử lý ─▶ Gửi kết quả ─▶ PLC ─▶ Van/robot
+                 (μs–ms)     (μs)      (μs–ms)        (ms–hàng chục ms)   (ms–trăm ms) (ms)         (quét)   (ms)
+                 |◀──────────────────────── độ trễ (latency) của một sản phẩm ──────────────────────────────▶|</code></pre>
+<table>
+  <tr><th>Khái niệm</th><th>Định nghĩa</th><th>Ví dụ</th></tr>
+  <tr><td><strong>Cycle time / chu kỳ</strong></td><td>Khoảng thời gian giữa hai sản phẩm liên tiếp; trạm phải xử lý xong <em>trung bình</em> một sản phẩm trong khoảng này</td><td>600 sản phẩm/phút → 100 ms</td></tr>
+  <tr><td><strong>Độ trễ (latency)</strong></td><td>Thời gian từ trigger của một sản phẩm tới khi kết quả của chính nó có ở PLC</td><td>Trigger lúc 0 ms, kết quả tới PLC lúc 85 ms</td></tr>
+  <tr><td><strong>Hạn chót (deadline)</strong></td><td>Thời điểm muộn nhất kết quả phải có, do khoảng cách tới van và tốc độ băng tải quyết định</td><td>Van cách 300 mm, băng tải 1 m/s, van cần 15 ms → hạn chót 285 ms</td></tr>
+  <tr><td><strong>Jitter</strong></td><td>Độ dao động của một khoảng thời gian giữa các lần</td><td>Xử lý trung bình 40 ms nhưng có lần 95 ms</td></tr>
+</table>
+<p>Hai điều người mới hay nhầm: (1) cycle time và độ trễ là <strong>hai ràng buộc khác nhau</strong>: độ trễ có thể dài hơn chu kỳ nhiều lần nếu các bước chạy song song (khi sản phẩm n đang xử lý thì sản phẩm n+1 đang được chụp); (2) thiết kế theo thời gian <strong>chậm nhất</strong>, không phải trung bình. Một lần chậm là một sản phẩm không có kết quả.</p>
+
+<h2>2. Trigger: chụp đúng lúc</h2>
+<table>
+  <tr><th>Nguồn trigger</th><th>Cách hoạt động</th><th>Dùng khi</th><th>Lưu ý</th></tr>
+  <tr><td>Free-run (chụp liên tục)</td><td>Camera chụp theo tốc độ khung, phần mềm tự tìm khung có sản phẩm</td><td>Thử nghiệm, sản phẩm chạy chậm, giám sát</td><td>Không biết chắc khung nào chứa sản phẩm ở giữa; tốn băng thông</td></tr>
+  <tr><td>Software trigger</td><td>Chương trình (hoặc PLC qua mạng) gửi lệnh chụp</td><td>Sản phẩm đứng yên trong đồ gá, robot đặt xong mới chụp</td><td>Độ trễ dao động vài ms do hệ điều hành, mạng; không dùng cho vật đang chạy nhanh</td></tr>
+  <tr><td>Hardware trigger từ cảm biến</td><td>Cảm biến quang nối thẳng ngõ vào camera</td><td>Phổ biến nhất cho băng tải</td><td>Đáp ứng cỡ micro giây đến dưới 1 ms, ổn định; cần trigger delay nếu cảm biến không đặt đúng tâm khung</td></tr>
+  <tr><td>Hardware trigger từ PLC</td><td>PLC xuất xung 24 V khi điều kiện đủ</td><td>Cần logic: chỉ chụp khi máy chạy, khi đúng công đoạn</td><td>Thêm độ trễ và jitter của vòng quét PLC (thường vài ms) trừ khi dùng ngõ ra tốc độ cao</td></tr>
+  <tr><td>Trigger theo vị trí encoder</td><td>Bộ đếm encoder phát trigger mỗi khi băng tải đi được một quãng định trước</td><td>Băng tải đổi tốc độ; camera line scan (mỗi dòng ảnh một trigger)</td><td>Ảnh luôn chụp ở cùng vị trí, không phụ thuộc tốc độ</td></tr>
+</table>
+<p><strong>Jitter của trigger biến thành sai lệch vị trí</strong>: sai lệch = tốc độ × jitter. Băng tải 1 m/s (1 mm/ms) với software trigger dao động 5 ms thì sản phẩm lệch tới 5 mm trong khung hình; với hardware trigger dao động 10 µs thì chỉ lệch 0,01 mm. Vì vậy vật đang chạy gần như luôn dùng hardware trigger.</p>
+<p>Ba sự cố trigger kinh điển cần thiết kế phòng tránh:</p>
+<ul>
+  <li><strong>Trigger kép</strong>: sản phẩm có lỗ, chai trong suốt, nhãn bóng làm tia cảm biến bị cắt hai lần. Cách xử lý: chọn cảm biến phù hợp (ví dụ cảm biến cho vật trong suốt), đặt thời gian khóa (debounce) hoặc khoảng cách tối thiểu giữa hai trigger.</li>
+  <li><strong>Mất trigger</strong>: hai sản phẩm dính sát nhau, cảm biến chỉ thấy một. Cách xử lý: tạo khe hở giữa sản phẩm (băng tải tách nhịp), hoặc trigger theo encoder.</li>
+  <li><strong>Trigger chồng (overrun)</strong>: trigger mới tới khi camera chưa sẵn sàng (đang phơi sáng hoặc đang đọc ảnh). Camera thường bỏ qua trigger đó. Cách xử lý: tính tốc độ khung tối đa của camera ở độ phân giải đang dùng và so với chu kỳ sản phẩm; giám sát số trigger so với số ảnh nhận được.</li>
+</ul>
+<p>Thời gian phơi sáng chống nhòe và đồng bộ đèn chớp được dạy riêng trong bài "Đèn strobe và đồng bộ trigger" ngay sau bài này.</p>
+
+<h2>3. Tính thời gian xử lý tối đa từ tốc độ dây chuyền</h2>
+<p>Có hai ràng buộc, thời gian xử lý cho phép là giá trị <strong>nhỏ hơn</strong> của hai:</p>
+<ol>
+  <li><strong>Nhịp (throughput)</strong>: trung bình mỗi chu kỳ phải xong một sản phẩm. Nếu chương trình chạy <em>một luồng</em> (chụp, chờ ảnh về, xử lý, rồi mới nhận ảnh tiếp), xử lý chỉ còn <code>chu kỳ − thời gian truyền ảnh</code>. Nếu chạy <em>pipeline</em> (một luồng nhận ảnh, một luồng xử lý), xử lý được dùng gần trọn chu kỳ.</li>
+  <li><strong>Hạn chót (latency)</strong>: truyền ảnh + xử lý + gửi kết quả phải xong trước khi PLC cần ra lệnh cho van: <code>hạn chót = khoảng cách tới van / tốc độ − thời gian đáp ứng van</code>.</li>
+</ol>
+<p>Rồi chừa dự phòng (thường 20–40%) cho trường hợp chậm nhất. Calculator dưới đây làm đủ các bước cho ba dây chuyền dùng cùng một camera 5 MP (ảnh 5 MB, 8 bit) qua GigE. Băng thông thực tế của GigE lấy khoảng 110 MB/s (tham khảo; lý thuyết 125 MB/s):</p>
+<pre><code class="language-python">def ngan_sach(sp_phut, pitch_mm, van_mm, anh_mb, bang_thong_mb_s, tg_khac_ms, van_ms=15, du_phong=0.7):
+    """Thời gian xử lý tối đa cho phép theo 2 ràng buộc: nhịp (throughput) và hạn chót (latency)."""
+    chu_ky = 60_000 / sp_phut                       # ms giữa 2 sản phẩm
+    toc_do = sp_phut / 60 * pitch_mm                # mm/s
+    truyen = anh_mb / bang_thong_mb_s * 1000        # ms truyền ảnh
+    han_chot = van_mm / toc_do * 1000 - van_ms      # ms sau trigger phải có lệnh mở van
+    co_dinh = truyen + sum(tg_khac_ms.values())
+    print(f"Chu kỳ {chu_ky:.0f} ms | băng tải {toc_do:.0f} mm/s | truyền ảnh {truyen:.1f} ms"
+          f" | hạn chót {han_chot:.0f} ms sau trigger")
+    if truyen &gt;= chu_ky:
+        print("   ✗ chỉ riêng truyền ảnh đã vượt chu kỳ: giảm ROI/độ phân giải hoặc đổi giao tiếp")
+        return
+    xl_tuan_tu = chu_ky - truyen                    # một luồng: chụp-truyền rồi mới xử lý
+    xl_song_song = chu_ky                           # pipeline: xử lý ảnh n trong lúc truyền ảnh n+1
+    xl_tre = han_chot - co_dinh                     # truyền + xử lý + gửi kết quả trước hạn chót
+    for ten, nhip in (("một luồng", xl_tuan_tu), ("pipeline ", xl_song_song)):
+        xl = min(nhip, xl_tre)
+        print(f"   {ten}: theo nhịp ≤ {nhip:5.1f} ms, theo hạn chót ≤ {xl_tre:5.1f} ms"
+              f" → thiết kế chậm nhất ≤ {xl * du_phong:5.1f} ms")
+    print(f"   số sản phẩm đang 'trên đường' từ camera tới van: {van_mm / pitch_mm:.1f}")
+
+
+KHAC = {"cảm biến + trễ trigger": 1.0, "phơi sáng": 0.1, "gửi kết quả (I/O + quét PLC)": 20.0}
+print("Ví dụ 1: 120 sp/phút, pitch 250 mm, van cách 400 mm, ảnh 5 MB qua GigE")
+ngan_sach(120, 250, 400, 5.0, 110, KHAC)
+print("Ví dụ 2: 600 sp/phút, pitch 100 mm, van cách 300 mm, cùng camera")
+ngan_sach(600, 100, 300, 5.0, 110, KHAC)
+print("Ví dụ 3: 1500 sp/phút, pitch 70 mm, van cách 300 mm, cùng camera")
+ngan_sach(1500, 70, 300, 5.0, 110, KHAC)</code></pre>
+<pre><code class="language-text">Ví dụ 1: 120 sp/phút, pitch 250 mm, van cách 400 mm, ảnh 5 MB qua GigE
+Chu kỳ 500 ms | băng tải 500 mm/s | truyền ảnh 45.5 ms | hạn chót 785 ms sau trigger
+   một luồng: theo nhịp ≤ 454.5 ms, theo hạn chót ≤ 718.4 ms → thiết kế chậm nhất ≤ 318.2 ms
+   pipeline : theo nhịp ≤ 500.0 ms, theo hạn chót ≤ 718.4 ms → thiết kế chậm nhất ≤ 350.0 ms
+   số sản phẩm đang 'trên đường' từ camera tới van: 1.6
+Ví dụ 2: 600 sp/phút, pitch 100 mm, van cách 300 mm, cùng camera
+Chu kỳ 100 ms | băng tải 1000 mm/s | truyền ảnh 45.5 ms | hạn chót 285 ms sau trigger
+   một luồng: theo nhịp ≤  54.5 ms, theo hạn chót ≤ 218.4 ms → thiết kế chậm nhất ≤  38.2 ms
+   pipeline : theo nhịp ≤ 100.0 ms, theo hạn chót ≤ 218.4 ms → thiết kế chậm nhất ≤  70.0 ms
+   số sản phẩm đang 'trên đường' từ camera tới van: 3.0
+Ví dụ 3: 1500 sp/phút, pitch 70 mm, van cách 300 mm, cùng camera
+Chu kỳ 40 ms | băng tải 1750 mm/s | truyền ảnh 45.5 ms | hạn chót 156 ms sau trigger
+   ✗ chỉ riêng truyền ảnh đã vượt chu kỳ: giảm ROI/độ phân giải hoặc đổi giao tiếp</code></pre>
+<ul>
+  <li><strong>Ví dụ 1</strong> rất thoải mái: hơn 300 ms cho xử lý. Chỉ cần lưu ý có 1,6 sản phẩm nằm giữa camera và van, nên vẫn phải theo dõi sản phẩm (mục 6).</li>
+  <li><strong>Ví dụ 2</strong>: cùng camera, nhưng nếu viết một luồng thì chỉ còn 38 ms cho trường hợp chậm nhất; chuyển sang pipeline thì có 70 ms. Đây là lý do code trạm thật tách luồng nhận ảnh và luồng xử lý (chặng 9 và phần triển khai). 3 sản phẩm "trên đường" tới van, kết quả <strong>bắt buộc</strong> phải gắn ID sản phẩm.</li>
+  <li><strong>Ví dụ 3</strong>: chỉ riêng truyền ảnh 45,5 ms đã vượt chu kỳ 40 ms. Không thuật toán nào cứu được. Phải giảm dữ liệu: chỉ đọc ROI từ cảm biến (hầu hết camera công nghiệp hỗ trợ), gộp pixel (binning), camera độ phân giải thấp hơn, hoặc giao tiếp nhanh hơn (USB3 Vision, 5/10GigE, CoaXPress). Nhớ rằng tốc độ khung tối đa của camera ở độ phân giải đó cũng phải lớn hơn 25 khung/giây.</li>
+</ul>
+<div class="warn"><strong>Trung bình không phải là con số để nghiệm thu</strong>Trên Windows hay Linux thông thường (không thời gian thực), thời gian xử lý có đuôi dài: cập nhật hệ điều hành, phần mềm diệt virus quét file, ghi ảnh ra ổ cứng chậm, bộ thu gom rác của .NET/Python. Hãy đo hàng chục nghìn lần, xem giá trị lớn nhất và phân vị cao (P99,9), đưa việc lưu ảnh và ghi log sang luồng nền, và để PLC xử lý trường hợp kết quả không về kịp (mục 6).</div>
+
+<h2>4. Encoder: đo quãng đường băng tải</h2>
+<p><strong>Encoder tương đối (incremental encoder)</strong> gắn vào trục băng tải hoặc vào một bánh đo lăn trên mặt băng. Mỗi vòng quay, encoder phát một số xung cố định trên kênh A và B (PPR, pulses per revolution); hai kênh lệch nhau 90° (cầu phương, quadrature) nên bộ đếm biết chiều quay. Đếm cả cạnh lên và cạnh xuống của cả hai kênh (giải mã ×4) cho số đếm gấp 4 lần PPR. Bộ đếm tốc độ cao (high-speed counter) của PLC, card I/O hoặc một số camera đọc trực tiếp các xung này.</p>
+<p>Ba con số cần tính cho mọi trạm dùng encoder:</p>
+<ul>
+  <li><strong>Độ phân giải</strong>: <code>xung/mm = PPR × hệ số giải mã / chu vi bánh đo (mm)</code>.</li>
+  <li><strong>Tần số tối đa</strong> ở tốc độ băng tải lớn nhất, so với khả năng của bộ đếm (đọc thông số của PLC/card; nhớ phân biệt tần số kênh A với tần số đếm sau ×4).</li>
+  <li><strong>Khoảng cách tính bằng xung</strong>: camera → van, cảm biến → tâm khung hình, độ dài cửa sổ thổi.</li>
+</ul>
+<pre><code class="language-python">CHU_VI_MM = 200.0        # chu vi bánh đo (con lăn) gắn encoder
+PPR = 1000               # xung/vòng mỗi kênh A, B
+NHAN = 4                 # giải mã cầu phương ×4 (đếm cả cạnh lên/xuống của A và B)
+VAN_MM = 600.0           # camera → van thổi
+VAN_MS = 15.0            # thời gian đáp ứng của van
+
+dem_mm = PPR * NHAN / CHU_VI_MM
+print(f"Độ phân giải: {dem_mm:.0f} xung đếm/mm = {1 / dem_mm:.3f} mm/xung")
+print(f"Camera → van: {VAN_MM:.0f} mm = {VAN_MM * dem_mm:.0f} xung đếm")
+for v in (0.5, 1.0, 1.5):                     # m/s
+    f_a = v * 1000 / CHU_VI_MM * PPR          # tần số kênh A (Hz)
+    som = v * 1000 * VAN_MS / 1000            # mm sản phẩm đi được trong lúc van mở
+    print(f"v = {v} m/s: kênh A {f_a / 1000:.1f} kHz, bộ đếm ×4 {f_a * NHAN / 1000:.0f} kHz;"
+          f" mở van sớm {som:.1f} mm = {som * dem_mm:.0f} xung")</code></pre>
+<pre><code class="language-text">Độ phân giải: 20 xung đếm/mm = 0.050 mm/xung
+Camera → van: 600 mm = 12000 xung đếm
+v = 0.5 m/s: kênh A 2.5 kHz, bộ đếm ×4 10 kHz; mở van sớm 7.5 mm = 150 xung
+v = 1.0 m/s: kênh A 5.0 kHz, bộ đếm ×4 20 kHz; mở van sớm 15.0 mm = 300 xung
+v = 1.5 m/s: kênh A 7.5 kHz, bộ đếm ×4 30 kHz; mở van sớm 22.5 mm = 450 xung</code></pre>
+<p>Dòng cuối cho thấy một chi tiết hay bị quên: van cần 15 ms để mở, nên lệnh phải được phát <strong>sớm hơn</strong> một đoạn bằng <code>tốc độ × 15 ms</code>. Đoạn này thay đổi theo tốc độ (7,5 mm ở 0,5 m/s, 22,5 mm ở 1,5 m/s), nên bù cố định bằng một số xung chỉ đúng ở một tốc độ. PLC tốt sẽ tính bù theo tốc độ đo được từ chính encoder.</p>
+<table>
+  <tr><th>Vấn đề lắp đặt</th><th>Hậu quả</th><th>Cách xử lý</th></tr>
+  <tr><td>Bánh đo trượt trên mặt băng</td><td>Số đếm ít hơn quãng đường thật</td><td>Lò xo ép đủ lực, bề mặt bánh có độ bám; hoặc gắn vào trục kéo (chú ý băng bị giãn)</td></tr>
+  <tr><td>Gắn vào trục động cơ qua hộp số</td><td>Khe hở bánh răng, băng trượt trên puly</td><td>Ưu tiên gắn trên trục puly của băng hoặc bánh đo trực tiếp</td></tr>
+  <tr><td>Mức tín hiệu không khớp</td><td>Mất xung, đếm sai</td><td>Khớp loại ngõ ra encoder (HTL 24 V, TTL/RS-422 vi sai) với ngõ vào bộ đếm; cáp chống nhiễu</td></tr>
+  <tr><td>Rung, băng chạy lùi khi dừng</td><td>Số đếm nhảy</td><td>Dùng đếm hai chiều với tín hiệu cầu phương, không chỉ đếm kênh A</td></tr>
+</table>
+
+<h2>5. Vì sao loại hàng theo hẹn giờ thất bại khi tốc độ thay đổi</h2>
+<p>Cách đơn giản nhất: "thấy NG thì sau 585 ms mở van" (600 mm ở 1 m/s, trừ 15 ms đáp ứng van). Nó đúng hoàn hảo cho tới khi băng tải giảm tốc vì máy đóng thùng phía sau bị đầy. Mô phỏng: băng tải chạy 1 m/s, giảm còn 0,6 m/s trong 0,5 s, chạy chậm 1,5 s, rồi tăng lại. Mỗi sản phẩm cách nhau 100 mm. Ta đo xem khi luồng khí tới, sản phẩm cần thổi đang cách van bao xa:</p>
+<pre><code class="language-python"># Mô phỏng: băng tải giảm tốc rồi tăng tốc. So sánh loại hàng theo THỜI GIAN và theo ENCODER.
+DT = 0.0001              # bước mô phỏng 0,1 ms
+DEM_MM = 20              # xung đếm/mm (từ phần trước)
+VAN_MM, VAN_S = 600.0, 0.015
+PITCH = 100.0            # mm giữa 2 sản phẩm
+V_DANH_DINH = 1000.0     # mm/s, tốc độ lúc cài đặt bộ hẹn giờ
+
+
+def toc_do(t):
+    """mm/s: 1,0 m/s → giảm còn 0,6 m/s (t = 2,0–2,5 s) → giữ → tăng lại 1,0 m/s (t = 4,0–4,5 s)."""
+    if t &lt; 2.0:
+        return 1000.0
+    if t &lt; 2.5:
+        return 1000.0 - 800.0 * (t - 2.0)
+    if t &lt; 4.0:
+        return 600.0
+    if t &lt; 4.5:
+        return 600.0 + 800.0 * (t - 4.0)
+    return 1000.0
+
+
+t, x = 0.0, 0.0                       # thời gian (s), quãng đường băng tải (mm)
+lich_su = []                          # (t, x) để tra vị trí theo thời gian
+sp_camera = []                        # (t, x) lúc mỗi sản phẩm đi qua camera
+cho_timer, cho_enc = [], []           # hàng đợi: thời điểm mở van / số đếm mở van
+ban_timer, ban_enc = [], []           # (id, thời điểm khí tới sản phẩm)
+while t &lt; 7.0:
+    v = toc_do(t)
+    x += v * DT
+    t += DT
+    dem = int(x * DEM_MM)             # giá trị bộ đếm tốc độ cao
+    lich_su.append((t, x))
+    if x &gt;= (len(sp_camera) + 1) * PITCH:                   # sản phẩm tới camera
+        i = len(sp_camera)
+        sp_camera.append((t, x))
+        cho_timer.append((i, t + VAN_MM / V_DANH_DINH - VAN_S))   # hẹn giờ cố định
+        cho_enc.append((i, dem + VAN_MM * DEM_MM))                 # mốc số đếm
+    while cho_timer and t &gt;= cho_timer[0][1]:
+        i, _ = cho_timer.pop(0)
+        ban_timer.append((i, t + VAN_S))
+    # encoder: mở van sớm theo tốc độ ĐO ĐƯỢC hiện tại
+    while cho_enc and dem &gt;= cho_enc[0][1] - v * VAN_S * DEM_MM:
+        i, _ = cho_enc.pop(0)
+        ban_enc.append((i, t + VAN_S))
+
+
+def vi_tri_luc(tt):
+    k = min(int(tt / DT), len(lich_su) - 1)
+    return lich_su[k][1]
+
+
+for ten, ban in (("Hẹn giờ", ban_timer), ("Encoder", ban_enc)):
+    sai = [vi_tri_luc(tk) - sp_camera[i][1] - VAN_MM for i, tk in ban]   # &lt;0: sản phẩm còn ở trước van
+    xau = [s for s in sai if abs(s) &gt; 15]
+    print(f"{ten}: {len(sai)} sản phẩm, sai lệch {min(sai):+7.1f} .. {max(sai):+6.1f} mm,"
+          f" trượt (|sai| &gt; 15 mm): {len(xau)}")</code></pre>
+<pre><code class="language-text">Hẹn giờ: 56 sản phẩm, sai lệch  -239.9 ..   +0.2 mm, trượt (|sai| &gt; 15 mm): 20
+Encoder: 56 sản phẩm, sai lệch    -0.1 ..   +0.3 mm, trượt (|sai| &gt; 15 mm): 0</code></pre>
+<ul>
+  <li><strong>Hẹn giờ</strong>: 20/56 sản phẩm bị thổi trượt; trường hợp xấu nhất khí tới khi sản phẩm cần loại còn cách van 240 mm, tức khoảng 2,4 bước sản phẩm. Lúc đó trước van là <em>một sản phẩm khác</em>: chai OK bị thổi, chai NG lọt qua. Đây là lỗi nguy hiểm nhất vì thống kê của trạm vẫn báo "đã loại 1 NG".</li>
+  <li><strong>Encoder</strong>: sai lệch dưới 0,5 mm ở mọi tốc độ, vì mốc mở van là <em>quãng đường</em> chứ không phải thời gian; chỉ phần bù thời gian đáp ứng van phụ thuộc tốc độ, và được tính theo tốc độ đo được.</li>
+</ul>
+<p>Quy tắc thực tế: nếu băng tải có thể dừng, khởi động, đổi tốc độ theo mã sản phẩm hoặc bị máy phía sau kéo chậm (gần như mọi dây chuyền), hãy theo dõi sản phẩm bằng encoder. Hẹn giờ chỉ chấp nhận được khi tốc độ thật sự cố định và khoảng cách tới van ngắn.</p>
+
+<h2>6. Theo dõi sản phẩm trong PLC: hàng đợi và nguyên tắc an toàn</h2>
+<p>Khi có nhiều sản phẩm nằm giữa camera và van, PLC giữ một <strong>hàng đợi (FIFO, thanh ghi dịch)</strong>: mỗi trigger tạo một ô (ID, số đếm encoder lúc chụp); kết quả vision ghi vào đúng ô theo ID; khi sản phẩm đầu hàng tới van, PLC đọc ô đó để quyết định. Hai nguyên tắc bắt buộc:</p>
+<ul>
+  <li><strong>Kết quả phải mang ID</strong> (số thứ tự trigger, hoặc số đếm encoder). Không bao giờ giả định "kết quả tới sau thuộc về sản phẩm tiếp theo".</li>
+  <li><strong>Không có kết quả đúng hạn = NG</strong> (fail-safe): thổi bỏ sản phẩm và báo động. Mặc định OK nghĩa là mỗi lần PC treo là một lô hàng không được kiểm tra đi thẳng tới khách hàng.</li>
+</ul>
+<p>Mô phỏng dưới đây cho 8 sản phẩm, chu kỳ 100 ms, hạn chót 285 ms (như ví dụ 2 ở mục 3). Kết quả của sản phẩm 4 bị mất, của sản phẩm 6 tới trễ 310 ms. Để đơn giản băng tải chạy đều nên dùng mili giây; trạm thật thay mili giây bằng số đếm encoder.</p>
+<pre><code class="language-python"># PLC theo dõi sản phẩm: mỗi trigger tạo một ô trong hàng đợi, kết quả vision ghi vào đúng ô theo ID.
+# Khi sản phẩm tới van mà ô chưa có kết quả → coi là NG (an toàn) và báo động.
+from collections import deque
+
+HAN_CHOT_MS = 285                            # từ trigger tới lúc phải quyết định ở van
+CHU_KY_MS = 100
+# (id, thời điểm kết quả tới PLC tính từ trigger của chính nó, kết quả); id 4 bị mất, id 6 tới trễ
+KET_QUA_VISION = {0: (60, "OK"), 1: (62, "NG"), 2: (58, "OK"), 3: (61, "OK"),
+                  5: (64, "OK"), 6: (310, "OK"), 7: (59, "NG")}
+
+hang_doi = deque()
+so_trigger = 0
+for t in range(0, 8 * CHU_KY_MS + HAN_CHOT_MS + 1):     # quét mỗi 1 ms như vòng quét PLC
+    if t % CHU_KY_MS == 0 and so_trigger &lt; 8:            # cảm biến báo sản phẩm mới
+        hang_doi.append({"id": so_trigger, "t_trigger": t, "kq": None})
+        so_trigger += 1
+    for o in hang_doi:                                   # nhận kết quả đã tới hạn
+        kq = KET_QUA_VISION.get(o["id"])
+        if kq and o["kq"] is None and t - o["t_trigger"] &gt;= kq[0]:
+            o["kq"] = kq[1]
+    if hang_doi and t - hang_doi[0]["t_trigger"] &gt;= HAN_CHOT_MS:   # sản phẩm đầu hàng tới van
+        o = hang_doi.popleft()
+        if o["kq"] is None:
+            print(f"sp {o['id']}: KHÔNG có kết quả đúng hạn → THỔI (NG an toàn) + báo động")
+        else:
+            print(f"sp {o['id']}: {o['kq']} → {'THỔI' if o['kq'] == 'NG' else 'cho qua'}")
+print(f"Số trigger {so_trigger}, số kết quả đúng hạn "
+      f"{sum(1 for d, _ in KET_QUA_VISION.values() if d &lt; HAN_CHOT_MS)}")</code></pre>
+<pre><code class="language-text">sp 0: OK → cho qua
+sp 1: NG → THỔI
+sp 2: OK → cho qua
+sp 3: OK → cho qua
+sp 4: KHÔNG có kết quả đúng hạn → THỔI (NG an toàn) + báo động
+sp 5: OK → cho qua
+sp 6: KHÔNG có kết quả đúng hạn → THỔI (NG an toàn) + báo động
+sp 7: NG → THỔI
+Số trigger 8, số kết quả đúng hạn 6</code></pre>
+<p>Hai sản phẩm 4 và 6 bị thổi bỏ dù có thể là hàng tốt: đó là cái giá chấp nhận được của nguyên tắc an toàn, và báo động giúp kỹ sư tìm nguyên nhân (PC quá tải, mạng chập chờn). Dòng cuối là phép kiểm tra sức khỏe đơn giản nhất cho một trạm: <strong>số trigger phải bằng số kết quả đúng hạn</strong>. Lệch nhau là có vấn đề, kể cả khi chưa ai phàn nàn. Giao tiếp I/O và handshake chi tiết với PLC được dạy ở chặng 9.</p>
+
+<h2>7. Checklist thiết kế thời gian cho một trạm</h2>
+<table>
+  <tr><th>#</th><th>Câu hỏi</th><th>Con số cần có</th></tr>
+  <tr><td>1</td><td>Năng suất tối đa (kể cả kế hoạch tăng tốc sau này)?</td><td>sản phẩm/phút → chu kỳ (ms)</td></tr>
+  <tr><td>2</td><td>Tốc độ băng tải tối đa, có đổi tốc độ/dừng không?</td><td>m/phút; có cần encoder không</td></tr>
+  <tr><td>3</td><td>Nguồn trigger và độ trễ, jitter của nó?</td><td>ms hoặc µs; sai lệch vị trí = tốc độ × jitter</td></tr>
+  <tr><td>4</td><td>Kích thước ảnh, giao tiếp, tốc độ khung tối đa?</td><td>MB/ảnh, MB/s, khung/giây</td></tr>
+  <tr><td>5</td><td>Khoảng cách camera → điểm loại, thời gian đáp ứng cơ cấu?</td><td>mm, ms → hạn chót</td></tr>
+  <tr><td>6</td><td>Thời gian gửi kết quả: I/O, mạng, vòng quét PLC?</td><td>ms</td></tr>
+  <tr><td>7</td><td>Thời gian xử lý <em>chậm nhất</em> đo trên máy thật?</td><td>max, P99,9 qua ≥ 10.000 ảnh</td></tr>
+  <tr><td>8</td><td>Xử lý khi thiếu kết quả, trigger kép, mất trigger?</td><td>quy tắc fail-safe, báo động, bộ đếm giám sát</td></tr>
+</table>
+
+<h2>8. Sai lầm thường gặp</h2>
+<ul>
+  <li><strong>Đo thời gian xử lý trên ảnh mẫu ở văn phòng</strong> rồi lấy trung bình. Ảnh NG thật (nhiều blob, nhiều contour) thường xử lý chậm hơn ảnh OK.</li>
+  <li><strong>Quên thời gian truyền ảnh và vòng quét PLC</strong> trong ngân sách thời gian.</li>
+  <li><strong>Đặt cảm biến trigger quá xa</strong> tâm khung hình rồi bù bằng trigger delay theo thời gian: khi tốc độ đổi, sản phẩm lệch khỏi khung. Đặt cảm biến gần đúng vị trí, hoặc bù delay theo xung encoder.</li>
+  <li><strong>Loại hàng theo hẹn giờ</strong> trên băng tải đổi tốc độ (mục 5).</li>
+  <li><strong>Kết quả không có ID, mặc định OK khi thiếu kết quả</strong> (mục 6).</li>
+  <li><strong>Không có bộ đếm giám sát</strong>: số trigger, số ảnh, số kết quả, số lần thổi, số sản phẩm vào thùng NG (cảm biến xác nhận loại). Năm con số này phải khớp nhau.</li>
+</ul>
+
+<h2>9. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Dây chuyền 200 sản phẩm/phút, pitch 150 mm, van cách camera 450 mm, van cần 20 ms. Camera 2,3 MP (ảnh 2,3 MB) qua GigE 110 MB/s; trigger + phơi sáng 1 ms; gửi kết quả 15 ms. Tính chu kỳ, tốc độ băng tải, hạn chót, và thời gian xử lý thiết kế (dự phòng 30%) cho chương trình một luồng.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">sp_phut, pitch, van_mm, van_ms = 200, 150, 450, 20
+truyen = 2.3 / 110 * 1000
+chu_ky = 60_000 / sp_phut
+toc_do = sp_phut / 60 * pitch
+han_chot = van_mm / toc_do * 1000 - van_ms
+xl = min(chu_ky - truyen, han_chot - truyen - 1 - 15)
+print(f"chu kỳ {chu_ky:.0f} ms, băng tải {toc_do:.0f} mm/s, hạn chót {han_chot:.0f} ms")
+print(f"truyền {truyen:.1f} ms → xử lý ≤ {xl:.1f} ms, thiết kế chậm nhất ≤ {0.7 * xl:.0f} ms")</code></pre>
+<pre><code class="language-text">chu kỳ 300 ms, băng tải 500 mm/s, hạn chót 880 ms
+truyền 20.9 ms → xử lý ≤ 279.1 ms, thiết kế chậm nhất ≤ 195 ms</code></pre>
+<p>Chu kỳ 300 ms, băng tải 500 mm/s, hạn chót 880 ms. Ràng buộc chặt hơn là nhịp (300 − 20,9 ms), nên thời gian xử lý thiết kế khoảng 195 ms cho trường hợp chậm nhất.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Encoder 2500 PPR, giải mã ×4, gắn bánh đo chu vi 250 mm. Van cách camera 750 mm, van cần 12 ms, băng tải chạy tối đa 2 m/s. Tính xung/mm, số xung camera → van, tần số kênh A và tần số đếm tối đa, số xung phải phát lệnh sớm ở 2 m/s.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">ppr, nhan, chu_vi, van_mm, van_ms, v_max = 2500, 4, 250.0, 750.0, 12.0, 2000.0  # v: mm/s
+dem_mm = ppr * nhan / chu_vi
+f_a = v_max / chu_vi * ppr
+print(f"{dem_mm:.0f} xung/mm, camera → van {van_mm * dem_mm:.0f} xung")
+print(f"kênh A {f_a / 1000:.0f} kHz, sau ×4 {f_a * nhan / 1000:.0f} kHz")
+print(f"phát lệnh sớm {v_max * van_ms / 1000:.0f} mm = {v_max * van_ms / 1000 * dem_mm:.0f} xung")</code></pre>
+<pre><code class="language-text">40 xung/mm, camera → van 30000 xung
+kênh A 20 kHz, sau ×4 80 kHz
+phát lệnh sớm 24 mm = 960 xung</code></pre>
+<p>Tần số đếm 80 kHz: phải kiểm tra bộ đếm tốc độ cao của PLC chịu được (và chú ý thông số ghi theo tần số kênh hay tần số đếm). Nếu không, giảm PPR: độ phân giải 40 xung/mm là thừa cho việc thổi chai, 4–10 xung/mm đã đủ.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Một trạm cũ có quy tắc "PC không trả lời thì cho qua" vì "không muốn mất hàng". Hãy viết 3–4 câu thuyết phục quản lý sản xuất đổi sang "không có kết quả thì loại", và đề xuất cách để việc đổi này không làm mất nhiều hàng tốt.</p>
+<details><summary>Xem đáp án</summary>
+<p>Mặc định cho qua nghĩa là mỗi lần PC treo hay mạng chập chờn, mọi sản phẩm trong thời gian đó đi tới khách hàng mà không được kiểm tra, và thống kê của trạm không hề biết. Một khiếu nại lọt lỗi từ khách hàng thường tốn kém hơn nhiều so với vài sản phẩm tốt bị loại. Để giảm hàng tốt bị mất: (1) sản phẩm bị loại vì "không có kết quả" đi vào thùng riêng để kiểm tra lại thủ công hoặc chạy lại qua trạm; (2) báo động ngay khi có sản phẩm thiếu kết quả, và dừng dây chuyền nếu xảy ra liên tiếp N lần; (3) theo dõi tỉ lệ thiếu kết quả hằng ngày như một chỉ số sức khỏe của trạm.</p>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Chuỗi: cảm biến → trigger → phơi sáng → truyền ảnh → xử lý → gửi kết quả → PLC → cơ cấu loại. Mỗi bước có độ trễ và jitter.</li>
+  <li>Thời gian xử lý cho phép = nhỏ hơn của (nhịp) và (hạn chót trừ các thời gian cố định); pipeline nới ràng buộc nhịp; luôn thiết kế theo trường hợp chậm nhất kèm dự phòng.</li>
+  <li>Vật đang chạy dùng hardware trigger; sai lệch vị trí = tốc độ × jitter. Phòng trigger kép, mất trigger, trigger chồng.</li>
+  <li>Encoder: xung/mm = PPR × 4 / chu vi; kiểm tra tần số đếm tối đa; mọi khoảng cách tính bằng xung; bù thời gian đáp ứng van theo tốc độ đo được.</li>
+  <li>Loại hàng theo hẹn giờ thất bại khi băng tải đổi tốc độ; theo dõi sản phẩm bằng hàng đợi có ID, thiếu kết quả thì loại và báo động.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Đèn strobe và đồng bộ trigger</strong>, để ảnh chụp sản phẩm đang chạy không bị nhòe.</p>
