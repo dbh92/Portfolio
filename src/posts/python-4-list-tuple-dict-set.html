@@ -1,0 +1,189 @@
+<p>Một ca sản xuất sinh ra hàng nghìn kết quả, mỗi kết quả gồm nhiều thông tin: mã sản phẩm, kết quả, kích thước đo, thời gian. Bài này dạy bốn cấu trúc dữ liệu có sẵn của Python để lưu và xử lý những tập dữ liệu như vậy: <strong>list</strong>, <strong>tuple</strong>, <strong>dict</strong> và <strong>set</strong>.</p>
+
+<h2>1. list: danh sách có thứ tự, thay đổi được</h2>
+<pre><code class="language-python">duong_kinh = [12.48, 12.51, 12.47, 12.62, 12.50]
+
+print(duong_kinh[0])      # phần tử đầu tiên: 12.48 (chỉ số bắt đầu từ 0)
+print(duong_kinh[-1])     # phần tử cuối: 12.5
+print(len(duong_kinh))    # số phần tử: 5
+
+duong_kinh.append(12.49)          # thêm vào cuối
+duong_kinh[3] = 12.52             # sửa phần tử thứ 4
+print(duong_kinh)</code></pre>
+<pre><code class="language-text">12.48
+12.5
+5
+[12.48, 12.51, 12.47, 12.52, 12.5, 12.49]</code></pre>
+
+<h3>Cắt list (slicing)</h3>
+<p>Cú pháp <code>[bat_dau:ket_thuc:buoc]</code>, không gồm vị trí kết thúc, giống <code>range()</code>. Đây cũng chính là cú pháp cắt vùng ảnh (ROI) bằng NumPy mà bạn sẽ dùng hằng ngày:</p>
+<pre><code class="language-python">so = [0, 10, 20, 30, 40, 50, 60]
+print(so[1:4])    # [10, 20, 30]
+print(so[:3])     # 3 phần tử đầu: [0, 10, 20]
+print(so[-2:])    # 2 phần tử cuối: [50, 60]
+print(so[::2])    # cách một lấy một: [0, 20, 40, 60]</code></pre>
+
+<h3>Thống kê nhanh</h3>
+<pre><code class="language-python">do = [12.48, 12.51, 12.47, 12.52, 12.50, 12.49]
+print("Nhỏ nhất:", min(do), "Lớn nhất:", max(do))
+print(f"Trung bình: {sum(do) / len(do):.3f}")
+print("Sắp xếp:", sorted(do))</code></pre>
+<pre><code class="language-text">Nhỏ nhất: 12.47 Lớn nhất: 12.52
+Trung bình: 12.495
+Sắp xếp: [12.47, 12.48, 12.49, 12.5, 12.51, 12.52]</code></pre>
+<p><code>sorted()</code> tạo list mới đã sắp xếp; còn <code>do.sort()</code> sắp xếp ngay trên list cũ.</p>
+
+<h2>2. List comprehension: lọc và biến đổi trong một dòng</h2>
+<p>Thay vì viết vòng lặp 4 dòng, Python cho phép tạo list mới trong một dòng:</p>
+<pre><code class="language-python">do = [12.48, 12.51, 12.47, 12.62, 12.50, 12.38]
+
+ngoai_dung_sai = [d for d in do if not 12.40 &lt;= d &lt;= 12.60]
+print(ngoai_dung_sai)                 # [12.62, 12.38]
+
+do_um = [round(d / 25.4, 4) for d in do]   # đổi mm sang inch
+print(do_um[:2])                      # [0.4913, 0.4925]</code></pre>
+<p>Đọc là: "lấy <code>d</code> với mỗi <code>d</code> trong <code>do</code>, nếu điều kiện đúng". Đừng lạm dụng: nếu logic dài hơn một dòng, hãy viết vòng lặp <code>for</code> cho dễ đọc.</p>
+
+<h2>3. tuple: dãy không thay đổi được</h2>
+<p>Tuple viết bằng ngoặc tròn. Dùng cho dữ liệu cố định đi thành cặp, thành bộ, ví dụ tọa độ hay kích thước ảnh:</p>
+<pre><code class="language-python">tam = (320, 240)                  # tọa độ (x, y)
+kich_thuoc = (1080, 1920, 3)      # (cao, rộng, số kênh màu) — đúng thứ tự NumPy dùng
+
+x, y = tam                        # "mở gói" tuple thành từng biến
+cao, rong, kenh = kich_thuoc
+print(f"Tâm ({x}, {y}), ảnh {rong}x{cao}, {kenh} kênh")</code></pre>
+<pre><code class="language-text">Tâm (320, 240), ảnh 1920x1080, 3 kênh</code></pre>
+<p>Tuple không sửa được (<code>tam[0] = 5</code> sẽ báo lỗi <code>TypeError</code>). Chính vì thế nó an toàn để làm khóa của dict. OpenCV và NumPy trả về rất nhiều tuple, ví dụ <code>img.shape</code>.</p>
+
+<h2>4. dict: tra cứu theo tên</h2>
+<p>Dict lưu cặp <strong>khóa → giá trị</strong>. Thay vì nhớ "phần tử thứ 3 là đường kính", bạn gọi đúng tên:</p>
+<pre><code class="language-python">san_pham = {
+    "ma": "SP-0042",
+    "ket_qua": "NG",
+    "duong_kinh": 12.62,
+    "ly_do": "ngoài dung sai",
+}
+
+print(san_pham["ma"], san_pham["ket_qua"])
+san_pham["anh"] = "ST3_000042_NG.png"         # thêm khóa mới
+print(san_pham.get("nhiet_do", "không có"))   # get() trả giá trị mặc định nếu thiếu khóa
+
+for khoa, gia_tri in san_pham.items():
+    print(f"  {khoa}: {gia_tri}")</code></pre>
+<pre><code class="language-text">SP-0042 NG
+không có
+  ma: SP-0042
+  ket_qua: NG
+  duong_kinh: 12.62
+  ly_do: ngoài dung sai
+  anh: ST3_000042_NG.png</code></pre>
+<p>Truy cập khóa không tồn tại bằng <code>san_pham["nhiet_do"]</code> sẽ gây <code>KeyError</code>. Dùng <code>.get()</code> khi không chắc khóa có tồn tại.</p>
+
+<h3>Dict làm cấu hình</h3>
+<p>Tham số của thuật toán nên gom vào một dict để dễ chỉnh, dễ lưu ra file (bài 6 và chặng OpenCV sẽ dùng cách này):</p>
+<pre><code class="language-python">cau_hinh = {"nguong_sang": 120, "dien_tich_min": 500, "roi": (100, 80, 400, 300)}
+print(cau_hinh["roi"])</code></pre>
+
+<h3>Đếm theo nhóm</h3>
+<pre><code class="language-python">ly_do_ng = ["xước", "lệch tâm", "xước", "ba via", "xước", "lệch tâm"]
+
+dem = {}
+for ld in ly_do_ng:
+    dem[ld] = dem.get(ld, 0) + 1
+print(dem)
+
+from collections import Counter          # cách ngắn hơn có sẵn trong Python
+print(Counter(ly_do_ng).most_common(2))</code></pre>
+<pre><code class="language-text">{'xước': 3, 'lệch tâm': 2, 'ba via': 1}
+[('xước', 3), ('lệch tâm', 2)]</code></pre>
+<p>Bảng "lỗi nào xảy ra nhiều nhất" (biểu đồ Pareto) là báo cáo mà quản lý chất lượng hỏi đầu tiên.</p>
+
+<h2>5. set: tập hợp không trùng lặp</h2>
+<pre><code class="language-python">ma_da_doc = ["A01", "A02", "A01", "A03", "A02"]
+print(set(ma_da_doc))               # {'A01', 'A02', 'A03'} (thứ tự có thể khác)
+print(len(set(ma_da_doc)) != len(ma_da_doc))   # True: có mã bị đọc trùng
+
+ke_hoach = {"A01", "A02", "A03", "A04"}
+thuc_te = {"A01", "A02", "A03"}
+print("Thiếu:", ke_hoach - thuc_te)   # {'A04'}</code></pre>
+<p>Set rất nhanh khi kiểm tra "đã có hay chưa" (<code>"A01" in thuc_te</code>), kể cả với hàng triệu phần tử. Ứng dụng: phát hiện mã DataMatrix bị in trùng ở chặng 7.</p>
+
+<h2>6. Chọn cấu trúc nào?</h2>
+<table>
+  <tr><th>Cần</th><th>Dùng</th></tr>
+  <tr><td>Dãy có thứ tự, thêm/sửa/xóa được</td><td><code>list</code></td></tr>
+  <tr><td>Bộ giá trị cố định (tọa độ, kích thước)</td><td><code>tuple</code></td></tr>
+  <tr><td>Tra cứu theo tên, cấu hình, một bản ghi</td><td><code>dict</code></td></tr>
+  <tr><td>Loại trùng, kiểm tra tồn tại nhanh</td><td><code>set</code></td></tr>
+</table>
+<p>Trong thực tế bạn sẽ kết hợp: <strong>list các dict</strong> là cách tự nhiên để lưu kết quả cả ca, mỗi dict là một sản phẩm.</p>
+<pre><code class="language-python">ca_sang = [
+    {"ma": "SP-01", "ket_qua": "OK", "dk": 12.50},
+    {"ma": "SP-02", "ket_qua": "NG", "dk": 12.63},
+    {"ma": "SP-03", "ket_qua": "OK", "dk": 12.49},
+]
+ng = [sp["ma"] for sp in ca_sang if sp["ket_qua"] == "NG"]
+dk_ok = [sp["dk"] for sp in ca_sang if sp["ket_qua"] == "OK"]
+print("Mã NG:", ng)
+print(f"Đường kính TB hàng OK: {sum(dk_ok) / len(dk_ok):.3f}")</code></pre>
+<pre><code class="language-text">Mã NG: ['SP-02']
+Đường kính TB hàng OK: 12.495</code></pre>
+
+<div class="warn"><strong>Bẫy: gán list là dùng chung</strong>Viết <code>b = a</code> với <code>a</code> là list thì <code>b</code> và <code>a</code> là <strong>cùng một</strong> list: sửa <code>b</code> thì <code>a</code> cũng đổi. Muốn bản sao độc lập, dùng <code>b = a.copy()</code>. Bẫy này cũng xảy ra với ảnh NumPy (bài 9).</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>list: <code>[ ]</code>, chỉ số từ 0, slicing <code>[a:b]</code> không gồm b, <code>append</code>, <code>sorted</code>.</li>
+  <li>List comprehension: <code>[f(x) for x in ds if dieu_kien]</code>.</li>
+  <li>tuple: <code>( )</code>, cố định, mở gói <code>x, y = tam</code>.</li>
+  <li>dict: <code>{khóa: giá trị}</code>, <code>.get()</code>, <code>.items()</code>; dùng cho cấu hình và bản ghi.</li>
+  <li>set: loại trùng, kiểm tra tồn tại nhanh, phép trừ tập hợp.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Thống kê đo lường</h3>
+<p>Cho 10 giá trị đo: <code>[25.01, 24.98, 25.03, 25.07, 24.99, 25.00, 24.93, 25.02, 25.04, 24.97]</code>, dung sai 25,00 ± 0,05. Tính trung bình, số lượng NG và tỉ lệ NG (%).</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">do = [25.01, 24.98, 25.03, 25.07, 24.99, 25.00, 24.93, 25.02, 25.04, 24.97]
+ng = [d for d in do if not 24.95 &lt;= d &lt;= 25.05]
+print(f"Trung bình: {sum(do) / len(do):.3f}")
+print("NG:", ng)
+print(f"Tỉ lệ NG: {len(ng) / len(do):.0%}")</code></pre>
+<pre><code class="language-text">Trung bình: 25.004
+NG: [25.07, 24.93]
+Tỉ lệ NG: 20%</code></pre>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Pareto lỗi</h3>
+<p>Từ danh sách kết quả dạng dict dưới đây, in bảng số lượng theo từng lý do NG, sắp xếp giảm dần.</p>
+<pre><code class="language-python">ket_qua = [
+    {"ma": 1, "kq": "NG", "ly_do": "xước"}, {"ma": 2, "kq": "OK", "ly_do": ""},
+    {"ma": 3, "kq": "NG", "ly_do": "thiếu chi tiết"}, {"ma": 4, "kq": "NG", "ly_do": "xước"},
+    {"ma": 5, "kq": "NG", "ly_do": "bẩn"}, {"ma": 6, "kq": "NG", "ly_do": "xước"},
+]</code></pre>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">from collections import Counter
+dem = Counter(r["ly_do"] for r in ket_qua if r["kq"] == "NG")
+for ly_do, so in dem.most_common():
+    print(f"{ly_do:15s} {so}")</code></pre>
+<pre><code class="language-text">xước            3
+thiếu chi tiết  1
+bẩn             1</code></pre>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 3. Mã bị đọc trùng</h3>
+<p>Cho danh sách mã DataMatrix đọc được trong ca: <code>["M100","M101","M102","M101","M103","M100"]</code>. In ra các mã bị đọc nhiều hơn một lần.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">ma = ["M100", "M101", "M102", "M101", "M103", "M100"]
+da_thay, trung = set(), set()
+for m in ma:
+    if m in da_thay:
+        trung.add(m)
+    da_thay.add(m)
+print(sorted(trung))</code></pre>
+<pre><code class="language-text">['M100', 'M101']</code></pre>
+</details>
+</div>

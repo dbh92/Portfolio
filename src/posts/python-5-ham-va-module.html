@@ -1,0 +1,163 @@
+<p>Khi chương trình dài ra, bạn sẽ thấy cùng một đoạn code xuất hiện nhiều lần: kiểm tra dung sai, đặt tên file, tính độ sáng. <strong>Hàm</strong> gói đoạn code đó lại, đặt tên và dùng lại bao nhiêu lần cũng được. <strong>Module</strong> gom các hàm vào file riêng. Đây là kỹ năng phân biệt "viết được code" với "viết được phần mềm".</p>
+
+<h2>1. Định nghĩa và gọi hàm</h2>
+<pre><code class="language-python">def kiem_tra_dung_sai(gia_tri, danh_nghia, dung_sai):
+    """Trả về True nếu gia_tri nằm trong danh_nghia ± dung_sai."""
+    return danh_nghia - dung_sai &lt;= gia_tri &lt;= danh_nghia + dung_sai
+
+
+print(kiem_tra_dung_sai(12.48, 12.50, 0.10))   # True
+print(kiem_tra_dung_sai(12.63, 12.50, 0.10))   # False</code></pre>
+<ul>
+  <li><code>def</code> + tên hàm + danh sách <strong>tham số</strong> trong ngoặc + dấu <code>:</code>.</li>
+  <li>Chuỗi ba dấu nháy ngay dưới dòng <code>def</code> là <strong>docstring</strong>: mô tả hàm làm gì. VS Code hiện docstring khi bạn rê chuột lên tên hàm.</li>
+  <li><code>return</code> trả kết quả về nơi gọi và kết thúc hàm. Hàm không có <code>return</code> sẽ trả về <code>None</code>.</li>
+</ul>
+
+<h2>2. Tham số mặc định và tham số theo tên</h2>
+<pre><code class="language-python">def dat_ten_anh(so_thu_tu, ket_qua, tram="ST1", duoi=".png"):
+    return f"{tram}_{so_thu_tu:06d}_{ket_qua}{duoi}"
+
+
+print(dat_ten_anh(7, "OK"))                         # dùng giá trị mặc định
+print(dat_ten_anh(8, "NG", tram="ST3"))             # đổi một tham số theo tên
+print(dat_ten_anh(ket_qua="OK", so_thu_tu=9, duoi=".jpg"))</code></pre>
+<pre><code class="language-text">ST1_000007_OK.png
+ST3_000008_NG.png
+ST1_000009_OK.jpg</code></pre>
+<p>Tham số có giá trị mặc định phải đứng <strong>sau</strong> tham số bắt buộc. Gọi theo tên (<code>tram="ST3"</code>) giúp code dễ đọc khi hàm có nhiều tham số.</p>
+<div class="warn"><strong>Bẫy: không dùng list làm giá trị mặc định</strong>Viết <code>def them(x, ds=[])</code> thì list <code>ds</code> được tạo <strong>một lần</strong> và dùng chung giữa các lần gọi, dữ liệu sẽ dồn lại một cách khó hiểu. Dùng <code>ds=None</code> rồi trong hàm viết <code>if ds is None: ds = []</code>.</div>
+
+<h2>3. Trả về nhiều giá trị</h2>
+<pre><code class="language-python">def thong_ke(ds):
+    """Trả về (nhỏ nhất, lớn nhất, trung bình) của một list số."""
+    return min(ds), max(ds), sum(ds) / len(ds)
+
+
+nho, lon, tb = thong_ke([12.48, 12.51, 12.47, 12.52])
+print(f"min={nho} max={lon} tb={tb:.3f}")</code></pre>
+<pre><code class="language-text">min=12.47 max=12.52 tb=12.495</code></pre>
+<p>Thực chất hàm trả về một tuple, và dòng gọi "mở gói" tuple đó thành 3 biến.</p>
+
+<h2>4. Phạm vi biến</h2>
+<pre><code class="language-python">nguong = 128            # biến toàn cục
+
+def phan_loai(do_sang):
+    ket_qua = "sáng" if do_sang &gt; nguong else "tối"   # đọc được biến toàn cục
+    return ket_qua
+
+print(phan_loai(200))
+# print(ket_qua)  → NameError: biến tạo trong hàm chỉ tồn tại trong hàm</code></pre>
+<p>Biến tạo bên trong hàm là <strong>biến cục bộ</strong>, biến mất khi hàm kết thúc. Hàm đọc được biến toàn cục, nhưng cách tốt hơn là <strong>truyền mọi thứ hàm cần qua tham số</strong>: <code>def phan_loai(do_sang, nguong=128)</code>. Hàm như vậy dễ kiểm thử và dễ dùng lại.</p>
+
+<h2>5. Type hint: ghi chú kiểu dữ liệu</h2>
+<pre><code class="language-python">def ty_le_ng(so_ng: int, tong: int) -&gt; float:
+    """Tỉ lệ NG trong khoảng 0–1. Trả 0.0 nếu chưa có sản phẩm nào."""
+    if tong == 0:
+        return 0.0
+    return so_ng / tong
+
+
+print(f"{ty_le_ng(7, 1284):.2%}")   # 0.55%</code></pre>
+<p><code>so_ng: int</code> và <code>-&gt; float</code> là <strong>type hint</strong>. Python không bắt buộc kiểu khi chạy, nhưng VS Code (Pylance) dùng chúng để gợi ý và cảnh báo khi bạn truyền sai. Trong dự án thật, type hint giúp đồng nghiệp hiểu hàm ngay mà không phải đọc code bên trong.</p>
+
+<h2>6. Module: tách code ra file riêng</h2>
+<p>Khi có nhiều hàm, hãy gom chúng vào một file và <strong>import</strong> từ chỗ khác. Tạo thư mục dự án như sau:</p>
+<pre><code class="language-text">tram_kiem_tra/
+├── cong_cu.py      ← các hàm dùng chung
+└── main.py         ← chương trình chính</code></pre>
+<p>File <code>cong_cu.py</code>:</p>
+<pre><code class="language-python">"""Các hàm tiện ích cho trạm kiểm tra."""
+
+def kiem_tra_dung_sai(gia_tri: float, danh_nghia: float, dung_sai: float) -&gt; bool:
+    return danh_nghia - dung_sai &lt;= gia_tri &lt;= danh_nghia + dung_sai
+
+
+def dat_ten_anh(so_thu_tu: int, ket_qua: str, tram: str = "ST1") -&gt; str:
+    return f"{tram}_{so_thu_tu:06d}_{ket_qua}.png"
+
+
+if __name__ == "__main__":
+    # Chỉ chạy khi chạy trực tiếp: python cong_cu.py (dùng để tự kiểm tra nhanh)
+    assert kiem_tra_dung_sai(12.5, 12.5, 0.1)
+    assert dat_ten_anh(1, "OK") == "ST1_000001_OK.png"
+    print("cong_cu.py: các kiểm tra đều đạt")</code></pre>
+<p>File <code>main.py</code> (cùng thư mục):</p>
+<pre><code class="language-python"># (minh họa) cần file cong_cu.py ở cùng thư mục
+import cong_cu
+from cong_cu import dat_ten_anh
+
+ket_qua = "OK" if cong_cu.kiem_tra_dung_sai(12.48, 12.50, 0.10) else "NG"
+print(dat_ten_anh(42, ket_qua))</code></pre>
+<p>Hai cách import:</p>
+<ul>
+  <li><code>import cong_cu</code> rồi gọi <code>cong_cu.ten_ham()</code>: rõ hàm đến từ đâu.</li>
+  <li><code>from cong_cu import ten_ham</code>: gọi ngắn gọn <code>ten_ham()</code>.</li>
+</ul>
+<p>Khối <code>if __name__ == "__main__":</code> chỉ chạy khi bạn chạy trực tiếp file đó, <strong>không</strong> chạy khi file được import. Dùng nó để đặt đoạn tự kiểm tra hoặc chương trình chính.</p>
+<div class="tip"><strong>Thư viện chuẩn có sẵn rất nhiều module</strong>Bạn đã dùng <code>math</code> và <code>collections</code>. Sẽ gặp thường xuyên: <code>pathlib</code> (đường dẫn), <code>json</code> (cấu hình), <code>csv</code>, <code>datetime</code> (thời gian), <code>time</code> (đo tốc độ), <code>logging</code> (ghi log). Tất cả đều có sẵn, không cần cài.</div>
+
+<h2>7. Khi nào nên tách thành hàm?</h2>
+<ul>
+  <li>Đoạn code lặp lại từ 2 lần trở lên.</li>
+  <li>Đoạn code làm một việc có thể đặt tên rõ ràng: "tính độ sáng", "lưu kết quả".</li>
+  <li>Hàm dài quá khoảng 30–40 dòng: tách tiếp thành hàm nhỏ hơn.</li>
+</ul>
+<p>Một hàm tốt <strong>làm một việc</strong>, có tên là động từ (<code>tinh_</code>, <code>kiem_tra_</code>, <code>luu_</code>), nhận dữ liệu qua tham số và trả kết quả qua <code>return</code> thay vì in ra màn hình. Hàm trả kết quả thì dùng lại được ở mọi nơi; hàm chỉ in thì không.</p>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li><code>def ten(tham_so): ... return ket_qua</code>, kèm docstring.</li>
+  <li>Tham số mặc định đứng sau; gọi theo tên cho dễ đọc; không dùng list làm mặc định.</li>
+  <li>Trả nhiều giá trị bằng tuple; biến trong hàm là cục bộ.</li>
+  <li>Type hint giúp VS Code gợi ý và đồng nghiệp dễ hiểu.</li>
+  <li>Module = file .py; <code>import</code>; <code>if __name__ == "__main__":</code>.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Hàm đánh giá độ sáng</h3>
+<p>Viết hàm <code>danh_gia_do_sang(gia_tri, toi=50, sang=200)</code> trả về <code>"tối"</code>, <code>"sáng"</code> hoặc <code>"tốt"</code>. Gọi thử với 30, 120, 230 và với ngưỡng tùy chỉnh <code>toi=80</code>.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">def danh_gia_do_sang(gia_tri: float, toi: float = 50, sang: float = 200) -&gt; str:
+    """Phân loại độ sáng trung bình của ảnh (0–255)."""
+    if gia_tri &lt; toi:
+        return "tối"
+    if gia_tri &gt; sang:
+        return "sáng"
+    return "tốt"
+
+
+for v in (30, 120, 230):
+    print(v, danh_gia_do_sang(v))
+print(60, danh_gia_do_sang(60, toi=80))</code></pre>
+<pre><code class="language-text">30 tối
+120 tốt
+230 sáng
+60 tối</code></pre>
+<p>Để ý: khi đã <code>return</code> thì hàm kết thúc, nên không cần <code>elif</code>/<code>else</code> sau mỗi <code>return</code>.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Hàm báo cáo ca</h3>
+<p>Viết hàm <code>bao_cao(ket_qua)</code> nhận list các chuỗi "OK"/"NG", trả về dict <code>{"tong": ..., "ok": ..., "ng": ..., "ty_le_ng": ...}</code>. Xử lý trường hợp list rỗng.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">def bao_cao(ket_qua: list[str]) -&gt; dict:
+    tong = len(ket_qua)
+    ng = ket_qua.count("NG")
+    return {"tong": tong, "ok": tong - ng, "ng": ng, "ty_le_ng": ng / tong if tong else 0.0}
+
+
+print(bao_cao(["OK", "NG", "OK", "OK"]))
+print(bao_cao([]))</code></pre>
+<pre><code class="language-text">{'tong': 4, 'ok': 3, 'ng': 1, 'ty_le_ng': 0.25}
+{'tong': 0, 'ok': 0, 'ng': 0, 'ty_le_ng': 0.0}</code></pre>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 3. Tách module</h3>
+<p>Tạo thư mục <code>bai_tap_5</code> gồm <code>do_luong.py</code> (chứa hàm <code>kiem_tra_dung_sai</code> và <code>thong_ke</code>) và <code>main.py</code> import hai hàm đó, đọc list giá trị đo, in thống kê và số NG. Thêm khối <code>if __name__ == "__main__":</code> trong <code>do_luong.py</code> để tự kiểm tra bằng <code>assert</code>.</p>
+<details><summary>Gợi ý</summary>
+<p>Dùng lại code ở mục 3 và mục 6. Chạy <code>python do_luong.py</code> phải in thông báo tự kiểm tra; chạy <code>python main.py</code> chỉ in kết quả thống kê, không in thông báo tự kiểm tra.</p>
+</details>
+</div>

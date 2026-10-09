@@ -1,0 +1,246 @@
+<p>Chương trình thật phải đọc cấu hình từ file, ghi kết quả ra file, và không được "chết" chỉ vì một ảnh hỏng hay một file thiếu. Bài này dạy ba kỹ năng đó: đọc ghi file văn bản, làm việc với đường dẫn bằng <code>pathlib</code>, và xử lý lỗi bằng <code>try/except</code>. Cuối bài bạn sẽ có hàm đọc file cấu hình JSON an toàn, thứ mọi trạm vision đều cần.</p>
+
+<h2>1. Đọc và ghi file văn bản với with</h2>
+<pre><code class="language-python">with open("ket_qua_ca.txt", "w", encoding="utf-8") as f:
+    f.write("SP-01,OK\n")
+    f.write("SP-02,NG,xước\n")
+
+with open("ket_qua_ca.txt", "a", encoding="utf-8") as f:   # "a": ghi thêm vào cuối
+    f.write("SP-03,OK\n")
+
+with open("ket_qua_ca.txt", encoding="utf-8") as f:
+    for dong in f:
+        print(dong.strip().split(","))</code></pre>
+<pre><code class="language-text">['SP-01', 'OK']
+['SP-02', 'NG', 'xước']
+['SP-03', 'OK']</code></pre>
+<ul>
+  <li>Chế độ mở: <code>"r"</code> đọc (mặc định), <code>"w"</code> ghi mới (<strong>xóa nội dung cũ</strong>), <code>"a"</code> ghi thêm.</li>
+  <li><code>with</code> tự đóng file khi xong, kể cả khi có lỗi. Luôn dùng <code>with</code> thay vì <code>open()</code> rồi quên <code>close()</code>.</li>
+  <li><strong>Luôn ghi <code>encoding="utf-8"</code></strong>. Trên Windows, mặc định có thể không phải UTF-8 và chữ tiếng Việt sẽ bị lỗi.</li>
+  <li><code>"\n"</code> là ký tự xuống dòng; <code>.strip()</code> bỏ nó khi đọc.</li>
+</ul>
+
+<h2>2. pathlib: làm việc với đường dẫn</h2>
+<p>Đừng ghép đường dẫn bằng cộng chuỗi (<code>"anh" + "\\" + ten</code>): sai ngay khi chuyển từ Windows sang Linux. Dùng <code>pathlib.Path</code> và toán tử <code>/</code>:</p>
+<pre><code class="language-python">from pathlib import Path
+
+goc = Path("du_lieu")
+thu_muc_ng = goc / "2026-10-09" / "NG"
+thu_muc_ng.mkdir(parents=True, exist_ok=True)   # tạo cả cây thư mục, không lỗi nếu đã có
+
+file_anh = thu_muc_ng / "ST3_000128_NG.png"
+print(file_anh)                  # du_lieu/2026-10-09/NG/ST3_000128_NG.png (Windows hiện dấu \)
+print(file_anh.name)             # ST3_000128_NG.png
+print(file_anh.stem)             # ST3_000128_NG
+print(file_anh.suffix)           # .png
+print(file_anh.parent.name)      # NG
+print(file_anh.exists())         # False (chưa tạo file)
+print(file_anh.with_suffix(".jpg").name)   # ST3_000128_NG.jpg</code></pre>
+
+<h3>Liệt kê file</h3>
+<pre><code class="language-python">for i in range(3):
+    (thu_muc_ng / f"anh_{i}.png").write_text("demo")   # tạo vài file thử
+
+ds_anh = sorted(thu_muc_ng.glob("*.png"))              # glob: tìm theo mẫu tên
+print(len(ds_anh), [p.name for p in ds_anh])
+
+tat_ca = list(goc.rglob("*.png"))                      # rglob: tìm cả thư mục con
+print(len(tat_ca))</code></pre>
+<pre><code class="language-text">3 ['anh_0.png', 'anh_1.png', 'anh_2.png']
+3</code></pre>
+<p><code>Path.read_text()</code> và <code>Path.write_text()</code> là cách ngắn gọn để đọc ghi cả file văn bản một lần (cũng nên truyền <code>encoding="utf-8"</code> khi có tiếng Việt).</p>
+
+<h2>3. Ngoại lệ: khi có lỗi lúc chạy</h2>
+<p>Khi gặp lỗi, Python "ném" ra một <strong>ngoại lệ</strong> (exception). Không ai bắt thì chương trình dừng. Với trạm kiểm tra chạy 24/7, một file ảnh hỏng không được phép làm dừng cả dây chuyền. <code>try/except</code> bắt ngoại lệ và xử lý:</p>
+<pre><code class="language-python">gia_tri_doc = ["12.48", "12,51", "", "12.50"]   # dữ liệu "bẩn" từ file
+
+ket_qua = []
+for s in gia_tri_doc:
+    try:
+        ket_qua.append(float(s))
+    except ValueError:
+        print(f"Bỏ qua giá trị không hợp lệ: {s!r}")
+
+print(ket_qua)</code></pre>
+<pre><code class="language-text">Bỏ qua giá trị không hợp lệ: '12,51'
+Bỏ qua giá trị không hợp lệ: ''
+[12.48, 12.5]</code></pre>
+<p><code>{s!r}</code> in chuỗi kèm dấu nháy để thấy rõ cả chuỗi rỗng. Thực tế bạn có thể sửa <code>"12,51"</code> thành <code>"12.51"</code> bằng <code>.replace(",", ".")</code> trước khi ép kiểu.</p>
+
+<h3>Đầy đủ: try / except / else / finally</h3>
+<pre><code class="language-python">from pathlib import Path
+
+
+def doc_so_luong(duong_dan):
+    try:
+        with open(duong_dan, encoding="utf-8") as f:
+            n = int(f.read().strip())
+    except FileNotFoundError:
+        print("Không thấy file:", duong_dan)
+        return 0
+    except ValueError:
+        print("Nội dung file không phải số nguyên")
+        return 0
+    else:
+        print("Đọc thành công")          # chỉ chạy khi không có lỗi
+        return n
+    finally:
+        print("Kết thúc đọc file")       # luôn chạy, có lỗi hay không
+
+
+Path("dem.txt").write_text("1284", encoding="utf-8")
+print(doc_so_luong("dem.txt"))
+print(doc_so_luong("khong_co.txt"))</code></pre>
+<pre><code class="language-text">Đọc thành công
+Kết thúc đọc file
+1284
+Không thấy file: khong_co.txt
+Kết thúc đọc file
+0</code></pre>
+
+<h3>Các ngoại lệ hay gặp</h3>
+<table>
+  <tr><th>Ngoại lệ</th><th>Khi nào</th></tr>
+  <tr><td><code>FileNotFoundError</code></td><td>Mở file không tồn tại</td></tr>
+  <tr><td><code>ValueError</code></td><td>Giá trị sai dạng: <code>int("abc")</code></td></tr>
+  <tr><td><code>KeyError</code></td><td>Khóa không có trong dict</td></tr>
+  <tr><td><code>IndexError</code></td><td>Chỉ số vượt quá độ dài list</td></tr>
+  <tr><td><code>ZeroDivisionError</code></td><td>Chia cho 0</td></tr>
+  <tr><td><code>PermissionError</code></td><td>Không có quyền ghi (file đang mở trong Excel…)</td></tr>
+</table>
+<div class="warn"><strong>Đừng "nuốt" mọi lỗi</strong>Viết <code>except:</code> trống hoặc <code>except Exception: pass</code> sẽ che mất lỗi thật, khiến bạn không biết vì sao chương trình chạy sai. Chỉ bắt <strong>đúng loại lỗi bạn biết cách xử lý</strong>, và luôn ghi lại (in hoặc log) lỗi đó.</div>
+
+<h3>Tự ném lỗi với raise</h3>
+<pre><code class="language-python">def kiem_tra_nguong(nguong: int) -&gt; int:
+    if not 0 &lt;= nguong &lt;= 255:
+        raise ValueError(f"Ngưỡng phải trong khoảng 0–255, nhận {nguong}")
+    return nguong
+
+
+try:
+    kiem_tra_nguong(300)
+except ValueError as loi:
+    print("Cấu hình sai:", loi)</code></pre>
+<pre><code class="language-text">Cấu hình sai: Ngưỡng phải trong khoảng 0–255, nhận 300</code></pre>
+<p>Báo lỗi sớm với thông điệp rõ ràng tốt hơn nhiều so với để chương trình chạy tiếp với giá trị sai rồi cho ra kết quả kiểm tra sai.</p>
+
+<h2>4. Ứng dụng: file cấu hình JSON</h2>
+<p>Tham số thuật toán (ngưỡng, vùng ROI, dung sai) nên nằm trong file cấu hình để người vận hành chỉnh mà không phải sửa code. JSON là định dạng phổ biến nhất, và module <code>json</code> chuyển qua lại giữa file JSON và dict:</p>
+<pre><code class="language-python">import json
+from pathlib import Path
+
+MAC_DINH = {"nguong": 128, "dien_tich_min": 500, "roi": [100, 80, 400, 300], "luu_anh_ok": False}
+
+
+def doc_cau_hinh(duong_dan: str | Path) -&gt; dict:
+    """Đọc file cấu hình JSON; thiếu file hoặc thiếu khóa thì dùng giá trị mặc định."""
+    duong_dan = Path(duong_dan)
+    cau_hinh = dict(MAC_DINH)
+    if not duong_dan.exists():
+        print(f"Chưa có {duong_dan}, tạo file mặc định")
+        duong_dan.write_text(json.dumps(MAC_DINH, indent=2, ensure_ascii=False), encoding="utf-8")
+        return cau_hinh
+    try:
+        cau_hinh.update(json.loads(duong_dan.read_text(encoding="utf-8")))
+    except json.JSONDecodeError as loi:
+        raise ValueError(f"File {duong_dan} sai cú pháp JSON: {loi}") from loi
+    if not 0 &lt;= cau_hinh["nguong"] &lt;= 255:
+        raise ValueError("nguong phải trong khoảng 0–255")
+    return cau_hinh
+
+
+cfg = doc_cau_hinh("cau_hinh.json")      # lần đầu: tạo file mặc định
+cfg = doc_cau_hinh("cau_hinh.json")      # lần sau: đọc từ file
+print(cfg["nguong"], cfg["roi"])
+print(Path("cau_hinh.json").read_text(encoding="utf-8"))</code></pre>
+<pre><code class="language-text">Chưa có cau_hinh.json, tạo file mặc định
+128 [100, 80, 400, 300]
+{
+  "nguong": 128,
+  "dien_tich_min": 500,
+  "roi": [
+    100,
+    80,
+    400,
+    300
+  ],
+  "luu_anh_ok": false
+}</code></pre>
+<p>Ba chi tiết đáng học:</p>
+<ul>
+  <li><code>ensure_ascii=False</code> giữ chữ tiếng Việt dễ đọc trong file JSON.</li>
+  <li>Bắt đầu từ giá trị mặc định rồi <code>update</code> bằng nội dung file: file thiếu khóa nào thì vẫn có giá trị dùng được.</li>
+  <li>Kiểm tra giá trị ngay sau khi đọc và báo lỗi rõ ràng (<code>raise ... from loi</code> giữ lại lỗi gốc để dễ tra).</li>
+</ul>
+<p>JSON chỉ có list, không có tuple: <code>(100, 80, 400, 300)</code> lưu xuống rồi đọc lên sẽ thành list <code>[100, 80, 400, 300]</code>.</p>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li><code>with open(..., encoding="utf-8")</code>; <code>"w"</code> ghi đè, <code>"a"</code> ghi thêm.</li>
+  <li><code>Path</code> + <code>/</code> để ghép đường dẫn; <code>mkdir(parents=True, exist_ok=True)</code>; <code>glob</code>, <code>rglob</code>.</li>
+  <li><code>try/except</code> bắt đúng loại lỗi; <code>finally</code> luôn chạy; <code>raise</code> báo lỗi sớm.</li>
+  <li>Cấu hình để trong JSON, có mặc định và kiểm tra giá trị.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Đọc file kết quả an toàn</h3>
+<p>File <code>do_luong.txt</code> mỗi dòng một giá trị đo, có dòng trống, dòng dùng dấu phẩy thập phân và dòng chữ. Viết hàm trả về list số thực hợp lệ (chấp nhận cả dấu phẩy) và số dòng bị bỏ qua.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">from pathlib import Path
+
+Path("do_luong.txt").write_text("12.48\n12,51\n\nabc\n12.50\n", encoding="utf-8")
+
+
+def doc_gia_tri(duong_dan):
+    hop_le, bo_qua = [], 0
+    for dong in Path(duong_dan).read_text(encoding="utf-8").splitlines():
+        dong = dong.strip().replace(",", ".")
+        if not dong:
+            continue
+        try:
+            hop_le.append(float(dong))
+        except ValueError:
+            bo_qua += 1
+    return hop_le, bo_qua
+
+
+print(doc_gia_tri("do_luong.txt"))</code></pre>
+<pre><code class="language-text">([12.48, 12.51, 12.5], 1)</code></pre>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Sắp xếp ảnh theo kết quả</h3>
+<p>Thư mục <code>anh_moi</code> chứa ảnh tên dạng <code>ST1_000001_OK.png</code>, <code>ST1_000002_NG.png</code>. Viết chương trình chuyển ảnh vào <code>da_phan_loai/OK</code> hoặc <code>da_phan_loai/NG</code> dựa vào phần cuối tên file. Gợi ý: <code>Path.rename()</code> hoặc <code>shutil.move()</code>.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">from pathlib import Path
+import shutil
+
+nguon = Path("anh_moi")
+nguon.mkdir(exist_ok=True)
+for i, kq in enumerate(["OK", "NG", "OK"], start=1):
+    (nguon / f"ST1_{i:06d}_{kq}.png").write_text("demo")
+
+dich = Path("da_phan_loai")
+for anh in nguon.glob("*.png"):
+    ket_qua = anh.stem.split("_")[-1]          # phần cuối tên: OK hoặc NG
+    thu_muc = dich / ket_qua
+    thu_muc.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(anh), str(thu_muc / anh.name))
+
+for p in sorted(dich.rglob("*.png")):
+    print(p.parent.name, p.name)</code></pre>
+<pre><code class="language-text">NG ST1_000002_NG.png
+OK ST1_000001_OK.png
+OK ST1_000003_OK.png</code></pre>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 3. Kiểm tra cấu hình đầy đủ hơn</h3>
+<p>Mở rộng hàm <code>doc_cau_hinh</code>: báo lỗi nếu <code>roi</code> không có đúng 4 số, hoặc chiều rộng/cao của ROI (phần tử thứ 3, 4) không dương. Thử với file JSON sai để thấy thông báo lỗi.</p>
+<details><summary>Gợi ý</summary>
+<p>Thêm sau dòng kiểm tra ngưỡng: <code>if len(cau_hinh["roi"]) != 4 or cau_hinh["roi"][2] &lt;= 0 or cau_hinh["roi"][3] &lt;= 0: raise ValueError(...)</code>. Tạo file sai bằng <code>Path("sai.json").write_text('{"roi": [1, 2, 3]}')</code>.</p>
+</details>
+</div>
+<p>Bài tiếp theo: bạn sẽ tạo <strong>môi trường ảo</strong> và cài thư viện bằng pip, chuẩn bị cho NumPy và OpenCV.</p>

@@ -58,6 +58,8 @@ for p in pages:
             err("link hỏng:", p, "→", u)
         elif frag and tgt.endswith(".html") and frag not in ids(tgt):
             err("anchor hỏng:", p, "→", u)
+    if 'http-equiv="refresh"' in t:  # trang chuyển hướng: không cần SEO
+        continue
     if len(re.findall(r"<h1[\s>]", t)) != 1:
         err("số h1 khác 1:", p)
     for tag in (r"<title>", r'<meta name="description"', r'<link rel="canonical"'):
@@ -109,6 +111,8 @@ for f in sorted(glob.glob("src/posts/*.html")):
         code = html.unescape(re.sub(r"<[^>]+>", "", blk))
         looks_py = re.search(r"^(import |from \w+ import|def |for .* in .*:$)", code, re.M)
         other = re.search(r"^\s*(using |public |var |\$ |pip |git |docker |FROM |RUN )", code, re.M)
+        if "(minh họa)" in code:  # khối cố ý chứa lỗi để người học tự sửa
+            continue
         if looks_py and not other:
             py_blocks += 1
             try:

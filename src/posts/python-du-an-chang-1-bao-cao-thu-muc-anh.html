@@ -1,0 +1,209 @@
+<p>Đây là dự án cuối chặng 1. Bạn sẽ viết một công cụ thật mà kỹ sư Vision dùng hằng tuần: quét một thư mục ảnh (có thể hàng nghìn ảnh, nhiều thư mục con), phát hiện ảnh hỏng, quá tối, quá sáng, mờ, rồi xuất báo cáo CSV và file log. Dự án dùng lại toàn bộ kiến thức chặng 1: hàm, module, pathlib, xử lý lỗi, cấu hình JSON, NumPy và CSV.</p>
+<div class="tip"><strong>Cách làm dự án hiệu quả</strong>Đọc yêu cầu, <strong>tự làm trước ít nhất 60 phút</strong>, chỉ xem lời giải khi đã thử hết cách. So sánh lời giải của bạn với lời giải mẫu theo bảng tiêu chí ở cuối bài.</div>
+
+<h2>1. Bài toán</h2>
+<p>Trước khi huấn luyện mô hình AI hay chỉnh thuật toán, bạn nhận được một thư mục ảnh thu từ dây chuyền. Một phần ảnh có vấn đề: file hỏng do mất mạng khi lưu, ảnh tối do đèn chưa bật, ảnh cháy sáng, ảnh mờ do camera rung. Dùng ảnh xấu để huấn luyện hay chỉnh ngưỡng sẽ cho kết quả sai. Công cụ của bạn phải tìm ra chúng tự động.</p>
+
+<h2>2. Yêu cầu</h2>
+<table>
+  <tr><th>#</th><th>Yêu cầu</th></tr>
+  <tr><td>1</td><td>Nhận đường dẫn thư mục ảnh, duyệt cả thư mục con, chấp nhận <code>.png .jpg .jpeg .bmp</code> (không phân biệt hoa thường).</td></tr>
+  <tr><td>2</td><td>Với mỗi ảnh: kích thước, độ sáng trung bình, độ tương phản (độ lệch chuẩn), độ nét (phương sai Laplacian).</td></tr>
+  <tr><td>3</td><td>Phân loại: <code>hong</code> (không đọc được), <code>toi</code>, <code>sang</code>, <code>mo</code>, <code>tot</code>. Ngưỡng đọc từ file <code>cau_hinh.json</code>.</td></tr>
+  <tr><td>4</td><td>Ghi <code>bao_cao.csv</code> (mở được bằng Excel, tiếng Việt không lỗi font) và <code>bao_cao.log</code>.</td></tr>
+  <tr><td>5</td><td>In tóm tắt: tổng số ảnh, số lượng từng loại, thời gian xử lý.</td></tr>
+  <tr><td>6</td><td>Một ảnh hỏng không được làm dừng chương trình.</td></tr>
+</table>
+
+<h2>3. Chuẩn bị</h2>
+<pre><code class="language-bash">pip install numpy opencv-python</code></pre>
+<p>Bài này dùng 3 hàm của OpenCV (chặng 2 sẽ học kỹ): <code>cv2.imread</code> đọc ảnh, <code>cv2.cvtColor</code> chuyển sang ảnh xám và <code>cv2.Laplacian</code> đo độ nét. Ảnh càng nét thì cạnh càng sắc, ảnh Laplacian càng nhiều giá trị lớn và <strong>phương sai</strong> của nó càng cao. Ảnh mờ cho phương sai thấp.</p>
+<p>Chưa có thư mục ảnh thật? Đoạn code sau tạo dữ liệu thử gồm ảnh tốt, tối, sáng, mờ và một file hỏng:</p>
+<pre><code class="language-python">from pathlib import Path
+import cv2
+import numpy as np
+
+thu_muc = Path("du_lieu_thu")
+(thu_muc / "ca_1").mkdir(parents=True, exist_ok=True)
+(thu_muc / "ca_2").mkdir(parents=True, exist_ok=True)
+rng = np.random.default_rng(0)
+
+
+def anh_mau(do_sang=120):
+    anh = np.full((240, 320, 3), do_sang, np.uint8)
+    for _ in range(8):
+        x, y = rng.integers(30, 290), rng.integers(30, 210)
+        cv2.circle(anh, (int(x), int(y)), int(rng.integers(8, 25)), (230, 230, 230), -1)
+    return anh
+
+
+for i in range(6):
+    cv2.imwrite(str(thu_muc / "ca_1" / f"tot_{i}.png"), anh_mau())
+cv2.imwrite(str(thu_muc / "ca_1" / "toi.png"), anh_mau(5) // 8)
+cv2.imwrite(str(thu_muc / "ca_2" / "sang.JPG"), np.full((240, 320, 3), 250, np.uint8))
+cv2.imwrite(str(thu_muc / "ca_2" / "mo.png"), cv2.GaussianBlur(anh_mau(), (31, 31), 0))
+(thu_muc / "ca_2" / "hong.png").write_bytes(b"file bi loi khi luu")
+print(sorted(p.name for p in thu_muc.rglob("*")))</code></pre>
+
+<h2>4. Gợi ý thiết kế</h2>
+<p>Chia chương trình thành các hàm nhỏ, mỗi hàm một việc:</p>
+<pre><code class="language-text">doc_cau_hinh(duong_dan)      → dict ngưỡng (có mặc định)
+tim_anh(thu_muc)             → list Path các ảnh
+phan_tich_anh(duong_dan)     → dict chỉ số của một ảnh, hoặc None nếu hỏng
+phan_loai(chi_so, cau_hinh)  → "tot" / "toi" / "sang" / "mo"
+ghi_csv(ket_qua, duong_dan)  → ghi file báo cáo
+main()                       → nối mọi thứ lại, in tóm tắt</code></pre>
+<p>Thứ tự phân loại nên là: hỏng → tối → sáng → mờ → tốt. Ảnh tối hầu như không có cạnh nên luôn "mờ"; kiểm tra tối/sáng trước giúp báo đúng nguyên nhân gốc.</p>
+
+<h2>5. Lời giải mẫu</h2>
+<details><summary>Xem lời giải đầy đủ (bao_cao_anh.py)</summary>
+<pre><code class="language-python">"""Báo cáo chất lượng thư mục ảnh: phát hiện ảnh hỏng, tối, sáng, mờ.
+
+Chạy: python bao_cao_anh.py du_lieu_thu
+"""
+import csv
+import json
+import logging
+import sys
+import time
+from collections import Counter
+from pathlib import Path
+
+import cv2
+import numpy as np
+
+DUOI_ANH = {".png", ".jpg", ".jpeg", ".bmp"}
+MAC_DINH = {"toi": 40, "sang": 220, "do_net_min": 100.0}
+log = logging.getLogger("bao_cao_anh")
+
+
+def doc_cau_hinh(duong_dan: Path) -&gt; dict:
+    cau_hinh = dict(MAC_DINH)
+    if duong_dan.exists():
+        cau_hinh.update(json.loads(duong_dan.read_text(encoding="utf-8")))
+    else:
+        duong_dan.write_text(json.dumps(MAC_DINH, indent=2), encoding="utf-8")
+        log.info("Tạo file cấu hình mặc định %s", duong_dan)
+    if not 0 &lt;= cau_hinh["toi"] &lt; cau_hinh["sang"] &lt;= 255:
+        raise ValueError("Cấu hình sai: cần 0 &lt;= toi &lt; sang &lt;= 255")
+    return cau_hinh
+
+
+def tim_anh(thu_muc: Path) -&gt; list[Path]:
+    return sorted(p for p in thu_muc.rglob("*") if p.is_file() and p.suffix.lower() in DUOI_ANH)
+
+
+def phan_tich_anh(duong_dan: Path) -&gt; dict | None:
+    # imdecode + fromfile đọc được cả đường dẫn có dấu tiếng Việt trên Windows
+    du_lieu = np.fromfile(str(duong_dan), dtype=np.uint8)
+    anh = cv2.imdecode(du_lieu, cv2.IMREAD_COLOR) if du_lieu.size else None
+    if anh is None:
+        return None
+    xam = cv2.cvtColor(anh, cv2.COLOR_BGR2GRAY)
+    return {
+        "rong": anh.shape[1],
+        "cao": anh.shape[0],
+        "do_sang": round(float(xam.mean()), 1),
+        "tuong_phan": round(float(xam.std()), 1),
+        "do_net": round(float(cv2.Laplacian(xam, cv2.CV_64F).var()), 1),
+    }
+
+
+def phan_loai(chi_so: dict, cau_hinh: dict) -&gt; str:
+    if chi_so["do_sang"] &lt; cau_hinh["toi"]:
+        return "toi"
+    if chi_so["do_sang"] &gt; cau_hinh["sang"]:
+        return "sang"
+    if chi_so["do_net"] &lt; cau_hinh["do_net_min"]:
+        return "mo"
+    return "tot"
+
+
+def ghi_csv(ket_qua: list[dict], duong_dan: Path) -&gt; None:
+    cot = ["duong_dan", "loai", "rong", "cao", "do_sang", "tuong_phan", "do_net"]
+    # utf-8-sig: thêm BOM để Excel nhận đúng tiếng Việt
+    with open(duong_dan, "w", newline="", encoding="utf-8-sig") as f:
+        w = csv.DictWriter(f, fieldnames=cot)
+        w.writeheader()
+        w.writerows(ket_qua)
+
+
+def main(thu_muc: str) -&gt; dict:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+        handlers=[logging.FileHandler("bao_cao.log", encoding="utf-8"), logging.StreamHandler()],
+        force=True,
+    )
+    goc = Path(thu_muc)
+    if not goc.is_dir():
+        raise SystemExit(f"Không tìm thấy thư mục: {goc}")
+    cau_hinh = doc_cau_hinh(Path("cau_hinh.json"))
+    t0 = time.perf_counter()
+
+    ket_qua = []
+    for p in tim_anh(goc):
+        try:
+            chi_so = phan_tich_anh(p)
+        except Exception:                       # lỗi lạ: ghi đầy đủ rồi đi tiếp
+            log.exception("Lỗi khi xử lý %s", p)
+            chi_so = None
+        if chi_so is None:
+            ket_qua.append({"duong_dan": str(p.relative_to(goc)), "loai": "hong"})
+            log.warning("Ảnh hỏng: %s", p)
+            continue
+        loai = phan_loai(chi_so, cau_hinh)
+        ket_qua.append({"duong_dan": str(p.relative_to(goc)), "loai": loai, **chi_so})
+        if loai != "tot":
+            log.info("%s: %s (sáng %.1f, nét %.1f)", p.name, loai, chi_so["do_sang"], chi_so["do_net"])
+
+    ghi_csv(ket_qua, Path("bao_cao.csv"))
+    dem = Counter(r["loai"] for r in ket_qua)
+    log.info("Tổng %d ảnh trong %.2f s: %s", len(ket_qua), time.perf_counter() - t0, dict(dem))
+    return dem
+
+
+if __name__ == "__main__":
+    main(sys.argv[1] if len(sys.argv) &gt; 1 else "du_lieu_thu")</code></pre>
+<pre><code class="language-text">2026-10-09 08:57:25,857 INFO Tạo file cấu hình mặc định cau_hinh.json
+2026-10-09 08:57:25,862 INFO toi.png: toi (sáng 2.9, nét 33.4)
+2026-10-09 08:57:25,880 WARNING Ảnh hỏng: du_lieu_thu/ca_2/hong.png
+2026-10-09 08:57:25,883 INFO mo.png: mo (sáng 127.9, nét 0.4)
+2026-10-09 08:57:25,886 INFO sang.JPG: sang (sáng 250.0, nét 0.0)
+2026-10-09 08:57:25,886 INFO Tổng 10 ảnh trong 0.03 s: {'toi': 1, 'tot': 6, 'hong': 1, 'mo': 1, 'sang': 1}</code></pre>
+<p>File <code>bao_cao.csv</code> (rút gọn):</p>
+<pre><code class="language-text">duong_dan,loai,rong,cao,do_sang,tuong_phan,do_net
+ca_1/toi.png,toi,320,240,2.9,8.5,33.4
+ca_1/tot_0.png,tot,320,240,127.1,27.0,357.3
+ca_2/hong.png,hong,,,,,
+ca_2/mo.png,mo,320,240,127.9,23.8,0.4
+ca_2/sang.JPG,sang,320,240,250.0,0.0,0.0</code></pre>
+<p>Để ý ảnh tối vẫn có độ nét 33,4, thấp hơn nhiều so với ảnh tốt (350–580) nhưng không bằng 0. Đó là lý do phải kiểm tra tối/sáng <strong>trước</strong> khi kết luận ảnh mờ. Ngưỡng <code>do_net_min</code> phụ thuộc nội dung ảnh, nên hãy chạy công cụ trên vài chục ảnh tốt của dây chuyền thật rồi đặt ngưỡng khoảng một nửa giá trị nhỏ nhất của ảnh tốt.</p>
+</details>
+
+<h3>Giải thích các điểm đáng học</h3>
+<ul>
+  <li><strong><code>np.fromfile</code> + <code>cv2.imdecode</code></strong> thay cho <code>cv2.imread</code>: đọc được đường dẫn có dấu tiếng Việt trên Windows, và trả <code>None</code> với file hỏng thay vì gây lỗi.</li>
+  <li><strong><code>logging</code></strong> ghi cùng lúc ra màn hình và file <code>bao_cao.log</code>, có thời gian và mức độ (INFO, WARNING). <code>log.exception</code> ghi cả traceback, rất quý khi tìm lỗi lạ sau một đêm chạy.</li>
+  <li><strong><code>utf-8-sig</code></strong> khi ghi CSV: Excel trên Windows cần ký tự BOM ở đầu file để hiển thị đúng tiếng Việt.</li>
+  <li><strong><code>**chi_so</code></strong> gộp dict chỉ số vào bản ghi kết quả; ảnh hỏng thiếu các cột này thì <code>DictWriter</code> để trống.</li>
+  <li><code>relative_to(goc)</code> ghi đường dẫn tương đối, báo cáo gọn và chuyển sang máy khác vẫn có nghĩa.</li>
+</ul>
+
+<h2>6. Tự đánh giá</h2>
+<table>
+  <tr><th>Tiêu chí</th><th>Đạt khi</th></tr>
+  <tr><td>Chạy đúng</td><td>Phân loại đúng cả 10 ảnh trong dữ liệu thử, kể cả file <code>.JPG</code> viết hoa</td></tr>
+  <tr><td>Bền vững</td><td>Thêm 3 file hỏng bất kỳ vào thư mục, chương trình vẫn chạy hết</td></tr>
+  <tr><td>Cấu hình</td><td>Đổi ngưỡng trong <code>cau_hinh.json</code> mà không sửa code, kết quả thay đổi tương ứng</td></tr>
+  <tr><td>Báo cáo</td><td>Mở <code>bao_cao.csv</code> bằng Excel thấy đúng tiếng Việt, đủ cột</td></tr>
+  <tr><td>Code sạch</td><td>Mỗi hàm một việc, có docstring hoặc tên tự giải thích, không có biến toàn cục bị sửa trong hàm</td></tr>
+</table>
+
+<h2>7. Mở rộng (nếu còn thời gian)</h2>
+<ol>
+  <li>Phát hiện <strong>ảnh trùng</strong>: tính <code>hashlib.md5(du_lieu).hexdigest()</code> cho từng file, báo các nhóm ảnh giống hệt nhau.</li>
+  <li>Thêm tham số dòng lệnh <code>--di-chuyen</code>: chuyển ảnh xấu sang thư mục <code>loai_bo/&lt;loai&gt;/</code> (dùng <code>argparse</code>).</li>
+  <li>Báo cáo thêm kích thước ảnh phổ biến nhất và cảnh báo ảnh có kích thước khác thường (thường là ảnh từ camera khác lẫn vào).</li>
+</ol>
+<p>Hoàn thành dự án này, bạn đã có đủ nền tảng Python để sang <strong>chặng 2: OpenCV</strong>. Hãy đánh dấu đã học xong và lưu dự án lên GitHub: đây là sản phẩm đầu tiên trong portfolio của bạn.</p>

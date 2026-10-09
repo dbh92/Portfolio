@@ -1,0 +1,198 @@
+<p>Một trạm kiểm tra làm hai việc lặp đi lặp lại: <strong>ra quyết định</strong> (sản phẩm này OK hay NG?) và <strong>lặp</strong> (làm thế với hàng nghìn sản phẩm). Bài này dạy hai công cụ tương ứng: câu lệnh <code>if</code> và vòng lặp <code>for</code>, <code>while</code>.</p>
+
+<h2>1. Thụt lề: cách Python nhóm lệnh</h2>
+<p>Python không dùng dấu ngoặc nhọn như C# hay C++. Các lệnh thuộc cùng một khối được <strong>thụt vào 4 dấu cách</strong> sau một dòng kết thúc bằng dấu hai chấm <code>:</code>. VS Code tự thụt lề khi bạn nhấn Enter sau dấu <code>:</code>.</p>
+
+<h2>2. if, elif, else</h2>
+<pre><code class="language-python">do_sang = 42   # độ sáng trung bình của ảnh, 0–255
+
+if do_sang &lt; 50:
+    print("Ảnh quá tối: kiểm tra đèn")
+elif do_sang &gt; 200:
+    print("Ảnh quá sáng: giảm thời gian phơi sáng")
+else:
+    print("Độ sáng bình thường")</code></pre>
+<pre><code class="language-text">Ảnh quá tối: kiểm tra đèn</code></pre>
+<p>Python kiểm tra lần lượt từ trên xuống, gặp điều kiện đúng đầu tiên thì chạy khối đó và <strong>bỏ qua phần còn lại</strong>. <code>elif</code> và <code>else</code> là tùy chọn.</p>
+
+<h3>Ví dụ thực tế: phân loại theo nhiều tiêu chí</h3>
+<pre><code class="language-python">duong_kinh = 12.53
+co_ba_via = False
+lech_tam = 0.08
+
+if co_ba_via:
+    ket_qua, ly_do = "NG", "có ba via"
+elif not (12.40 &lt;= duong_kinh &lt;= 12.60):
+    ket_qua, ly_do = "NG", f"đường kính {duong_kinh} ngoài dung sai"
+elif lech_tam &gt; 0.10:
+    ket_qua, ly_do = "NG", "lệch tâm quá 0.10 mm"
+else:
+    ket_qua, ly_do = "OK", ""
+
+print(ket_qua, ly_do)</code></pre>
+<pre><code class="language-text">OK</code></pre>
+<p>Kiểm tra lỗi nghiêm trọng nhất trước và ghi lại <strong>lý do NG</strong>. Khi trạm loại một sản phẩm, người vận hành luôn hỏi "vì sao", và bạn cần câu trả lời có sẵn trong log.</p>
+
+<h3>Biểu thức điều kiện một dòng</h3>
+<pre><code class="language-python">diem = 0.87
+nhan = "NG" if diem &gt;= 0.5 else "OK"
+print(nhan)   # NG</code></pre>
+
+<h2>3. Vòng lặp for</h2>
+<p><code>for</code> duyệt lần lượt qua từng phần tử của một dãy:</p>
+<pre><code class="language-python">ket_qua_ca = ["OK", "OK", "NG", "OK", "NG", "OK"]
+
+so_ng = 0
+for kq in ket_qua_ca:
+    if kq == "NG":
+        so_ng += 1          # viết gọn của so_ng = so_ng + 1
+
+print(f"{so_ng}/{len(ket_qua_ca)} sản phẩm NG")</code></pre>
+<pre><code class="language-text">2/6 sản phẩm NG</code></pre>
+
+<h3>range(): lặp theo số</h3>
+<pre><code class="language-python">for i in range(3):            # 0, 1, 2
+    print("Chụp ảnh lần", i)
+
+for x in range(0, 640, 160):  # bắt đầu 0, dừng trước 640, bước 160
+    print("Vạch chia tại cột", x)</code></pre>
+<pre><code class="language-text">Chụp ảnh lần 0
+Chụp ảnh lần 1
+Chụp ảnh lần 2
+Vạch chia tại cột 0
+Vạch chia tại cột 160
+Vạch chia tại cột 320
+Vạch chia tại cột 480</code></pre>
+<p><code>range(a, b)</code> <strong>không bao gồm b</strong>. Đây là quy ước chung của Python (và của cắt ảnh bằng NumPy ở các bài sau), nên hãy làm quen ngay từ đầu.</p>
+
+<h3>enumerate(): vừa lấy số thứ tự vừa lấy phần tử</h3>
+<pre><code class="language-python">for stt, kq in enumerate(ket_qua_ca, start=1):
+    if kq == "NG":
+        print(f"Sản phẩm thứ {stt} bị NG")</code></pre>
+<pre><code class="language-text">Sản phẩm thứ 3 bị NG
+Sản phẩm thứ 5 bị NG</code></pre>
+
+<h3>Vòng lặp lồng nhau: duyệt lưới ô</h3>
+<p>Ảnh thường được chia thành lưới ô để kiểm tra từng vùng. Hai vòng lặp lồng nhau duyệt qua mọi ô:</p>
+<pre><code class="language-python">rong, cao, o = 640, 480, 160
+for y in range(0, cao, o):
+    for x in range(0, rong, o):
+        print(f"({x},{y})", end=" ")
+    print()   # xuống dòng sau mỗi hàng</code></pre>
+<pre><code class="language-text">(0,0) (160,0) (320,0) (480,0)
+(0,160) (160,160) (320,160) (480,160)
+(0,320) (160,320) (320,320) (480,320)</code></pre>
+
+<h2>4. Vòng lặp while</h2>
+<p><code>while</code> lặp <strong>chừng nào điều kiện còn đúng</strong>. Dùng khi không biết trước số lần lặp, ví dụ thử lại kết nối camera:</p>
+<pre><code class="language-python">so_lan_thu = 0
+ket_noi_duoc = False
+
+while not ket_noi_duoc and so_lan_thu &lt; 5:
+    so_lan_thu += 1
+    print("Thử kết nối camera lần", so_lan_thu)
+    ket_noi_duoc = so_lan_thu == 3     # giả lập: lần 3 thì kết nối được
+
+print("Kết nối:", ket_noi_duoc)</code></pre>
+<pre><code class="language-text">Thử kết nối camera lần 1
+Thử kết nối camera lần 2
+Thử kết nối camera lần 3
+Kết nối: True</code></pre>
+<div class="warn"><strong>Vòng lặp vô hạn</strong>Nếu điều kiện không bao giờ sai, chương trình chạy mãi. Luôn có <strong>giới hạn số lần</strong> (như <code>so_lan_thu &lt; 5</code>) hoặc lệnh <code>break</code>. Nếu lỡ chạy vô hạn, nhấn <strong>Ctrl+C</strong> trong terminal để dừng.</div>
+
+<h2>5. break và continue</h2>
+<ul>
+  <li><code>break</code>: thoát hẳn khỏi vòng lặp.</li>
+  <li><code>continue</code>: bỏ qua phần còn lại của lượt hiện tại, sang lượt tiếp theo.</li>
+</ul>
+<pre><code class="language-python">ten_files = ["a.png", "ghi_chu.txt", "b.png", "LOI.png", "c.png"]
+
+for ten in ten_files:
+    if not ten.endswith(".png"):
+        continue                    # bỏ qua file không phải ảnh
+    if ten.startswith("LOI"):
+        print("Gặp ảnh lỗi, dừng xử lý:", ten)
+        break
+    print("Xử lý", ten)</code></pre>
+<pre><code class="language-text">Xử lý a.png
+Xử lý b.png
+Gặp ảnh lỗi, dừng xử lý: LOI.png</code></pre>
+<p>Vòng lặp chính của mọi chương trình camera bạn viết sau này có dạng <code>while True:</code> và thoát bằng <code>break</code> khi người dùng nhấn phím <code>q</code>. Bạn sẽ gặp lại ở chặng OpenCV.</p>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Khối lệnh = dòng kết thúc bằng <code>:</code> + thụt lề 4 dấu cách.</li>
+  <li><code>if/elif/else</code> kiểm tra từ trên xuống, dừng ở điều kiện đúng đầu tiên. Ghi lại lý do NG.</li>
+  <li><code>for</code> duyệt dãy; <code>range(a, b, buoc)</code> không gồm b; <code>enumerate</code> cho số thứ tự.</li>
+  <li><code>while</code> cần giới hạn để không chạy vô hạn; <code>break</code> thoát, <code>continue</code> bỏ qua.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Phân loại độ sáng</h3>
+<p>Cho danh sách độ sáng của 8 ảnh: <code>[12, 130, 245, 88, 47, 201, 150, 30]</code>. In mỗi ảnh là "tối" (&lt;50), "sáng" (&gt;200) hay "tốt", và đếm số ảnh tốt.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">do_sang_anh = [12, 130, 245, 88, 47, 201, 150, 30]
+so_tot = 0
+for i, v in enumerate(do_sang_anh, start=1):
+    if v &lt; 50:
+        loai = "tối"
+    elif v &gt; 200:
+        loai = "sáng"
+    else:
+        loai = "tốt"
+        so_tot += 1
+    print(f"Ảnh {i}: {v} → {loai}")
+print("Số ảnh tốt:", so_tot)</code></pre>
+<pre><code class="language-text">Ảnh 1: 12 → tối
+Ảnh 2: 130 → tốt
+Ảnh 3: 245 → sáng
+Ảnh 4: 88 → tốt
+Ảnh 5: 47 → tối
+Ảnh 6: 201 → sáng
+Ảnh 7: 150 → tốt
+Ảnh 8: 30 → tối
+Số ảnh tốt: 3</code></pre>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Ba NG liên tiếp</h3>
+<p>Dây chuyền phải dừng nếu có <strong>3 sản phẩm NG liên tiếp</strong> (dấu hiệu máy hỏng). Với <code>["OK","NG","NG","OK","NG","NG","NG","OK"]</code>, in vị trí (bắt đầu từ 1) của sản phẩm thứ ba trong chuỗi NG đó rồi dừng vòng lặp.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">ds = ["OK", "NG", "NG", "OK", "NG", "NG", "NG", "OK"]
+lien_tiep = 0
+for stt, kq in enumerate(ds, start=1):
+    if kq == "NG":
+        lien_tiep += 1
+    else:
+        lien_tiep = 0           # gặp OK thì đếm lại từ đầu
+    if lien_tiep == 3:
+        print("DỪNG DÂY CHUYỀN tại sản phẩm", stt)
+        break</code></pre>
+<pre><code class="language-text">DỪNG DÂY CHUYỀN tại sản phẩm 7</code></pre>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 3. Bảng thời gian phơi sáng</h3>
+<p>In bảng thời gian phơi sáng từ 100 µs đến 1000 µs, bước 100 µs, kèm độ nhòe (pixel) khi vật chạy 0,5 m/s và mỗi pixel là 0,05 mm. Gợi ý: quãng đường vật đi = vận tốc × thời gian; đổi đơn vị cẩn thận.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">van_toc_mm_s = 0.5 * 1000      # 0,5 m/s = 500 mm/s
+mm_moi_px = 0.05
+for t_us in range(100, 1001, 100):
+    quang_duong_mm = van_toc_mm_s * t_us / 1_000_000
+    nhoe_px = quang_duong_mm / mm_moi_px
+    canh_bao = "  ← nhòe quá 1 pixel" if nhoe_px &gt; 1 else ""
+    print(f"{t_us:5d} µs: nhòe {nhoe_px:.1f} px{canh_bao}")</code></pre>
+<pre><code class="language-text">  100 µs: nhòe 1.0 px
+  200 µs: nhòe 2.0 px  ← nhòe quá 1 pixel
+  300 µs: nhòe 3.0 px  ← nhòe quá 1 pixel
+  400 µs: nhòe 4.0 px  ← nhòe quá 1 pixel
+  500 µs: nhòe 5.0 px  ← nhòe quá 1 pixel
+  600 µs: nhòe 6.0 px  ← nhòe quá 1 pixel
+  700 µs: nhòe 7.0 px  ← nhòe quá 1 pixel
+  800 µs: nhòe 8.0 px  ← nhòe quá 1 pixel
+  900 µs: nhòe 9.0 px  ← nhòe quá 1 pixel
+ 1000 µs: nhòe 10.0 px  ← nhòe quá 1 pixel</code></pre>
+<p>Kết luận: muốn ảnh không nhòe quá 1 pixel ở tốc độ này, thời gian phơi sáng phải ≤ 100 µs. Đó là lý do phải dùng đèn strobe ở chặng 5.</p>
+</details>
+</div>
