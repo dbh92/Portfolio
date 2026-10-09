@@ -1,0 +1,587 @@
+<p>Đây là dự án tổng kết chặng PLC / Robot / MES: bạn ghép mọi thứ của chặng thành <strong>một chương trình trạm vision hoàn chỉnh</strong>, chạy được ngay trên máy tính với một PLC mô phỏng. Trạm nhận trigger qua Modbus TCP, "chụp" ảnh, kiểm tra bằng OpenCV, trả kết quả và số liệu cho PLC theo đúng trình tự bắt tay, lưu kết quả vào SQLite và ảnh NG vào thư mục theo ngày, ghi log đầy đủ ra file, và tự đứng dậy khi PLC khởi động lại giữa chừng. Khi xong, bạn có một khung chương trình dùng lại được cho trạm thật: chỉ cần thay camera giả bằng camera thật, thay PLC giả bằng IP của PLC thật.</p>
+
+<div class="tip"><strong>Mục tiêu dự án</strong>Nhận trigger qua Modbus TCP; xử lý ảnh, trả kết quả, lưu dữ liệu; chạy ổn định qua sự cố (mất kết nối, camera lỗi) và để lại log đủ để người khác chẩn đoán mà không cần hỏi bạn.</div>
+
+<h2>1. Đề bài</h2>
+<p>Một khay chứa <strong>4 chốt kim loại</strong> đi qua trạm kiểm tra. PLC dừng khay dưới camera và bật trigger. Trạm vision phải kiểm tra:</p>
+<ul>
+  <li>Đủ 4 chốt → OK.</li>
+  <li>Thiếu chốt, thừa chốt, hoặc có chốt sai kích thước (vỡ, cong) → NG kèm mã lỗi.</li>
+  <li>Không chụp được ảnh → LỖI (PLC xử lý như NG và báo động), trạm phải tự chạy tiếp ở sản phẩm sau.</li>
+</ul>
+<p>Trong mô phỏng, PLC đưa 12 khay qua trạm, trong đó có 1 khay thiếu chốt, 1 khay có chốt vỡ, 1 khay thừa chốt, 1 lần camera không trả ảnh, và PLC "mất điện" khoảng 1 giây sau khay thứ 6. Chương trình phải tự kết thúc sau 12 khay và in tổng kết.</p>
+<p>Bảng địa chỉ Modbus (địa chỉ giao thức, bắt đầu từ 0), cùng quy ước với bài "Modbus TCP bằng Python với pymodbus":</p>
+<table>
+  <tr><th>Địa chỉ</th><th>Bên ghi</th><th>Nội dung</th></tr>
+  <tr><td>coil 0</td><td>PLC</td><td>TRIGGER</td></tr>
+  <tr><td>coil 1, 2, 3, 4</td><td>Vision</td><td>READY, BUSY, DONE, ERROR</td></tr>
+  <tr><td>HR 0, 1</td><td>PLC</td><td>Mã sản phẩm, số chu kỳ</td></tr>
+  <tr><td>HR 10</td><td>Vision</td><td>Kết quả: 1 OK, 2 NG, 3 LỖI</td></tr>
+  <tr><td>HR 11</td><td>Vision</td><td>Số chu kỳ của kết quả (trả lại HR 1)</td></tr>
+  <tr><td>HR 12, 13</td><td>Vision</td><td>Số vật hợp lệ, mã lỗi (0 không lỗi, 1 thiếu, 2 thừa, 3 sai kích thước, 9 camera)</td></tr>
+  <tr><td>HR 14–15</td><td>Vision</td><td>Diện tích trung bình một chốt (mm², float32 ABCD)</td></tr>
+  <tr><td>HR 20</td><td>Vision</td><td>Heartbeat, tăng mỗi giây</td></tr>
+</table>
+
+<h2>2. Yêu cầu</h2>
+<table>
+  <tr><th>Mã</th><th>Yêu cầu</th><th>Tiêu chí đạt</th></tr>
+  <tr><td>R1</td><td>Nhận trigger qua Modbus TCP, bắt sườn lên, bắt tay 4 pha</td><td>12 trigger → đúng 12 chu kỳ, không chu kỳ nào bị bỏ hay chạy hai lần</td></tr>
+  <tr><td>R2</td><td>Kiểm tra ảnh bằng OpenCV, phân loại OK / NG (có mã lỗi) / LỖI</td><td>8 OK, 3 NG đúng mã lỗi, 1 LỖI</td></tr>
+  <tr><td>R3</td><td>Ghi kết quả + số liệu vào thanh ghi <em>trước</em> khi bật DONE; trả lại số chu kỳ</td><td>PLC nhận 12 kết quả, số chu kỳ khớp, thống kê PLC = thống kê trạm</td></tr>
+  <tr><td>R4</td><td>Lưu mọi kết quả vào SQLite; lưu ảnh NG (PNG) vào thư mục theo ngày; đường dẫn tương đối trong CSDL</td><td>12 bản ghi; 3 ảnh NG; không bản ghi nào trỏ tới file không tồn tại</td></tr>
+  <tr><td>R5</td><td>Ghi đĩa không chặn vòng lặp kiểm tra</td><td>Ảnh và CSDL ghi trong thread nền có hàng đợi giới hạn</td></tr>
+  <tr><td>R6</td><td>Tự kết nối lại khi mất kết nối PLC; khởi tạo lại tín hiệu sau khi kết nối</td><td>Sau khi PLC khởi động lại, các khay 7–12 vẫn được kiểm tra bình thường</td></tr>
+  <tr><td>R7</td><td>Timeout ở mọi chỗ chờ</td><td>Không có vòng <code>while</code> nào có thể chờ mãi; chương trình tự kết thúc</td></tr>
+  <tr><td>R8</td><td>Log ra file xoay vòng, có thời gian đến ms, mức độ, nguồn; gồm cả log của pymodbus</td><td>Đọc log biết được từng chu kỳ, lúc mất và có lại kết nối</td></tr>
+  <tr><td>R9</td><td>Dừng sạch</td><td>Tắt READY, ghi nốt hàng đợi, đóng CSDL, đóng kết nối</td></tr>
+</table>
+
+<h2>3. Kiến thức sử dụng</h2>
+<ul>
+  <li><strong>I/O số và handshake với PLC</strong>: trình tự TRIGGER → BUSY → kết quả → DONE → TRIGGER tắt → READY; bắt sườn; timeout hai phía.</li>
+  <li><strong>Modbus TCP bằng Python với pymodbus</strong>: PLC giả bằng <code>SimDevice</code>, <code>ModbusTcpClient</code>, <code>isError()</code>, float32 qua hai thanh ghi, vòng lặp kết nối lại.</li>
+  <li><strong>Lưu kết quả và ảnh NG: SQLite, thư mục, dọn ổ đĩa</strong>: WAL, tham số theo tên, thư mục theo ngày, thread ghi nền.</li>
+  <li>Chặng OpenCV và Image Processing: Otsu, <code>connectedComponentsWithStats</code>, lọc theo diện tích; tổ chức pipeline có cấu hình bằng <code>dataclass</code>.</li>
+  <li>Python: <code>logging</code> với <code>RotatingFileHandler</code>, <code>threading</code>, <code>queue</code>.</li>
+</ul>
+<pre><code class="language-bash">pip install pymodbus opencv-python numpy
+# Bài viết dùng pymodbus 3.15.0 (tham số device_id=, server khai báo bằng SimData/SimDevice)</code></pre>
+
+<h2>4. Gợi ý thiết kế</h2>
+<pre><code class="language-text">Một tiến trình Python, 4 thread:
+
+thread "plc"                 thread asyncio
+chuong_trinh_plc  ───────►   PlcGia: Modbus server 127.0.0.1:5022
+(bật TRIGGER, đọc KQ)               ▲
+                                    │ Modbus TCP, hỏi vòng 10 ms
+thread chính                        │
+TramVision ─────────────────────────┘
+  │ CameraGia.chup() → kiem_tra()
+  │
+  └─► queue ──► thread "ghi_nen": SQLite + ảnh NG
+
+Mọi thread ──► logging (root) ──► tram_data/tram.log (xoay vòng 1 MB × 5)</code></pre>
+<p>Gợi ý chia file khi làm trạm thật:</p>
+<pre><code class="language-text">tram_vision/
+├── cau_hinh.py     CauHinh (dataclass), bảng địa chỉ, cai_log()
+├── kiem_tra.py     kiem_tra(anh, cfg)  ← không biết gì về PLC hay ổ đĩa
+├── camera.py       CameraGia / CameraThat, cùng hàm chup()
+├── luu_tru.py      mo_csdl(), GhiNen, don_anh_cu()
+├── tram.py         TramVision: vòng lặp Modbus + bắt tay
+├── plc_gia.py      chỉ dùng khi thử nghiệm
+└── main.py         ghép tất cả, try/finally để dừng sạch</code></pre>
+<ol>
+  <li>Viết và thử <code>kiem_tra()</code> trên ảnh giả trước, chưa đụng tới Modbus.</li>
+  <li>Viết <code>TramVision</code> với một hàm kiểm tra giả luôn trả OK, chạy với PLC giả cho tới khi bắt tay đúng.</li>
+  <li>Ghép thuật toán thật, rồi thêm <code>GhiNen</code>, rồi log, rồi thử sự cố (tắt PLC giả giữa chừng, cho camera trả <code>None</code>).</li>
+  <li>Mỗi chỗ có <code>while</code> phải trả lời được câu hỏi: "nếu điều kiện không bao giờ xảy ra thì thoát ra sau bao lâu?".</li>
+  <li>Log ở mức <code>INFO</code> cho mỗi chu kỳ, <code>WARNING</code> cho NG/mất kết nối, <code>ERROR</code> cho timeout hay lỗi ghi. Log của pymodbus (logger <code>pymodbus.logging</code>) tự đổ vào cùng file nếu bạn gắn handler vào root logger.</li>
+</ol>
+<div class="warn"><strong>Ba cái bẫy trong dự án này</strong>(1) Cập nhật trạng thái sườn TRIGGER bằng giá trị đọc <em>trước</em> chu kỳ: trạm sẽ bỏ sót sản phẩm kế tiếp. (2) Không ghi lại READY sau khi kết nối lại: PLC khởi động lại với bộ nhớ trắng, chờ READY mãi. (3) Để thread ghi nền chết vì một exception: từ đó trở đi không còn gì được lưu mà không ai biết; bọc thân vòng lặp ghi bằng <code>try/except</code> và <code>log.exception</code>.</div>
+
+<h2>5. Lời giải</h2>
+<details><summary>Xem lời giải đầy đủ (7 phần, chép lần lượt vào một file <code>tram_vision.py</code>)</summary>
+<p><strong>Phần 1: cấu hình, bảng địa chỉ, log.</strong> Log gắn vào root logger để nhận cả thông báo của pymodbus; hàm gỡ handler cũ để chạy lại nhiều lần không bị nhân đôi dòng log.</p>
+<pre><code class="language-python"># ===== tram_vision.py — phần 1: cấu hình, bảng địa chỉ, log =====
+import asyncio
+import logging
+import queue
+import sqlite3
+import threading
+import time
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
+
+import cv2
+import numpy as np
+from pymodbus.client import ModbusTcpClient
+from pymodbus.exceptions import ModbusException
+from pymodbus.server import ModbusTcpServer
+from pymodbus.simulator import DataType, SimData, SimDevice
+
+
+@dataclass
+class CauHinh:
+    host: str = "127.0.0.1"
+    port: int = 5022
+    device_id: int = 1
+    thu_muc: str = "tram_data"
+    chu_ky_doc_s: float = 0.01          # hỏi vòng TRIGGER mỗi 10 ms
+    timeout_trigger_tat_s: float = 2.0
+    cho_ket_noi_lai_s: float = 0.3
+    so_vat_dung: int = 4
+    dien_tich_px: tuple = (2200, 3500)  # dung sai diện tích một vật (pixel)
+    mm_moi_px: float = 0.1
+    giu_anh_ngay: int = 30
+
+
+# Bảng địa chỉ (địa chỉ giao thức, bắt đầu từ 0) — "hợp đồng" với PLC
+TRIGGER, READY, BUSY, DONE, ERROR = 0, 1, 2, 3, 4           # coil
+HR_MA_SP, HR_CHU_KY = 0, 1                                  # PLC ghi
+HR_KQ, HR_CHU_KY_TRA, HR_SO_VAT, HR_MA_LOI, HR_DIEN_TICH = 10, 11, 12, 13, 14   # vision ghi; 14-15 float32
+HR_HEARTBEAT = 20
+KQ_OK, KQ_NG, KQ_LOI = 1, 2, 3
+MA_LOI = {"": 0, "thieu_vat": 1, "thua_vat": 2, "sai_kich_thuoc": 3, "loi_camera": 9}
+
+
+def cai_log(thu_muc):
+    """Log ra file xoay vòng 1 MB x 5 file. Gắn vào root để nhận cả log của pymodbus."""
+    goc = logging.getLogger()
+    for h in list(goc.handlers):                            # chạy lại nhiều lần không bị nhân đôi log
+        if isinstance(h, RotatingFileHandler):
+            goc.removeHandler(h)
+            h.close()
+    fh = RotatingFileHandler(Path(thu_muc) / "tram.log", maxBytes=1_000_000, backupCount=5, encoding="utf-8")
+    fh.setFormatter(logging.Formatter("%(asctime)s.%(msecs)03d %(levelname)-7s %(name)-8s %(message)s",
+                                      "%Y-%m-%d %H:%M:%S"))
+    goc.addHandler(fh)
+    goc.setLevel(logging.INFO)
+    return logging.getLogger("tram")</code></pre>
+<p><strong>Phần 2: PLC giả.</strong> Server giống bài Modbus; "chương trình PLC" chạy trong thread riêng, sau khay thứ 6 thì tắt server 1 giây rồi bật lại với bộ nhớ trắng.</p>
+<pre><code class="language-python"># ===== plc_gia.py — PLC mô phỏng: Modbus server + "chương trình PLC" =====
+class PlcGia:
+    def __init__(self, port):
+        self.port = port
+
+    def bat(self):
+        self._da_nghe = threading.Event()
+        self._thread = threading.Thread(target=lambda: asyncio.run(self._main()), daemon=True)
+        self._thread.start()
+        if not self._da_nghe.wait(timeout=3):
+            raise RuntimeError("PLC giả không khởi động được")
+
+    async def _main(self):
+        self.loop = asyncio.get_running_loop()
+        bo_nho = SimDevice(id=1, simdata=(
+            [SimData(0, count=16, values=False, datatype=DataType.BITS)],
+            [SimData(0, count=16, values=False, datatype=DataType.BITS)],
+            [SimData(0, count=32, values=0, datatype=DataType.REGISTERS)],
+            [SimData(0, count=16, values=0, datatype=DataType.REGISTERS)],
+        ))
+        self.server = ModbusTcpServer(bo_nho, address=("127.0.0.1", self.port))
+        await self.server.serve_forever(background=True)
+        self._da_nghe.set()
+        await self.server.serving
+
+    def tat(self):
+        asyncio.run_coroutine_threadsafe(self.server.shutdown(), self.loop).result(timeout=3)
+        self._thread.join(timeout=3)
+
+    def _goi(self, coro):
+        return asyncio.run_coroutine_threadsafe(coro, self.loop).result(timeout=2)
+
+    def doc_coil(self, dc):
+        return self._goi(self.server.async_getValues(1, 1, dc, 1))[0]
+
+    def ghi_coil(self, dc, v):
+        self._goi(self.server.async_setValues(1, 5, dc, [bool(v)]))
+
+    def doc_hr(self, dc, n=1):
+        return self._goi(self.server.async_getValues(1, 3, dc, n))
+
+    def ghi_hr(self, dc, gia_tri):
+        self._goi(self.server.async_setValues(1, 16, dc, list(gia_tri)))
+
+
+def chuong_trinh_plc(plc, so_sp, ket_qua_plc, khoi_dong_lai_sau=6, timeout_done=3.0):
+    """Mỗi sản phẩm: chờ READY → ghi mã SP + số chu kỳ → TRIGGER → chờ DONE → đọc kết quả → tắt TRIGGER."""
+    log = logging.getLogger("plc_gia")
+
+    def cho(dieu_kien, timeout):
+        han = time.monotonic() + timeout
+        while time.monotonic() &lt; han:
+            if dieu_kien():
+                return True
+            time.sleep(0.005)
+        return False
+
+    for k in range(1, so_sp + 1):
+        if not cho(lambda: plc.doc_coil(READY), 5.0):
+            log.error("SP%d: vision không READY", k)
+            ket_qua_plc.append((k, "KHONG_READY"))
+            continue
+        plc.ghi_hr(HR_MA_SP, [101, k])                 # mã sản phẩm 101, số chu kỳ k
+        plc.ghi_coil(TRIGGER, 1)
+        if cho(lambda: plc.doc_coil(DONE), timeout_done):
+            kq, k_tra, so_vat, ma_loi = plc.doc_hr(HR_KQ, 4)
+            if k_tra != k:
+                ket_qua_plc.append((k, "LECH_CHU_KY"))
+            else:
+                ket_qua_plc.append((k, {KQ_OK: "OK", KQ_NG: "NG", KQ_LOI: "LOI"}.get(kq, "KQ_SAI")))
+        else:
+            log.error("SP%d: TIMEOUT chờ DONE → đẩy ra như NG", k)
+            ket_qua_plc.append((k, "TIMEOUT"))
+        plc.ghi_coil(TRIGGER, 0)
+        cho(lambda: not plc.doc_coil(DONE), 2.0)
+        time.sleep(0.03)                               # băng tải đưa sản phẩm kế tiếp vào
+        if k == khoi_dong_lai_sau:
+            log.warning("Mô phỏng PLC khởi động lại (mất 1 s)")
+            plc.tat()
+            time.sleep(1.0)
+            plc.bat()</code></pre>
+<p><strong>Phần 3: camera giả và thuật toán kiểm tra.</strong> Camera sinh ảnh khay với nhiễu, kịch bản lỗi theo số chu kỳ; thuật toán không biết kịch bản, chỉ nhìn ảnh. Thử riêng thuật toán trước khi nối với PLC:</p>
+<pre><code class="language-python"># ===== camera_gia.py + kiem_tra.py =====
+# Kịch bản (vision KHÔNG biết trước): số chu kỳ → kiểu sản phẩm
+KICH_BAN = {3: "thieu", 5: "vo", 8: "camera_loi", 10: "thua"}
+VI_TRI = [(160, 160), (480, 160), (160, 330), (480, 330), (320, 245)]
+
+
+class CameraGia:
+    def chup(self, chu_ky):
+        kieu = KICH_BAN.get(chu_ky, "ok")
+        if kieu == "camera_loi":
+            return None                                    # giống cap.read() trả về False
+        rng = np.random.default_rng(chu_ky)
+        anh = rng.normal(45, 6, (480, 640)).clip(0, 255).astype(np.uint8)
+        so = {"thieu": 3, "thua": 5}.get(kieu, 4)
+        for i, (x, y) in enumerate(VI_TRI[:so]):
+            r = 15 if (kieu == "vo" and i == 1) else 30    # "vỡ": một vật chỉ còn mảnh nhỏ
+            cv2.circle(anh, (x, y), r, int(rng.integers(190, 220)), -1)
+        return anh
+
+
+def kiem_tra(anh, cfg):
+    """Trả về (ket_qua, ma_loi, so_vat_hop_le, dien_tich_tb_mm2)."""
+    if anh is None:
+        return KQ_LOI, "loi_camera", 0, 0.0
+    mo = cv2.GaussianBlur(anh, (5, 5), 0)
+    _, nhi_phan = cv2.threshold(mo, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    n, _, stats, _ = cv2.connectedComponentsWithStats(nhi_phan)
+    dien_tich = stats[1:, cv2.CC_STAT_AREA]
+    dien_tich = dien_tich[dien_tich &gt; 100]                 # bỏ đốm nhiễu
+    lo, hi = cfg.dien_tich_px
+    hop_le = dien_tich[(dien_tich &gt;= lo) &amp; (dien_tich &lt;= hi)]
+    tb_mm2 = round(float(hop_le.mean()) * cfg.mm_moi_px ** 2, 3) if len(hop_le) else 0.0
+    if len(hop_le) != len(dien_tich):
+        return KQ_NG, "sai_kich_thuoc", len(hop_le), tb_mm2
+    if len(hop_le) &lt; cfg.so_vat_dung:
+        return KQ_NG, "thieu_vat", len(hop_le), tb_mm2
+    if len(hop_le) &gt; cfg.so_vat_dung:
+        return KQ_NG, "thua_vat", len(hop_le), tb_mm2
+    return KQ_OK, "", len(hop_le), tb_mm2
+
+
+# Thử nhanh thuật toán trên vài ảnh, chưa cần PLC
+cfg_thu = CauHinh()
+for k in (1, 3, 5, 8, 10):
+    print(f"chu kỳ {k:2d}:", kiem_tra(CameraGia().chup(k), cfg_thu))</code></pre>
+<pre><code class="language-text">chu kỳ  1: (1, '', 4, 28.17)
+chu kỳ  3: (2, 'thieu_vat', 3, 28.173)
+chu kỳ  5: (2, 'sai_kich_thuoc', 3, 28.177)
+chu kỳ  8: (3, 'loi_camera', 0, 0.0)
+chu kỳ 10: (2, 'thua_vat', 5, 28.174)</code></pre>
+<p>Diện tích trung bình khoảng 28,2 mm² (khoảng 2817 pixel, sát π × 30² ≈ 2827). Khay chu kỳ 5 có một chốt chỉ còn mảnh nhỏ: nó vẫn là một vật (diện tích trên ngưỡng nhiễu) nhưng nằm ngoài dung sai, nên NG "sai_kich_thuoc".</p>
+<p><strong>Phần 4: lưu trữ.</strong> Thu gọn từ bài SQLite: một bảng, chỉ mục thời gian, thread ghi nền, dọn ảnh cũ lúc khởi động.</p>
+<pre><code class="language-python"># ===== luu_tru.py — SQLite + ảnh NG, ghi trong thread nền =====
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS kiem_tra (
+    id INTEGER PRIMARY KEY, thoi_gian TEXT NOT NULL, chu_ky INTEGER, ma_sp INTEGER,
+    ket_qua TEXT NOT NULL CHECK (ket_qua IN ('OK', 'NG', 'LOI')), ma_loi TEXT,
+    so_vat INTEGER, dien_tich_tb REAL, tg_xu_ly_ms REAL, duong_dan_anh TEXT);
+CREATE INDEX IF NOT EXISTS ix_thoi_gian ON kiem_tra(thoi_gian);
+"""
+SQL_THEM = """INSERT INTO kiem_tra (thoi_gian, chu_ky, ma_sp, ket_qua, ma_loi, so_vat, dien_tich_tb, tg_xu_ly_ms,
+              duong_dan_anh) VALUES (:thoi_gian, :chu_ky, :ma_sp, :ket_qua, :ma_loi, :so_vat, :dien_tich_tb,
+              :tg_xu_ly_ms, :duong_dan_anh)"""
+
+
+def mo_csdl(duong_dan):
+    con = sqlite3.connect(duong_dan, timeout=5.0)
+    con.execute("PRAGMA journal_mode=WAL")
+    con.execute("PRAGMA synchronous=NORMAL")
+    con.executescript(SCHEMA)
+    return con
+
+
+def don_anh_cu(thu_muc_anh, giu_ngay, hom_nay=None):
+    """Xóa thư mục ảnh YYYY-MM-DD cũ hơn giu_ngay (chạy lúc khởi động)."""
+    han = (hom_nay or date.today()) - timedelta(days=giu_ngay)
+    da_xoa = 0
+    for p in Path(thu_muc_anh).glob("????-??-??"):
+        try:
+            if p.is_dir() and date.fromisoformat(p.name) &lt; han:
+                for f in p.iterdir():
+                    f.unlink()
+                p.rmdir()
+                da_xoa += 1
+        except ValueError:
+            continue                                   # tên giống mẫu nhưng không phải ngày hợp lệ
+    return da_xoa
+
+
+class GhiNen(threading.Thread):
+    def __init__(self, thu_muc, kich_thuoc=200):
+        super().__init__(daemon=True, name="ghi_nen")
+        self.thu_muc = Path(thu_muc)
+        self.hang_doi = queue.Queue(maxsize=kich_thuoc)
+        self.so_ghi = self.so_anh = self.so_bo = 0
+        self.log = logging.getLogger("luu_tru")
+
+    def gui(self, ban_ghi, anh=None):
+        try:
+            self.hang_doi.put_nowait((ban_ghi, anh))
+        except queue.Full:
+            self.so_bo += 1
+            self.log.error("Hàng đợi ghi đầy, bỏ bản ghi chu kỳ %s", ban_ghi["chu_ky"])
+
+    def dung(self):
+        self.hang_doi.put((None, None))
+        self.join(timeout=10)
+
+    def run(self):
+        con = mo_csdl(self.thu_muc / "ket_qua.db")
+        cho, t_commit = 0, time.monotonic()
+        while True:
+            try:
+                ban_ghi, anh = self.hang_doi.get(timeout=0.5)
+                if ban_ghi is None:
+                    break
+                if anh is not None:
+                    dich = self.thu_muc / "anh" / ban_ghi["duong_dan_anh"]
+                    dich.parent.mkdir(parents=True, exist_ok=True)
+                    if cv2.imwrite(str(dich), anh):
+                        self.so_anh += 1
+                    else:
+                        self.log.error("Không ghi được ảnh %s", dich)
+                        ban_ghi["duong_dan_anh"] = None
+                con.execute(SQL_THEM, ban_ghi)
+                self.so_ghi += 1
+                cho += 1
+            except queue.Empty:
+                pass
+            except Exception:                          # thread ghi không bao giờ được chết âm thầm
+                self.log.exception("Lỗi khi ghi dữ liệu")
+            if cho and (cho &gt;= 50 or time.monotonic() - t_commit &gt;= 0.5):
+                con.commit()
+                cho, t_commit = 0, time.monotonic()
+        con.commit()
+        con.close()</code></pre>
+<p><strong>Phần 5: trạm vision.</strong> Vòng lặp chính: kết nối (lại) → hỏi vòng TRIGGER → bắt sườn → một chu kỳ → heartbeat. Một chu kỳ: BUSY → đọc mã SP và số chu kỳ → chụp → kiểm tra → ghi kết quả (một lệnh) → DONE → gửi bản ghi cho thread nền → chờ TRIGGER tắt (có timeout) → READY.</p>
+<pre><code class="language-python"># ===== tram.py — vòng lặp chính của trạm vision =====
+class TramVision:
+    def __init__(self, cfg, camera, ghi):
+        self.cfg, self.camera, self.ghi = cfg, camera, ghi
+        self.client = ModbusTcpClient(cfg.host, port=cfg.port, timeout=0.5, retries=1)
+        self.log = logging.getLogger("tram")
+        self.thong_ke = {"OK": 0, "NG": 0, "LOI": 0}
+        self.cycle_ms = []
+        self.so_lan_ket_noi = 0
+        self.heartbeat, self.t_heartbeat = 0, 0.0
+
+    # --- tiện ích Modbus: mọi phản hồi lỗi đều thành exception
+    def _kiem(self, rr):
+        if rr.isError():
+            raise ModbusException(f"PLC trả lỗi: {rr}")
+        return rr
+
+    def _doc_trigger(self):
+        return self._kiem(self.client.read_coils(TRIGGER, count=1, device_id=self.cfg.device_id)).bits[0]
+
+    def _tin_hieu(self, ready, busy, done, error=False):
+        self._kiem(self.client.write_coils(READY, [ready, busy, done, error], device_id=self.cfg.device_id))
+
+    def _nhip_tim(self):
+        if time.monotonic() - self.t_heartbeat &gt;= 1.0:
+            self.heartbeat = (self.heartbeat + 1) % 65536
+            self._kiem(self.client.write_register(HR_HEARTBEAT, self.heartbeat, device_id=self.cfg.device_id))
+            self.t_heartbeat = time.monotonic()
+
+    # --- một chu kỳ kiểm tra
+    def _mot_chu_ky(self):
+        t0 = time.perf_counter()
+        thoi_diem = datetime.now()
+        self._tin_hieu(ready=False, busy=True, done=False)
+        ma_sp, chu_ky = self._kiem(self.client.read_holding_registers(
+            HR_MA_SP, count=2, device_id=self.cfg.device_id)).registers
+        anh = self.camera.chup(chu_ky)
+        kq, ma_loi, so_vat, dien_tich = kiem_tra(anh, self.cfg)
+        regs = [kq, chu_ky, so_vat, MA_LOI[ma_loi]] + self.client.convert_to_registers(
+            dien_tich, self.client.DATATYPE.FLOAT32)
+        self._kiem(self.client.write_registers(HR_KQ, regs, device_id=self.cfg.device_id))   # kết quả trước
+        self._tin_hieu(ready=False, busy=False, done=True, error=(kq == KQ_LOI))             # rồi mới DONE
+        tg_ms = (time.perf_counter() - t0) * 1000
+
+        ten_kq = {KQ_OK: "OK", KQ_NG: "NG", KQ_LOI: "LOI"}[kq]
+        duong_dan = None
+        if kq == KQ_NG:
+            gio = thoi_diem.strftime("%H%M%S_%f")[:-3]                 # 094001_123 (đến ms)
+            duong_dan = f"{thoi_diem:%Y-%m-%d}/{gio}_C{chu_ky:05d}_{ma_loi}.png"
+        self.ghi.gui({"thoi_gian": thoi_diem.isoformat(timespec="milliseconds"), "chu_ky": chu_ky,
+                      "ma_sp": ma_sp, "ket_qua": ten_kq, "ma_loi": ma_loi or None, "so_vat": so_vat,
+                      "dien_tich_tb": dien_tich, "tg_xu_ly_ms": round(tg_ms, 2), "duong_dan_anh": duong_dan},
+                     anh if kq == KQ_NG else None)
+        self.thong_ke[ten_kq] += 1
+        self.cycle_ms.append(tg_ms)
+        muc = logging.WARNING if kq != KQ_OK else logging.INFO
+        mo_ta = ten_kq + (f" ({ma_loi})" if ma_loi else "")
+        self.log.log(muc, "Chu kỳ %d: %s, %d vật, %.1f ms", chu_ky, mo_ta, so_vat, tg_ms)
+        print(f"Chu kỳ {chu_ky:2d}: {ten_kq:&lt;3} {ma_loi:&lt;15} {so_vat} vật")
+
+        han = time.monotonic() + self.cfg.timeout_trigger_tat_s       # chờ PLC tắt TRIGGER
+        trigger = True
+        while trigger:
+            if time.monotonic() &gt; han:
+                self.log.error("Chu kỳ %d: PLC không tắt TRIGGER sau %.1f s", chu_ky, self.cfg.timeout_trigger_tat_s)
+                break
+            time.sleep(self.cfg.chu_ky_doc_s)
+            trigger = self._doc_trigger()
+        self._tin_hieu(ready=True, busy=False, done=False)
+        return trigger
+
+    # --- vòng lặp chính
+    def chay(self, so_chu_ky, thoi_han_s=30):
+        trigger_truoc = False
+        het_han = time.monotonic() + thoi_han_s
+        tong = 0
+        try:
+            while tong &lt; so_chu_ky and time.monotonic() &lt; het_han:
+                try:
+                    if not self.client.connected:
+                        if not self.client.connect():
+                            time.sleep(self.cfg.cho_ket_noi_lai_s)
+                            continue
+                        self.so_lan_ket_noi += 1
+                        self.log.info("Kết nối PLC %s:%d (lần %d)", self.cfg.host, self.cfg.port, self.so_lan_ket_noi)
+                        if self.so_lan_ket_noi &gt; 1:
+                            print("  ... đã kết nối lại PLC")
+                        self._tin_hieu(ready=True, busy=False, done=False)  # PLC có thể vừa khởi động lại
+                        trigger_truoc = False
+                    trigger = self._doc_trigger()
+                    if trigger and not trigger_truoc:
+                        trigger = self._mot_chu_ky()
+                        tong += 1
+                    trigger_truoc = trigger
+                    self._nhip_tim()
+                    time.sleep(self.cfg.chu_ky_doc_s)
+                except (ModbusException, OSError) as e:      # OSError: socket bị reset, ống dẫn gãy...
+                    self.log.warning("Mất kết nối PLC (%s)", type(e).__name__)
+                    print("  ... mất kết nối PLC, đang thử lại")
+                    self.client.close()
+                    time.sleep(self.cfg.cho_ket_noi_lai_s)
+        finally:
+            if self.client.connected:
+                try:
+                    self._tin_hieu(ready=False, busy=False, done=False)   # tắt READY khi dừng
+                except (ModbusException, OSError):
+                    pass
+            self.client.close()
+            self.log.info("Dừng trạm sau %d chu kỳ", tong)</code></pre>
+<p><strong>Phần 6: chạy toàn bộ và tổng kết.</strong></p>
+<pre><code class="language-python"># ===== main.py — chạy toàn bộ: PLC giả + trạm vision, tự kết thúc sau N sản phẩm =====
+def main(so_sp=12):
+    cfg = CauHinh()
+    thu_muc = Path(cfg.thu_muc)
+    (thu_muc / "anh").mkdir(parents=True, exist_ok=True)
+    log = cai_log(thu_muc)
+    log.info("=== Khởi động trạm, cấu hình: %s", cfg)
+    log.info("Dọn ảnh cũ: xóa %d thư mục", don_anh_cu(thu_muc / "anh", cfg.giu_anh_ngay))
+
+    plc = PlcGia(cfg.port)
+    plc.bat()
+    ket_qua_plc = []
+    t_plc = threading.Thread(target=chuong_trinh_plc, args=(plc, so_sp, ket_qua_plc), daemon=True, name="plc")
+    t_plc.start()
+
+    ghi = GhiNen(thu_muc)
+    ghi.start()
+    tram = TramVision(cfg, CameraGia(), ghi)
+    try:
+        tram.chay(so_chu_ky=so_sp)
+    finally:
+        t_plc.join(timeout=5)
+        ghi.dung()                         # ghi nốt hàng đợi, commit, đóng CSDL
+        plc.tat()
+    return cfg, tram, ghi, ket_qua_plc
+
+
+cfg, tram, ghi, ket_qua_plc = main(so_sp=12)
+
+# ---- Tổng kết
+thu_muc = Path(cfg.thu_muc)
+print("\nThống kê trạm :", tram.thong_ke, "| số lần kết nối:", tram.so_lan_ket_noi)
+print("PLC ghi nhận  :", dict(ket_qua_plc))
+dem_plc = {k: sum(1 for _, kq in ket_qua_plc if kq == k) for k in ("OK", "NG", "LOI")}
+print("PLC và trạm khớp nhau:", dem_plc == tram.thong_ke and len(ket_qua_plc) == 12)
+con = sqlite3.connect(thu_muc / "ket_qua.db")
+print("CSDL          :", con.execute("SELECT ket_qua, COUNT(*) FROM kiem_tra GROUP BY ket_qua ORDER BY ket_qua").fetchall())
+anh_ng = sorted(p.name for p in (thu_muc / "anh").rglob("*.png"))
+print("Ảnh NG đã lưu :", len(anh_ng), "→", [n.split("_", 2)[2] for n in anh_ng])
+thieu = [p for (p,) in con.execute("SELECT duong_dan_anh FROM kiem_tra WHERE duong_dan_anh IS NOT NULL")
+         if not (thu_muc / "anh" / p).exists()]
+print("Bản ghi trỏ tới ảnh không tồn tại:", len(thieu), "| bỏ do hàng đợi đầy:", ghi.so_bo)
+con.close()
+ms = sorted(tram.cycle_ms)
+print(f"Thời gian xử lý (tùy máy): trung vị {ms[len(ms) // 2]:.1f} ms, lớn nhất {ms[-1]:.1f} ms")</code></pre>
+<p>Kết quả (dòng thời gian xử lý tùy máy):</p>
+<pre><code class="language-text">Chu kỳ  1: OK                  4 vật
+Chu kỳ  2: OK                  4 vật
+Chu kỳ  3: NG  thieu_vat       3 vật
+Chu kỳ  4: OK                  4 vật
+Chu kỳ  5: NG  sai_kich_thuoc  3 vật
+Chu kỳ  6: OK                  4 vật
+  ... mất kết nối PLC, đang thử lại
+  ... đã kết nối lại PLC
+Chu kỳ  7: OK                  4 vật
+Chu kỳ  8: LOI loi_camera      0 vật
+Chu kỳ  9: OK                  4 vật
+Chu kỳ 10: NG  thua_vat        5 vật
+Chu kỳ 11: OK                  4 vật
+Chu kỳ 12: OK                  4 vật
+
+Thống kê trạm : {'OK': 8, 'NG': 3, 'LOI': 1} | số lần kết nối: 2
+PLC ghi nhận  : {1: 'OK', 2: 'OK', 3: 'NG', 4: 'OK', 5: 'NG', 6: 'OK', 7: 'OK', 8: 'LOI', 9: 'OK', 10: 'NG', 11: 'OK', 12: 'OK'}
+PLC và trạm khớp nhau: True
+CSDL          : [('LOI', 1), ('NG', 3), ('OK', 8)]
+Ảnh NG đã lưu : 3 → ['C00003_thieu_vat.png', 'C00005_sai_kich_thuoc.png', 'C00010_thua_vat.png']
+Bản ghi trỏ tới ảnh không tồn tại: 0 | bỏ do hàng đợi đầy: 0
+Thời gian xử lý (tùy máy): trung vị 12.6 ms, lớn nhất 18.2 ms</code></pre>
+<p>Mọi tiêu chí đều kiểm tra được ngay trên kết quả: 12 chu kỳ không thiếu không thừa; khi PLC mất điện sau chu kỳ 6, trạm báo mất kết nối, thử lại, ghi lại READY và chạy tiếp từ chu kỳ 7; PLC và trạm cùng đếm 8 OK, 3 NG, 1 LỖI; CSDL có đủ 12 bản ghi; 3 ảnh NG nằm đúng chỗ CSDL trỏ tới. Lần camera lỗi (chu kỳ 8) không làm trạm dừng: PLC nhận mã LỖI ngay, bật cờ ERROR trong chu kỳ đó, rồi trạm tiếp tục ở chu kỳ 9.</p>
+<p><strong>Phần 7: đọc log.</strong> Log là thứ bạn (hoặc kỹ sư bảo trì) mở ra đầu tiên khi có sự cố:</p>
+<pre><code class="language-python">dong_log = (Path(cfg.thu_muc) / "tram.log").read_text(encoding="utf-8").splitlines()
+print("Trích log của trạm quanh lần PLC khởi động lại (thời gian tùy lần chạy):")
+dong_tram = [d for d in dong_log if " tram " in d]
+bat_dau = next(i for i, d in enumerate(dong_tram) if "Chu kỳ 6:" in d)
+for d in dong_tram[bat_dau:bat_dau + 6]:
+    print(d)</code></pre>
+<pre><code class="language-text">Trích log của trạm quanh lần PLC khởi động lại (thời gian tùy lần chạy):
+2026-10-09 09:41:56.160 INFO    tram     Chu kỳ 6: OK, 4 vật, 9.0 ms
+2026-10-09 09:41:56.206 WARNING tram     Mất kết nối PLC (ConnectionException)
+2026-10-09 09:41:57.409 INFO    tram     Kết nối PLC 127.0.0.1:5022 (lần 2)
+2026-10-09 09:41:57.441 INFO    tram     Chu kỳ 7: OK, 4 vật, 18.2 ms
+2026-10-09 09:41:57.503 WARNING tram     Chu kỳ 8: LOI (loi_camera), 0 vật, 2.5 ms
+2026-10-09 09:41:57.559 INFO    tram     Chu kỳ 9: OK, 4 vật, 11.6 ms</code></pre>
+<p>Thời gian trong log khác nhau mỗi lần chạy. Từ đoạn log này đọc được ngay: PLC mất kết nối khoảng 45 ms sau chu kỳ 6, trạm kết nối lại sau khoảng 1,2 s, chu kỳ 8 lỗi camera ở mức WARNING. File log đầy đủ còn có dòng khởi động (kèm toàn bộ cấu hình), các dòng "Connection refused" của pymodbus trong lúc PLC tắt, và dòng dừng trạm.</p>
+</details>
+
+<h2>6. Tự đánh giá</h2>
+<table>
+  <tr><th>Tiêu chí</th><th>Chưa đạt</th><th>Đạt</th><th>Tốt</th></tr>
+  <tr><td>Bắt tay với PLC</td><td>Có chu kỳ bị bỏ hoặc chạy hai lần</td><td>12/12 chu kỳ đúng, kết quả trước DONE</td><td>Thêm trả lại số chu kỳ, heartbeat, ERROR</td></tr>
+  <tr><td>Thuật toán</td><td>Sai phân loại</td><td>8 OK / 3 NG / 1 LỖI đúng mã lỗi</td><td>Tham số trong <code>CauHinh</code>, thử riêng được trên ảnh</td></tr>
+  <tr><td>Lưu dữ liệu</td><td>Mất bản ghi hoặc ảnh</td><td>Đủ 12 bản ghi, 3 ảnh, đường dẫn đúng</td><td>Ghi nền, gom commit, dọn ảnh, kiểm tra toàn vẹn</td></tr>
+  <tr><td>Chịu sự cố</td><td>Treo hoặc thoát khi PLC khởi động lại</td><td>Tự kết nối lại, chạy tiếp</td><td>Khởi tạo lại tín hiệu, mọi vòng chờ có timeout, camera lỗi không làm dừng trạm</td></tr>
+  <tr><td>Log</td><td>Chỉ <code>print</code></td><td>File log có thời gian, mức độ</td><td>Xoay vòng, gồm log thư viện, đủ để chẩn đoán mà không cần hỏi tác giả</td></tr>
+  <tr><td>Dừng sạch</td><td>Mất bản ghi cuối, cổng bị giữ</td><td>Dừng không lỗi</td><td>Tắt READY, ghi nốt hàng đợi trong <code>finally</code></td></tr>
+</table>
+
+<h2>7. Mở rộng</h2>
+<ul>
+  <li><strong>Chạy dài (soak test)</strong>: đặt <code>so_sp=2000</code>, khoảng cách giữa các khay 10 ms; theo dõi RAM, số dòng log, thời gian xử lý lớn nhất. Trạm thật phải chạy hàng tuần không khởi động lại.</li>
+  <li><strong>Camera thật</strong>: thay <code>CameraGia</code> bằng lớp đọc từ <code>cv2.VideoCapture</code> hoặc SDK của hãng, giữ nguyên hàm <code>chup()</code>; trả <code>None</code> khi lỗi để phần còn lại không đổi.</li>
+  <li><strong>Đổi công thức (recipe)</strong>: đọc HR 0 (mã sản phẩm) để chọn bộ tham số từ file JSON; mã lạ → LỖI, không đoán.</li>
+  <li><strong>Gửi tọa độ cho robot</strong>: thêm kênh TCP socket như bài "TCP socket: gửi kết quả và tọa độ cho robot", gửi tâm từng chốt kèm số thứ tự và chờ ACK.</li>
+  <li><strong>Báo cáo ca</strong>: script đọc SQLite in yield theo giờ, top lỗi, đường dẫn ảnh NG gần nhất; xuất CSV cho MES.</li>
+  <li><strong>Dọn theo dung lượng</strong>: thêm lớp dọn theo <code>shutil.disk_usage</code> chạy mỗi giờ trong thread nền, báo động khi phải xóa sớm.</li>
+  <li><strong>Watchdog</strong>: một thread kiểm tra vòng lặp chính có còn "nhịp" không (ví dụ thời điểm đọc TRIGGER gần nhất); quá 5 s thì ghi log CRITICAL và tự khởi động lại chương trình.</li>
+</ul>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Một trạm vision hoàn chỉnh = thuật toán + bắt tay PLC + lưu dữ liệu + log + xử lý sự cố; phần "không phải thuật toán" chiếm phần lớn code và quyết định trạm có chạy được ở nhà máy hay không.</li>
+  <li>Tách thuật toán khỏi giao tiếp và lưu trữ để thử riêng từng phần; PLC giả và camera giả cho phép thử mọi sự cố ngay trên bàn làm việc.</li>
+  <li>Mọi chỗ chờ đều có timeout, mọi sự cố đều có log, mọi kết quả đều có số chu kỳ để đối chiếu.</li>
+</ul>
+<p>Hoàn thành dự án này là bạn đã đi hết chặng PLC / Robot / MES. Chặng tiếp theo: <strong>Deep Learning</strong>, nơi phần <code>kiem_tra()</code> sẽ được thay bằng mô hình học sâu, còn toàn bộ khung trạm bạn vừa xây vẫn giữ nguyên.</p>

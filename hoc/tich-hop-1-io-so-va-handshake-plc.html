@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="vi" data-root="../">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>I/O số 24 V, NPN/PNP và handshake trigger–done với PLC | HọcFree</title>
+<meta name="description" content="Đấu đúng NPN/PNP, thiết kế bắt tay trigger–busy–done–OK/NG có timeout, đọc giản đồ thời gian và mô phỏng PLC + vision bằng Python.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://hocfree.vn/hoc/tich-hop-1-io-so-va-handshake-plc.html">
+<meta property="og:site_name" content="HọcFree">
+<meta property="og:type" content="article">
+<meta property="og:title" content="I/O số 24 V, NPN/PNP và handshake trigger–done với PLC">
+<meta property="og:description" content="Đấu đúng NPN/PNP, thiết kế bắt tay trigger–busy–done–OK/NG có timeout, đọc giản đồ thời gian và mô phỏng PLC + vision bằng Python.">
+<meta property="og:url" content="https://hocfree.vn/hoc/tich-hop-1-io-so-va-handshake-plc.html">
+<meta property="og:image" content="https://hocfree.vn/assets/images/posts/tich-hop-1-io-so-va-handshake-plc.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="I/O số 24 V, NPN/PNP và handshake trigger–done với PLC">
+<meta property="og:locale" content="vi_VN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="I/O số 24 V, NPN/PNP và handshake trigger–done với PLC">
+<meta name="twitter:description" content="Đấu đúng NPN/PNP, thiết kế bắt tay trigger–busy–done–OK/NG có timeout, đọc giản đồ thời gian và mô phỏng PLC + vision bằng Python.">
+<meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/tich-hop-1-io-so-va-handshake-plc.jpg">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/fonts.css?v=20261009">
+<link rel="stylesheet" href="../assets/css/style.css?v=20261009">
+<script>try{var t=localStorage.getItem('hf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
+<meta property="article:published_time" content="2026-10-09">
+<meta property="article:section" content="Học AI &amp; Lập trình">
+<meta property="article:tag" content="PLC">
+<meta property="article:tag" content="Industrial Vision">
+<meta property="article:tag" content="Python">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "I/O số 24 V, NPN/PNP và handshake trigger–done với PLC", "description": "Đấu đúng NPN/PNP, thiết kế bắt tay trigger–busy–done–OK/NG có timeout, đọc giản đồ thời gian và mô phỏng PLC + vision bằng Python.", "image": ["https://hocfree.vn/assets/images/posts/tich-hop-1-io-so-va-handshake-plc.jpg"], "datePublished": "2026-10-09", "dateModified": "2026-10-09", "inLanguage": "vi", "articleSection": "Học AI & Lập trình", "keywords": "PLC, Industrial Vision, Python", "wordCount": 4731, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/hoc/tich-hop-1-io-so-va-handshake-plc.html"}, "isPartOf": {"@type": "Course", "name": "Trở thành Vision Engineer", "url": "https://hocfree.vn/lo-trinh/vision-engineer.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Learning Paths", "item": "https://hocfree.vn/lo-trinh/"}, {"@type": "ListItem", "position": 3, "name": "Trở thành Vision Engineer", "item": "https://hocfree.vn/lo-trinh/vision-engineer.html"}, {"@type": "ListItem", "position": 4, "name": "Chặng 9: PLC / Robot / MES", "item": "https://hocfree.vn/lo-trinh/vision-engineer/plc-robot-mes.html"}, {"@type": "ListItem", "position": 5, "name": "I/O số 24 V, NPN/PNP và handshake trigger–done với PLC"}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div class="progress" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="container wide header-top">
+    <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="nav-scrim" hidden></div>
+    <a class="logo" href="../" aria-label="HọcFree – Trang chủ"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+    <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
+    <div class="header-actions">
+      <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="login-link" href="../dang-nhap.html">Đăng nhập</a>
+      <a class="btn start-btn" href="../lo-trinh/">Bắt đầu học</a>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="container wide">
+      <nav class="site-nav" id="site-nav" aria-label="Menu chính">
+        <div class="drawer-head">
+          <a class="logo" href="../" tabindex="-1"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+          <button class="icon-btn nav-close" aria-label="Đóng menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <button type="button" class="drawer-search search-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Tìm bài học, chủ đề…</span></button>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="../">Trang chủ</a></li><li class="nav-item has-panel is-mega"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-hoc">Học AI &amp; Lập trình<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel mega" id="nav-panel-hoc">
+  <div class="container wide mega-inner">
+    <div class="mega-groups"><div class="mega-group"><a class="mega-group-title" href="../hoc/#programming">Programming</a><ul><li><a href="../hoc/python.html">Python</a></li><li><a href="../hoc/csharp.html">C#</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#ai-machine-learning">AI &amp; Machine Learning</a><ul><li><a href="../hoc/machine-learning.html">Machine Learning</a></li><li><a href="../hoc/deep-learning.html">Deep Learning</a></li><li><a href="../hoc/pytorch.html">PyTorch</a></li><li><a href="../hoc/generative-ai.html">Generative AI</a></li><li><a href="../hoc/llm-ai-agents.html">LLM / AI Agents</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#computer-vision">Computer Vision</a><ul><li><a href="../hoc/opencv.html">OpenCV</a></li><li><a href="../hoc/image-processing.html">Image Processing</a></li><li><a href="../hoc/computer-vision.html">Computer Vision</a></li><li><a href="../hoc/ocr.html">OCR</a></li><li><a href="../hoc/object-detection.html">Object Detection</a></li><li><a href="../hoc/segmentation.html">Segmentation</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#vision-engineering">Vision Engineering</a><ul><li><a href="../hoc/machine-vision.html">Machine Vision</a></li><li><a href="../hoc/ai-vision.html">AI Vision</a></li><li><a href="../hoc/industrial-vision.html">Industrial Vision</a></li><li><a href="../hoc/camera-lens.html">Camera &amp; Lens</a></li><li><a href="../hoc/lighting.html">Lighting</a></li><li><a href="../hoc/calibration.html">Calibration</a></li><li><a href="../hoc/plc-robot-mes.html">PLC / Robot / MES</a></li><li><a href="../hoc/vision-deployment.html">Vision Deployment</a></li></ul></div></div>
+    <a class="feature-card" href="../lo-trinh/vision-engineer.html">
+  <span class="feature-eyebrow">⭐ Learning Path nổi bật</span>
+  <span class="feature-title">Trở thành Vision Engineer</span>
+  <span class="feature-sub">Machine Vision + AI Vision + Industrial Automation</span>
+  <span class="feature-desc">Lộ trình thực chiến từ Python, OpenCV và Machine Vision đến Deep Learning, AI Vision, Camera, PLC, Robot và triển khai hệ thống Vision trong nhà máy.</span>
+  <span class="feature-chain" aria-label="Các chặng chính"><span>Python</span><i aria-hidden="true">→</i><span>OpenCV</span><i aria-hidden="true">→</i><span>Machine Vision</span><i aria-hidden="true">→</i><span>AI Vision</span><i aria-hidden="true">→</i><span class="chain-goal">🎯 Vision Engineer</span></span>
+  <span class="feature-meta">14 chặng · 5 giai đoạn · ~12 tháng</span>
+  <span class="feature-cta">Xem lộ trình →</span>
+</a>
+  </div>
+  <div class="mega-foot"><div class="container wide mega-foot-inner"><ol class="journey compact" aria-label="Học, thực hành, trở thành kỹ sư"><li><a href="../hoc/" aria-current="step"><span class="journey-n">1</span><span class="journey-t"><b>Học</b><small>Học AI &amp; Lập trình</small></span></a></li><li><a href="../projects/"><span class="journey-n">2</span><span class="journey-t"><b>Thực hành</b><small>Projects</small></span></a></li><li><a href="../lo-trinh/"><span class="journey-n">3</span><span class="journey-t"><b>Trở thành kỹ sư</b><small>Learning Paths</small></span></a></li></ol><a class="panel-all" href="../hoc/">Xem tất cả Học AI &amp; Lập trình →</a></div></div>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-projects">Projects<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-projects">
+  <p class="panel-kicker"><span>Bước 2 · Thực hành</span>Áp dụng vào dự án thật</p>
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../projects/ai-projects.html"><span class="drop-label">AI Projects</span><span class="drop-desc">Ứng dụng ML và LLM, từ ý tưởng đến bản demo</span></a></li><li><a class="drop-link" href="../projects/computer-vision-projects.html"><span class="drop-label">Computer Vision Projects</span><span class="drop-desc">Phát hiện, nhận dạng và theo dõi đối tượng</span></a></li><li><a class="drop-link" href="../projects/industrial-vision-projects.html"><span class="drop-label">Industrial Vision Projects</span><span class="drop-desc">Đo kích thước, kiểm tra lỗi, đọc mã trên dây chuyền</span></a></li></ul></div></div>
+  <a class="panel-all" href="../projects/">Xem tất cả Projects →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger is-active" aria-expanded="false" aria-controls="nav-panel-lo-trinh" aria-current="true">Learning Paths<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-lo-trinh">
+  <p class="panel-kicker"><span>Bước 3 · Trở thành kỹ sư</span>Định hướng nghề nghiệp</p>
+  <ul class="drop-list"><li><a class="drop-link is-flagship" href="../lo-trinh/vision-engineer.html"><span class="drop-label">⭐ Trở thành Vision Engineer</span><span class="drop-desc">Machine Vision + AI Vision + Industrial Automation · 14 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/#python-developer"><span class="drop-label">Python Developer<span class="badge-soon">Sắp ra mắt</span></span><span class="drop-desc">Python, công cụ, tự động hóa</span></a></li></ul>
+  <a class="panel-all" href="../lo-trinh/">Xem tất cả lộ trình →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-kien-thuc">Kiến thức<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-kien-thuc">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Lĩnh vực</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/programming.html"><span class="drop-label">Programming</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-machine-learning.html"><span class="drop-label">AI / Machine Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/deep-learning.html"><span class="drop-label">Deep Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/machine-vision.html"><span class="drop-label">Machine Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-vision.html"><span class="drop-label">AI Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/industrial-automation.html"><span class="drop-label">Industrial Automation</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Công cụ &amp; mẹo</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/tools-frameworks.html"><span class="drop-label">Tools &amp; Frameworks</span></a></li><li><a class="drop-link" href="../kien-thuc/tips-tricks.html"><span class="drop-label">Tips &amp; Tricks</span></a></li></ul></div></div>
+  <a class="panel-all" href="../kien-thuc/">Xem tất cả Kiến thức →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tin-tuc-ai">Tin tức AI<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tin-tuc-ai">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tin-tuc-ai/ai-news.html"><span class="drop-label">AI News</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-models.html"><span class="drop-label">AI Models</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/technology.html"><span class="drop-label">Technology</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/robotics.html"><span class="drop-label">Robotics</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-industry.html"><span class="drop-label">AI Industry</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tin-tuc-ai/">Xem tất cả Tin tức AI →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-ngoai-ngu">Ngoại ngữ<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-ngoai-ngu">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/english.html"><span class="drop-label">English</span><span class="drop-desc">Lộ trình 700 TOEIC, phương pháp học, giáo trình HF-700TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chinese.html"><span class="drop-label">Chinese</span><span class="drop-desc">Lộ trình HSK3, phương pháp học, giáo trình HF-HSK3</span></a></li></ul></div></div>
+  <a class="panel-all" href="../ngoai-ngu/">Xem tất cả Ngoại ngữ →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tai-nguyen">Tài nguyên<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tai-nguyen">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tai-nguyen/source-code.html"><span class="drop-label">Source Code</span><span class="drop-desc">Mã nguồn mẫu đi kèm bài học</span></a></li><li><a class="drop-link" href="../tai-nguyen/dataset.html"><span class="drop-label">Dataset</span><span class="drop-desc">Bộ dữ liệu ảnh để luyện tập</span></a></li><li><a class="drop-link" href="../tai-nguyen/cheat-sheets.html"><span class="drop-label">Cheat Sheets</span><span class="drop-desc">Tóm tắt nhanh trong một trang</span></a></li><li><a class="drop-link" href="../tai-nguyen/documentation.html"><span class="drop-label">Documentation</span><span class="drop-desc">Tài liệu tra cứu thư viện, API</span></a></li><li><a class="drop-link" href="../tai-nguyen/ebook.html"><span class="drop-label">Ebook / Tài liệu</span><span class="drop-desc">Sách và tài liệu tham khảo</span></a></li><li><a class="drop-link" href="../tai-nguyen/ai-tools.html"><span class="drop-label">AI Tools</span><span class="drop-desc">Công cụ AI hữu ích cho việc học</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tai-nguyen/">Xem tất cả Tài nguyên →</a>
+</div></li></ul>
+        <div class="drawer-foot">
+          <a class="btn ghost" href="../dang-nhap.html">Đăng nhập</a>
+          <a class="btn" href="../lo-trinh/">Bắt đầu học</a>
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+<div class="search-dialog" hidden>
+  <div class="search-scrim"></div>
+  <div class="search-box" role="dialog" aria-modal="true" aria-label="Tìm kiếm">
+    <form class="search-form" action="../search.html" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" placeholder="Tìm bài học, chủ đề, bài viết…" autocomplete="off" aria-label="Từ khóa tìm kiếm" aria-controls="search-suggest">
+      <button type="button" class="icon-btn search-close" aria-label="Đóng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </form>
+    <div class="search-suggest" id="search-suggest" aria-live="polite">
+      <div class="search-empty">
+        <p class="search-group-title">Chủ đề phổ biến</p>
+        <div class="chips"><a class="chip" href="../hoc/python.html">Python</a><a class="chip" href="../hoc/opencv.html">OpenCV</a><a class="chip" href="../hoc/machine-vision.html">Machine Vision</a><a class="chip" href="../hoc/deep-learning.html">Deep Learning</a><a class="chip" href="../hoc/ai-vision.html">AI Vision</a><a class="chip" href="../hoc/object-detection.html">Object Detection</a><a class="chip" href="../hoc/pytorch.html">PyTorch</a><a class="chip" href="../ngoai-ngu/english.html">English</a></div>
+        <p class="search-group-title">Lộ trình nổi bật</p>
+        <a class="search-item" href="../lo-trinh/vision-engineer.html"><span class="search-ico" aria-hidden="true">⭐</span><span>Trở thành Vision Engineer<small>Learning Path · Machine Vision + AI Vision + Industrial Automation</small></span></a>
+      </div>
+    </div>
+    <div class="search-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> chọn</span><span><kbd>Enter</kbd> mở</span><span><kbd>Esc</kbd> đóng</span></div>
+  </div>
+</div>
+<main id="main">
+  <div class="container layout article-layout">
+    <article class="article">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../lo-trinh/">Learning Paths</a><span>/</span><a href="../lo-trinh/vision-engineer.html">Vision Engineer</a><span>/</span><a href="../lo-trinh/vision-engineer/plc-robot-mes.html">Chặng 9: PLC / Robot / MES</a></nav>
+      <header class="article-head">
+        <div class="course-bar" data-course="vision-engineer"><a class="course-chip" href="../lo-trinh/vision-engineer/plc-robot-mes.html">⭐ Vision Engineer · Chặng 9</a><span class="lesson-no">Bài 1/9</span><span class="kind kind-lesson">Bài học</span><span class="lesson-min"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></svg>~60 phút</span></div>
+        <h1>I/O số 24 V, NPN/PNP và handshake trigger–done với PLC</h1>
+        <p class="lead">Đấu đúng NPN/PNP, thiết kế bắt tay trigger–busy–done–OK/NG có timeout, đọc giản đồ thời gian và mô phỏng PLC + vision bằng Python.</p>
+        <div class="article-meta">
+          <span class="avatar" aria-hidden="true">HF</span>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>27 phút đọc</span></div>
+        </div>
+      </header>
+      <figure class="article-cover">
+        <img src="../assets/images/posts/tich-hop-1-io-so-va-handshake-plc.webp" alt="I/O số 24 V, NPN/PNP và handshake trigger–done với PLC" width="1200" height="675" fetchpriority="high" decoding="async">
+      </figure>
+      <section class="lesson-goals" aria-label="Mục tiêu bài học"><h2>Học xong bài này, bạn sẽ</h2><ul><li>Hiểu tín hiệu NPN/PNP, 24 V</li><li>Thiết kế handshake trigger – busy – done – OK/NG</li><li>Vẽ và đọc giản đồ thời gian</li></ul><p class="goals-before">Nên học trước: <a href="../projects/do-kich-thuoc-chi-tiet-bang-camera.html">Dự án chặng 8: đo kích thước chi tiết cơ khí</a></p></section>
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol class="toc-plain"><li><a href="#1-vi-sao-tin-hieu-cong-nghiep-dung-24-v">1. Vì sao tín hiệu công nghiệp dùng 24 V?</a></li><li><a href="#2-npn-va-pnp-sinking-va-sourcing">2. NPN và PNP: sinking và sourcing</a></li><li><a href="#3-thoi-gian-tren-day-chu-ky-quet-va-bo-loc-ngo-vao">3. Thời gian trên dây: chu kỳ quét và bộ lọc ngõ vào</a></li><li><a href="#4-bo-tin-hieu-handshake">4. Bộ tín hiệu handshake</a></li><li><a href="#5-trinh-tu-bat-tay-tung-buoc">5. Trình tự bắt tay từng bước</a></li><li><a href="#6-gian-do-thoi-gian-ve-va-doc">6. Giản đồ thời gian: vẽ và đọc</a></li><li><a href="#7-bon-quy-tac-thiet-ke">7. Bốn quy tắc thiết kế</a></li><li><a href="#8-mo-phong-plc-vision-bang-python">8. Mô phỏng PLC + vision bằng Python</a></li><li><a href="#9-loi-thuong-gap">9. Lỗi thường gặp</a></li><li><a href="#10-bai-tap">10. Bài tập</a></li><li><a href="#tom-tat">Tóm tắt</a></li></ol></details>
+      <div class="prose">
+<p>Thuật toán của bạn có thể đạt 100% trên bộ ảnh vàng ở chặng 5, nhưng ra hiện trường, trạm vision vẫn "loại nhầm" hoặc "để lọt" nếu phần nói chuyện với PLC làm ẩu: PLC đọc kết quả cũ, trigger bị nuốt mất, hay cả dây chuyền đứng vì hai bên chờ nhau. Bài mở đầu chặng PLC / Robot / MES này đi từ tầng thấp nhất: <strong>dây tín hiệu 24 V</strong>, NPN và PNP, rồi tới <strong>giao thức bắt tay (handshake)</strong> trigger – busy – done – OK/NG và cách vẽ, đọc <strong>giản đồ thời gian</strong>. Bài tiếp theo, "Các chuẩn giao tiếp: Modbus TCP, EtherNet/IP, PROFINET", so sánh các mạng công nghiệp; bài này đi sâu vào phần điện và thời gian, nền tảng mà mọi giao thức phía trên đều dựa vào. Các bài sau sẽ chuyển cùng logic bắt tay này sang Modbus TCP và TCP socket.</p>
+
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Đấu đúng một cảm biến/camera NPN hoặc PNP vào ngõ vào PLC; thiết kế được bảng tín hiệu và trình tự handshake có timeout; vẽ và đọc được giản đồ thời gian; chạy được mô phỏng PLC + vision bằng Python để kiểm tra trình tự trước khi ra hiện trường.</div>
+
+<h2 id="1-vi-sao-tin-hieu-cong-nghiep-dung-24-v">1. Vì sao tín hiệu công nghiệp dùng 24 V?</h2>
+<p>Trong nhà máy, ngõ vào/ra số (digital I/O) gần như luôn là <strong>24 V DC</strong>, không phải 3,3 V hay 5 V như mạch Arduino. Lý do:</p>
+<ul>
+  <li><strong>Chống nhiễu</strong>: dây tín hiệu chạy dài vài chục mét cạnh dây động lực của biến tần, motor. Nhiễu cảm ứng vài vôn có thể làm một ngõ vào 5 V nhảy sai, nhưng không đủ vượt ngưỡng của ngõ vào 24 V.</li>
+  <li><strong>Ngưỡng rộng và rõ ràng</strong>: chuẩn IEC 61131-2 cho ngõ vào số định nghĩa vùng ON (khoảng từ 11–15 V trở lên, tùy loại ngõ vào) và vùng OFF (dưới khoảng 5 V), giữa là vùng không xác định. Khoảng cách lớn giữa hai vùng giúp tín hiệu chịu được sụt áp trên dây dài.</li>
+  <li><strong>Dòng đủ lớn</strong>: mỗi ngõ vào kéo vài mA, đủ để nhiễu tĩnh điện (trở kháng cao) không "kích" được ngõ vào.</li>
+  <li><strong>Chuẩn chung</strong>: cảm biến, PLC, van khí, đèn báo, camera công nghiệp đều có bản 24 V, nối với nhau không cần mạch chuyển mức.</li>
+</ul>
+<p>Hệ quả cho kỹ sư vision: <strong>không bao giờ</strong> nối trực tiếp dây 24 V vào GPIO của máy tính nhúng, Raspberry Pi hay chân I/O 3,3 V của board phát triển. Luôn đi qua ngõ vào/ra có cách ly của camera, card I/O công nghiệp hoặc module relay/opto.</p>
+
+<h2 id="2-npn-va-pnp-sinking-va-sourcing">2. NPN và PNP: sinking và sourcing</h2>
+<p>Ngõ ra transistor của cảm biến, camera hay PLC chỉ làm một việc: <strong>đóng một công tắc</strong>. Khác nhau ở chỗ công tắc đó nối dây tín hiệu với cực nào của nguồn:</p>
+<ul>
+  <li><strong>PNP (sourcing, "cấp dòng")</strong>: khi tác động, chân OUT được nối lên <strong>+24 V</strong>. Dòng đi <em>ra</em> từ thiết bị, qua tải (ngõ vào PLC) rồi về 0 V.</li>
+  <li><strong>NPN (sinking, "hút dòng")</strong>: khi tác động, chân OUT được nối xuống <strong>0 V</strong>. Dòng đi từ +24 V, qua tải, <em>vào</em> chân OUT rồi xuống 0 V.</li>
+</ul>
+<pre><code class="language-text">PNP (sourcing) → ngõ vào PLC có COM nối 0 V
+
+  +24V ───────────┬──────────────── (+) nâu
+                  │  cảm biến PNP
+                  └─[công tắc]─ OUT (đen) ──────► X0 ──[opto]── COM ── 0V
+  0V   ──────────────────────────── (−) xanh
+  Dòng: +24V → công tắc → OUT → X0 → opto → COM → 0V
+
+
+NPN (sinking) → ngõ vào PLC có COM nối +24 V
+
+  +24V ── COM ──[opto]── X0 ◄────── OUT (đen) ─[công tắc]─┐
+                                     cảm biến NPN         │
+  0V   ─────────────────────────────────────── (−) xanh ──┘
+  Dòng: +24V → COM → opto → X0 → OUT → công tắc → 0V</code></pre>
+<table>
+  <tr><th></th><th>NPN (sinking)</th><th>PNP (sourcing)</th></tr>
+  <tr><td>Khi ON, chân OUT nối với</td><td>0 V</td><td>+24 V</td></tr>
+  <tr><td>Tải / ngõ vào nối giữa</td><td>OUT và +24 V</td><td>OUT và 0 V</td></tr>
+  <tr><td>COM của ngõ vào PLC đấu về</td><td>+24 V</td><td>0 V</td></tr>
+  <tr><td>Đo OUT so với 0 V khi ON</td><td>≈ 0 V</td><td>≈ 24 V</td></tr>
+  <tr><td>Đo OUT so với 0 V khi OFF</td><td>≈ 24 V nếu đã nối tải (bị kéo lên qua tải); thả nổi nếu chưa nối</td><td>≈ 0 V nếu đã nối tải; thả nổi nếu chưa nối</td></tr>
+  <tr><td>Thường gặp ở</td><td>thiết bị theo truyền thống Nhật, châu Á</td><td>thiết bị theo truyền thống châu Âu</td></tr>
+</table>
+<p>Trong các nhà máy FDI ở Việt Nam bạn sẽ gặp <strong>cả hai</strong>, có khi trên cùng một dây chuyền. Quy tắc nhớ: cảm biến NPN cần ngõ vào "nhận dòng chảy ra từ chân X", cảm biến PNP cần ngõ vào "nhận dòng chảy vào chân X". Nhiều module ngõ vào PLC có một chân chung (COM, S/S…) cho cả nhóm: đấu chân này về 0 V để nhận PNP, đấu về +24 V để nhận NPN. Vì vậy <strong>một nhóm ngõ vào chỉ nhận một loại</strong>; muốn dùng cả hai loại phải chia nhóm.</p>
+<div class="warn"><strong>Chữ "sink input" không thống nhất giữa các hãng</strong>Có hãng gọi ngõ vào nhận cảm biến PNP là "sink input" (vì ngõ vào hút dòng), có hãng lại gọi ngõ vào dùng với cảm biến NPN là "sink input" (vì cảm biến là loại sink). Đừng tin vào chữ, hãy mở <strong>sơ đồ đấu dây</strong> trong manual và hỏi đúng một câu: "thiết bị này ra NPN hay PNP, COM của nhóm ngõ vào nối 0 V hay +24 V?".</div>
+
+<h3 id="camera-va-card-i-o-cua-pc">Camera và card I/O của PC</h3>
+<p>Camera công nghiệp và card I/O thường có ngõ vào/ra <strong>cách ly quang</strong> (optocoupler): bên trong là một LED và một phototransistor, tín hiệu đi qua bằng ánh sáng nên mass của camera/PC và mass 24 V của tủ điện tách rời nhau. Nhờ đó xung nhiễu, chênh lệch điện thế đất (ground loop) phía tủ điện không chạy vào máy tính. Ngõ ra cách ly quang của camera thường là dạng <strong>open collector</strong>: chỉ có transistor, bạn phải đấu theo sơ đồ của hãng (có loại cần điện trở kéo lên, có loại cấu hình được NPN/PNP). Dòng cho phép của các ngõ ra này thường nhỏ (cỡ vài chục mA): đủ cho ngõ vào PLC, <strong>không đủ</strong> để kéo trực tiếp van điện từ hay đèn tháp. Tải cảm (cuộn relay, van) phải có diode dập ngược.</p>
+<table>
+  <tr><th>Loại ngõ ra</th><th>Thời gian đóng/ngắt</th><th>Dùng cho</th></tr>
+  <tr><td>Transistor (NPN/PNP, opto)</td><td>cỡ µs đến dưới 1 ms</td><td>Trigger, DONE, OK/NG, xung tốc độ cao</td></tr>
+  <tr><td>Relay cơ</td><td>cỡ 5–15 ms, có rung tiếp điểm</td><td>Đèn, còi, tải cách ly hoàn toàn; <strong>không</strong> dùng cho trigger hay strobe</td></tr>
+</table>
+<div class="warn"><strong>Hai nguồn 24 V phải chung 0 V</strong>Khi camera dùng nguồn riêng và PLC dùng nguồn tủ, tín hiệu NPN/PNP được đo <em>so với 0 V</em>. Nếu hai 0 V không nối với nhau, ngõ vào không có đường dòng khép kín: LED trên ngõ vào không sáng dù thiết bị đã bật. Đây là lỗi đấu dây hàng đầu khi lắp trạm mới (ngoại lệ: ngõ vào/ra cách ly có hai chân riêng, đấu đúng theo sơ đồ cách ly của hãng).</div>
+
+<h2 id="3-thoi-gian-tren-day-chu-ky-quet-va-bo-loc-ngo-vao">3. Thời gian trên dây: chu kỳ quét và bộ lọc ngõ vào</h2>
+<p>PLC không "nhìn" ngõ vào liên tục. Nó chạy vòng lặp <strong>quét (scan)</strong>: đọc toàn bộ ngõ vào → chạy chương trình → ghi toàn bộ ngõ ra, lặp lại mỗi vài ms đến vài chục ms. Thêm vào đó, mỗi ngõ vào có <strong>bộ lọc</strong> (input filter, thường chỉnh được, cỡ vài ms) để bỏ qua rung tiếp điểm. Hệ quả:</p>
+<ul>
+  <li>Một thay đổi trên dây có thể chỉ được PLC thấy sau tối đa <strong>(chu kỳ quét + thời gian lọc)</strong>.</li>
+  <li>Một <strong>xung</strong> ngắn hơn khoảng đó có thể lọt giữa hai lần quét và bị mất hoàn toàn.</li>
+</ul>
+<pre><code class="language-python">def xung_toi_thieu(chu_ky_quet_ms, loc_vao_ms):
+    """Xung ngắn hơn (quét + lọc) có thể lọt giữa hai lần quét của PLC."""
+    return chu_ky_quet_ms + loc_vao_ms
+
+
+print("Quét | Lọc vào | Xung tối thiểu | Nên đặt (x2)")
+for quet, loc in [(2, 1), (10, 3), (20, 10)]:
+    t = xung_toi_thieu(quet, loc)
+    print(f"{quet:&gt;4} | {loc:&gt;7} | {t:&gt;11} ms | {2 * t:&gt;9} ms")
+
+# Ngân sách thời gian handshake cho một sản phẩm (trường hợp xấu nhất)
+quet, loc, vision_doc_io, t_setup, xu_ly = 10, 3, 1, 5, 60
+tre_plc = quet + loc                     # PLC thấy một thay đổi chậm nhất sau (quét + lọc)
+tong = vision_doc_io + xu_ly + t_setup + tre_plc + vision_doc_io + tre_plc
+print(f"\nXử lý ảnh {xu_ly} ms, nhưng một chu kỳ handshake tốn tới {tong} ms")
+print(f"Phần 'bắt tay' chiếm {tong - xu_ly} ms ({(tong - xu_ly) / tong:.0%})")</code></pre>
+<pre><code class="language-text">Quét | Lọc vào | Xung tối thiểu | Nên đặt (x2)
+   2 |       1 |           3 ms |         6 ms
+  10 |       3 |          13 ms |        26 ms
+  20 |      10 |          30 ms |        60 ms
+
+Xử lý ảnh 60 ms, nhưng một chu kỳ handshake tốn tới 93 ms
+Phần 'bắt tay' chiếm 33 ms (35%)</code></pre>
+<p>Con số thứ hai là bài học quan trọng: với xử lý ảnh 60 ms, phần "bắt tay" qua I/O có thể cộng thêm hơn 30 ms mỗi sản phẩm. Khi tính cycle time (chặng 5), bạn phải cộng cả độ trễ này, không chỉ thời gian chạy thuật toán.</p>
+
+<h2 id="4-bo-tin-hieu-handshake">4. Bộ tín hiệu handshake</h2>
+<p>Bảng tín hiệu tối thiểu cho trạm vision dùng I/O số. Cột "Kiểu" là điểm mấu chốt: <strong>mức (level)</strong> nghĩa là tín hiệu giữ nguyên cho tới khi bên kia xác nhận; <strong>xung (pulse)</strong> là tín hiệu tự tắt sau một khoảng thời gian.</p>
+<table>
+  <tr><th>Tín hiệu</th><th>Chiều</th><th>Kiểu</th><th>Ý nghĩa</th></tr>
+  <tr><td>TRIGGER</td><td>PLC → Vision</td><td>Mức, vision bắt sườn lên</td><td>Sản phẩm đã vào vị trí, chụp và kiểm tra</td></tr>
+  <tr><td>READY</td><td>Vision → PLC</td><td>Mức</td><td>Vision sẵn sàng nhận trigger mới</td></tr>
+  <tr><td>BUSY</td><td>Vision → PLC</td><td>Mức</td><td>Đang chụp/xử lý (PLC chưa được di chuyển sản phẩm nếu cần chụp lại)</td></tr>
+  <tr><td>DONE (result valid)</td><td>Vision → PLC</td><td>Mức</td><td>OK/NG trên dây đã đúng và ổn định, PLC được phép đọc</td></tr>
+  <tr><td>OK</td><td>Vision → PLC</td><td>Mức, chỉ có nghĩa khi DONE = 1</td><td>Sản phẩm đạt</td></tr>
+  <tr><td>NG</td><td>Vision → PLC</td><td>Mức, chỉ có nghĩa khi DONE = 1</td><td>Sản phẩm lỗi</td></tr>
+  <tr><td>ERROR</td><td>Vision → PLC</td><td>Mức</td><td>Mất camera, lỗi cấu hình… PLC dừng hoặc báo động</td></tr>
+</table>
+<p>Vì sao dùng <strong>hai</strong> dây OK và NG thay vì một dây "1 = OK, 0 = NG"? Vì với một dây, mức 0 vừa có nghĩa "NG" vừa có nghĩa "đứt dây", "camera mất nguồn" hay "chưa có kết quả". Với hai dây, chỉ có <code>10</code> (OK) và <code>01</code> (NG) là hợp lệ; <code>00</code> hoặc <code>11</code> là lỗi và PLC xử lý như NG. Nguyên tắc chung: <strong>trạng thái an toàn phải là trạng thái "không có điện"</strong>, mất tín hiệu không bao giờ được hiểu thành OK.</p>
+
+<h2 id="5-trinh-tu-bat-tay-tung-buoc">5. Trình tự bắt tay từng bước</h2>
+<table>
+  <tr><th>Bước</th><th>Ai làm</th><th>Hành động</th><th>Điều kiện để bước tiếp</th></tr>
+  <tr><td>0</td><td>Vision</td><td>READY = 1, BUSY = DONE = OK = NG = 0</td><td>Sẵn sàng</td></tr>
+  <tr><td>1</td><td>PLC</td><td>Sản phẩm vào vị trí, đã dừng hẳn → TRIGGER = 1, bắt đầu đếm timeout</td><td>READY = 1</td></tr>
+  <tr><td>2</td><td>Vision</td><td>Thấy <strong>sườn lên</strong> TRIGGER → READY = 0, BUSY = 1, chụp</td><td></td></tr>
+  <tr><td>3</td><td>Vision</td><td>Xử lý xong, ghi OK hoặc NG <strong>trước</strong></td><td>TRIGGER vẫn = 1</td></tr>
+  <tr><td>4</td><td>Vision</td><td>Chờ t<sub>setup</sub> rồi DONE = 1, BUSY = 0</td><td></td></tr>
+  <tr><td>5</td><td>PLC</td><td>Thấy DONE = 1 → đọc OK/NG, chốt kết quả cho sản phẩm, TRIGGER = 0</td><td>DONE = 1</td></tr>
+  <tr><td>6</td><td>Vision</td><td>Thấy TRIGGER = 0 → DONE = OK = NG = 0, READY = 1</td><td>TRIGGER = 0</td></tr>
+  <tr><td>7</td><td>PLC</td><td>Thấy DONE = 0 → cho sản phẩm đi, sẵn sàng chu kỳ mới</td><td>DONE = 0</td></tr>
+</table>
+<p>Mỗi bên chỉ đổi tín hiệu của mình sau khi <strong>thấy</strong> bên kia đã đổi. Đây là kiểu bắt tay "4 pha" (four-phase handshake): bật yêu cầu, bật trả lời, tắt yêu cầu, tắt trả lời. Nó chậm hơn bắn xung nhưng không phụ thuộc chu kỳ quét: dù PLC quét 2 ms hay 50 ms, không tín hiệu nào bị mất.</p>
+
+<h2 id="6-gian-do-thoi-gian-ve-va-doc">6. Giản đồ thời gian: vẽ và đọc</h2>
+<p>Giản đồ thời gian (timing diagram) là "ngôn ngữ chung" giữa kỹ sư vision và kỹ sư PLC. Trục ngang là thời gian, mỗi hàng là một tín hiệu, mức cao là 1. Một chu kỳ OK chuẩn:</p>
+<pre><code class="language-text">            1   2                         3 4   5 6    7
+TRIGGER  ___/‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\___________
+READY    ‾‾‾‾‾‾‾\_________________________________/‾‾‾‾‾‾‾‾‾
+BUSY     _______/‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\_______________
+OK       _________________________________/‾‾‾‾‾‾‾\_________
+DONE     ___________________________________/‾‾‾‾‾\_________
+                |&lt;------- t_xu_ly -------&gt;| |
+                                        t_setup
+(1) PLC bật TRIGGER      (2) vision bắt sườn lên: BUSY=1, READY=0
+(3) vision đặt OK trước  (4) sau t_setup: DONE=1, BUSY=0
+(5) PLC thấy DONE, chốt kết quả, tắt TRIGGER
+(6) vision thấy TRIGGER tắt: xóa DONE, OK; READY=1
+(7) PLC thấy DONE=0: chu kỳ kết thúc</code></pre>
+<p>Cách đọc một giản đồ do khách hàng hoặc kỹ sư PLC gửi:</p>
+<ol>
+  <li>Tìm <strong>tín hiệu khởi đầu</strong> (thường là TRIGGER) và đi theo các mũi tên nhân quả: sườn nào gây ra sườn nào.</li>
+  <li>Đánh dấu các <strong>khoảng thời gian có tên</strong>: thời gian xử lý tối đa, t<sub>setup</sub> (kết quả phải có trước DONE bao lâu), độ rộng xung tối thiểu, timeout.</li>
+  <li>Kiểm tra mỗi tín hiệu "kết quả" (OK/NG, mã lỗi) chỉ được đọc khi tín hiệu "hợp lệ" (DONE) đang ở mức 1.</li>
+  <li>Hỏi trường hợp lỗi: nếu bước (4) không bao giờ xảy ra thì sao? Giản đồ tốt luôn có một hình cho trường hợp timeout.</li>
+</ol>
+
+<h2 id="7-bon-quy-tac-thiet-ke">7. Bốn quy tắc thiết kế</h2>
+<h3 id="7-1-xung-hay-muc">7.1. Xung hay mức?</h3>
+<p><strong>Xung</strong> (ví dụ DONE bật 20 ms rồi tự tắt) đơn giản, không cần PLC trả lời, nhưng: độ rộng xung phải lớn hơn (chu kỳ quét + lọc) của bên nhận như mục 3, và nếu PLC đang bận/ đang dừng thì xung mất mà không ai biết. <strong>Mức + bắt tay</strong> chắc chắn hơn và là lựa chọn mặc định cho kết quả. Xung chỉ nên dùng khi bên nhận là phần cứng nhanh (ví dụ cảm biến quang nối thẳng vào ngõ trigger của camera để chụp vật đang chạy, hoàn toàn không qua PLC).</p>
+
+<h3 id="7-2-ket-qua-phai-co-truoc-done">7.2. Kết quả phải có trước DONE</h3>
+<p>DONE chính là tín hiệu <strong>result valid (strobe)</strong>: nó khẳng định "các dây kết quả đã đúng". Nếu phần mềm bật OK và DONE trong cùng một lệnh, trên dây thật hai ngõ ra có thể đổi trạng thái lệch nhau một chút (transistor, opto, bộ lọc ngõ vào khác nhau). Nếu PLC quét đúng vào khe hở đó, nó thấy <code>DONE=1, OK=0, NG=0</code> và chốt sai. Vì vậy: ghi OK/NG, chờ t<sub>setup</sub> (vài ms, lớn hơn thời gian lọc ngõ vào của PLC), rồi mới bật DONE. Tương tự, khi xóa: tắt DONE cùng lúc hoặc trước khi xóa OK/NG, không bao giờ để DONE=1 với kết quả cũ.</p>
+
+<h3 id="7-3-bat-suon-khong-bat-muc">7.3. Bắt sườn, không bắt mức</h3>
+<p>Vision chỉ bắt đầu chu kỳ mới khi thấy TRIGGER đổi từ 0 lên 1. Nếu bắt mức ("TRIGGER = 1 thì chụp"), khi PLC chậm tắt TRIGGER, vision sẽ chụp và báo kết quả hai lần cho cùng một sản phẩm.</p>
+
+<h3 id="7-4-timeout-o-ca-hai-phia">7.4. Timeout ở cả hai phía</h3>
+<ul>
+  <li><strong>Phía PLC</strong>: đếm từ lúc bật TRIGGER; quá timeout mà chưa có DONE → coi sản phẩm là NG (đẩy ra hoặc giữ lại kiểm tra tay), báo lỗi vision, tắt TRIGGER. <strong>Tuyệt đối không cho đi như OK.</strong></li>
+  <li><strong>Phía vision</strong>: trước khi bật DONE, kiểm tra TRIGGER vẫn còn bật. Nếu PLC đã bỏ cuộc thì <strong>bỏ kết quả</strong>, không được để kết quả muộn của sản phẩm cũ "dính" sang sản phẩm mới.</li>
+  <li>Chọn timeout: lớn hơn thời gian xử lý <em>tối đa</em> đo được (không phải trung bình) cộng độ trễ handshake, có dự phòng; đồng thời nhỏ hơn thời gian dây chuyền cho phép dừng tại trạm.</li>
+</ul>
+
+<h2 id="8-mo-phong-plc-vision-bang-python">8. Mô phỏng PLC + vision bằng Python</h2>
+<p>Trước khi ra hiện trường, hãy mô phỏng trình tự để chắc chắn logic không bị kẹt. Mô hình dưới đây chạy theo từng bước 1 ms: PLC chỉ đọc/ghi ở đầu mỗi lần quét (5 ms), vision đọc I/O mỗi 1 ms. Mỗi bên là một <strong>máy trạng thái</strong> (state machine): một biến <code>trang_thai</code> và mỗi bước chỉ xử lý trường hợp của trạng thái hiện tại. Đây cũng là cấu trúc bạn sẽ viết cho vòng lặp thật ở bài Modbus.</p>
+<pre><code class="language-python">TIN_HIEU = ["TRIGGER", "READY", "BUSY", "DONE", "OK", "NG"]
+
+
+class PLC:
+    """PLC quét theo chu kỳ: chỉ đọc ngõ vào và ghi ngõ ra ở đầu mỗi lần quét."""
+
+    def __init__(self, thoi_diem_sp, chu_ky_quet=5, timeout=150):
+        self.thoi_diem_sp = list(thoi_diem_sp)   # thời điểm (ms) từng sản phẩm vào vị trí chụp
+        self.quet = chu_ky_quet
+        self.timeout = timeout
+        self.trang_thai = "CHO_SP"
+        self.idx = 0
+        self.t_trigger = 0
+        self.ket_qua = []
+        self.nhat_ky = []
+
+    def buoc(self, t, day):
+        if t % self.quet:                        # chưa tới lần quét tiếp theo
+            return
+        vao = dict(day)                          # "chụp" toàn bộ ngõ vào ở đầu lần quét
+        sp = f"SP{self.idx + 1}"
+        if self.trang_thai == "CHO_SP":
+            co_sp = self.idx &lt; len(self.thoi_diem_sp) and t &gt;= self.thoi_diem_sp[self.idx]
+            if co_sp and vao["READY"]:
+                day["TRIGGER"] = 1
+                self.t_trigger = t
+                self.trang_thai = "CHO_DONE"
+                self.nhat_ky.append((t, "PLC", f"{sp} vào vị trí, bật TRIGGER"))
+        elif self.trang_thai == "CHO_DONE":
+            if vao["DONE"]:
+                if (vao["OK"], vao["NG"]) == (1, 0):
+                    kq = "OK"
+                elif (vao["OK"], vao["NG"]) == (0, 1):
+                    kq = "NG"
+                else:
+                    kq = "KQ_SAI"                # 00 hoặc 11: không tin, xử lý như NG
+                day["TRIGGER"] = 0
+                self.ket_qua.append((sp, kq))
+                self.nhat_ky.append((t, "PLC", f"thấy DONE, {sp} = {kq} "
+                                               f"(sau {t - self.t_trigger} ms), tắt TRIGGER"))
+                self.trang_thai = "CHO_DONE_TAT"
+            elif t - self.t_trigger &gt;= self.timeout:
+                day["TRIGGER"] = 0
+                self.ket_qua.append((sp, "TIMEOUT"))
+                self.nhat_ky.append((t, "PLC", f"TIMEOUT {self.timeout} ms: {sp} đẩy ra như NG, báo lỗi"))
+                self.idx += 1
+                self.trang_thai = "CHO_SP"       # chờ READY trở lại mới chụp SP tiếp theo
+        elif self.trang_thai == "CHO_DONE_TAT":
+            if not vao["DONE"]:
+                self.idx += 1
+                self.trang_thai = "CHO_SP"
+
+
+class Vision:
+    """Trạm vision đọc I/O mỗi 1 ms."""
+
+    def __init__(self, thoi_gian_xu_ly, ket_qua, t_setup=2):
+        self.thoi_gian_xu_ly = list(thoi_gian_xu_ly)
+        self.ket_qua = list(ket_qua)
+        self.t_setup = t_setup                   # thời gian giữ kết quả ổn định trước khi bật DONE
+        self.trang_thai = "SAN_SANG"
+        self.trigger_truoc = 0
+        self.dem = 0
+        self.lan = 0
+        self.nhat_ky = []
+
+    def buoc(self, t, day):
+        trigger = day["TRIGGER"]
+        suon_len = trigger == 1 and self.trigger_truoc == 0   # chỉ phản ứng với SƯỜN LÊN
+        self.trigger_truoc = trigger
+
+        if self.trang_thai == "SAN_SANG":
+            day["READY"] = 1
+            if suon_len:
+                day["READY"], day["BUSY"] = 0, 1
+                self.dem = self.thoi_gian_xu_ly[self.lan]
+                self.trang_thai = "XU_LY"
+                self.nhat_ky.append((t, "VIS", "thấy sườn lên TRIGGER: READY=0, BUSY=1, chụp + xử lý"))
+
+        elif self.trang_thai == "XU_LY":
+            self.dem -= 1
+            if self.dem &gt; 0:
+                return
+            kq = self.ket_qua[self.lan]
+            self.lan += 1
+            if not trigger:                      # PLC đã bỏ cuộc (timeout) trong lúc mình xử lý
+                day["BUSY"], day["READY"] = 0, 1
+                self.trang_thai = "SAN_SANG"
+                self.nhat_ky.append((t, "VIS", "xử lý xong nhưng TRIGGER đã tắt: BỎ kết quả, READY=1"))
+                return
+            day["OK"], day["NG"] = (1, 0) if kq == "OK" else (0, 1)
+            self.dem = self.t_setup
+            self.trang_thai = "DAT_KQ"
+            self.nhat_ky.append((t, "VIS", f"ghi kết quả {kq} lên OK/NG (chưa bật DONE)"))
+
+        elif self.trang_thai == "DAT_KQ":
+            self.dem -= 1
+            if self.dem == 0:
+                day["DONE"], day["BUSY"] = 1, 0
+                self.trang_thai = "CHO_TRIGGER_TAT"
+                self.nhat_ky.append((t, "VIS", f"kết quả đã ổn định {self.t_setup} ms: DONE=1, BUSY=0"))
+
+        elif self.trang_thai == "CHO_TRIGGER_TAT":
+            if not trigger:
+                day["DONE"], day["OK"], day["NG"] = 0, 0, 0
+                day["READY"] = 1
+                self.trang_thai = "SAN_SANG"
+                self.nhat_ky.append((t, "VIS", "TRIGGER tắt: xóa DONE và OK/NG, READY=1"))
+
+
+def mo_phong(plc, vis, tong_ms):
+    day = {k: 0 for k in TIN_HIEU}               # mức điện trên từng dây
+    lich_su = {k: [] for k in TIN_HIEU}
+    for t in range(tong_ms):                     # mỗi bước = 1 ms
+        vis.buoc(t, day)
+        plc.buoc(t, day)
+        for k in TIN_HIEU:
+            lich_su[k].append(day[k])
+    return lich_su
+
+
+def in_nhat_ky(plc, vis):
+    for t, ai, noi_dung in sorted(plc.nhat_ky + vis.nhat_ky):
+        print(f"{t:4d} ms  {ai}: {noi_dung}")
+
+
+def ve_gian_do(lich_su, ms_moi_ky_tu=10):
+    n = len(lich_su[TIN_HIEU[0]])
+    for k in TIN_HIEU:
+        s = lich_su[k]
+        hang = "".join("‾" if max(s[i:i + ms_moi_ky_tu]) else "_" for i in range(0, n, ms_moi_ky_tu))
+        print(f"{k:&lt;8}{hang}")
+    thuoc = "".join(f"{i * ms_moi_ky_tu:&lt;10d}" for i in range(0, n // ms_moi_ky_tu, 10))
+    print(f"{'ms':&lt;8}{thuoc}".rstrip())</code></pre>
+<p>Kịch bản: ba sản phẩm. SP1 xử lý 40 ms (OK), SP2 45 ms (NG), SP3 camera "treo" 250 ms trong khi PLC đặt timeout 150 ms.</p>
+<pre><code class="language-python">plc = PLC(thoi_diem_sp=[20, 100, 180], chu_ky_quet=5, timeout=150)
+vis = Vision(thoi_gian_xu_ly=[40, 45, 250],         # SP3: camera "treo" 250 ms
+             ket_qua=["OK", "NG", "OK"], t_setup=2)
+lich_su = mo_phong(plc, vis, tong_ms=460)
+
+in_nhat_ky(plc, vis)
+print()
+ve_gian_do(lich_su)
+print("\nPLC ghi nhận:", plc.ket_qua)</code></pre>
+<pre><code class="language-text">  20 ms  PLC: SP1 vào vị trí, bật TRIGGER
+  21 ms  VIS: thấy sườn lên TRIGGER: READY=0, BUSY=1, chụp + xử lý
+  61 ms  VIS: ghi kết quả OK lên OK/NG (chưa bật DONE)
+  63 ms  VIS: kết quả đã ổn định 2 ms: DONE=1, BUSY=0
+  65 ms  PLC: thấy DONE, SP1 = OK (sau 45 ms), tắt TRIGGER
+  66 ms  VIS: TRIGGER tắt: xóa DONE và OK/NG, READY=1
+ 100 ms  PLC: SP2 vào vị trí, bật TRIGGER
+ 101 ms  VIS: thấy sườn lên TRIGGER: READY=0, BUSY=1, chụp + xử lý
+ 146 ms  VIS: ghi kết quả NG lên OK/NG (chưa bật DONE)
+ 148 ms  VIS: kết quả đã ổn định 2 ms: DONE=1, BUSY=0
+ 150 ms  PLC: thấy DONE, SP2 = NG (sau 50 ms), tắt TRIGGER
+ 151 ms  VIS: TRIGGER tắt: xóa DONE và OK/NG, READY=1
+ 180 ms  PLC: SP3 vào vị trí, bật TRIGGER
+ 181 ms  VIS: thấy sườn lên TRIGGER: READY=0, BUSY=1, chụp + xử lý
+ 330 ms  PLC: TIMEOUT 150 ms: SP3 đẩy ra như NG, báo lỗi
+ 431 ms  VIS: xử lý xong nhưng TRIGGER đã tắt: BỎ kết quả, READY=1
+
+TRIGGER __‾‾‾‾‾___‾‾‾‾‾___‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾_____________
+READY   ‾‾‾___‾‾‾‾‾____‾‾‾‾________________________‾‾‾
+BUSY    __‾‾‾‾‾___‾‾‾‾‾___‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾__
+DONE    ______‾_______‾‾______________________________
+OK      ______‾_______________________________________
+NG      ______________‾‾______________________________
+ms      0         100       200       300       400
+
+PLC ghi nhận: [('SP1', 'OK'), ('SP2', 'NG'), ('SP3', 'TIMEOUT')]</code></pre>
+<p>Đọc kết quả mô phỏng:</p>
+<ul>
+  <li>SP1: vision đặt OK ở 61 ms, bật DONE ở 63 ms, nhưng PLC chỉ thấy ở lần quét 65 ms. Từ lúc bật TRIGGER đến khi chốt kết quả là 45 ms dù xử lý chỉ 40 ms: đó là chi phí bắt tay.</li>
+  <li>SP3: PLC chờ đủ 150 ms thì tự tắt TRIGGER, ghi nhận TIMEOUT và đẩy sản phẩm ra như NG. 100 ms sau vision mới xong, thấy TRIGGER đã tắt nên bỏ kết quả và bật lại READY. Không có kết quả "OK muộn" nào bị gán nhầm.</li>
+  <li>Trên giản đồ (mỗi ký tự = 10 ms), DONE và OK/NG chỉ rộng 1–2 ký tự: thời gian giữ kết quả ngắn vì PLC phản hồi nhanh. Đó là lý do không thể thay handshake bằng "PLC tự đọc OK sau một khoảng thời gian cố định".</li>
+</ul>
+<div class="tip"><strong>Dùng mô phỏng như bản đặc tả</strong>Gửi giản đồ và nhật ký mô phỏng cho kỹ sư PLC trước khi họ viết ladder. Hai bên thống nhất trên cùng một hình, kể cả trường hợp timeout, sẽ tiết kiệm hàng giờ "đổ lỗi" khi chạy thử. Trên hệ thật, ghi log mọi sườn tín hiệu kèm thời gian đến ms ở phía vision.</div>
+
+<h2 id="9-loi-thuong-gap">9. Lỗi thường gặp</h2>
+<table>
+  <tr><th>Hiện tượng</th><th>Nguyên nhân hay gặp</th><th>Cách xử lý</th></tr>
+  <tr><td>LED ngõ vào PLC không sáng dù camera báo đã bật ngõ ra</td><td>Lẫn NPN/PNP với kiểu COM của nhóm ngõ vào; hai nguồn không chung 0 V</td><td>Đo OUT so với 0 V khi ON; xem lại sơ đồ đấu COM</td></tr>
+  <tr><td>Thỉnh thoảng PLC "không thấy" kết quả</td><td>Dùng xung ngắn hơn chu kỳ quét + lọc</td><td>Chuyển sang mức + bắt tay, hoặc kéo dài xung ≥ 2 × (quét + lọc)</td></tr>
+  <tr><td>Hiếm khi một sản phẩm tốt bị đẩy NG mà ảnh lại OK</td><td>Bật DONE cùng lúc với OK, PLC quét vào khe lệch</td><td>Đặt kết quả trước, chờ t<sub>setup</sub>, rồi mới bật DONE</td></tr>
+  <tr><td>Một sản phẩm có hai kết quả trong log</td><td>Vision bắt mức TRIGGER thay vì sườn lên</td><td>Chỉ phản ứng với sườn lên, và chỉ khi đang READY</td></tr>
+  <tr><td>Kết quả của sản phẩm trước gán cho sản phẩm sau</td><td>Vision không kiểm tra TRIGGER trước khi bật DONE sau timeout</td><td>Bỏ kết quả nếu TRIGGER đã tắt; dùng mã/số thứ tự sản phẩm khi giao tiếp qua mạng</td></tr>
+  <tr><td>Dây chuyền đứng, cả hai bên chờ nhau</td><td>Thiếu timeout, hoặc vision không bật lại READY sau lỗi</td><td>Timeout ở cả hai phía, mọi nhánh lỗi đều quay về trạng thái READY hoặc ERROR rõ ràng</td></tr>
+</table>
+
+<h2 id="10-bai-tap">10. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> PLC có chu kỳ quét tối đa 12 ms, bộ lọc ngõ vào 5 ms. Camera thông minh chỉ hỗ trợ xuất OK dạng xung 10 ms. PLC có chắc chắn đọc được không? Bạn đề xuất gì?</p>
+<details><summary>Xem đáp án</summary>
+<p>Không. Xung tối thiểu để chắc chắn được thấy là 12 + 5 = 17 ms, xung 10 ms có thể lọt giữa hai lần quét. Đề xuất theo thứ tự ưu tiên: (1) cấu hình camera xuất kết quả dạng mức, giữ đến khi có trigger mới hoặc đến khi PLC xác nhận; (2) nếu chỉ có xung, kéo dài lên khoảng 2 × 17 ≈ 35 ms và kiểm tra lại cycle time; (3) đưa tín hiệu vào ngõ vào tốc độ cao/ngõ vào ngắt của PLC (nếu có), nơi không phụ thuộc chu kỳ quét.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Dùng mô phỏng ở mục 8 với thời gian xử lý <code>[40, 45, 70]</code>. Chạy với timeout 60 ms và 120 ms. Sản phẩm nào bị TIMEOUT? Bạn chọn timeout bao nhiêu nếu đo được thời gian xử lý tối đa 70 ms?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">for timeout in (60, 120):
+    plc = PLC(thoi_diem_sp=[20, 100, 180], chu_ky_quet=5, timeout=timeout)
+    vis = Vision(thoi_gian_xu_ly=[40, 45, 70], ket_qua=["OK", "NG", "OK"])
+    mo_phong(plc, vis, tong_ms=400)
+    print(f"timeout={timeout:3d} ms →", plc.ket_qua)</code></pre>
+<pre><code class="language-text">timeout= 60 ms → [('SP1', 'OK'), ('SP2', 'NG'), ('SP3', 'TIMEOUT')]
+timeout=120 ms → [('SP1', 'OK'), ('SP2', 'NG'), ('SP3', 'OK')]</code></pre>
+<p>Với 60 ms, SP3 (70 ms) bị timeout dù vision không hỏng: đây là kiểu "overkill" do cài đặt, không phải do thuật toán. Timeout phải lớn hơn thời gian xử lý tối đa cộng độ trễ bắt tay (ở đây cỡ 5–10 ms), cộng dự phòng cho lúc hệ điều hành bận: khoảng 1,5–2 lần, tức 110–150 ms, miễn là vẫn nằm trong thời gian dây chuyền cho phép dừng tại trạm.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Một kỹ sư đề xuất: "Bỏ DONE đi cho nhanh. PLC bật TRIGGER, chờ cố định 80 ms rồi đọc OK/NG." Nêu ít nhất ba rủi ro.</p>
+<details><summary>Xem đáp án</summary>
+<ul>
+  <li>Khi xử lý lâu hơn 80 ms (ảnh khó, hệ điều hành bận, ghi ổ đĩa chậm), PLC đọc kết quả <strong>của sản phẩm trước</strong> hoặc 00 → gán sai.</li>
+  <li>Khi vision treo hoặc mất nguồn, PLC vẫn "đọc" được một giá trị và không có cách nào phân biệt với kết quả thật; mất tín hiệu có thể bị hiểu thành OK nếu chỉ dùng một dây.</li>
+  <li>Phải đặt thời gian chờ theo trường hợp xấu nhất cho mọi sản phẩm, nên thực ra còn <strong>chậm hơn</strong> handshake (vốn kết thúc ngay khi có kết quả).</li>
+  <li>Không có bằng chứng thời gian trong log để phân xử khi có sự cố.</li>
+</ul>
+</details>
+</div>
+
+<h2 id="tom-tat">Tóm tắt</h2>
+<ul>
+  <li>I/O công nghiệp dùng 24 V vì chống nhiễu, ngưỡng ON/OFF rộng và là chuẩn chung; không nối 24 V vào GPIO máy tính.</li>
+  <li>PNP (sourcing) nối OUT lên +24 V khi ON, cần ngõ vào có COM về 0 V; NPN (sinking) nối OUT xuống 0 V, cần COM về +24 V. Xem sơ đồ đấu dây, đừng tin chữ "sink/source".</li>
+  <li>PLC chỉ thấy thay đổi sau tối đa (chu kỳ quét + lọc ngõ vào); xung phải dài hơn khoảng này, tốt nhất dùng mức + bắt tay.</li>
+  <li>Handshake 4 pha: TRIGGER↑ → BUSY↑ → (OK/NG) → DONE↑ → TRIGGER↓ → DONE↓ → READY↑. Hai dây OK/NG, chỉ đọc khi DONE = 1.</li>
+  <li>Đặt kết quả trước DONE một khoảng t<sub>setup</sub>; vision bắt sườn lên TRIGGER; timeout ở cả hai phía, PLC timeout = NG, vision bỏ kết quả muộn.</li>
+  <li>Mô phỏng máy trạng thái và giản đồ thời gian là bản đặc tả chung với kỹ sư PLC.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Các chuẩn giao tiếp: Modbus TCP, EtherNet/IP, PROFINET</strong>, để đưa trình tự bắt tay này lên mạng và gửi được cả số đo, không chỉ vài bit OK/NG.</p>
+
+      </div>
+      <div class="lesson-done" data-course="vision-engineer"><button type="button" class="lesson-done-btn" data-lesson-done="tich-hop-1-io-so-va-handshake-plc" aria-pressed="false"><span class="box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></span><span class="off">Đánh dấu đã học xong</span><span class="on">Đã học xong bài này</span></button><a class="btn lg" href="../kien-thuc/giao-tiep-camera-vision-voi-plc.html">Bài tiếp theo<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a></div>
+      <footer class="article-foot">
+        <div class="tags"><a class="tag" href="../search.html?q=PLC">#PLC</a><a class="tag" href="../search.html?q=Industrial Vision">#Industrial Vision</a><a class="tag" href="../search.html?q=Python">#Python</a></div>
+        <div class="share">
+      <span>Chia sẻ:</span>
+      <a class="share-btn fb" href="https://www.facebook.com/sharer/sharer.php?u=https://hocfree.vn/hoc/tich-hop-1-io-so-va-handshake-plc.html" target="_blank" rel="noopener" aria-label="Chia sẻ Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8z"/></svg></a>
+      <a class="share-btn x" href="https://twitter.com/intent/tweet?url=https://hocfree.vn/hoc/tich-hop-1-io-so-va-handshake-plc.html" target="_blank" rel="noopener" aria-label="Chia sẻ X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+      <button class="share-btn copy-link" data-url="https://hocfree.vn/hoc/tich-hop-1-io-so-va-handshake-plc.html" aria-label="Sao chép liên kết"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+    </div>
+      </footer>
+      <div class="author-box">
+        <span class="avatar lg" aria-hidden="true">HF</span>
+        <div>
+          <strong>Ban biên tập HọcFree</strong>
+          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và ngoại ngữ, hoàn toàn miễn phí.</p>
+        </div>
+      </div>
+      <nav class="pager lesson-pager" aria-label="Bài học trước/sau"><a class="prev" href="../projects/do-kich-thuoc-chi-tiet-bang-camera.html"><span>← Bài trước · Bài 6 · Chặng 8</span>Dự án chặng 8: đo kích thước chi tiết cơ khí</a><a class="next" href="../kien-thuc/giao-tiep-camera-vision-voi-plc.html"><span>Bài tiếp → · Bài 2</span>Các chuẩn giao tiếp: Modbus TCP, EtherNet/IP, PROFINET</a></nav>
+    </article>
+    <aside class="sidebar course-side" data-course="vision-engineer">
+      <section class="widget course-toc">
+        <p class="widget-title">Chặng 9/14 · Vision Engineer</p>
+        <a class="course-toc-title" href="../lo-trinh/vision-engineer/plc-robot-mes.html">PLC / Robot / MES</a>
+        <div class="lc" data-lesson-count="tich-hop-1-io-so-va-handshake-plc giao-tiep-camera-vision-voi-plc tich-hop-3-modbus-tcp-python opc-ua-cho-ky-su-vision tich-hop-5-tcp-socket-gui-toa-do-robot vision-dan-huong-robot-gap-vat mes-truy-xuat-nguon-goc-vision tich-hop-8-luu-ket-qua-sqlite-anh-ng tich-hop-9-du-an-tram-vision-mo-phong"><div class="lc-bar"><span data-lc-bar></span></div><span data-lc-text>0/9 bài</span></div>
+        <ol class="toc-lessons"><li data-lesson="tich-hop-1-io-so-va-handshake-plc" class="is-current"><a href="../hoc/tich-hop-1-io-so-va-handshake-plc.html" aria-current="page"><span class="tn">1</span><span class="tt">I/O số và handshake với PLC</span></a></li><li data-lesson="giao-tiep-camera-vision-voi-plc"><a href="../kien-thuc/giao-tiep-camera-vision-voi-plc.html"><span class="tn">2</span><span class="tt">Các chuẩn giao tiếp: Modbus TCP, EtherNet/IP, PROFINET</span></a></li><li data-lesson="tich-hop-3-modbus-tcp-python"><a href="../hoc/tich-hop-3-modbus-tcp-python.html"><span class="tn">3</span><span class="tt">Modbus TCP bằng Python với pymodbus</span></a></li><li data-lesson="opc-ua-cho-ky-su-vision"><a href="../kien-thuc/opc-ua-cho-ky-su-vision.html"><span class="tn">4</span><span class="tt">OPC UA cho kỹ sư Vision</span></a></li><li data-lesson="tich-hop-5-tcp-socket-gui-toa-do-robot"><a href="../hoc/tich-hop-5-tcp-socket-gui-toa-do-robot.html"><span class="tn">5</span><span class="tt">TCP socket: gửi kết quả và tọa độ cho robot</span></a></li><li data-lesson="vision-dan-huong-robot-gap-vat"><a href="../hoc/vision-dan-huong-robot-gap-vat.html"><span class="tn">6</span><span class="tt">Vision dẫn hướng robot gắp vật</span></a></li><li data-lesson="mes-truy-xuat-nguon-goc-vision"><a href="../kien-thuc/mes-truy-xuat-nguon-goc-vision.html"><span class="tn">7</span><span class="tt">MES và truy xuất nguồn gốc</span></a></li><li data-lesson="tich-hop-8-luu-ket-qua-sqlite-anh-ng"><a href="../hoc/tich-hop-8-luu-ket-qua-sqlite-anh-ng.html"><span class="tn">8</span><span class="tt">Lưu kết quả và ảnh NG: SQLite, thư mục, dọn ổ đĩa</span></a></li><li data-lesson="tich-hop-9-du-an-tram-vision-mo-phong"><a href="../hoc/tich-hop-9-du-an-tram-vision-mo-phong.html"><span class="tn">9</span><span class="tt">Dự án chặng 9: trạm vision hoàn chỉnh với PLC mô phỏng</span></a></li></ol>
+        <a class="more" href="../lo-trinh/vision-engineer.html">Xem toàn bộ lộ trình<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a>
+      </section>
+    </aside>
+  </div>
+  <section class="band">
+    <div class="container">
+      <div class="section-title"><h2>Có thể bạn quan tâm</h2></div>
+      <div class="card-grid"><article class="card">
+  <a class="thumb" href="../hoc/python-1-cai-dat-python-va-vs-code.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-1-cai-dat-python-va-vs-code.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-1-cai-dat-python-va-vs-code.html">Python cơ bản: cài Python, VS Code và chạy chương trình đầu tiên</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>7 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/python-2-bien-kieu-du-lieu-toan-tu.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-2-bien-kieu-du-lieu-toan-tu.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-2-bien-kieu-du-lieu-toan-tu.html">Python cơ bản: biến, kiểu dữ liệu và toán tử</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/python-3-re-nhanh-va-vong-lap.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-3-re-nhanh-va-vong-lap.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-3-re-nhanh-va-vong-lap.html">Python cơ bản: rẽ nhánh và vòng lặp</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article></div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <a class="logo" href="../"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+      <p>HọcFree.vn – nền tảng học miễn phí về AI, lập trình, Computer Vision, Machine Vision, tin tức AI và ngoại ngữ dành cho người Việt.</p>
+    </div>
+    <div><h3>Học &amp; thực hành</h3><ul><li><a href="../hoc/">Học AI &amp; Lập trình</a></li><li><a href="../projects/">Projects</a></li><li><a href="../lo-trinh/">Learning Paths</a></li></ul></div>
+    <div><h3>Khám phá</h3><ul><li><a href="../kien-thuc/">Kiến thức</a></li><li><a href="../tin-tuc-ai/">Tin tức AI</a></li><li><a href="../ngoai-ngu/">Ngoại ngữ</a></li><li><a href="../tai-nguyen/">Tài nguyên</a></li></ul></div>
+    <div><h3>Bài mới</h3><ul><li><a href="../hoc/python-1-cai-dat-python-va-vs-code.html">Python cơ bản: cài Python, VS Code và chạy chương trình đầu tiên</a></li><li><a href="../hoc/python-2-bien-kieu-du-lieu-toan-tu.html">Python cơ bản: biến, kiểu dữ liệu và toán tử</a></li><li><a href="../hoc/python-3-re-nhanh-va-vong-lap.html">Python cơ bản: rẽ nhánh và vòng lặp</a></li><li><a href="../hoc/python-4-list-tuple-dict-set.html">Python cơ bản: list, tuple, dict và set</a></li></ul></div>
+    <div>
+      <h3>HọcFree</h3>
+      <ul>
+        <li><a href="../gioi-thieu.html">Giới thiệu</a></li>
+        <li><a href="../search.html">Tìm kiếm</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">© 2026 HọcFree.vn · Kiến thức là để chia sẻ.</div>
+  </div>
+</footer>
+<button class="to-top" aria-label="Lên đầu trang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<script src="../assets/js/search-data.js?v=20261009" defer></script>
+<script src="../assets/js/main.js?v=20261009" defer></script>
+</body>
+</html>

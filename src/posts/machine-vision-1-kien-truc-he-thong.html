@@ -1,0 +1,254 @@
+<p>Ở Giai đoạn 1 bạn đã viết được chương trình OpenCV đọc ảnh, phân ngưỡng, tìm contour và trả về OK/NG. Nhưng một chương trình xử lý ảnh mới chỉ là <strong>một khối</strong> trong trạm kiểm tra thật. Trước nó là đèn, ống kính, camera và tín hiệu kích hoạt; sau nó là PLC, van thổi loại hàng và cơ sở dữ liệu. Phần lớn dự án Machine Vision thất bại không phải vì thuật toán kém, mà vì một khối khác bị chọn sai, thường là chiếu sáng. Bài này mở đầu chặng 4 "Machine Vision": bạn sẽ nhìn toàn bộ hệ thống, đi dọc một trạm kiểm tra nắp chai từ cảm biến đến lúc loại hàng, và tự chứng minh bằng code vì sao người trong nghề hay nói "chiếu sáng quyết định 80% thành công".</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Vẽ được sơ đồ khối của một trạm Machine Vision, nói được vai trò và thông số chính của từng khối, phân biệt Computer Vision với Machine Vision, và giải thích bằng con số vì sao chiếu sáng tốt làm thuật toán đơn giản chạy ổn định.</div>
+
+<h2>1. Machine Vision và Computer Vision khác nhau thế nào?</h2>
+<p><strong>Computer Vision</strong> (thị giác máy tính) là lĩnh vực khoa học nghiên cứu cách máy tính hiểu ảnh: nhận dạng khuôn mặt, xe tự lái, phân đoạn ảnh y tế, tìm kiếm ảnh. <strong>Machine Vision</strong> (thị giác máy) là ngành <em>kỹ thuật ứng dụng</em>: dùng camera, chiếu sáng và xử lý ảnh để tự động kiểm tra, đo, nhận dạng và dẫn hướng trong sản xuất. Machine Vision dùng thuật toán của Computer Vision, nhưng sản phẩm cuối cùng là <strong>một trạm máy chạy 24/7 nối với dây chuyền</strong>, không phải một mô hình hay một bài báo.</p>
+<table>
+  <tr><th>Tiêu chí</th><th>Computer Vision (điển hình)</th><th>Machine Vision (điển hình)</th></tr>
+  <tr><td>Môi trường ảnh</td><td>Không kiểm soát: trời nắng, mưa, góc chụp bất kỳ</td><td><strong>Kiểm soát được</strong>: đèn riêng, vị trí vật cố định, khoảng cách cố định</td></tr>
+  <tr><td>Đầu ra</td><td>Nhãn, khung, mô tả ảnh</td><td>Tín hiệu OK/NG, số đo (mm), tọa độ gửi cho PLC/robot</td></tr>
+  <tr><td>Yêu cầu thời gian</td><td>Thường "càng nhanh càng tốt"</td><td><strong>Cứng</strong>: phải xong trước khi sản phẩm tới van loại, ví dụ dưới 80 ms</td></tr>
+  <tr><td>Yêu cầu độ tin cậy</td><td>Độ chính xác 90–95% đã là tốt</td><td>Lọt lỗi tính bằng ppm (phần triệu); loại nhầm vài phần nghìn đã bị phàn nàn</td></tr>
+  <tr><td>Phần cứng</td><td>Webcam, điện thoại, GPU máy chủ</td><td>Camera công nghiệp, ống kính, đèn chuyên dụng, I/O 24 V, PC công nghiệp</td></tr>
+  <tr><td>Người dùng</td><td>Người dùng cuối, nhà nghiên cứu</td><td>Công nhân vận hành, kỹ sư bảo trì, phòng chất lượng (QA)</td></tr>
+</table>
+<p>Ranh giới không tuyệt đối: deep learning ngày nay xuất hiện ở cả hai bên, và một trạm Machine Vision có thể dùng mạng nơ-ron để phân loại lỗi bề mặt. Điểm khác cốt lõi là <strong>tư duy hệ thống</strong>: kỹ sư Machine Vision được phép (và phải) thay đổi điều kiện chụp để bài toán dễ đi, thay vì cố viết thuật toán chịu được mọi điều kiện xấu.</p>
+
+<h2>2. Sơ đồ khối của một trạm Machine Vision</h2>
+<pre><code class="language-text">          ┌──────────────┐
+ Sản phẩm │  Chiếu sáng  │  tạo tương phản giữa đặc điểm cần xem và nền
+ trên  ──▶│  Quang học   │  ống kính + filter: tạo ảnh sắc nét đúng FOV
+ băng tải │  Camera      │  cảm biến biến ánh sáng thành ảnh số
+          └──────┬───────┘
+   Cảm biến /    │ ảnh (GigE Vision, USB3 Vision, CoaXPress…)
+   encoder ──trigger──┐
+                 ▼    │
+          ┌──────────────┐
+          │   Xử lý      │  PC công nghiệp / smart camera / máy nhúng
+          │ (phần mềm)   │  thuật toán → OK/NG, số đo, tọa độ
+          └──────┬───────┘
+                 │ I/O số 24 V, PROFINET, EtherNet/IP, Modbus TCP…
+                 ▼
+          ┌──────────────┐        ┌───────────────────┐
+          │ PLC / Robot  │──────▶ │ Van thổi, cần gạt │  loại sản phẩm NG
+          └──────┬───────┘        └───────────────────┘
+                 ▼
+          HMI, lưu ảnh NG, MES (thống kê, truy xuất)</code></pre>
+<table>
+  <tr><th>Khối</th><th>Vai trò</th><th>Thông số phải chọn</th><th>Hậu quả nếu chọn sai</th></tr>
+  <tr><td><strong>Kích hoạt</strong> (cảm biến quang, encoder, PLC)</td><td>Báo "sản phẩm đã tới đúng chỗ, chụp ngay"</td><td>Vị trí lắp, độ trễ, độ lặp lại thời điểm</td><td>Ảnh chụp lúc vật lệch khỏi khung, chụp hụt, chụp 2 lần</td></tr>
+  <tr><td><strong>Chiếu sáng</strong></td><td>Làm đặc điểm cần kiểm tra nổi bật, triệt tiêu thứ không cần</td><td>Kiểu đèn (backlight, ring, coaxial, dome, góc thấp), màu, chế độ liên tục hay strobe</td><td>Tương phản thấp, chói, ảnh thay đổi theo giờ trong ngày</td></tr>
+  <tr><td><strong>Quang học</strong> (ống kính, filter)</td><td>Chiếu vùng cần nhìn (FOV, field of view, trường nhìn) lên cảm biến, rõ nét</td><td>Tiêu cự, khoảng làm việc, độ sâu trường ảnh, méo, telecentric hay không</td><td>Ảnh mờ, vật ra ngoài FOV, kích thước đổi khi vật cao thấp khác nhau</td></tr>
+  <tr><td><strong>Camera</strong></td><td>Biến ảnh quang học thành dữ liệu số</td><td>Độ phân giải, kích thước pixel, màn trập global/rolling, tốc độ khung, giao tiếp, đơn sắc hay màu</td><td>Không đủ pixel để thấy lỗi nhỏ, ảnh méo khi vật chạy nhanh</td></tr>
+  <tr><td><strong>Xử lý</strong> (phần cứng + phần mềm)</td><td>Chạy thuật toán, ra quyết định</td><td>CPU/GPU, hệ điều hành, thư viện (OpenCV, Halcon…), thời gian xử lý tối đa</td><td>Không kịp cycle time, treo máy giữa ca</td></tr>
+  <tr><td><strong>I/O và truyền thông</strong></td><td>Nhận trigger, gửi kết quả cho PLC/robot, báo lỗi</td><td>Mức tín hiệu (24 V PNP/NPN), giao thức công nghiệp, cơ chế handshake</td><td>Kết quả tới trễ hoặc gán nhầm cho sản phẩm khác</td></tr>
+  <tr><td><strong>Cơ cấu chấp hành</strong></td><td>Loại sản phẩm NG khỏi dây chuyền</td><td>Khoảng cách tới camera, thời gian đáp ứng van, cách theo dõi sản phẩm</td><td>Thổi nhầm chai OK bên cạnh, chai NG lọt qua</td></tr>
+  <tr><td><strong>HMI, lưu trữ, MES</strong></td><td>Cho người vận hành xem, chỉnh, truy xuất</td><td>Quyền truy cập, lưu ảnh NG bao lâu, dữ liệu gửi lên MES</td><td>Không giải thích được vì sao trạm loại hàng, không truy được lô lỗi</td></tr>
+</table>
+<p>Khối "kích hoạt" và chuỗi thời gian sẽ học kỹ ở chặng 5 "Industrial Vision". Camera, ống kính và đèn có cả chặng 6 "Camera / Lens / Lighting". Giao tiếp PLC, robot, MES nằm ở chặng 9. Bài này chỉ cần bạn nắm <strong>vai trò</strong> và <strong>mối liên hệ</strong> giữa các khối.</p>
+
+<h2>3. Đi dọc một trạm thật: kiểm tra có nắp chai</h2>
+<p>Bài toán: dây chuyền nước giải khát chạy <strong>300 chai/phút</strong>, khoảng cách tâm hai chai liên tiếp (pitch) 100 mm. Trạm phải phát hiện chai thiếu nắp và thổi chai đó ra khỏi băng tải. Đây là bài toán "có/không" kinh điển, đủ đơn giản để thấy rõ mọi khối.</p>
+<h3>Bố trí</h3>
+<ul>
+  <li><strong>Chiếu sáng</strong>: đèn nền (backlight) đặt sau băng tải, camera đặt phía trước, cùng độ cao với cổ chai. Chai che đèn nên hiện thành <em>bóng đen trên nền trắng</em>. Có nắp hay không chỉ là câu hỏi "vùng phía trên cổ chai có tối không".</li>
+  <li><strong>Camera</strong>: đơn sắc, màn trập global (chụp cả khung cùng lúc, không méo khi vật chạy), độ phân giải vừa phải (khoảng 0,3–1,3 MP là thừa đủ cho bài có/không).</li>
+  <li><strong>Kích hoạt</strong>: cảm biến quang (photoelectric sensor) dạng thu phát, chùm tia ngang cổ chai, đặt sao cho khi tia bị cắt thì chai nằm giữa khung hình.</li>
+  <li><strong>Loại hàng</strong>: van khí nén thổi ngang, đặt cách camera 600 mm về phía hạ nguồn.</li>
+</ul>
+<h3>Chuỗi sự kiện cho một chai</h3>
+<table>
+  <tr><th>Bước</th><th>Việc xảy ra</th><th>Thời gian (ví dụ)</th></tr>
+  <tr><td>1</td><td>Cổ chai cắt tia cảm biến, cảm biến xuất xung 24 V</td><td>0 ms (mốc)</td></tr>
+  <tr><td>2</td><td>Camera nhận trigger phần cứng, phơi sáng (đèn nền chớp đồng bộ)</td><td>~0,1 ms</td></tr>
+  <tr><td>3</td><td>Đọc cảm biến ảnh và truyền ảnh qua GigE về PC</td><td>~10 ms</td></tr>
+  <tr><td>4</td><td>Phần mềm: lấy ROI vùng nắp, tính độ tối, so ngưỡng</td><td>~3 ms</td></tr>
+  <tr><td>5</td><td>PC gửi kết quả OK/NG cho PLC (I/O số hoặc mạng công nghiệp)</td><td>~2–10 ms</td></tr>
+  <tr><td>6</td><td>PLC ghi kết quả vào hàng đợi theo dõi chai; khi chai NG tới van, PLC mở van</td><td>sau ~1,2 s</td></tr>
+  <tr><td>7</td><td>PC lưu ảnh NG kèm thời gian, đếm thống kê, hiển thị lên HMI</td><td>chạy nền, không chặn</td></tr>
+</table>
+<p>Hai con số chi phối thiết kế: <strong>chu kỳ</strong> (một chai mới tới mỗi bao lâu) và <strong>số chai nằm giữa camera và van</strong>. Tính nhanh:</p>
+<pre><code class="language-python">chai_phut = 300          # năng suất dây chuyền
+pitch_mm = 100           # khoảng cách tâm hai chai
+khoang_cach_van_mm = 600 # camera → van thổi
+
+chu_ky_ms = 60_000 / chai_phut
+toc_do_mm_s = chai_phut / 60 * pitch_mm
+thoi_gian_toi_van_s = khoang_cach_van_mm / toc_do_mm_s
+so_chai_giua = khoang_cach_van_mm / pitch_mm
+
+print(f"Chu kỳ mỗi chai     : {chu_ky_ms:.0f} ms")
+print(f"Tốc độ băng tải     : {toc_do_mm_s:.0f} mm/s = {toc_do_mm_s * 60 / 1000:.0f} m/phút")
+print(f"Thời gian tới van   : {thoi_gian_toi_van_s:.2f} s")
+print(f"Số chai nằm giữa camera và van: {so_chai_giua:.0f}")</code></pre>
+<pre><code class="language-text">Chu kỳ mỗi chai     : 200 ms
+Tốc độ băng tải     : 500 mm/s = 30 m/phút
+Thời gian tới van   : 1.20 s
+Số chai nằm giữa camera và van: 6</code></pre>
+<p>Hệ quả thực tế:</p>
+<ul>
+  <li>Ảnh, xử lý và gửi kết quả cộng lại khoảng 15–25 ms, còn rất xa chu kỳ 200 ms. Bài này không bị giới hạn bởi tốc độ xử lý.</li>
+  <li>Khi chai NG tới van thì camera đã chụp thêm khoảng 6 chai khác. PC <strong>không thể</strong> tự bật van "ngay khi thấy lỗi"; PLC phải lưu kết quả vào một hàng đợi (FIFO, hay thanh ghi dịch) và mở van đúng chai. Nếu băng tải đổi tốc độ, cần encoder để theo dõi theo quãng đường thay vì theo thời gian (chặng 5).</li>
+  <li>Mọi chai phải có <strong>đúng một</strong> kết quả. Nếu trigger bị dội (một chai gây hai xung) hoặc PC treo một nhịp, hàng đợi lệch và trạm bắt đầu thổi nhầm chai. Vì vậy trạm thật luôn có giám sát: đếm số trigger so với số kết quả, và báo lỗi khi PC không trả lời đúng hạn.</li>
+</ul>
+
+<h2>4. Vì sao chiếu sáng quyết định "80% thành công"?</h2>
+<p>"80%" là cách nói kinh nghiệm của ngành, không phải con số đo được. Ý nghĩa của nó: <strong>phần mềm không tạo ra thông tin không có trong ảnh</strong>. Nếu nắp đỏ và nền xám có cùng độ sáng trên ảnh đơn sắc, không ngưỡng nào tách được chúng. Ngược lại, khi chiếu sáng làm đặc điểm cần xem nổi hẳn lên, thuật toán đơn giản nhất cũng chạy ổn định nhiều tháng.</p>
+<p>Ta thử bằng code. Cùng một thuật toán ("độ chênh xám giữa vùng nắp và vùng nền bên cạnh, so với ngưỡng"), chạy trên hai kiểu chiếu sáng:</p>
+<ul>
+  <li><strong>Đèn phía trước</strong>: nắp có ba màu (trắng, đỏ, xanh), ánh sáng xưởng thay đổi theo giờ, thỉnh thoảng có vệt chói trên cổ chai.</li>
+  <li><strong>Đèn nền</strong>: chai che đèn nên nắp màu gì cũng thành bóng đen.</li>
+</ul>
+<p>Kỹ sư cài ngưỡng bằng một chai nắp trắng và một chai không nắp (điều rất hay gặp khi chạy thử), rồi thử trên 1000 chai mỗi loại:</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+H, W = 160, 160
+ROI_NAP = (slice(28, 48), slice(62, 98))      # vùng nắp: (hàng, cột)
+ROI_NEN = (slice(28, 48), slice(8, 40))       # vùng nền tham chiếu cùng độ cao
+
+
+def tao_anh(co_nap, kieu_den, rng, mau_nap=None):
+    """Ảnh cổ chai nhìn ngang. kieu_den: 'truoc' (đèn phía trước) hoặc 'nen' (backlight)."""
+    dy = int(rng.integers(-3, 4))                         # chai lệch vị trí ±3 px
+    if kieu_den == "nen":
+        nen, co_chai, nap, nhieu = 225 + rng.normal(0, 3), 25, 25, 4
+    else:
+        moi_truong = rng.uniform(-35, 35)                 # ánh sáng xưởng thay đổi
+        nen = 120 + moi_truong
+        co_chai = nen + 12                                # cổ chai: tương phản thấp với nền
+        mau = rng.choice([205, 140, 100]) if mau_nap is None else mau_nap  # trắng / đỏ / xanh
+        nap = mau + 0.5 * moi_truong
+        nhieu = 10
+    anh = np.full((H, W), nen, np.float32)
+    cv2.rectangle(anh, (66, 50 + dy), (94, H), float(co_chai), -1)            # cổ chai
+    if co_nap:
+        cv2.rectangle(anh, (60, 26 + dy), (100, 52 + dy), float(nap), -1)     # nắp
+    if kieu_den == "truoc" and rng.random() &lt; 0.5:                            # vệt chói
+        cv2.ellipse(anh, (80, 70 + dy), (6, 18), 0, 0, 360, 250.0, -1)
+    anh += rng.normal(0, nhieu, anh.shape)
+    return np.clip(anh, 0, 255).astype(np.uint8)
+
+
+def diem(anh):
+    """Cùng một thuật toán cho mọi kiểu đèn: độ chênh xám giữa vùng nắp và vùng nền."""
+    return abs(float(anh[ROI_NAP].mean()) - float(anh[ROI_NEN].mean()))
+
+
+rng = np.random.default_rng(1)
+for kieu in ("truoc", "nen"):
+    # Kỹ sư cài ngưỡng từ 1 chai có nắp TRẮNG và 1 chai không nắp
+    anh_ok = tao_anh(True, kieu, np.random.default_rng(100), mau_nap=205)
+    anh_ng = tao_anh(False, kieu, np.random.default_rng(101))
+    nguong = (diem(anh_ok) + diem(anh_ng)) / 2
+    s_ok = np.array([diem(tao_anh(True, kieu, rng)) for _ in range(1000)])
+    s_ng = np.array([diem(tao_anh(False, kieu, rng)) for _ in range(1000)])
+    sai_ok = int((s_ok &lt;= nguong).sum())      # có nắp nhưng báo thiếu → loại nhầm
+    sai_ng = int((s_ng &gt; nguong).sum())       # thiếu nắp nhưng báo có → lọt lỗi
+    print(f"Đèn {kieu}: ngưỡng {nguong:.1f}")
+    print(f"  điểm chai có nắp  : {s_ok.min():6.1f} .. {s_ok.max():6.1f}")
+    print(f"  điểm chai thiếu nắp: {s_ng.min():6.1f} .. {s_ng.max():6.1f}")
+    print(f"  khoảng hở (min có nắp - max thiếu nắp): {s_ok.min() - s_ng.max():.1f}")
+    print(f"  báo thiếu nắp nhầm: {sai_ok}/1000 | thiếu nắp bị cho qua: {sai_ng}/1000")
+    cv2.imwrite(f"nap_{kieu}.png", np.hstack([anh_ok, anh_ng]))</code></pre>
+<pre><code class="language-text">Đèn truoc: ngưỡng 41.5
+  điểm chai có nắp  :    2.0 ..  103.3
+  điểm chai thiếu nắp:    0.0 ..    1.6
+  khoảng hở (min có nắp - max thiếu nắp): 0.3
+  báo thiếu nắp nhầm: 656/1000 | thiếu nắp bị cho qua: 0/1000
+Đèn nen: ngưỡng 100.4
+  điểm chai có nắp  :  183.5 ..  209.9
+  điểm chai thiếu nắp:    0.0 ..    8.7
+  khoảng hở (min có nắp - max thiếu nắp): 174.8
+  báo thiếu nắp nhầm: 0/1000 | thiếu nắp bị cho qua: 0/1000</code></pre>
+<p>Đọc kết quả như một kỹ sư:</p>
+<ul>
+  <li><strong>Đèn phía trước</strong>: điểm của chai có nắp trải từ 2 đến 103. Nắp trắng cho điểm cao, nhưng nắp đỏ và xanh có độ xám gần nền, và khi ánh sáng xưởng thay đổi thì có lúc gần như trùng nền. Khoảng hở giữa hai nhóm chỉ còn 0,3 mức xám: <strong>không tồn tại ngưỡng an toàn</strong>. Ngưỡng cài bằng nắp trắng làm 656/1000 chai tốt bị báo thiếu nắp. Hạ ngưỡng xuống thì một chút nhiễu hay vệt chói sẽ làm chai thiếu nắp lọt qua.</li>
+  <li><strong>Đèn nền</strong>: mọi nắp đều thành bóng đen, điểm từ 183 đến 210; chai thiếu nắp dưới 9. Khoảng hở gần 175 mức xám, ngưỡng đặt ở đâu trong khoảng đó cũng đúng. Màu nắp, ánh sáng xưởng, vệt chói đều <strong>không còn ảnh hưởng</strong>.</li>
+</ul>
+<p>Mở hai ảnh <code>nap_truoc.png</code> và <code>nap_nen.png</code> để nhìn tận mắt. Bài học quan trọng nhất: <strong>đừng sửa bằng phần mềm thứ mà chiếu sáng sửa được</strong>. Thay vì thêm tiền xử lý, cân bằng sáng, học máy cho trường hợp đèn phía trước, đổi sang đèn nền là xong. Thước đo bạn vừa dùng, <em>khoảng hở giữa hai nhóm điểm</em>, là cách định lượng "ảnh tốt" mà bạn sẽ dùng lại khi chọn đèn ở chặng 6 và khi đặt ngưỡng OK/NG ở chặng 5.</p>
+<div class="tip"><strong>Chiếu sáng tốt làm ba việc</strong>(1) Tối đa hóa tương phản của đặc điểm cần xem: mép, lỗ, vết xước, ký tự. (2) Tối thiểu hóa thứ không cần xem: hoa văn nền, màu sắc, phản xạ. (3) Lấn át ánh sáng môi trường: đèn đủ mạnh, che chắn trạm, dùng đèn chớp hoặc filter cùng màu đèn để ánh sáng xưởng gần như không còn ảnh hưởng. Đèn chớp được giải thích trong bài "Đèn strobe và đồng bộ trigger" ở chặng 5.</div>
+<p>Vài cặp "bài toán → kiểu đèn" bạn sẽ gặp lại liên tục:</p>
+<table>
+  <tr><th>Cần thấy</th><th>Kiểu đèn thường dùng</th><th>Vì sao</th></tr>
+  <tr><td>Biên dạng, có/không, đo kích thước ngoài</td><td>Đèn nền (backlight)</td><td>Bóng đen sắc nét, không phụ thuộc màu và bề mặt vật</td></tr>
+  <tr><td>Vết xước, chữ dập nổi trên mặt phẳng</td><td>Đèn góc thấp (low-angle, dark field)</td><td>Mặt phẳng tối, mép xước và chữ nổi bắt sáng</td></tr>
+  <tr><td>Mặt phẳng bóng (kim loại, wafer, nhãn bóng)</td><td>Đèn đồng trục (coaxial)</td><td>Ánh sáng chiếu thẳng góc, mặt phẳng phản xạ đều</td></tr>
+  <tr><td>Bề mặt cong, bóng (lon, vỉ thuốc)</td><td>Đèn vòm (dome)</td><td>Ánh sáng khuếch tán từ mọi phía, triệt chói</td></tr>
+  <tr><td>Phân biệt màu trên ảnh đơn sắc</td><td>Đèn màu + filter</td><td>Đèn cùng màu vật làm vật sáng, màu bù làm vật tối</td></tr>
+</table>
+
+<h2>5. Khối xử lý và khối I/O: những gì cần biết ngay bây giờ</h2>
+<p><strong>Phần cứng xử lý</strong> có ba dạng chính:</p>
+<ul>
+  <li><strong>PC công nghiệp + camera rời</strong>: linh hoạt nhất, chạy được OpenCV, Halcon, deep learning, nhiều camera. Cần tủ điện, quạt, phần mềm tự viết hoặc mua.</li>
+  <li><strong>Smart camera</strong>: camera có bộ xử lý và phần mềm cấu hình bên trong, nối thẳng I/O với PLC. Gọn, nhanh triển khai cho bài toán đơn giản.</li>
+  <li><strong>Máy nhúng</strong> (ARM, máy có GPU nhúng): rẻ, nhỏ, hợp sản phẩm số lượng lớn hoặc cần AI tại chỗ; đòi hỏi kỹ năng phần mềm cao hơn.</li>
+</ul>
+<p>Cách chọn giữa chúng là nội dung bài 3 của chặng này.</p>
+<p><strong>I/O và truyền thông</strong> với PLC thường gồm hai lớp:</p>
+<ul>
+  <li><strong>I/O số 24 V</strong>: dây tín hiệu riêng cho những thứ cần nhanh và chắc chắn: Trigger vào, Ready/Busy ra, OK/NG ra. Phải khớp kiểu PNP/NPN giữa hai bên.</li>
+  <li><strong>Mạng công nghiệp</strong>: PROFINET, EtherNet/IP, Modbus TCP, CC-Link IE, hoặc TCP socket thuần, dùng để gửi dữ liệu nhiều hơn: số đo, mã đọc được, tọa độ, mã lỗi, tên công thức sản phẩm.</li>
+</ul>
+<p>Hai bên trao đổi theo cơ chế bắt tay (handshake): PLC chỉ gửi trigger khi camera báo Ready, camera chỉ đặt kết quả khi đã xử lý xong và báo bằng một tín hiệu "dữ liệu hợp lệ". Chi tiết ở chặng 9.</p>
+
+<h2>6. Sai lầm thường gặp của người mới</h2>
+<ul>
+  <li><strong>Chọn camera trước, nghĩ tới đèn sau.</strong> Thứ tự đúng: xác định đặc điểm cần thấy → thử chiếu sáng trên mẫu thật → tính độ phân giải và FOV → chọn camera, ống kính.</li>
+  <li><strong>Thử trên vài mẫu đẹp ở văn phòng.</strong> Mẫu thật trên dây chuyền có bụi, giọt nước, lệch vị trí, nhiều màu nắp, nhiều lô vật liệu. Hãy xin ít nhất vài chục mẫu OK và mọi loại mẫu lỗi có thể.</li>
+  <li><strong>Quên ánh sáng môi trường.</strong> Trạm chạy đúng ca sáng, sai ca chiều vì nắng chiếu qua cửa sổ. Che chắn và đèn đủ mạnh là bắt buộc.</li>
+  <li><strong>Quên khối loại hàng.</strong> Phát hiện đúng mà thổi nhầm chai thì vẫn là trạm hỏng. Khoảng cách tới van, theo dõi sản phẩm, xác nhận đã loại phải được thiết kế ngay từ đầu.</li>
+  <li><strong>Không lưu ảnh.</strong> Khi khách hàng báo "hôm qua lọt chai thiếu nắp", không có ảnh thì không thể chứng minh hay sửa.</li>
+</ul>
+
+<h2>7. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Một nhà máy muốn kiểm tra hạn sử dụng (date code) in phun trên đáy lon nhôm, 1200 lon/phút. Hãy kể tên các khối của trạm và với mỗi khối nêu một câu hỏi bạn cần hỏi khách hàng.</p>
+<details><summary>Xem đáp án</summary>
+<ul>
+  <li><strong>Kích hoạt</strong>: lon chạy liên tục hay theo nhịp? Có encoder trên băng tải không? Lon cách đều không?</li>
+  <li><strong>Chiếu sáng</strong>: đáy lon là nhôm cong và bóng, mực in màu gì? Thường phải thử đèn vòm hoặc đèn góc thấp để triệt chói.</li>
+  <li><strong>Quang học</strong>: lon có rung lên xuống không (ảnh hưởng độ sâu trường ảnh)? Vùng in rộng bao nhiêu mm, ký tự cao bao nhiêu mm?</li>
+  <li><strong>Camera</strong>: 1200 lon/phút là 20 lon/giây, chu kỳ 50 ms, cần camera đủ nhanh và màn trập global; thời gian phơi sáng đủ ngắn để không nhòe.</li>
+  <li><strong>Xử lý</strong>: chỉ cần "có in" hay phải đọc đúng từng ký tự (OCR) và so với ngày của lô? Ngày đúng lấy từ đâu?</li>
+  <li><strong>I/O</strong>: PLC hãng nào, giao thức gì? Có cần gửi chuỗi đọc được lên MES không?</li>
+  <li><strong>Loại hàng</strong>: loại bằng gì, đặt cách bao xa, có xác nhận lon đã bị loại không?</li>
+</ul>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Dây chuyền chạy 600 chai/phút, pitch 80 mm, van thổi đặt cách camera 900 mm. Tính chu kỳ mỗi chai, tốc độ băng tải và số chai nằm giữa camera và van. Nếu PC xử lý mất 30 ms mỗi ảnh, trạm có kịp không?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">chai_phut, pitch_mm, van_mm, xu_ly_ms = 600, 80, 900, 30
+chu_ky_ms = 60_000 / chai_phut
+toc_do = chai_phut / 60 * pitch_mm               # mm/s
+print(f"chu kỳ {chu_ky_ms:.0f} ms, băng tải {toc_do:.0f} mm/s, "
+      f"{van_mm / pitch_mm:.2f} chai giữa camera và van, tới van sau {van_mm / toc_do * 1000:.0f} ms")
+print("kịp" if xu_ly_ms &lt; chu_ky_ms else "không kịp", "| còn dư", chu_ky_ms - xu_ly_ms, "ms")</code></pre>
+<pre><code class="language-text">chu kỳ 100 ms, băng tải 800 mm/s, 11.25 chai giữa camera và van, tới van sau 1125 ms
+kịp | còn dư 70.0 ms</code></pre>
+<p>Kịp về chu kỳ (30 ms &lt; 100 ms), nhưng nhớ rằng thời gian xử lý còn phải cộng thời gian truyền ảnh và gửi kết quả, và lấy theo trường hợp <em>chậm nhất</em> chứ không phải trung bình. Số chai giữa camera và van là 11,25, không nguyên: PLC phải theo dõi theo quãng đường (encoder) hoặc theo thời gian, không được giả định "chai thứ 11".</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Trong mô phỏng ở mục 4, giả sử nhà máy chỉ dùng duy nhất nắp trắng và không thể lắp đèn nền vì băng tải sát tường. Kể ba biện pháp không dùng đèn nền để tăng khoảng hở giữa hai nhóm điểm.</p>
+<details><summary>Xem đáp án</summary>
+<ul>
+  <li><strong>Che chắn trạm</strong> (hộp tối) và dùng đèn chớp mạnh: loại bỏ biến động ánh sáng xưởng, nguồn gây phần lớn độ trải điểm.</li>
+  <li><strong>Đặt tấm nền tối</strong> (vải đen, tấm nhựa đen mờ) phía sau cổ chai: nắp trắng trên nền đen cho tương phản lớn, không cần đèn nền.</li>
+  <li><strong>Đổi góc chiếu</strong> để vệt chói trên thủy tinh không rơi vào ROI, hoặc dùng filter phân cực trên đèn và ống kính để giảm chói.</li>
+</ul>
+<p>Cả ba đều là thay đổi phần cứng, không phải thuật toán. Đó chính là ý của "chiếu sáng quyết định 80%".</p>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Machine Vision là ngành kỹ thuật ứng dụng thị giác máy vào sản xuất: điều kiện chụp kiểm soát được, đầu ra là tín hiệu cho PLC/robot, thời gian và độ tin cậy là yêu cầu cứng.</li>
+  <li>Một trạm gồm: kích hoạt, chiếu sáng, quang học, camera, xử lý, I/O, cơ cấu loại hàng, HMI và lưu trữ. Một khối hỏng là cả trạm hỏng.</li>
+  <li>Với mỗi trạm, tính ngay chu kỳ sản phẩm và số sản phẩm nằm giữa camera và điểm loại; PLC phải theo dõi từng sản phẩm.</li>
+  <li>Chiếu sáng quyết định tương phản; phần mềm không tạo ra thông tin không có trong ảnh. Đo chất lượng ảnh bằng khoảng hở giữa điểm của nhóm OK và nhóm NG.</li>
+  <li>Thứ tự thiết kế: đặc điểm cần thấy → chiếu sáng → độ phân giải, FOV → camera, ống kính → xử lý → I/O.</li>
+</ul>
+<p>Bài tiếp theo: <strong>5 nhóm bài toán Machine Vision và cách giải</strong>, nơi bạn học cách nhận diện một yêu cầu thuộc nhóm nào và ước lượng độ khó của nó.</p>

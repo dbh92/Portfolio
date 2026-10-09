@@ -1,0 +1,265 @@
+<p>Một trạm kiểm tra chỉ tốt bằng <strong>định nghĩa lỗi</strong> của nó. "Loại các sản phẩm bẩn" không phải tiêu chí: hai người QC sẽ cho hai kết quả khác nhau, và trạm của bạn sẽ bị đánh giá theo ý kiến của người khó tính nhất. Bài này dạy cách viết tiêu chí OK/NG bằng con số đo được, hiểu hai loại sai mà mọi trạm đều mắc: <strong>escape</strong> (lọt lỗi) và <strong>overkill</strong> (loại nhầm), và cách chọn ngưỡng dựa trên chi phí thay vì cảm giác. Bài trước, "Trigger, encoder và cycle time", bảo đảm trạm chụp và loại đúng sản phẩm; bài này bảo đảm trạm quyết định đúng. Các chỉ số theo kiểu học máy (precision, recall, ma trận nhầm lẫn) sẽ được trình bày riêng ở bài "Precision, Recall và ma trận nhầm lẫn" ngay sau.</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Viết được tiêu chí lỗi gồm đại lượng, đơn vị, giới hạn, vùng áp dụng và chuyển sang ngưỡng pixel; tính được tỉ lệ escape, overkill, ppm lọt và chi phí mỗi ca theo ngưỡng; giải thích vì sao đặt ngưỡng đúng bằng giới hạn đặc tả lại gây lọt lỗi; thiết kế vùng xám kiểm lại; biết cần bao nhiêu mẫu NG để chứng minh một tỉ lệ lọt.</div>
+
+<h2>1. Định nghĩa lỗi bằng con số đo được</h2>
+<table>
+  <tr><th>Định nghĩa kém</th><th>Định nghĩa đo được</th></tr>
+  <tr><td>"Không có vết bẩn rõ"</td><td>Vết có độ tương phản ≥ 30 mức xám so với nền lân cận (trong điều kiện chiếu sáng của trạm) và diện tích ≥ 0,30 mm² trong vùng A là NG</td></tr>
+  <tr><td>"Nhãn dán thẳng"</td><td>Góc nghiêng nhãn so với cạnh đáy ≤ 1,5°, lệch tâm ngang ≤ 1,0 mm</td></tr>
+  <tr><td>"Không xước"</td><td>Vết xước dài ≥ 2,0 mm ở vùng A hoặc B là NG; vết ngắn hơn không xét</td></tr>
+  <tr><td>"In rõ ràng"</td><td>Đọc đúng 100% ký tự và khớp dữ liệu lô; độ cao nét chữ không thiếu quá 20% so với mẫu</td></tr>
+</table>
+<p>Một tiêu chí hoàn chỉnh có 6 thành phần:</p>
+<ol>
+  <li><strong>Đại lượng</strong> đo được: diện tích, chiều dài, độ sâu, góc, độ tương phản, số lượng.</li>
+  <li><strong>Đơn vị vật lý</strong> (mm, mm², độ), không phải pixel. Pixel thay đổi khi đổi camera, ống kính; mm thì không.</li>
+  <li><strong>Giới hạn và chiều so sánh</strong>: "≥ 0,30 mm² là NG" (nói rõ bằng giới hạn thì OK hay NG).</li>
+  <li><strong>Vùng áp dụng</strong>: vùng A (mặt nhìn thấy khi dùng) chặt hơn vùng B (mặt khuất).</li>
+  <li><strong>Số lượng cho phép</strong>: "tối đa 2 vết từ 0,10 đến 0,30 mm², cách nhau ≥ 10 mm".</li>
+  <li><strong>Mẫu giới hạn</strong> (limit sample): sản phẩm thật nằm ngay ở ranh giới OK/NG, được QA của khách hàng ký xác nhận. Mẫu giới hạn là "thước đo" chung giữa bạn, QC và khách hàng.</li>
+</ol>
+<p>Khi có tiêu chí bằng mm, bạn chuyển sang ngưỡng pixel từ hệ số hiệu chuẩn (chặng 8 dạy cách lấy hệ số này chính xác):</p>
+<pre><code class="language-python">import math
+
+MM_PX = 0.05                     # mm/pixel sau hiệu chuẩn
+TIEU_CHI = [  # (mã, mô tả, đại lượng, giới hạn, đơn vị, vùng)
+    ("D01", "Vết bẩn: diện tích vết lớn nhất", "dien_tich", 0.30, "mm²", "A"),
+    ("D02", "Vết bẩn: diện tích vết lớn nhất", "dien_tich", 0.80, "mm²", "B"),
+    ("D03", "Xước: chiều dài", "chieu_dai", 2.0, "mm", "A, B"),
+    ("D04", "Sứt mép: độ sâu vào trong", "chieu_dai", 0.40, "mm", "mép"),
+]
+print("mã  | giới hạn        | vùng | ngưỡng pixel")
+for ma, mo_ta, dai_luong, gh, dv, vung in TIEU_CHI:
+    if dai_luong == "dien_tich":
+        px = gh / MM_PX ** 2                        # 1 pixel = 0,0025 mm²
+        d_td = 2 * math.sqrt(gh / math.pi)          # đường kính tương đương
+        print(f"{ma} | ≥ {gh:.2f} {dv:4s}    | {vung:4s} | ≥ {px:.0f} px (đường kính tương đương {d_td:.2f} mm)")
+    else:
+        print(f"{ma} | ≥ {gh:.2f} {dv:4s}    | {vung:4s} | ≥ {gh / MM_PX:.0f} px")</code></pre>
+<pre><code class="language-text">mã  | giới hạn        | vùng | ngưỡng pixel
+D01 | ≥ 0.30 mm²     | A    | ≥ 120 px (đường kính tương đương 0.62 mm)
+D02 | ≥ 0.80 mm²     | B    | ≥ 320 px (đường kính tương đương 1.01 mm)
+D03 | ≥ 2.00 mm      | A, B | ≥ 40 px
+D04 | ≥ 0.40 mm      | mép  | ≥ 8 px</code></pre>
+<p>Dòng D04 là một cảnh báo: sứt mép 0,40 mm chỉ là 8 pixel. Đo được, nhưng sai số 1–2 pixel ở mép đã là 12–25% giới hạn. Tiêu chí càng gần độ phân giải của hệ thống, vùng "không chắc chắn" quanh giới hạn càng rộng, và đó chính là nguồn gốc của escape và overkill.</p>
+
+<h2>2. Escape và overkill</h2>
+<table>
+  <tr><th></th><th>Trạm báo OK</th><th>Trạm báo NG</th></tr>
+  <tr><th>Thật sự OK</th><td>Đúng</td><td><strong>Overkill</strong> (loại nhầm, false reject)</td></tr>
+  <tr><th>Thật sự NG</th><td><strong>Escape</strong> (lọt lỗi, slip, false accept)</td><td>Đúng</td></tr>
+</table>
+<ul>
+  <li><strong>Tỉ lệ escape</strong> thường tính theo số NG thật: <code>escape = số NG bị cho qua / tổng số NG thật</code>. Nó nói trạm bắt được bao nhiêu phần lỗi.</li>
+  <li><strong>ppm lọt ra khách hàng</strong> tính theo sản phẩm được giao: <code>ppm = số NG bị cho qua / số sản phẩm được giao × 1.000.000</code>. Đây là con số khách hàng nhìn thấy và hay ghi trong hợp đồng.</li>
+  <li><strong>Tỉ lệ overkill</strong> thường tính theo số OK thật: <code>overkill = số OK bị loại / tổng số OK thật</code>. Có nhà máy tính theo tổng sản lượng; hãy hỏi rõ định nghĩa trước khi cam kết con số.</li>
+</ul>
+<p>Hai loại sai có <strong>chi phí rất khác nhau</strong>. Escape: khiếu nại, trả hàng, phân loại lại tại kho khách hàng, mất uy tín, có thể mất hợp đồng; với linh kiện an toàn (ô tô, y tế) còn nghiêm trọng hơn nhiều. Overkill: mất giá trị sản phẩm tốt, tốn người kiểm lại, và nếu quá cao thì công nhân sẽ <em>tắt trạm</em> hoặc nới ngưỡng tùy tiện, đây là kiểu thất bại phổ biến nhất của trạm vision trong thực tế.</p>
+<p>Ví dụ nhanh: 1.000.000 sản phẩm, 0,5% lỗi thật (5.000 NG). Trạm bắt 99% NG (escape 1%) và loại nhầm 1% hàng OK. Kết quả: 50 sản phẩm lỗi lọt tới khách hàng (khoảng 50 ppm) và 9.950 sản phẩm tốt bị loại, gấp đôi số NG thật. Một trạm "bắt 99%" vẫn có thể là trạm tồi nếu không ai tính phía overkill.</p>
+
+<h2>3. Vì sao không có ngưỡng hoàn hảo: sai số đo quanh giới hạn</h2>
+<p>Mô phỏng một tiêu chí: vết bẩn lớn nhất ≥ 0,30 mm² là NG. Diện tích thật của vết bẩn lớn nhất trên mỗi sản phẩm phân bố liên tục (đa số rất nhỏ, càng lớn càng hiếm), và camera đo với sai số σ = 0,03 mm² (do nhiễu, phân ngưỡng, mép vết mờ). Sản phẩm có vết <em>thật</em> 0,29 mm² là OK, nhưng có thể bị đo thành 0,32 mm²; và ngược lại.</p>
+<pre><code class="language-python">import numpy as np
+
+rng = np.random.default_rng(7)
+N = 2_000_000                                   # số sản phẩm mô phỏng
+GIOI_HAN = 0.30                                 # mm²: vết bẩn lớn nhất ≥ 0,30 mm² là NG (theo đặc tả)
+that = rng.exponential(0.06, N)                 # diện tích THẬT của vết lớn nhất trên mỗi sản phẩm
+do = that + rng.normal(0, 0.03, N)              # diện tích camera ĐO được (sai số σ = 0,03 mm²)
+la_ng = that &gt;= GIOI_HAN
+print(f"Tỉ lệ NG thật: {la_ng.mean():.3%}  ({la_ng.sum()} / {N})")
+np.savez("mo_phong_vet_ban.npz", that=that, do=do)
+
+print("ngưỡng | escape (% của NG) | overkill (% của OK)")
+for T in (0.22, 0.25, 0.28, 0.30, 0.32, 0.35):
+    bao_ng = do &gt;= T
+    escape = (~bao_ng &amp; la_ng).sum() / la_ng.sum()          # NG thật bị cho qua
+    overkill = (bao_ng &amp; ~la_ng).sum() / (~la_ng).sum()      # OK thật bị loại
+    print(f"  {T:.2f} | {escape:17.2%} | {overkill:19.3%}")</code></pre>
+<pre><code class="language-text">Tỉ lệ NG thật: 0.666%  (13326 / 2000000)
+ngưỡng | escape (% của NG) | overkill (% của OK)
+  0.22 |             0.04% |              2.223%
+  0.25 |             0.71% |              1.101%
+  0.28 |             6.02% |              0.439%
+  0.30 |            15.32% |              0.192%
+  0.32 |            28.95% |              0.067%
+  0.35 |            51.95% |              0.008%</code></pre>
+<p>Điều quan trọng nhất của bài nằm ở dòng ngưỡng 0,30: <strong>đặt ngưỡng đúng bằng giới hạn đặc tả làm lọt 15% số NG</strong>. Vì vết bẩn nhỏ phổ biến hơn vết lớn, có rất nhiều sản phẩm NG chỉ vừa vượt giới hạn, và sai số đo kéo khoảng một nửa trong số chúng xuống dưới ngưỡng. Muốn bắt chúng, phải hạ ngưỡng vào trong vùng OK, gọi là <strong>dải bảo vệ (guard band)</strong>, và chấp nhận loại nhầm một phần hàng OK sát giới hạn. Nguyên lý này giống quy tắc quyết định trong đo lường cơ khí (ví dụ ISO 14253-1): gần giới hạn, độ bất định của phép đo phải được tính vào quyết định.</p>
+<p>Hai cách duy nhất để giảm <em>cả hai</em> loại sai cùng lúc là: (1) giảm sai số đo σ (chiếu sáng tốt hơn, độ phân giải cao hơn, thuật toán ổn định hơn), và (2) giảm số sản phẩm nằm sát giới hạn (cải tiến quy trình sản xuất). Dịch ngưỡng chỉ <em>đổi</em> loại sai này lấy loại sai kia.</p>
+
+<h2>4. Chọn ngưỡng theo chi phí mỗi ca</h2>
+<p>Gắn chi phí cho mỗi loại sai rồi chọn ngưỡng làm tổng chi phí nhỏ nhất. Con số chi phí dưới đây là <strong>giả định</strong> (đơn vị tùy ý): một sản phẩm lỗi lọt tới khách hàng tốn 300, một sản phẩm tốt bị loại tốn 3, tức tỉ lệ 100:1. Trong dự án thật, hỏi phòng chất lượng và tài chính để có tỉ lệ này. Ca sản xuất 40.000 sản phẩm.</p>
+<pre><code class="language-python">import numpy as np
+
+d = np.load("mo_phong_vet_ban.npz")
+that, do = d["that"], d["do"]
+la_ng = that &gt;= 0.30
+SP_CA = 40_000                       # sản phẩm mỗi ca
+CP_LOT = 300                         # chi phí một sản phẩm lỗi lọt tới khách (đơn vị giả định)
+CP_NHAM = 3                          # chi phí một sản phẩm tốt bị loại nhầm (đơn vị giả định)
+
+
+def mot_ca(T):
+    bao_ng = do &gt;= T
+    lot = (~bao_ng &amp; la_ng).mean() * SP_CA                 # số NG lọt mỗi ca
+    nham = (bao_ng &amp; ~la_ng).mean() * SP_CA                # số OK bị loại mỗi ca
+    giao = (~bao_ng).mean() * SP_CA                        # số sản phẩm được giao
+    return lot, nham, lot / giao * 1e6, lot * CP_LOT + nham * CP_NHAM
+
+
+print("ngưỡng | lọt/ca | loại nhầm/ca | ppm lọt | chi phí/ca")
+for T in (0.20, 0.22, 0.24, 0.26, 0.28, 0.30):
+    lot, nham, ppm, cp = mot_ca(T)
+    print(f"  {T:.2f} | {lot:6.1f} | {nham:12.0f} | {ppm:7.0f} | {cp:9.0f}")
+ds = np.arange(0.15, 0.351, 0.005)
+tot = min(ds, key=lambda T: mot_ca(T)[3])
+lot, nham, ppm, cp = mot_ca(tot)
+print(f"Ngưỡng chi phí thấp nhất: {tot:.3f} mm² → lọt {lot:.1f}/ca ({ppm:.0f} ppm), "
+      f"loại nhầm {nham:.0f}/ca, chi phí {cp:.0f}")</code></pre>
+<pre><code class="language-text">ngưỡng | lọt/ca | loại nhầm/ca | ppm lọt | chi phí/ca
+  0.20 |    0.0 |         1339 |       0 |      4016
+  0.22 |    0.1 |          883 |       3 |      2680
+  0.24 |    0.8 |          561 |      19 |      1912
+  0.26 |    4.4 |          333 |     112 |      2324
+  0.28 |   16.0 |          174 |     405 |      5335
+  0.30 |   40.8 |           76 |    1028 |     12475
+Ngưỡng chi phí thấp nhất: 0.245 mm² → lọt 1.2/ca (30 ppm), loại nhầm 497/ca, chi phí 1846</code></pre>
+<ul>
+  <li>Ngưỡng tối ưu 0,245 mm², nằm sâu trong vùng OK (dải bảo vệ 0,055 mm², gần 2σ). Lọt khoảng 1 sản phẩm/ca (30 ppm), đổi lại loại nhầm gần 500 sản phẩm/ca, khoảng 1,2% sản lượng.</li>
+  <li>Hạ thêm xuống 0,20 thì gần như không lọt, nhưng loại nhầm 1339/ca và chi phí tăng gấp đôi. Đây là cái giá của yêu cầu "không được lọt con nào".</li>
+  <li>Đổi tỉ lệ chi phí (ví dụ linh kiện an toàn, chi phí lọt 10.000) thì ngưỡng tối ưu dịch xuống thấp hơn. Ngưỡng là <strong>quyết định kinh doanh</strong> được hỗ trợ bởi số liệu, không phải tham số kỹ thuật thuần túy; hãy để khách hàng ký xác nhận.</li>
+</ul>
+
+<h2>5. Vùng xám và kiểm lại</h2>
+<p>Thay vì một ngưỡng, dùng hai: dưới T1 là OK chắc chắn, từ T2 trở lên là NG chắc chắn, ở giữa là <strong>vùng xám</strong> (nghi ngờ): sản phẩm được tách sang luồng thứ ba để người kiểm lại, hoặc qua một trạm thứ hai với độ phân giải cao hơn. Giả định người kiểm lại tốn 0,5 đơn vị mỗi sản phẩm và quyết định đúng:</p>
+<pre><code class="language-python">import numpy as np
+
+d = np.load("mo_phong_vet_ban.npz")
+la_ng = d["that"] &gt;= 0.30
+do_ng, do_ok = np.sort(d["do"][la_ng]), np.sort(d["do"][~la_ng])
+N = len(d["do"])
+SP_CA, CP_LOT, CP_NHAM = 40_000, 300, 3
+CP_KIEM_LAI = 0.5                    # chi phí người kiểm lại 1 sản phẩm vùng xám (giả định kiểm đúng)
+
+
+def dem_duoi(mang, T):               # số phần tử &lt; T trong mảng đã sắp xếp
+    return np.searchsorted(mang, T)
+
+
+def mot_ca(T1, T2):
+    """do &lt; T1 → OK; do ≥ T2 → NG; ở giữa → vùng xám, người kiểm lại."""
+    lot = dem_duoi(do_ng, T1) / N * SP_CA
+    nham = (len(do_ok) - dem_duoi(do_ok, T2)) / N * SP_CA
+    xam = ((dem_duoi(do_ng, T2) - dem_duoi(do_ng, T1))
+           + (dem_duoi(do_ok, T2) - dem_duoi(do_ok, T1))) / N * SP_CA
+    return lot, nham, xam, lot * CP_LOT + nham * CP_NHAM + xam * CP_KIEM_LAI
+
+
+luoi = np.round(np.arange(0.15, 0.401, 0.005), 3)
+tot = min(((a, b) for a in luoi for b in luoi if b &gt;= a), key=lambda p: mot_ca(*p)[3])
+for ten, (T1, T2) in (("Một ngưỡng 0,245", (0.245, 0.245)), (f"Vùng xám {tot[0]:.3f}–{tot[1]:.3f}", tot)):
+    lot, nham, xam, cp = mot_ca(T1, T2)
+    print(f"{ten:24s}: lọt {lot:4.1f}/ca | loại nhầm {nham:4.0f}/ca | kiểm lại {xam:5.0f}/ca | chi phí {cp:5.0f}")</code></pre>
+<pre><code class="language-text">Một ngưỡng 0,245        : lọt  1.2/ca | loại nhầm  497/ca | kiểm lại     0/ca | chi phí  1846
+Vùng xám 0.225–0.345    : lọt  0.2/ca | loại nhầm    5/ca | kiểm lại   917/ca | chi phí   526</code></pre>
+<p>Vùng xám 0,225–0,345 giảm loại nhầm từ 497 xuống 5 sản phẩm/ca và lọt còn 0,2/ca, đổi lại 917 sản phẩm/ca (khoảng 2,3%) phải kiểm lại. Nếu mỗi lần kiểm mất 5 giây, đó là khoảng 76 phút công mỗi ca, tức một phần thời gian của <em>một</em> người, phù hợp mục tiêu "giữ lại 1 QC" ở bài tập chặng 4. Lưu ý khi áp dụng:</p>
+<ul>
+  <li>Cần cơ cấu tách ba ngả (OK, NG, nghi ngờ) và quy trình rõ ràng cho thùng nghi ngờ; sản phẩm nghi ngờ không bao giờ được tự quay về dòng OK.</li>
+  <li>Người kiểm lại cũng mắc lỗi, nhất là khi mệt hoặc khi 99% sản phẩm trong thùng là OK. Hiển thị ảnh và vị trí nghi ngờ giúp họ kiểm nhanh và đúng hơn.</li>
+  <li>Theo dõi tỉ lệ vùng xám hằng ngày: tăng đột ngột thường là dấu hiệu đèn yếu đi, ống kính bẩn hoặc vật liệu đổi lô.</li>
+</ul>
+
+<h2>6. Chứng minh tỉ lệ lọt: cần bao nhiêu mẫu NG?</h2>
+<p>Khách hàng yêu cầu "lọt dưới 0,1%". Bạn chạy 50 mẫu NG, bắt đủ 50. Đã chứng minh được chưa? Chưa. Với 0 lần lọt trong n mẫu, cận trên của tỉ lệ lọt ở độ tin cậy 95% xấp xỉ <strong>3/n</strong> (quy tắc số 3):</p>
+<pre><code class="language-python">import math
+
+# Thử n mẫu NG, KHÔNG lọt mẫu nào. Với độ tin cậy 95%, tỉ lệ lọt thật nhỏ hơn bao nhiêu?
+for n in (30, 100, 300, 1000, 3000):
+    p_tren = 1 - 0.05 ** (1 / n)                   # cận trên chính xác (phân phối nhị thức, 0 lỗi)
+    print(f"n = {n:5d} mẫu NG, 0 lọt → escape &lt; {p_tren:.3%} (quy tắc số 3: 3/n = {3 / n:.3%})")
+
+# Ngược lại: muốn chứng minh escape &lt; p thì cần bao nhiêu mẫu NG (không được lọt mẫu nào)?
+for p in (0.01, 0.001, 0.0001):
+    n = math.ceil(math.log(0.05) / math.log(1 - p))
+    print(f"chứng minh escape &lt; {p:.2%} với 95% tin cậy: cần {n} mẫu NG, 0 lọt")</code></pre>
+<pre><code class="language-text">n =    30 mẫu NG, 0 lọt → escape &lt; 9.503% (quy tắc số 3: 3/n = 10.000%)
+n =   100 mẫu NG, 0 lọt → escape &lt; 2.951% (quy tắc số 3: 3/n = 3.000%)
+n =   300 mẫu NG, 0 lọt → escape &lt; 0.994% (quy tắc số 3: 3/n = 1.000%)
+n =  1000 mẫu NG, 0 lọt → escape &lt; 0.299% (quy tắc số 3: 3/n = 0.300%)
+n =  3000 mẫu NG, 0 lọt → escape &lt; 0.100% (quy tắc số 3: 3/n = 0.100%)
+chứng minh escape &lt; 1.00% với 95% tin cậy: cần 299 mẫu NG, 0 lọt
+chứng minh escape &lt; 0.10% với 95% tin cậy: cần 2995 mẫu NG, 0 lọt
+chứng minh escape &lt; 0.01% với 95% tin cậy: cần 29956 mẫu NG, 0 lọt</code></pre>
+<p>Hệ quả thực tế cho nghiệm thu (bài "Đặc tả kỹ thuật và nghiệm thu FAT/SAT"):</p>
+<ul>
+  <li>Với vài chục mẫu NG, bạn chỉ chứng minh được escape cỡ dưới 10%. Muốn chứng minh 1% cần khoảng 300 lần thử NG không lọt.</li>
+  <li>Chạy lại <strong>cùng một mẫu</strong> 100 lần không tương đương 100 mẫu độc lập: nó kiểm tra độ lặp lại, không kiểm tra độ đa dạng của lỗi. Nên kết hợp nhiều mẫu lỗi khác nhau, nhiều vị trí, nhiều hướng.</li>
+  <li>Tỉ lệ ppm rất nhỏ (ví dụ 10 ppm trên sản lượng) không thể chứng minh trong vài ngày nghiệm thu; nó được theo dõi dần trong sản xuất qua dữ liệu khiếu nại và kiểm tra lại định kỳ. Hãy ghi rõ điều này trong hợp đồng.</li>
+</ul>
+
+<h2>7. Sai lầm thường gặp</h2>
+<ul>
+  <li><strong>Nhận tiêu chí bằng lời</strong> và tự diễn giải. Mọi tiêu chí phải có con số, đơn vị, vùng và mẫu giới hạn được ký duyệt.</li>
+  <li><strong>Đặt ngưỡng đúng bằng giới hạn đặc tả</strong>, quên sai số đo (mục 3).</li>
+  <li><strong>Chỉ báo cáo một con số</strong> ("độ chính xác 99,5%"). Luôn báo cả escape và overkill, kèm số lượng tuyệt đối.</li>
+  <li><strong>Chỉnh ngưỡng tại chỗ</strong> mỗi khi công nhân phàn nàn loại nhầm, không ghi lại. Mọi thay đổi ngưỡng phải có phân quyền, nhật ký và kiểm tra lại với bộ mẫu chuẩn.</li>
+  <li><strong>Hứa "zero escape"</strong>. Không phép đo nào hoàn hảo; điều bạn cam kết được là một tỉ lệ có thể kiểm chứng, với một tỉ lệ overkill đi kèm.</li>
+</ul>
+
+<h2>8. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Viết lại thành tiêu chí đo được: (a) "nắp chai phải đóng kín"; (b) "không có bọt khí lớn trong sản phẩm nhựa trong"; (c) "mã in phải đọc được".</p>
+<details><summary>Xem đáp án</summary>
+<ul>
+  <li>(a) Khe hở giữa mép dưới nắp và vai chai (nhìn ngang, đèn nền) ≤ 0,5 mm tại mọi điểm; góc nghiêng nắp so với trục chai ≤ 2°. Kèm mẫu giới hạn 0,5 mm và 2°.</li>
+  <li>(b) Bọt có đường kính tương đương ≥ 0,3 mm trong vùng A là NG; tối đa 3 bọt từ 0,1 đến 0,3 mm trong toàn sản phẩm. Phát hiện trong điều kiện đèn nền theo đặc tả trạm.</li>
+  <li>(c) Bộ đọc giải mã thành công và nội dung khớp dữ liệu lô từ MES; điểm chất lượng in (theo phương pháp đã thống nhất, ví dụ ISO/IEC 15415 cho mã 2D in trên nhãn) không thấp hơn mức đã thỏa thuận. Nếu không đọc được trong 2 lần chụp là NG.</li>
+</ul>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Dùng file mô phỏng ở mục 3, giữ nguyên mọi thứ nhưng giả sử cải tiến chiếu sáng làm sai số đo giảm từ σ = 0,03 xuống 0,015 mm². Tính lại escape và overkill ở ngưỡng 0,27. Kết luận gì?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import numpy as np
+
+rng = np.random.default_rng(7)
+N = 2_000_000
+that = rng.exponential(0.06, N)
+la_ng = that &gt;= 0.30
+for sigma in (0.03, 0.015):
+    do = that + np.random.default_rng(1).normal(0, sigma, N)
+    bao_ng = do &gt;= 0.27
+    esc = (~bao_ng &amp; la_ng).sum() / la_ng.sum()
+    ovk = (bao_ng &amp; ~la_ng).sum() / (~la_ng).sum()
+    print(f"σ = {sigma}: escape {esc:.2%}, overkill {ovk:.3%}")</code></pre>
+<pre><code class="language-text">σ = 0.03: escape 3.48%, overkill 0.608%
+σ = 0.015: escape 0.20%, overkill 0.476%</code></pre>
+<p>Giảm sai số đo một nửa làm <strong>cả hai</strong> loại sai giảm cùng lúc ở cùng một ngưỡng, điều mà dịch ngưỡng không bao giờ làm được. Đầu tư vào chất lượng ảnh (chiếu sáng, độ phân giải, ổn định thuật toán) là cách hiệu quả nhất để cải thiện trạm.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Trạm của bạn đã chạy 6 tháng, kiểm 2.000.000 sản phẩm, khách hàng báo về 12 sản phẩm lỗi lọt. Phòng QC kiểm lại thùng NG và thấy 8.400 sản phẩm bị loại, trong đó 6.300 là OK. Tính ppm lọt (theo sản phẩm được giao) và tỉ lệ overkill theo tổng sản lượng. Cần thêm thông tin gì để tính escape theo số NG thật?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">tong, lot, bi_loai, ok_trong_thung_ng = 2_000_000, 12, 8_400, 6_300
+giao = tong - bi_loai
+print(f"ppm lọt: {lot / giao * 1e6:.1f}")
+print(f"overkill theo sản lượng: {ok_trong_thung_ng / tong:.3%}")
+print(f"NG thật bắt được: {bi_loai - ok_trong_thung_ng}, ước lượng escape: "
+      f"{lot / (lot + bi_loai - ok_trong_thung_ng):.2%}")</code></pre>
+<pre><code class="language-text">ppm lọt: 6.0
+overkill theo sản lượng: 0.315%
+NG thật bắt được: 2100, ước lượng escape: 0.57%</code></pre>
+<p>Escape ước lượng 0,57% chỉ đúng nếu khách hàng phát hiện <em>mọi</em> sản phẩm lỗi lọt qua, điều gần như không bao giờ đúng (khách hàng cũng có escape của họ). Để ước lượng tốt hơn cần một đợt kiểm tra độc lập: lấy mẫu ngẫu nhiên hàng đã được trạm cho qua và kiểm 100% bằng phương pháp chuẩn (người kiểm kỹ, kính hiển vi) để đếm số NG thật bị lọt.</p>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Tiêu chí lỗi đầy đủ: đại lượng, đơn vị vật lý, giới hạn và chiều so sánh, vùng, số lượng cho phép, mẫu giới hạn được ký duyệt; chuyển sang pixel bằng hệ số hiệu chuẩn.</li>
+  <li>Escape = NG bị cho qua (tính theo số NG thật, hoặc ppm theo sản phẩm giao); overkill = OK bị loại. Định nghĩa mẫu số phải được thống nhất trước.</li>
+  <li>Sai số đo làm sản phẩm sát giới hạn bị phân loại sai; ngưỡng đặt bằng giới hạn gây lọt lỗi, cần dải bảo vệ.</li>
+  <li>Chọn ngưỡng theo chi phí escape/overkill mỗi ca; dịch ngưỡng chỉ đổi loại sai này lấy loại sai kia, giảm sai số đo mới giảm được cả hai.</li>
+  <li>Vùng xám + kiểm lại giảm mạnh cả hai loại sai với chi phí công người có kiểm soát.</li>
+  <li>Chứng minh escape &lt; p với 95% tin cậy cần khoảng 3/p mẫu NG không lọt.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Precision, Recall và ma trận nhầm lẫn</strong>, nối ngôn ngữ escape/overkill của nhà máy với các chỉ số đánh giá mô hình học máy.</p>

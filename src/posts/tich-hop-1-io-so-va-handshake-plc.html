@@ -1,0 +1,388 @@
+<p>Thuật toán của bạn có thể đạt 100% trên bộ ảnh vàng ở chặng 5, nhưng ra hiện trường, trạm vision vẫn "loại nhầm" hoặc "để lọt" nếu phần nói chuyện với PLC làm ẩu: PLC đọc kết quả cũ, trigger bị nuốt mất, hay cả dây chuyền đứng vì hai bên chờ nhau. Bài mở đầu chặng PLC / Robot / MES này đi từ tầng thấp nhất: <strong>dây tín hiệu 24 V</strong>, NPN và PNP, rồi tới <strong>giao thức bắt tay (handshake)</strong> trigger – busy – done – OK/NG và cách vẽ, đọc <strong>giản đồ thời gian</strong>. Bài tiếp theo, "Các chuẩn giao tiếp: Modbus TCP, EtherNet/IP, PROFINET", so sánh các mạng công nghiệp; bài này đi sâu vào phần điện và thời gian, nền tảng mà mọi giao thức phía trên đều dựa vào. Các bài sau sẽ chuyển cùng logic bắt tay này sang Modbus TCP và TCP socket.</p>
+
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Đấu đúng một cảm biến/camera NPN hoặc PNP vào ngõ vào PLC; thiết kế được bảng tín hiệu và trình tự handshake có timeout; vẽ và đọc được giản đồ thời gian; chạy được mô phỏng PLC + vision bằng Python để kiểm tra trình tự trước khi ra hiện trường.</div>
+
+<h2>1. Vì sao tín hiệu công nghiệp dùng 24 V?</h2>
+<p>Trong nhà máy, ngõ vào/ra số (digital I/O) gần như luôn là <strong>24 V DC</strong>, không phải 3,3 V hay 5 V như mạch Arduino. Lý do:</p>
+<ul>
+  <li><strong>Chống nhiễu</strong>: dây tín hiệu chạy dài vài chục mét cạnh dây động lực của biến tần, motor. Nhiễu cảm ứng vài vôn có thể làm một ngõ vào 5 V nhảy sai, nhưng không đủ vượt ngưỡng của ngõ vào 24 V.</li>
+  <li><strong>Ngưỡng rộng và rõ ràng</strong>: chuẩn IEC 61131-2 cho ngõ vào số định nghĩa vùng ON (khoảng từ 11–15 V trở lên, tùy loại ngõ vào) và vùng OFF (dưới khoảng 5 V), giữa là vùng không xác định. Khoảng cách lớn giữa hai vùng giúp tín hiệu chịu được sụt áp trên dây dài.</li>
+  <li><strong>Dòng đủ lớn</strong>: mỗi ngõ vào kéo vài mA, đủ để nhiễu tĩnh điện (trở kháng cao) không "kích" được ngõ vào.</li>
+  <li><strong>Chuẩn chung</strong>: cảm biến, PLC, van khí, đèn báo, camera công nghiệp đều có bản 24 V, nối với nhau không cần mạch chuyển mức.</li>
+</ul>
+<p>Hệ quả cho kỹ sư vision: <strong>không bao giờ</strong> nối trực tiếp dây 24 V vào GPIO của máy tính nhúng, Raspberry Pi hay chân I/O 3,3 V của board phát triển. Luôn đi qua ngõ vào/ra có cách ly của camera, card I/O công nghiệp hoặc module relay/opto.</p>
+
+<h2>2. NPN và PNP: sinking và sourcing</h2>
+<p>Ngõ ra transistor của cảm biến, camera hay PLC chỉ làm một việc: <strong>đóng một công tắc</strong>. Khác nhau ở chỗ công tắc đó nối dây tín hiệu với cực nào của nguồn:</p>
+<ul>
+  <li><strong>PNP (sourcing, "cấp dòng")</strong>: khi tác động, chân OUT được nối lên <strong>+24 V</strong>. Dòng đi <em>ra</em> từ thiết bị, qua tải (ngõ vào PLC) rồi về 0 V.</li>
+  <li><strong>NPN (sinking, "hút dòng")</strong>: khi tác động, chân OUT được nối xuống <strong>0 V</strong>. Dòng đi từ +24 V, qua tải, <em>vào</em> chân OUT rồi xuống 0 V.</li>
+</ul>
+<pre><code class="language-text">PNP (sourcing) → ngõ vào PLC có COM nối 0 V
+
+  +24V ───────────┬──────────────── (+) nâu
+                  │  cảm biến PNP
+                  └─[công tắc]─ OUT (đen) ──────► X0 ──[opto]── COM ── 0V
+  0V   ──────────────────────────── (−) xanh
+  Dòng: +24V → công tắc → OUT → X0 → opto → COM → 0V
+
+
+NPN (sinking) → ngõ vào PLC có COM nối +24 V
+
+  +24V ── COM ──[opto]── X0 ◄────── OUT (đen) ─[công tắc]─┐
+                                     cảm biến NPN         │
+  0V   ─────────────────────────────────────── (−) xanh ──┘
+  Dòng: +24V → COM → opto → X0 → OUT → công tắc → 0V</code></pre>
+<table>
+  <tr><th></th><th>NPN (sinking)</th><th>PNP (sourcing)</th></tr>
+  <tr><td>Khi ON, chân OUT nối với</td><td>0 V</td><td>+24 V</td></tr>
+  <tr><td>Tải / ngõ vào nối giữa</td><td>OUT và +24 V</td><td>OUT và 0 V</td></tr>
+  <tr><td>COM của ngõ vào PLC đấu về</td><td>+24 V</td><td>0 V</td></tr>
+  <tr><td>Đo OUT so với 0 V khi ON</td><td>≈ 0 V</td><td>≈ 24 V</td></tr>
+  <tr><td>Đo OUT so với 0 V khi OFF</td><td>≈ 24 V nếu đã nối tải (bị kéo lên qua tải); thả nổi nếu chưa nối</td><td>≈ 0 V nếu đã nối tải; thả nổi nếu chưa nối</td></tr>
+  <tr><td>Thường gặp ở</td><td>thiết bị theo truyền thống Nhật, châu Á</td><td>thiết bị theo truyền thống châu Âu</td></tr>
+</table>
+<p>Trong các nhà máy FDI ở Việt Nam bạn sẽ gặp <strong>cả hai</strong>, có khi trên cùng một dây chuyền. Quy tắc nhớ: cảm biến NPN cần ngõ vào "nhận dòng chảy ra từ chân X", cảm biến PNP cần ngõ vào "nhận dòng chảy vào chân X". Nhiều module ngõ vào PLC có một chân chung (COM, S/S…) cho cả nhóm: đấu chân này về 0 V để nhận PNP, đấu về +24 V để nhận NPN. Vì vậy <strong>một nhóm ngõ vào chỉ nhận một loại</strong>; muốn dùng cả hai loại phải chia nhóm.</p>
+<div class="warn"><strong>Chữ "sink input" không thống nhất giữa các hãng</strong>Có hãng gọi ngõ vào nhận cảm biến PNP là "sink input" (vì ngõ vào hút dòng), có hãng lại gọi ngõ vào dùng với cảm biến NPN là "sink input" (vì cảm biến là loại sink). Đừng tin vào chữ, hãy mở <strong>sơ đồ đấu dây</strong> trong manual và hỏi đúng một câu: "thiết bị này ra NPN hay PNP, COM của nhóm ngõ vào nối 0 V hay +24 V?".</div>
+
+<h3>Camera và card I/O của PC</h3>
+<p>Camera công nghiệp và card I/O thường có ngõ vào/ra <strong>cách ly quang</strong> (optocoupler): bên trong là một LED và một phototransistor, tín hiệu đi qua bằng ánh sáng nên mass của camera/PC và mass 24 V của tủ điện tách rời nhau. Nhờ đó xung nhiễu, chênh lệch điện thế đất (ground loop) phía tủ điện không chạy vào máy tính. Ngõ ra cách ly quang của camera thường là dạng <strong>open collector</strong>: chỉ có transistor, bạn phải đấu theo sơ đồ của hãng (có loại cần điện trở kéo lên, có loại cấu hình được NPN/PNP). Dòng cho phép của các ngõ ra này thường nhỏ (cỡ vài chục mA): đủ cho ngõ vào PLC, <strong>không đủ</strong> để kéo trực tiếp van điện từ hay đèn tháp. Tải cảm (cuộn relay, van) phải có diode dập ngược.</p>
+<table>
+  <tr><th>Loại ngõ ra</th><th>Thời gian đóng/ngắt</th><th>Dùng cho</th></tr>
+  <tr><td>Transistor (NPN/PNP, opto)</td><td>cỡ µs đến dưới 1 ms</td><td>Trigger, DONE, OK/NG, xung tốc độ cao</td></tr>
+  <tr><td>Relay cơ</td><td>cỡ 5–15 ms, có rung tiếp điểm</td><td>Đèn, còi, tải cách ly hoàn toàn; <strong>không</strong> dùng cho trigger hay strobe</td></tr>
+</table>
+<div class="warn"><strong>Hai nguồn 24 V phải chung 0 V</strong>Khi camera dùng nguồn riêng và PLC dùng nguồn tủ, tín hiệu NPN/PNP được đo <em>so với 0 V</em>. Nếu hai 0 V không nối với nhau, ngõ vào không có đường dòng khép kín: LED trên ngõ vào không sáng dù thiết bị đã bật. Đây là lỗi đấu dây hàng đầu khi lắp trạm mới (ngoại lệ: ngõ vào/ra cách ly có hai chân riêng, đấu đúng theo sơ đồ cách ly của hãng).</div>
+
+<h2>3. Thời gian trên dây: chu kỳ quét và bộ lọc ngõ vào</h2>
+<p>PLC không "nhìn" ngõ vào liên tục. Nó chạy vòng lặp <strong>quét (scan)</strong>: đọc toàn bộ ngõ vào → chạy chương trình → ghi toàn bộ ngõ ra, lặp lại mỗi vài ms đến vài chục ms. Thêm vào đó, mỗi ngõ vào có <strong>bộ lọc</strong> (input filter, thường chỉnh được, cỡ vài ms) để bỏ qua rung tiếp điểm. Hệ quả:</p>
+<ul>
+  <li>Một thay đổi trên dây có thể chỉ được PLC thấy sau tối đa <strong>(chu kỳ quét + thời gian lọc)</strong>.</li>
+  <li>Một <strong>xung</strong> ngắn hơn khoảng đó có thể lọt giữa hai lần quét và bị mất hoàn toàn.</li>
+</ul>
+<pre><code class="language-python">def xung_toi_thieu(chu_ky_quet_ms, loc_vao_ms):
+    """Xung ngắn hơn (quét + lọc) có thể lọt giữa hai lần quét của PLC."""
+    return chu_ky_quet_ms + loc_vao_ms
+
+
+print("Quét | Lọc vào | Xung tối thiểu | Nên đặt (x2)")
+for quet, loc in [(2, 1), (10, 3), (20, 10)]:
+    t = xung_toi_thieu(quet, loc)
+    print(f"{quet:&gt;4} | {loc:&gt;7} | {t:&gt;11} ms | {2 * t:&gt;9} ms")
+
+# Ngân sách thời gian handshake cho một sản phẩm (trường hợp xấu nhất)
+quet, loc, vision_doc_io, t_setup, xu_ly = 10, 3, 1, 5, 60
+tre_plc = quet + loc                     # PLC thấy một thay đổi chậm nhất sau (quét + lọc)
+tong = vision_doc_io + xu_ly + t_setup + tre_plc + vision_doc_io + tre_plc
+print(f"\nXử lý ảnh {xu_ly} ms, nhưng một chu kỳ handshake tốn tới {tong} ms")
+print(f"Phần 'bắt tay' chiếm {tong - xu_ly} ms ({(tong - xu_ly) / tong:.0%})")</code></pre>
+<pre><code class="language-text">Quét | Lọc vào | Xung tối thiểu | Nên đặt (x2)
+   2 |       1 |           3 ms |         6 ms
+  10 |       3 |          13 ms |        26 ms
+  20 |      10 |          30 ms |        60 ms
+
+Xử lý ảnh 60 ms, nhưng một chu kỳ handshake tốn tới 93 ms
+Phần 'bắt tay' chiếm 33 ms (35%)</code></pre>
+<p>Con số thứ hai là bài học quan trọng: với xử lý ảnh 60 ms, phần "bắt tay" qua I/O có thể cộng thêm hơn 30 ms mỗi sản phẩm. Khi tính cycle time (chặng 5), bạn phải cộng cả độ trễ này, không chỉ thời gian chạy thuật toán.</p>
+
+<h2>4. Bộ tín hiệu handshake</h2>
+<p>Bảng tín hiệu tối thiểu cho trạm vision dùng I/O số. Cột "Kiểu" là điểm mấu chốt: <strong>mức (level)</strong> nghĩa là tín hiệu giữ nguyên cho tới khi bên kia xác nhận; <strong>xung (pulse)</strong> là tín hiệu tự tắt sau một khoảng thời gian.</p>
+<table>
+  <tr><th>Tín hiệu</th><th>Chiều</th><th>Kiểu</th><th>Ý nghĩa</th></tr>
+  <tr><td>TRIGGER</td><td>PLC → Vision</td><td>Mức, vision bắt sườn lên</td><td>Sản phẩm đã vào vị trí, chụp và kiểm tra</td></tr>
+  <tr><td>READY</td><td>Vision → PLC</td><td>Mức</td><td>Vision sẵn sàng nhận trigger mới</td></tr>
+  <tr><td>BUSY</td><td>Vision → PLC</td><td>Mức</td><td>Đang chụp/xử lý (PLC chưa được di chuyển sản phẩm nếu cần chụp lại)</td></tr>
+  <tr><td>DONE (result valid)</td><td>Vision → PLC</td><td>Mức</td><td>OK/NG trên dây đã đúng và ổn định, PLC được phép đọc</td></tr>
+  <tr><td>OK</td><td>Vision → PLC</td><td>Mức, chỉ có nghĩa khi DONE = 1</td><td>Sản phẩm đạt</td></tr>
+  <tr><td>NG</td><td>Vision → PLC</td><td>Mức, chỉ có nghĩa khi DONE = 1</td><td>Sản phẩm lỗi</td></tr>
+  <tr><td>ERROR</td><td>Vision → PLC</td><td>Mức</td><td>Mất camera, lỗi cấu hình… PLC dừng hoặc báo động</td></tr>
+</table>
+<p>Vì sao dùng <strong>hai</strong> dây OK và NG thay vì một dây "1 = OK, 0 = NG"? Vì với một dây, mức 0 vừa có nghĩa "NG" vừa có nghĩa "đứt dây", "camera mất nguồn" hay "chưa có kết quả". Với hai dây, chỉ có <code>10</code> (OK) và <code>01</code> (NG) là hợp lệ; <code>00</code> hoặc <code>11</code> là lỗi và PLC xử lý như NG. Nguyên tắc chung: <strong>trạng thái an toàn phải là trạng thái "không có điện"</strong>, mất tín hiệu không bao giờ được hiểu thành OK.</p>
+
+<h2>5. Trình tự bắt tay từng bước</h2>
+<table>
+  <tr><th>Bước</th><th>Ai làm</th><th>Hành động</th><th>Điều kiện để bước tiếp</th></tr>
+  <tr><td>0</td><td>Vision</td><td>READY = 1, BUSY = DONE = OK = NG = 0</td><td>Sẵn sàng</td></tr>
+  <tr><td>1</td><td>PLC</td><td>Sản phẩm vào vị trí, đã dừng hẳn → TRIGGER = 1, bắt đầu đếm timeout</td><td>READY = 1</td></tr>
+  <tr><td>2</td><td>Vision</td><td>Thấy <strong>sườn lên</strong> TRIGGER → READY = 0, BUSY = 1, chụp</td><td></td></tr>
+  <tr><td>3</td><td>Vision</td><td>Xử lý xong, ghi OK hoặc NG <strong>trước</strong></td><td>TRIGGER vẫn = 1</td></tr>
+  <tr><td>4</td><td>Vision</td><td>Chờ t<sub>setup</sub> rồi DONE = 1, BUSY = 0</td><td></td></tr>
+  <tr><td>5</td><td>PLC</td><td>Thấy DONE = 1 → đọc OK/NG, chốt kết quả cho sản phẩm, TRIGGER = 0</td><td>DONE = 1</td></tr>
+  <tr><td>6</td><td>Vision</td><td>Thấy TRIGGER = 0 → DONE = OK = NG = 0, READY = 1</td><td>TRIGGER = 0</td></tr>
+  <tr><td>7</td><td>PLC</td><td>Thấy DONE = 0 → cho sản phẩm đi, sẵn sàng chu kỳ mới</td><td>DONE = 0</td></tr>
+</table>
+<p>Mỗi bên chỉ đổi tín hiệu của mình sau khi <strong>thấy</strong> bên kia đã đổi. Đây là kiểu bắt tay "4 pha" (four-phase handshake): bật yêu cầu, bật trả lời, tắt yêu cầu, tắt trả lời. Nó chậm hơn bắn xung nhưng không phụ thuộc chu kỳ quét: dù PLC quét 2 ms hay 50 ms, không tín hiệu nào bị mất.</p>
+
+<h2>6. Giản đồ thời gian: vẽ và đọc</h2>
+<p>Giản đồ thời gian (timing diagram) là "ngôn ngữ chung" giữa kỹ sư vision và kỹ sư PLC. Trục ngang là thời gian, mỗi hàng là một tín hiệu, mức cao là 1. Một chu kỳ OK chuẩn:</p>
+<pre><code class="language-text">            1   2                         3 4   5 6    7
+TRIGGER  ___/‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\___________
+READY    ‾‾‾‾‾‾‾\_________________________________/‾‾‾‾‾‾‾‾‾
+BUSY     _______/‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾\_______________
+OK       _________________________________/‾‾‾‾‾‾‾\_________
+DONE     ___________________________________/‾‾‾‾‾\_________
+                |&lt;------- t_xu_ly -------&gt;| |
+                                        t_setup
+(1) PLC bật TRIGGER      (2) vision bắt sườn lên: BUSY=1, READY=0
+(3) vision đặt OK trước  (4) sau t_setup: DONE=1, BUSY=0
+(5) PLC thấy DONE, chốt kết quả, tắt TRIGGER
+(6) vision thấy TRIGGER tắt: xóa DONE, OK; READY=1
+(7) PLC thấy DONE=0: chu kỳ kết thúc</code></pre>
+<p>Cách đọc một giản đồ do khách hàng hoặc kỹ sư PLC gửi:</p>
+<ol>
+  <li>Tìm <strong>tín hiệu khởi đầu</strong> (thường là TRIGGER) và đi theo các mũi tên nhân quả: sườn nào gây ra sườn nào.</li>
+  <li>Đánh dấu các <strong>khoảng thời gian có tên</strong>: thời gian xử lý tối đa, t<sub>setup</sub> (kết quả phải có trước DONE bao lâu), độ rộng xung tối thiểu, timeout.</li>
+  <li>Kiểm tra mỗi tín hiệu "kết quả" (OK/NG, mã lỗi) chỉ được đọc khi tín hiệu "hợp lệ" (DONE) đang ở mức 1.</li>
+  <li>Hỏi trường hợp lỗi: nếu bước (4) không bao giờ xảy ra thì sao? Giản đồ tốt luôn có một hình cho trường hợp timeout.</li>
+</ol>
+
+<h2>7. Bốn quy tắc thiết kế</h2>
+<h3>7.1. Xung hay mức?</h3>
+<p><strong>Xung</strong> (ví dụ DONE bật 20 ms rồi tự tắt) đơn giản, không cần PLC trả lời, nhưng: độ rộng xung phải lớn hơn (chu kỳ quét + lọc) của bên nhận như mục 3, và nếu PLC đang bận/ đang dừng thì xung mất mà không ai biết. <strong>Mức + bắt tay</strong> chắc chắn hơn và là lựa chọn mặc định cho kết quả. Xung chỉ nên dùng khi bên nhận là phần cứng nhanh (ví dụ cảm biến quang nối thẳng vào ngõ trigger của camera để chụp vật đang chạy, hoàn toàn không qua PLC).</p>
+
+<h3>7.2. Kết quả phải có trước DONE</h3>
+<p>DONE chính là tín hiệu <strong>result valid (strobe)</strong>: nó khẳng định "các dây kết quả đã đúng". Nếu phần mềm bật OK và DONE trong cùng một lệnh, trên dây thật hai ngõ ra có thể đổi trạng thái lệch nhau một chút (transistor, opto, bộ lọc ngõ vào khác nhau). Nếu PLC quét đúng vào khe hở đó, nó thấy <code>DONE=1, OK=0, NG=0</code> và chốt sai. Vì vậy: ghi OK/NG, chờ t<sub>setup</sub> (vài ms, lớn hơn thời gian lọc ngõ vào của PLC), rồi mới bật DONE. Tương tự, khi xóa: tắt DONE cùng lúc hoặc trước khi xóa OK/NG, không bao giờ để DONE=1 với kết quả cũ.</p>
+
+<h3>7.3. Bắt sườn, không bắt mức</h3>
+<p>Vision chỉ bắt đầu chu kỳ mới khi thấy TRIGGER đổi từ 0 lên 1. Nếu bắt mức ("TRIGGER = 1 thì chụp"), khi PLC chậm tắt TRIGGER, vision sẽ chụp và báo kết quả hai lần cho cùng một sản phẩm.</p>
+
+<h3>7.4. Timeout ở cả hai phía</h3>
+<ul>
+  <li><strong>Phía PLC</strong>: đếm từ lúc bật TRIGGER; quá timeout mà chưa có DONE → coi sản phẩm là NG (đẩy ra hoặc giữ lại kiểm tra tay), báo lỗi vision, tắt TRIGGER. <strong>Tuyệt đối không cho đi như OK.</strong></li>
+  <li><strong>Phía vision</strong>: trước khi bật DONE, kiểm tra TRIGGER vẫn còn bật. Nếu PLC đã bỏ cuộc thì <strong>bỏ kết quả</strong>, không được để kết quả muộn của sản phẩm cũ "dính" sang sản phẩm mới.</li>
+  <li>Chọn timeout: lớn hơn thời gian xử lý <em>tối đa</em> đo được (không phải trung bình) cộng độ trễ handshake, có dự phòng; đồng thời nhỏ hơn thời gian dây chuyền cho phép dừng tại trạm.</li>
+</ul>
+
+<h2>8. Mô phỏng PLC + vision bằng Python</h2>
+<p>Trước khi ra hiện trường, hãy mô phỏng trình tự để chắc chắn logic không bị kẹt. Mô hình dưới đây chạy theo từng bước 1 ms: PLC chỉ đọc/ghi ở đầu mỗi lần quét (5 ms), vision đọc I/O mỗi 1 ms. Mỗi bên là một <strong>máy trạng thái</strong> (state machine): một biến <code>trang_thai</code> và mỗi bước chỉ xử lý trường hợp của trạng thái hiện tại. Đây cũng là cấu trúc bạn sẽ viết cho vòng lặp thật ở bài Modbus.</p>
+<pre><code class="language-python">TIN_HIEU = ["TRIGGER", "READY", "BUSY", "DONE", "OK", "NG"]
+
+
+class PLC:
+    """PLC quét theo chu kỳ: chỉ đọc ngõ vào và ghi ngõ ra ở đầu mỗi lần quét."""
+
+    def __init__(self, thoi_diem_sp, chu_ky_quet=5, timeout=150):
+        self.thoi_diem_sp = list(thoi_diem_sp)   # thời điểm (ms) từng sản phẩm vào vị trí chụp
+        self.quet = chu_ky_quet
+        self.timeout = timeout
+        self.trang_thai = "CHO_SP"
+        self.idx = 0
+        self.t_trigger = 0
+        self.ket_qua = []
+        self.nhat_ky = []
+
+    def buoc(self, t, day):
+        if t % self.quet:                        # chưa tới lần quét tiếp theo
+            return
+        vao = dict(day)                          # "chụp" toàn bộ ngõ vào ở đầu lần quét
+        sp = f"SP{self.idx + 1}"
+        if self.trang_thai == "CHO_SP":
+            co_sp = self.idx &lt; len(self.thoi_diem_sp) and t &gt;= self.thoi_diem_sp[self.idx]
+            if co_sp and vao["READY"]:
+                day["TRIGGER"] = 1
+                self.t_trigger = t
+                self.trang_thai = "CHO_DONE"
+                self.nhat_ky.append((t, "PLC", f"{sp} vào vị trí, bật TRIGGER"))
+        elif self.trang_thai == "CHO_DONE":
+            if vao["DONE"]:
+                if (vao["OK"], vao["NG"]) == (1, 0):
+                    kq = "OK"
+                elif (vao["OK"], vao["NG"]) == (0, 1):
+                    kq = "NG"
+                else:
+                    kq = "KQ_SAI"                # 00 hoặc 11: không tin, xử lý như NG
+                day["TRIGGER"] = 0
+                self.ket_qua.append((sp, kq))
+                self.nhat_ky.append((t, "PLC", f"thấy DONE, {sp} = {kq} "
+                                               f"(sau {t - self.t_trigger} ms), tắt TRIGGER"))
+                self.trang_thai = "CHO_DONE_TAT"
+            elif t - self.t_trigger &gt;= self.timeout:
+                day["TRIGGER"] = 0
+                self.ket_qua.append((sp, "TIMEOUT"))
+                self.nhat_ky.append((t, "PLC", f"TIMEOUT {self.timeout} ms: {sp} đẩy ra như NG, báo lỗi"))
+                self.idx += 1
+                self.trang_thai = "CHO_SP"       # chờ READY trở lại mới chụp SP tiếp theo
+        elif self.trang_thai == "CHO_DONE_TAT":
+            if not vao["DONE"]:
+                self.idx += 1
+                self.trang_thai = "CHO_SP"
+
+
+class Vision:
+    """Trạm vision đọc I/O mỗi 1 ms."""
+
+    def __init__(self, thoi_gian_xu_ly, ket_qua, t_setup=2):
+        self.thoi_gian_xu_ly = list(thoi_gian_xu_ly)
+        self.ket_qua = list(ket_qua)
+        self.t_setup = t_setup                   # thời gian giữ kết quả ổn định trước khi bật DONE
+        self.trang_thai = "SAN_SANG"
+        self.trigger_truoc = 0
+        self.dem = 0
+        self.lan = 0
+        self.nhat_ky = []
+
+    def buoc(self, t, day):
+        trigger = day["TRIGGER"]
+        suon_len = trigger == 1 and self.trigger_truoc == 0   # chỉ phản ứng với SƯỜN LÊN
+        self.trigger_truoc = trigger
+
+        if self.trang_thai == "SAN_SANG":
+            day["READY"] = 1
+            if suon_len:
+                day["READY"], day["BUSY"] = 0, 1
+                self.dem = self.thoi_gian_xu_ly[self.lan]
+                self.trang_thai = "XU_LY"
+                self.nhat_ky.append((t, "VIS", "thấy sườn lên TRIGGER: READY=0, BUSY=1, chụp + xử lý"))
+
+        elif self.trang_thai == "XU_LY":
+            self.dem -= 1
+            if self.dem &gt; 0:
+                return
+            kq = self.ket_qua[self.lan]
+            self.lan += 1
+            if not trigger:                      # PLC đã bỏ cuộc (timeout) trong lúc mình xử lý
+                day["BUSY"], day["READY"] = 0, 1
+                self.trang_thai = "SAN_SANG"
+                self.nhat_ky.append((t, "VIS", "xử lý xong nhưng TRIGGER đã tắt: BỎ kết quả, READY=1"))
+                return
+            day["OK"], day["NG"] = (1, 0) if kq == "OK" else (0, 1)
+            self.dem = self.t_setup
+            self.trang_thai = "DAT_KQ"
+            self.nhat_ky.append((t, "VIS", f"ghi kết quả {kq} lên OK/NG (chưa bật DONE)"))
+
+        elif self.trang_thai == "DAT_KQ":
+            self.dem -= 1
+            if self.dem == 0:
+                day["DONE"], day["BUSY"] = 1, 0
+                self.trang_thai = "CHO_TRIGGER_TAT"
+                self.nhat_ky.append((t, "VIS", f"kết quả đã ổn định {self.t_setup} ms: DONE=1, BUSY=0"))
+
+        elif self.trang_thai == "CHO_TRIGGER_TAT":
+            if not trigger:
+                day["DONE"], day["OK"], day["NG"] = 0, 0, 0
+                day["READY"] = 1
+                self.trang_thai = "SAN_SANG"
+                self.nhat_ky.append((t, "VIS", "TRIGGER tắt: xóa DONE và OK/NG, READY=1"))
+
+
+def mo_phong(plc, vis, tong_ms):
+    day = {k: 0 for k in TIN_HIEU}               # mức điện trên từng dây
+    lich_su = {k: [] for k in TIN_HIEU}
+    for t in range(tong_ms):                     # mỗi bước = 1 ms
+        vis.buoc(t, day)
+        plc.buoc(t, day)
+        for k in TIN_HIEU:
+            lich_su[k].append(day[k])
+    return lich_su
+
+
+def in_nhat_ky(plc, vis):
+    for t, ai, noi_dung in sorted(plc.nhat_ky + vis.nhat_ky):
+        print(f"{t:4d} ms  {ai}: {noi_dung}")
+
+
+def ve_gian_do(lich_su, ms_moi_ky_tu=10):
+    n = len(lich_su[TIN_HIEU[0]])
+    for k in TIN_HIEU:
+        s = lich_su[k]
+        hang = "".join("‾" if max(s[i:i + ms_moi_ky_tu]) else "_" for i in range(0, n, ms_moi_ky_tu))
+        print(f"{k:&lt;8}{hang}")
+    thuoc = "".join(f"{i * ms_moi_ky_tu:&lt;10d}" for i in range(0, n // ms_moi_ky_tu, 10))
+    print(f"{'ms':&lt;8}{thuoc}".rstrip())</code></pre>
+<p>Kịch bản: ba sản phẩm. SP1 xử lý 40 ms (OK), SP2 45 ms (NG), SP3 camera "treo" 250 ms trong khi PLC đặt timeout 150 ms.</p>
+<pre><code class="language-python">plc = PLC(thoi_diem_sp=[20, 100, 180], chu_ky_quet=5, timeout=150)
+vis = Vision(thoi_gian_xu_ly=[40, 45, 250],         # SP3: camera "treo" 250 ms
+             ket_qua=["OK", "NG", "OK"], t_setup=2)
+lich_su = mo_phong(plc, vis, tong_ms=460)
+
+in_nhat_ky(plc, vis)
+print()
+ve_gian_do(lich_su)
+print("\nPLC ghi nhận:", plc.ket_qua)</code></pre>
+<pre><code class="language-text">  20 ms  PLC: SP1 vào vị trí, bật TRIGGER
+  21 ms  VIS: thấy sườn lên TRIGGER: READY=0, BUSY=1, chụp + xử lý
+  61 ms  VIS: ghi kết quả OK lên OK/NG (chưa bật DONE)
+  63 ms  VIS: kết quả đã ổn định 2 ms: DONE=1, BUSY=0
+  65 ms  PLC: thấy DONE, SP1 = OK (sau 45 ms), tắt TRIGGER
+  66 ms  VIS: TRIGGER tắt: xóa DONE và OK/NG, READY=1
+ 100 ms  PLC: SP2 vào vị trí, bật TRIGGER
+ 101 ms  VIS: thấy sườn lên TRIGGER: READY=0, BUSY=1, chụp + xử lý
+ 146 ms  VIS: ghi kết quả NG lên OK/NG (chưa bật DONE)
+ 148 ms  VIS: kết quả đã ổn định 2 ms: DONE=1, BUSY=0
+ 150 ms  PLC: thấy DONE, SP2 = NG (sau 50 ms), tắt TRIGGER
+ 151 ms  VIS: TRIGGER tắt: xóa DONE và OK/NG, READY=1
+ 180 ms  PLC: SP3 vào vị trí, bật TRIGGER
+ 181 ms  VIS: thấy sườn lên TRIGGER: READY=0, BUSY=1, chụp + xử lý
+ 330 ms  PLC: TIMEOUT 150 ms: SP3 đẩy ra như NG, báo lỗi
+ 431 ms  VIS: xử lý xong nhưng TRIGGER đã tắt: BỎ kết quả, READY=1
+
+TRIGGER __‾‾‾‾‾___‾‾‾‾‾___‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾_____________
+READY   ‾‾‾___‾‾‾‾‾____‾‾‾‾________________________‾‾‾
+BUSY    __‾‾‾‾‾___‾‾‾‾‾___‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾__
+DONE    ______‾_______‾‾______________________________
+OK      ______‾_______________________________________
+NG      ______________‾‾______________________________
+ms      0         100       200       300       400
+
+PLC ghi nhận: [('SP1', 'OK'), ('SP2', 'NG'), ('SP3', 'TIMEOUT')]</code></pre>
+<p>Đọc kết quả mô phỏng:</p>
+<ul>
+  <li>SP1: vision đặt OK ở 61 ms, bật DONE ở 63 ms, nhưng PLC chỉ thấy ở lần quét 65 ms. Từ lúc bật TRIGGER đến khi chốt kết quả là 45 ms dù xử lý chỉ 40 ms: đó là chi phí bắt tay.</li>
+  <li>SP3: PLC chờ đủ 150 ms thì tự tắt TRIGGER, ghi nhận TIMEOUT và đẩy sản phẩm ra như NG. 100 ms sau vision mới xong, thấy TRIGGER đã tắt nên bỏ kết quả và bật lại READY. Không có kết quả "OK muộn" nào bị gán nhầm.</li>
+  <li>Trên giản đồ (mỗi ký tự = 10 ms), DONE và OK/NG chỉ rộng 1–2 ký tự: thời gian giữ kết quả ngắn vì PLC phản hồi nhanh. Đó là lý do không thể thay handshake bằng "PLC tự đọc OK sau một khoảng thời gian cố định".</li>
+</ul>
+<div class="tip"><strong>Dùng mô phỏng như bản đặc tả</strong>Gửi giản đồ và nhật ký mô phỏng cho kỹ sư PLC trước khi họ viết ladder. Hai bên thống nhất trên cùng một hình, kể cả trường hợp timeout, sẽ tiết kiệm hàng giờ "đổ lỗi" khi chạy thử. Trên hệ thật, ghi log mọi sườn tín hiệu kèm thời gian đến ms ở phía vision.</div>
+
+<h2>9. Lỗi thường gặp</h2>
+<table>
+  <tr><th>Hiện tượng</th><th>Nguyên nhân hay gặp</th><th>Cách xử lý</th></tr>
+  <tr><td>LED ngõ vào PLC không sáng dù camera báo đã bật ngõ ra</td><td>Lẫn NPN/PNP với kiểu COM của nhóm ngõ vào; hai nguồn không chung 0 V</td><td>Đo OUT so với 0 V khi ON; xem lại sơ đồ đấu COM</td></tr>
+  <tr><td>Thỉnh thoảng PLC "không thấy" kết quả</td><td>Dùng xung ngắn hơn chu kỳ quét + lọc</td><td>Chuyển sang mức + bắt tay, hoặc kéo dài xung ≥ 2 × (quét + lọc)</td></tr>
+  <tr><td>Hiếm khi một sản phẩm tốt bị đẩy NG mà ảnh lại OK</td><td>Bật DONE cùng lúc với OK, PLC quét vào khe lệch</td><td>Đặt kết quả trước, chờ t<sub>setup</sub>, rồi mới bật DONE</td></tr>
+  <tr><td>Một sản phẩm có hai kết quả trong log</td><td>Vision bắt mức TRIGGER thay vì sườn lên</td><td>Chỉ phản ứng với sườn lên, và chỉ khi đang READY</td></tr>
+  <tr><td>Kết quả của sản phẩm trước gán cho sản phẩm sau</td><td>Vision không kiểm tra TRIGGER trước khi bật DONE sau timeout</td><td>Bỏ kết quả nếu TRIGGER đã tắt; dùng mã/số thứ tự sản phẩm khi giao tiếp qua mạng</td></tr>
+  <tr><td>Dây chuyền đứng, cả hai bên chờ nhau</td><td>Thiếu timeout, hoặc vision không bật lại READY sau lỗi</td><td>Timeout ở cả hai phía, mọi nhánh lỗi đều quay về trạng thái READY hoặc ERROR rõ ràng</td></tr>
+</table>
+
+<h2>10. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> PLC có chu kỳ quét tối đa 12 ms, bộ lọc ngõ vào 5 ms. Camera thông minh chỉ hỗ trợ xuất OK dạng xung 10 ms. PLC có chắc chắn đọc được không? Bạn đề xuất gì?</p>
+<details><summary>Xem đáp án</summary>
+<p>Không. Xung tối thiểu để chắc chắn được thấy là 12 + 5 = 17 ms, xung 10 ms có thể lọt giữa hai lần quét. Đề xuất theo thứ tự ưu tiên: (1) cấu hình camera xuất kết quả dạng mức, giữ đến khi có trigger mới hoặc đến khi PLC xác nhận; (2) nếu chỉ có xung, kéo dài lên khoảng 2 × 17 ≈ 35 ms và kiểm tra lại cycle time; (3) đưa tín hiệu vào ngõ vào tốc độ cao/ngõ vào ngắt của PLC (nếu có), nơi không phụ thuộc chu kỳ quét.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Dùng mô phỏng ở mục 8 với thời gian xử lý <code>[40, 45, 70]</code>. Chạy với timeout 60 ms và 120 ms. Sản phẩm nào bị TIMEOUT? Bạn chọn timeout bao nhiêu nếu đo được thời gian xử lý tối đa 70 ms?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">for timeout in (60, 120):
+    plc = PLC(thoi_diem_sp=[20, 100, 180], chu_ky_quet=5, timeout=timeout)
+    vis = Vision(thoi_gian_xu_ly=[40, 45, 70], ket_qua=["OK", "NG", "OK"])
+    mo_phong(plc, vis, tong_ms=400)
+    print(f"timeout={timeout:3d} ms →", plc.ket_qua)</code></pre>
+<pre><code class="language-text">timeout= 60 ms → [('SP1', 'OK'), ('SP2', 'NG'), ('SP3', 'TIMEOUT')]
+timeout=120 ms → [('SP1', 'OK'), ('SP2', 'NG'), ('SP3', 'OK')]</code></pre>
+<p>Với 60 ms, SP3 (70 ms) bị timeout dù vision không hỏng: đây là kiểu "overkill" do cài đặt, không phải do thuật toán. Timeout phải lớn hơn thời gian xử lý tối đa cộng độ trễ bắt tay (ở đây cỡ 5–10 ms), cộng dự phòng cho lúc hệ điều hành bận: khoảng 1,5–2 lần, tức 110–150 ms, miễn là vẫn nằm trong thời gian dây chuyền cho phép dừng tại trạm.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Một kỹ sư đề xuất: "Bỏ DONE đi cho nhanh. PLC bật TRIGGER, chờ cố định 80 ms rồi đọc OK/NG." Nêu ít nhất ba rủi ro.</p>
+<details><summary>Xem đáp án</summary>
+<ul>
+  <li>Khi xử lý lâu hơn 80 ms (ảnh khó, hệ điều hành bận, ghi ổ đĩa chậm), PLC đọc kết quả <strong>của sản phẩm trước</strong> hoặc 00 → gán sai.</li>
+  <li>Khi vision treo hoặc mất nguồn, PLC vẫn "đọc" được một giá trị và không có cách nào phân biệt với kết quả thật; mất tín hiệu có thể bị hiểu thành OK nếu chỉ dùng một dây.</li>
+  <li>Phải đặt thời gian chờ theo trường hợp xấu nhất cho mọi sản phẩm, nên thực ra còn <strong>chậm hơn</strong> handshake (vốn kết thúc ngay khi có kết quả).</li>
+  <li>Không có bằng chứng thời gian trong log để phân xử khi có sự cố.</li>
+</ul>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>I/O công nghiệp dùng 24 V vì chống nhiễu, ngưỡng ON/OFF rộng và là chuẩn chung; không nối 24 V vào GPIO máy tính.</li>
+  <li>PNP (sourcing) nối OUT lên +24 V khi ON, cần ngõ vào có COM về 0 V; NPN (sinking) nối OUT xuống 0 V, cần COM về +24 V. Xem sơ đồ đấu dây, đừng tin chữ "sink/source".</li>
+  <li>PLC chỉ thấy thay đổi sau tối đa (chu kỳ quét + lọc ngõ vào); xung phải dài hơn khoảng này, tốt nhất dùng mức + bắt tay.</li>
+  <li>Handshake 4 pha: TRIGGER↑ → BUSY↑ → (OK/NG) → DONE↑ → TRIGGER↓ → DONE↓ → READY↑. Hai dây OK/NG, chỉ đọc khi DONE = 1.</li>
+  <li>Đặt kết quả trước DONE một khoảng t<sub>setup</sub>; vision bắt sườn lên TRIGGER; timeout ở cả hai phía, PLC timeout = NG, vision bỏ kết quả muộn.</li>
+  <li>Mô phỏng máy trạng thái và giản đồ thời gian là bản đặc tả chung với kỹ sư PLC.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Các chuẩn giao tiếp: Modbus TCP, EtherNet/IP, PROFINET</strong>, để đưa trình tự bắt tay này lên mạng và gửi được cả số đo, không chỉ vài bit OK/NG.</p>

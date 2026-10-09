@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="vi" data-root="../">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lưu kết quả kiểm tra vào SQLite, ảnh NG theo ngày và dọn ổ đĩa</title>
+<meta name="description" content="Thiết kế bảng SQLite có chỉ mục, truy vấn yield và lỗi NG, lưu ảnh theo ngày, tự dọn ảnh cũ và ghi nền không chặn cycle time.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://hocfree.vn/hoc/tich-hop-8-luu-ket-qua-sqlite-anh-ng.html">
+<meta property="og:site_name" content="HọcFree">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Lưu kết quả kiểm tra vào SQLite, ảnh NG theo ngày và dọn ổ đĩa">
+<meta property="og:description" content="Thiết kế bảng SQLite có chỉ mục, truy vấn yield và lỗi NG, lưu ảnh theo ngày, tự dọn ảnh cũ và ghi nền không chặn cycle time.">
+<meta property="og:url" content="https://hocfree.vn/hoc/tich-hop-8-luu-ket-qua-sqlite-anh-ng.html">
+<meta property="og:image" content="https://hocfree.vn/assets/images/posts/tich-hop-8-luu-ket-qua-sqlite-anh-ng.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="Lưu kết quả kiểm tra vào SQLite, ảnh NG theo ngày và dọn ổ đĩa">
+<meta property="og:locale" content="vi_VN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Lưu kết quả kiểm tra vào SQLite, ảnh NG theo ngày và dọn ổ đĩa">
+<meta name="twitter:description" content="Thiết kế bảng SQLite có chỉ mục, truy vấn yield và lỗi NG, lưu ảnh theo ngày, tự dọn ảnh cũ và ghi nền không chặn cycle time.">
+<meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/tich-hop-8-luu-ket-qua-sqlite-anh-ng.jpg">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/fonts.css?v=20261009">
+<link rel="stylesheet" href="../assets/css/style.css?v=20261009">
+<script>try{var t=localStorage.getItem('hf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
+<meta property="article:published_time" content="2026-10-09">
+<meta property="article:section" content="Học AI &amp; Lập trình">
+<meta property="article:tag" content="Python">
+<meta property="article:tag" content="Industrial Vision">
+<meta property="article:tag" content="Machine Vision">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "Lưu kết quả kiểm tra vào SQLite, ảnh NG theo ngày và dọn ổ đĩa", "description": "Thiết kế bảng SQLite có chỉ mục, truy vấn yield và lỗi NG, lưu ảnh theo ngày, tự dọn ảnh cũ và ghi nền không chặn cycle time.", "image": ["https://hocfree.vn/assets/images/posts/tich-hop-8-luu-ket-qua-sqlite-anh-ng.jpg"], "datePublished": "2026-10-09", "dateModified": "2026-10-09", "inLanguage": "vi", "articleSection": "Học AI & Lập trình", "keywords": "Python, Industrial Vision, Machine Vision", "wordCount": 4498, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/hoc/tich-hop-8-luu-ket-qua-sqlite-anh-ng.html"}, "isPartOf": {"@type": "Course", "name": "Trở thành Vision Engineer", "url": "https://hocfree.vn/lo-trinh/vision-engineer.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Learning Paths", "item": "https://hocfree.vn/lo-trinh/"}, {"@type": "ListItem", "position": 3, "name": "Trở thành Vision Engineer", "item": "https://hocfree.vn/lo-trinh/vision-engineer.html"}, {"@type": "ListItem", "position": 4, "name": "Chặng 9: PLC / Robot / MES", "item": "https://hocfree.vn/lo-trinh/vision-engineer/plc-robot-mes.html"}, {"@type": "ListItem", "position": 5, "name": "Lưu kết quả kiểm tra vào SQLite, ảnh NG theo ngày và dọn ổ đĩa"}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div class="progress" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="container wide header-top">
+    <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="nav-scrim" hidden></div>
+    <a class="logo" href="../" aria-label="HọcFree – Trang chủ"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+    <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
+    <div class="header-actions">
+      <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="login-link" href="../dang-nhap.html">Đăng nhập</a>
+      <a class="btn start-btn" href="../lo-trinh/">Bắt đầu học</a>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="container wide">
+      <nav class="site-nav" id="site-nav" aria-label="Menu chính">
+        <div class="drawer-head">
+          <a class="logo" href="../" tabindex="-1"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+          <button class="icon-btn nav-close" aria-label="Đóng menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <button type="button" class="drawer-search search-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Tìm bài học, chủ đề…</span></button>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="../">Trang chủ</a></li><li class="nav-item has-panel is-mega"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-hoc">Học AI &amp; Lập trình<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel mega" id="nav-panel-hoc">
+  <div class="container wide mega-inner">
+    <div class="mega-groups"><div class="mega-group"><a class="mega-group-title" href="../hoc/#programming">Programming</a><ul><li><a href="../hoc/python.html">Python</a></li><li><a href="../hoc/csharp.html">C#</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#ai-machine-learning">AI &amp; Machine Learning</a><ul><li><a href="../hoc/machine-learning.html">Machine Learning</a></li><li><a href="../hoc/deep-learning.html">Deep Learning</a></li><li><a href="../hoc/pytorch.html">PyTorch</a></li><li><a href="../hoc/generative-ai.html">Generative AI</a></li><li><a href="../hoc/llm-ai-agents.html">LLM / AI Agents</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#computer-vision">Computer Vision</a><ul><li><a href="../hoc/opencv.html">OpenCV</a></li><li><a href="../hoc/image-processing.html">Image Processing</a></li><li><a href="../hoc/computer-vision.html">Computer Vision</a></li><li><a href="../hoc/ocr.html">OCR</a></li><li><a href="../hoc/object-detection.html">Object Detection</a></li><li><a href="../hoc/segmentation.html">Segmentation</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#vision-engineering">Vision Engineering</a><ul><li><a href="../hoc/machine-vision.html">Machine Vision</a></li><li><a href="../hoc/ai-vision.html">AI Vision</a></li><li><a href="../hoc/industrial-vision.html">Industrial Vision</a></li><li><a href="../hoc/camera-lens.html">Camera &amp; Lens</a></li><li><a href="../hoc/lighting.html">Lighting</a></li><li><a href="../hoc/calibration.html">Calibration</a></li><li><a href="../hoc/plc-robot-mes.html">PLC / Robot / MES</a></li><li><a href="../hoc/vision-deployment.html">Vision Deployment</a></li></ul></div></div>
+    <a class="feature-card" href="../lo-trinh/vision-engineer.html">
+  <span class="feature-eyebrow">⭐ Learning Path nổi bật</span>
+  <span class="feature-title">Trở thành Vision Engineer</span>
+  <span class="feature-sub">Machine Vision + AI Vision + Industrial Automation</span>
+  <span class="feature-desc">Lộ trình thực chiến từ Python, OpenCV và Machine Vision đến Deep Learning, AI Vision, Camera, PLC, Robot và triển khai hệ thống Vision trong nhà máy.</span>
+  <span class="feature-chain" aria-label="Các chặng chính"><span>Python</span><i aria-hidden="true">→</i><span>OpenCV</span><i aria-hidden="true">→</i><span>Machine Vision</span><i aria-hidden="true">→</i><span>AI Vision</span><i aria-hidden="true">→</i><span class="chain-goal">🎯 Vision Engineer</span></span>
+  <span class="feature-meta">14 chặng · 5 giai đoạn · ~12 tháng</span>
+  <span class="feature-cta">Xem lộ trình →</span>
+</a>
+  </div>
+  <div class="mega-foot"><div class="container wide mega-foot-inner"><ol class="journey compact" aria-label="Học, thực hành, trở thành kỹ sư"><li><a href="../hoc/" aria-current="step"><span class="journey-n">1</span><span class="journey-t"><b>Học</b><small>Học AI &amp; Lập trình</small></span></a></li><li><a href="../projects/"><span class="journey-n">2</span><span class="journey-t"><b>Thực hành</b><small>Projects</small></span></a></li><li><a href="../lo-trinh/"><span class="journey-n">3</span><span class="journey-t"><b>Trở thành kỹ sư</b><small>Learning Paths</small></span></a></li></ol><a class="panel-all" href="../hoc/">Xem tất cả Học AI &amp; Lập trình →</a></div></div>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-projects">Projects<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-projects">
+  <p class="panel-kicker"><span>Bước 2 · Thực hành</span>Áp dụng vào dự án thật</p>
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../projects/ai-projects.html"><span class="drop-label">AI Projects</span><span class="drop-desc">Ứng dụng ML và LLM, từ ý tưởng đến bản demo</span></a></li><li><a class="drop-link" href="../projects/computer-vision-projects.html"><span class="drop-label">Computer Vision Projects</span><span class="drop-desc">Phát hiện, nhận dạng và theo dõi đối tượng</span></a></li><li><a class="drop-link" href="../projects/industrial-vision-projects.html"><span class="drop-label">Industrial Vision Projects</span><span class="drop-desc">Đo kích thước, kiểm tra lỗi, đọc mã trên dây chuyền</span></a></li></ul></div></div>
+  <a class="panel-all" href="../projects/">Xem tất cả Projects →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger is-active" aria-expanded="false" aria-controls="nav-panel-lo-trinh" aria-current="true">Learning Paths<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-lo-trinh">
+  <p class="panel-kicker"><span>Bước 3 · Trở thành kỹ sư</span>Định hướng nghề nghiệp</p>
+  <ul class="drop-list"><li><a class="drop-link is-flagship" href="../lo-trinh/vision-engineer.html"><span class="drop-label">⭐ Trở thành Vision Engineer</span><span class="drop-desc">Machine Vision + AI Vision + Industrial Automation · 14 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/#python-developer"><span class="drop-label">Python Developer<span class="badge-soon">Sắp ra mắt</span></span><span class="drop-desc">Python, công cụ, tự động hóa</span></a></li></ul>
+  <a class="panel-all" href="../lo-trinh/">Xem tất cả lộ trình →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-kien-thuc">Kiến thức<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-kien-thuc">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Lĩnh vực</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/programming.html"><span class="drop-label">Programming</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-machine-learning.html"><span class="drop-label">AI / Machine Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/deep-learning.html"><span class="drop-label">Deep Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/machine-vision.html"><span class="drop-label">Machine Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-vision.html"><span class="drop-label">AI Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/industrial-automation.html"><span class="drop-label">Industrial Automation</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Công cụ &amp; mẹo</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/tools-frameworks.html"><span class="drop-label">Tools &amp; Frameworks</span></a></li><li><a class="drop-link" href="../kien-thuc/tips-tricks.html"><span class="drop-label">Tips &amp; Tricks</span></a></li></ul></div></div>
+  <a class="panel-all" href="../kien-thuc/">Xem tất cả Kiến thức →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tin-tuc-ai">Tin tức AI<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tin-tuc-ai">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tin-tuc-ai/ai-news.html"><span class="drop-label">AI News</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-models.html"><span class="drop-label">AI Models</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/technology.html"><span class="drop-label">Technology</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/robotics.html"><span class="drop-label">Robotics</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-industry.html"><span class="drop-label">AI Industry</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tin-tuc-ai/">Xem tất cả Tin tức AI →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-ngoai-ngu">Ngoại ngữ<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-ngoai-ngu">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/english.html"><span class="drop-label">English</span><span class="drop-desc">Lộ trình 700 TOEIC, phương pháp học, giáo trình HF-700TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chinese.html"><span class="drop-label">Chinese</span><span class="drop-desc">Lộ trình HSK3, phương pháp học, giáo trình HF-HSK3</span></a></li></ul></div></div>
+  <a class="panel-all" href="../ngoai-ngu/">Xem tất cả Ngoại ngữ →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tai-nguyen">Tài nguyên<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tai-nguyen">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tai-nguyen/source-code.html"><span class="drop-label">Source Code</span><span class="drop-desc">Mã nguồn mẫu đi kèm bài học</span></a></li><li><a class="drop-link" href="../tai-nguyen/dataset.html"><span class="drop-label">Dataset</span><span class="drop-desc">Bộ dữ liệu ảnh để luyện tập</span></a></li><li><a class="drop-link" href="../tai-nguyen/cheat-sheets.html"><span class="drop-label">Cheat Sheets</span><span class="drop-desc">Tóm tắt nhanh trong một trang</span></a></li><li><a class="drop-link" href="../tai-nguyen/documentation.html"><span class="drop-label">Documentation</span><span class="drop-desc">Tài liệu tra cứu thư viện, API</span></a></li><li><a class="drop-link" href="../tai-nguyen/ebook.html"><span class="drop-label">Ebook / Tài liệu</span><span class="drop-desc">Sách và tài liệu tham khảo</span></a></li><li><a class="drop-link" href="../tai-nguyen/ai-tools.html"><span class="drop-label">AI Tools</span><span class="drop-desc">Công cụ AI hữu ích cho việc học</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tai-nguyen/">Xem tất cả Tài nguyên →</a>
+</div></li></ul>
+        <div class="drawer-foot">
+          <a class="btn ghost" href="../dang-nhap.html">Đăng nhập</a>
+          <a class="btn" href="../lo-trinh/">Bắt đầu học</a>
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+<div class="search-dialog" hidden>
+  <div class="search-scrim"></div>
+  <div class="search-box" role="dialog" aria-modal="true" aria-label="Tìm kiếm">
+    <form class="search-form" action="../search.html" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" placeholder="Tìm bài học, chủ đề, bài viết…" autocomplete="off" aria-label="Từ khóa tìm kiếm" aria-controls="search-suggest">
+      <button type="button" class="icon-btn search-close" aria-label="Đóng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </form>
+    <div class="search-suggest" id="search-suggest" aria-live="polite">
+      <div class="search-empty">
+        <p class="search-group-title">Chủ đề phổ biến</p>
+        <div class="chips"><a class="chip" href="../hoc/python.html">Python</a><a class="chip" href="../hoc/opencv.html">OpenCV</a><a class="chip" href="../hoc/machine-vision.html">Machine Vision</a><a class="chip" href="../hoc/deep-learning.html">Deep Learning</a><a class="chip" href="../hoc/ai-vision.html">AI Vision</a><a class="chip" href="../hoc/object-detection.html">Object Detection</a><a class="chip" href="../hoc/pytorch.html">PyTorch</a><a class="chip" href="../ngoai-ngu/english.html">English</a></div>
+        <p class="search-group-title">Lộ trình nổi bật</p>
+        <a class="search-item" href="../lo-trinh/vision-engineer.html"><span class="search-ico" aria-hidden="true">⭐</span><span>Trở thành Vision Engineer<small>Learning Path · Machine Vision + AI Vision + Industrial Automation</small></span></a>
+      </div>
+    </div>
+    <div class="search-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> chọn</span><span><kbd>Enter</kbd> mở</span><span><kbd>Esc</kbd> đóng</span></div>
+  </div>
+</div>
+<main id="main">
+  <div class="container layout article-layout">
+    <article class="article">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../lo-trinh/">Learning Paths</a><span>/</span><a href="../lo-trinh/vision-engineer.html">Vision Engineer</a><span>/</span><a href="../lo-trinh/vision-engineer/plc-robot-mes.html">Chặng 9: PLC / Robot / MES</a></nav>
+      <header class="article-head">
+        <div class="course-bar" data-course="vision-engineer"><a class="course-chip" href="../lo-trinh/vision-engineer/plc-robot-mes.html">⭐ Vision Engineer · Chặng 9</a><span class="lesson-no">Bài 8/9</span><span class="kind kind-lesson">Bài học</span><span class="lesson-min"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></svg>~60 phút</span></div>
+        <h1>Lưu kết quả kiểm tra vào SQLite, ảnh NG theo ngày và dọn ổ đĩa</h1>
+        <p class="lead">Thiết kế bảng SQLite có chỉ mục, truy vấn yield và lỗi NG, lưu ảnh theo ngày, tự dọn ảnh cũ và ghi nền không chặn cycle time.</p>
+        <div class="article-meta">
+          <span class="avatar" aria-hidden="true">HF</span>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>25 phút đọc</span></div>
+        </div>
+      </header>
+      <figure class="article-cover">
+        <img src="../assets/images/posts/tich-hop-8-luu-ket-qua-sqlite-anh-ng.webp" alt="Lưu kết quả kiểm tra vào SQLite, ảnh NG theo ngày và dọn ổ đĩa" width="1200" height="675" fetchpriority="high" decoding="async">
+      </figure>
+      <section class="lesson-goals" aria-label="Mục tiêu bài học"><h2>Học xong bài này, bạn sẽ</h2><ul><li>Lưu kết quả vào SQLite</li><li>Tổ chức thư mục ảnh theo ngày</li><li>Tự dọn ảnh cũ để không đầy ổ đĩa</li></ul><p class="goals-before">Nên học trước: <a href="../kien-thuc/mes-truy-xuat-nguon-goc-vision.html">MES và truy xuất nguồn gốc</a></p></section>
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol class="toc-plain"><li><a href="#1-vi-sao-sqlite-khong-phai-csv">1. Vì sao SQLite, không phải CSV?</a></li><li><a href="#2-thiet-ke-bang-va-mo-csdl-dung-cach">2. Thiết kế bảng và mở CSDL đúng cách</a></li><li><a href="#3-ghi-du-lieu-tham-so-va-gom-giao-dich">3. Ghi dữ liệu: tham số và gom giao dịch</a></li><li><a href="#4-truy-van-yield-theo-ngay-ly-do-ng-ng-theo-gio">4. Truy vấn: yield theo ngày, lý do NG, NG theo giờ</a></li><li><a href="#5-luu-anh-ng-theo-thu-muc-ngay">5. Lưu ảnh NG theo thư mục ngày</a></li><li><a href="#6-tu-don-anh-theo-tuoi-va-theo-dung-luong">6. Tự dọn ảnh: theo tuổi và theo dung lượng</a></li><li><a href="#7-ghi-nen-khong-de-o-dia-lam-cham-cycle-time">7. Ghi nền: không để ổ đĩa làm chậm cycle time</a></li><li><a href="#8-loi-thuong-gap">8. Lỗi thường gặp</a></li><li><a href="#9-bai-tap">9. Bài tập</a></li><li><a href="#tom-tat">Tóm tắt</a></li></ol></details>
+      <div class="prose">
+<p>Ba tháng sau khi bàn giao trạm, khách hàng gọi: "Lô hàng tuần trước bị khiếu nại, cho xem kết quả kiểm tra và ảnh của các sản phẩm đó". Hoặc tệ hơn: "Máy vision tự dừng lúc 3 giờ sáng", và nguyên nhân là ổ đĩa đầy ảnh. Bài "MES và truy xuất nguồn gốc" đã nói trạm vision <em>nên</em> lưu gì; bài này là phần <strong>làm</strong>: lưu kết quả vào <strong>SQLite</strong> sao cho truy vấn nhanh, lưu ảnh NG theo thư mục ngày, tự dọn ảnh cũ để ổ đĩa không bao giờ đầy, và ghi tất cả những thứ đó trong một thread nền để không làm chậm cycle time. Đây là mảnh ghép cuối trước dự án chặng 9.</p>
+
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Thiết kế bảng SQLite có chỉ mục, ghi bằng câu lệnh tham số và gom giao dịch, truy vấn yield theo ngày và lý do NG; lưu ảnh NG vào thư mục theo ngày với đường dẫn ghi trong CSDL; dọn ảnh theo tuổi và theo dung lượng trống; đưa toàn bộ việc ghi đĩa ra thread nền có hàng đợi.</div>
+
+<h2 id="1-vi-sao-sqlite-khong-phai-csv">1. Vì sao SQLite, không phải CSV?</h2>
+<table>
+  <tr><th></th><th>File CSV</th><th>SQLite</th></tr>
+  <tr><td>Cài đặt</td><td>Không cần</td><td>Không cần: có sẵn trong Python (<code>import sqlite3</code>), CSDL là một file</td></tr>
+  <tr><td>Hỏi "yield hôm qua, ca 2?"</td><td>Đọc lại toàn bộ file</td><td>Một câu SQL, dùng chỉ mục, vài ms</td></tr>
+  <tr><td>Mất điện giữa lúc ghi</td><td>Dòng cuối có thể hỏng, file khó đọc</td><td>Giao dịch: hoặc ghi đủ, hoặc không ghi gì</td></tr>
+  <tr><td>Vừa ghi vừa có người mở xem</td><td>Excel khóa file, chương trình ghi lỗi</td><td>Chế độ WAL: đọc và ghi song song</td></tr>
+  <tr><td>Kiểm tra dữ liệu</td><td>Không</td><td>Kiểu cột, <code>NOT NULL</code>, <code>CHECK</code></td></tr>
+</table>
+<p>SQLite hợp với <strong>dữ liệu cục bộ của một trạm</strong>: hàng chục nghìn đến vài triệu bản ghi, một chương trình ghi. Khi nhiều trạm cần ghi chung một CSDL qua mạng, đó là việc của máy chủ CSDL hoặc MES (đừng đặt file SQLite trên ổ mạng chia sẻ). Ngay cả khi có MES, CSDL cục bộ vẫn là bộ đệm khi mạng gián đoạn.</p>
+
+<h2 id="2-thiet-ke-bang-va-mo-csdl-dung-cach">2. Thiết kế bảng và mở CSDL đúng cách</h2>
+<pre><code class="language-python">import sqlite3
+from pathlib import Path
+
+GOC = Path("du_lieu")
+GOC.mkdir(exist_ok=True)
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS kiem_tra (
+    id            INTEGER PRIMARY KEY,
+    thoi_gian     TEXT    NOT NULL,          -- ISO 8601: '2026-10-09T08:15:02.123'
+    tram          TEXT    NOT NULL,
+    ma_sp         TEXT,                      -- số seri / mã đọc được, nếu có
+    ket_qua       TEXT    NOT NULL CHECK (ket_qua IN ('OK', 'NG')),
+    ma_loi        TEXT,                      -- NULL khi OK
+    gia_tri       REAL,                      -- giá trị đo chính (mm)
+    tg_xu_ly_ms   REAL,
+    recipe        TEXT,
+    duong_dan_anh TEXT                       -- tương đối so với thư mục ảnh; NULL nếu không lưu/đã xóa
+);
+CREATE INDEX IF NOT EXISTS ix_kt_thoi_gian ON kiem_tra(thoi_gian);
+CREATE INDEX IF NOT EXISTS ix_kt_kq_thoi_gian ON kiem_tra(ket_qua, thoi_gian);
+"""
+
+
+def mo_csdl(duong_dan):
+    con = sqlite3.connect(duong_dan, timeout=5.0)          # chờ tối đa 5 s nếu file đang bị khóa
+    con.execute("PRAGMA journal_mode=WAL")                  # đọc không chặn ghi, ghi không chặn đọc
+    con.execute("PRAGMA synchronous=NORMAL")                # an toàn với WAL, nhanh hơn FULL nhiều
+    con.executescript(SCHEMA)
+    return con
+
+
+con = mo_csdl(GOC / "ket_qua.db")
+print("journal_mode:", con.execute("PRAGMA journal_mode").fetchone()[0])
+print("Bảng:", [r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")])
+print("Chỉ mục:", [r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='index'")])</code></pre>
+<pre><code class="language-text">journal_mode: wal
+Bảng: ['kiem_tra']
+Chỉ mục: ['ix_kt_thoi_gian', 'ix_kt_kq_thoi_gian']</code></pre>
+<ul>
+  <li><strong>Thời gian dạng chuỗi ISO 8601</strong> (<code>2026-10-09T08:15:02.123</code>): sắp xếp theo chữ cũng là sắp xếp theo thời gian, đọc được bằng mắt, và các hàm <code>date()</code>, <code>strftime()</code> của SQLite hiểu được. Nhớ ghi rõ là giờ địa phương hay UTC, và đồng bộ đồng hồ máy (NTP).</li>
+  <li><strong>Chỉ mục</strong> trên <code>thoi_gian</code> và (<code>ket_qua</code>, <code>thoi_gian</code>): gần như mọi câu hỏi đều theo khoảng thời gian. Đừng tạo chỉ mục cho mọi cột: mỗi chỉ mục làm chậm việc ghi một chút.</li>
+  <li><strong>WAL</strong> (write-ahead log): người khác mở CSDL để xem (ví dụ bằng DB Browser for SQLite) không chặn chương trình đang ghi. Với WAL, <code>synchronous=NORMAL</code> vẫn giữ CSDL nguyên vẹn khi mất điện, chỉ có thể mất các giao dịch cuối cùng chưa kịp đồng bộ xuống đĩa.</li>
+  <li><strong>Đường dẫn ảnh tương đối</strong> so với thư mục ảnh: chuyển cả thư mục sang ổ khác hay máy khác mà CSDL vẫn đúng.</li>
+</ul>
+
+<h2 id="3-ghi-du-lieu-tham-so-va-gom-giao-dich">3. Ghi dữ liệu: tham số và gom giao dịch</h2>
+<pre><code class="language-python">import time
+from datetime import datetime, timedelta
+
+import numpy as np
+
+SQL_THEM = """INSERT INTO kiem_tra (thoi_gian, tram, ma_sp, ket_qua, ma_loi, gia_tri, tg_xu_ly_ms, recipe, duong_dan_anh)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+
+# Một bản ghi: luôn dùng tham số ?, không bao giờ ghép chuỗi SQL bằng f-string
+con.execute(SQL_THEM, ("2026-10-09T08:15:02.123", "VIS-01", "SN0001", "OK", None, 10.004, 38.2, "VONG_DEM_10", None))
+con.commit()
+
+# Dữ liệu giả 3 ngày, 2 ca/ngày, mỗi 20 s một sản phẩm
+rng = np.random.default_rng(1)
+LOI = ["thieu_vat", "xuoc_be_mat", "sai_kich_thuoc"]
+ban_ghi = []
+for ngay in range(3):
+    t = datetime(2026, 10, 6 + ngay, 6, 0, 0)
+    ty_le_ng = [0.02, 0.05, 0.03][ngay]
+    for i in range(1440):                                   # 8 giờ x 180 sản phẩm/giờ
+        ng = rng.random() &lt; ty_le_ng
+        ma_loi = str(rng.choice(LOI, p=[0.5, 0.3, 0.2])) if ng else None
+        d = round(float(rng.normal(10.0, 0.02)), 3)
+        ban_ghi.append((t.isoformat(timespec="milliseconds"), "VIS-01", f"SN{ngay}{i:05d}",
+                        "NG" if ng else "OK", ma_loi, d, round(float(rng.normal(40, 3)), 1),
+                        "VONG_DEM_10", None))
+        t += timedelta(seconds=20)
+
+# So sánh: commit từng dòng và gom một giao dịch
+t0 = time.perf_counter()
+for r in ban_ghi[:500]:
+    con.execute(SQL_THEM, r)
+    con.commit()
+t_tung_dong = time.perf_counter() - t0
+
+t0 = time.perf_counter()
+with con:                                                   # một giao dịch: tự commit khi ra khỏi khối
+    con.executemany(SQL_THEM, ban_ghi[500:])
+t_gom = time.perf_counter() - t0
+
+print(f"Commit từng dòng : {t_tung_dong / 500 * 1e6:7.1f} µs/dòng")
+print(f"Một giao dịch    : {t_gom / (len(ban_ghi) - 500) * 1e6:7.1f} µs/dòng")
+print("Tổng số bản ghi:", con.execute("SELECT COUNT(*) FROM kiem_tra").fetchone()[0])</code></pre>
+<pre><code class="language-text">Commit từng dòng :    55.6 µs/dòng
+Một giao dịch    :     3.2 µs/dòng
+Tổng số bản ghi: 4321</code></pre>
+<p>Thời gian tùy máy và ổ đĩa, nhưng gom giao dịch luôn nhanh hơn nhiều lần tính trên mỗi dòng. Mỗi <code>commit</code> có một chi phí cố định: khóa file, ghi nhật ký, và ở chế độ mặc định <code>synchronous=FULL</code> còn phải chờ hệ điều hành xác nhận dữ liệu đã xuống đĩa (fsync). Trên HDD hoặc thẻ nhớ công nghiệp, một lần fsync có thể tốn vài ms đến hàng chục ms, đủ ăn mất cycle time. WAL + <code>NORMAL</code> đã bỏ fsync ở mỗi commit (chỉ đồng bộ khi checkpoint) nên demo trên khá nhanh, nhưng vẫn nên gom: ở mục 7 ta commit sau mỗi 50 dòng hoặc mỗi 0,5 s, cái nào đến trước. Khi mất điện, CSDL vẫn nguyên vẹn; cái mất là vài giây dữ liệu cuối (bản ghi còn trong hàng đợi và các giao dịch chưa kịp đồng bộ xuống đĩa). Với hầu hết trạm điều này chấp nhận được, vì PLC đã nhận kết quả của từng sản phẩm.</p>
+<div class="warn"><strong>Luôn dùng tham số <code>?</code></strong>Không ghép chuỗi kiểu <code>f"INSERT ... VALUES ('{ma_sp}')"</code>. Mã sản phẩm đọc từ DataMatrix có thể chứa dấu nháy hay ký tự lạ, làm hỏng câu lệnh hoặc tệ hơn là chạy một câu lệnh khác (SQL injection). Tham số còn giúp SQLite tái sử dụng câu lệnh đã biên dịch.</div>
+
+<h2 id="4-truy-van-yield-theo-ngay-ly-do-ng-ng-theo-gio">4. Truy vấn: yield theo ngày, lý do NG, NG theo giờ</h2>
+<pre><code class="language-python">print("Ngày        Tổng    OK   NG  Yield")
+for ngay, tong, ok, ng, y in con.execute("""
+        SELECT date(thoi_gian) AS ngay, COUNT(*), SUM(ket_qua = 'OK'), SUM(ket_qua = 'NG'),
+               ROUND(100.0 * SUM(ket_qua = 'OK') / COUNT(*), 2)
+        FROM kiem_tra GROUP BY ngay ORDER BY ngay"""):
+    print(f"{ngay}  {tong:5d} {ok:5d} {ng:4d}  {y:.2f}%")
+
+print("\nLý do NG ngày 2026-10-07:")
+for ma_loi, n in con.execute("""
+        SELECT ma_loi, COUNT(*) AS n FROM kiem_tra
+        WHERE ket_qua = 'NG' AND thoi_gian &gt;= ? AND thoi_gian &lt; ?
+        GROUP BY ma_loi ORDER BY n DESC""", ("2026-10-07", "2026-10-08")):
+    print(f"  {ma_loi:&lt;15} {n}")
+
+print("\nNG theo giờ ngày 2026-10-07:")
+hang = con.execute("""
+        SELECT strftime('%H', thoi_gian) AS gio, SUM(ket_qua = 'NG') FROM kiem_tra
+        WHERE thoi_gian &gt;= ? AND thoi_gian &lt; ? GROUP BY gio""", ("2026-10-07", "2026-10-08")).fetchall()
+print("  " + "  ".join(f"{g}h:{n}" for g, n in hang))
+
+ke_hoach = con.execute("""EXPLAIN QUERY PLAN SELECT COUNT(*) FROM kiem_tra
+                         WHERE thoi_gian &gt;= ? AND thoi_gian &lt; ?""", ("2026-10-07", "2026-10-08")).fetchall()
+print("\nKế hoạch truy vấn:", ke_hoach[0][-1])</code></pre>
+<pre><code class="language-text">Ngày        Tổng    OK   NG  Yield
+2026-10-06   1440  1410   30  97.92%
+2026-10-07   1440  1373   67  95.35%
+2026-10-08   1440  1393   47  96.74%
+2026-10-09      1     1    0  100.00%
+
+Lý do NG ngày 2026-10-07:
+  thieu_vat       34
+  xuoc_be_mat     26
+  sai_kich_thuoc  7
+
+NG theo giờ ngày 2026-10-07:
+  06h:7  07h:8  08h:8  09h:7  10h:7  11h:10  12h:10  13h:10
+
+Kế hoạch truy vấn: SEARCH kiem_tra USING COVERING INDEX ix_kt_thoi_gian (thoi_gian&gt;? AND thoi_gian&lt;?)</code></pre>
+<p>Ngày 07 yield giảm còn 95,35%, chủ yếu do <code>thieu_vat</code>: đây là loại báo cáo mà quản lý sản xuất muốn xem mỗi sáng. Dòng cuối là kế hoạch truy vấn: <code>SEARCH ... USING COVERING INDEX ix_kt_thoi_gian</code> nghĩa là SQLite dùng chỉ mục thay vì đọc cả bảng. Lưu ý mẹo viết điều kiện: <code>thoi_gian &gt;= '2026-10-07' AND thoi_gian &lt; '2026-10-08'</code> dùng được chỉ mục, còn <code>date(thoi_gian) = '2026-10-07'</code> thì không (phải tính hàm trên từng dòng). Với vài triệu dòng, khác biệt là vài ms so với vài giây.</p>
+
+<h2 id="5-luu-anh-ng-theo-thu-muc-ngay">5. Lưu ảnh NG theo thư mục ngày</h2>
+<p>Cấu trúc gợi ý:</p>
+<pre><code class="language-text">du_lieu/
+├── ket_qua.db
+└── anh/
+    ├── 2026-10-08/
+    │   ├── 061512_004_SN00421_thieu_vat.jpg
+    │   └── ...
+    └── 2026-10-09/
+        └── 081502_123_SN0042_xuoc_be_mat.jpg   ← giờ phút giây_ms_mã SP_lỗi</code></pre>
+<ul>
+  <li><strong>Một thư mục mỗi ngày</strong>: dọn dẹp chỉ cần xóa cả thư mục; mỗi thư mục không quá nhiều file (trình quản lý file và lệnh liệt kê chậm hẳn khi một thư mục có hàng trăm nghìn file).</li>
+  <li><strong>Tên file tự mô tả và sắp xếp được</strong>: nhìn tên biết thời điểm, sản phẩm, lỗi mà không cần mở CSDL. Chỉ dùng chữ không dấu, số, <code>_</code>, <code>-</code>.</li>
+</ul>
+<pre><code class="language-python">from datetime import datetime
+
+import cv2
+import numpy as np
+
+THU_MUC_ANH = GOC / "anh"
+
+
+def duong_dan_anh(thoi_diem, ma_sp, ma_loi, duoi=".jpg"):
+    """anh/2026-10-09/081502_123_SN0042_thieu_vat.jpg  (thư mục theo ngày, tên sắp xếp được theo giờ)"""
+    ngay = thoi_diem.strftime("%Y-%m-%d")
+    ten = f"{thoi_diem.strftime('%H%M%S_%f')[:-3]}_{ma_sp}_{ma_loi}{duoi}"
+    return f"{ngay}/{ten}"                          # đường dẫn TƯƠNG ĐỐI, lưu vào CSDL
+
+
+def luu_anh(anh, tuong_doi, chat_luong=90):
+    dich = THU_MUC_ANH / tuong_doi
+    dich.parent.mkdir(parents=True, exist_ok=True)
+    if dich.suffix == ".jpg":
+        ok = cv2.imwrite(str(dich), anh, [cv2.IMWRITE_JPEG_QUALITY, chat_luong])
+    else:
+        ok = cv2.imwrite(str(dich), anh, [cv2.IMWRITE_PNG_COMPRESSION, 3])
+    if not ok:
+        raise OSError(f"Không ghi được {dich}")
+    return dich.stat().st_size
+
+
+# Ảnh giả 1280x1024 có vân bề mặt (giống ảnh thật hơn một mảng phẳng)
+rng = np.random.default_rng(0)
+anh = cv2.GaussianBlur(rng.integers(90, 160, (1024, 1280), dtype=np.uint8), (5, 5), 0)
+cv2.circle(anh, (640, 512), 300, 210, -1)
+cv2.line(anh, (500, 400), (760, 470), 60, 3)        # vết xước
+anh = cv2.cvtColor(anh, cv2.COLOR_GRAY2BGR)
+
+t = datetime(2026, 10, 9, 8, 15, 2, 123000)
+print("Đường dẫn:", duong_dan_anh(t, "SN0042", "xuoc_be_mat"))
+print(f"Ảnh thô (BGR)  : {anh.nbytes / 1024:8.0f} KB")
+for duoi, cl in [(".png", None), (".jpg", 95), (".jpg", 90), (".jpg", 75)]:
+    td = duong_dan_anh(t, "SN0042", f"thu_{cl or 'png'}", duoi)
+    kb = luu_anh(anh, td, cl or 0) / 1024
+    doc_lai = cv2.imread(str(THU_MUC_ANH / td))
+    sai_lech = np.abs(doc_lai.astype(int) - anh.astype(int)).max()
+    print(f"{duoi[1:].upper():4} {str(cl or ''):&gt;3}       : {kb:8.0f} KB   sai lệch lớn nhất {sai_lech}")</code></pre>
+<pre><code class="language-text">Đường dẫn: 2026-10-09/081502_123_SN0042_xuoc_be_mat.jpg
+Ảnh thô (BGR)  :     3840 KB
+PNG            :      697 KB   sai lệch lớn nhất 0
+JPG   95       :      272 KB   sai lệch lớn nhất 8
+JPG   90       :      196 KB   sai lệch lớn nhất 18
+JPG   75       :      121 KB   sai lệch lớn nhất 38</code></pre>
+<p>Với ảnh này, PNG không mất mát nhưng nặng gấp khoảng 3,5 lần JPEG 90. Lựa chọn thực tế:</p>
+<table>
+  <tr><th>Mục đích</th><th>Định dạng</th><th>Lý do</th></tr>
+  <tr><td>Ảnh gốc để phân tích lại, chỉnh thuật toán, huấn luyện AI</td><td>PNG (hoặc BMP/TIFF)</td><td>Không mất chi tiết, thuật toán chạy lại cho đúng kết quả cũ</td></tr>
+  <tr><td>Ảnh minh chứng, xem nhanh trên HMI/MES</td><td>JPEG 85–90</td><td>Nhẹ, mắt người không thấy khác</td></tr>
+  <tr><td>Ảnh kết quả có vẽ khung, chữ</td><td>JPEG 85–90</td><td>Chỉ để xem</td></tr>
+</table>
+<p>JPEG 75 sai lệch tới 38 mức xám (thường ở các cạnh sắc như mép vật, vết xước): nếu bạn chạy lại thuật toán ngưỡng trên ảnh này, kết quả có thể khác lúc kiểm tra thật. Camera đơn sắc thì lưu ảnh xám một kênh (dữ liệu thô nhỏ hơn 3 lần so với chuyển sang BGR). Nhiều trạm lưu cả hai: PNG ảnh gốc cho NG, JPEG ảnh kết quả cho NG và một tỷ lệ nhỏ mẫu OK.</p>
+
+<h2 id="6-tu-don-anh-theo-tuoi-va-theo-dung-luong">6. Tự dọn ảnh: theo tuổi và theo dung lượng</h2>
+<p>Hai lớp bảo vệ chạy cùng nhau:</p>
+<ol>
+  <li><strong>Theo tuổi</strong>: giữ N ngày (theo yêu cầu truy xuất của khách hàng, ví dụ 30 hay 90 ngày). Dựa vào <strong>tên thư mục</strong>, không dựa vào ngày sửa file (ngày sửa thay đổi khi chép, khi khôi phục).</li>
+  <li><strong>Theo dung lượng trống</strong>: dù tuổi chưa tới, nếu ổ trống dưới ngưỡng (ví dụ 20%) thì xóa thư mục cũ nhất cho tới khi đủ, nhưng không bao giờ xóa vài ngày gần nhất, và phải báo động để người vận hành biết dữ liệu đang bị cắt sớm.</li>
+</ol>
+<p>Hàm đo dung lượng được truyền vào làm tham số (mặc định <code>shutil.disk_usage</code>), nhờ vậy demo dùng một "ổ giả" 12 MB để kết quả lặp lại được trên mọi máy.</p>
+<pre><code class="language-python">import re
+import shutil
+from collections import namedtuple
+from datetime import date, timedelta
+
+MAU_NGAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def cac_thu_muc_ngay(goc):
+    """Các thư mục tên YYYY-MM-DD trong goc, cũ nhất trước. Thư mục tên khác: không đụng tới."""
+    kq = [(date.fromisoformat(p.name), p) for p in goc.iterdir() if p.is_dir() and MAU_NGAY.match(p.name)]
+    return sorted(kq)
+
+
+def xoa_mot_ngay(con, p):
+    so_file = sum(1 for _ in p.iterdir())
+    shutil.rmtree(p)
+    with con:                                       # đánh dấu trong CSDL: ảnh không còn
+        n = con.execute("UPDATE kiem_tra SET duong_dan_anh = NULL WHERE duong_dan_anh LIKE ?",
+                        (p.name + "/%",)).rowcount
+    return so_file, n
+
+
+def don_theo_tuoi(con, goc, giu_ngay, hom_nay):
+    han = hom_nay - timedelta(days=giu_ngay)
+    da_xoa = []
+    for ngay, p in cac_thu_muc_ngay(goc):
+        if ngay &lt; han:
+            xoa_mot_ngay(con, p)
+            da_xoa.append(p.name)
+    return da_xoa
+
+
+def don_theo_dung_luong(con, goc, trong_toi_thieu_pct, giu_it_nhat=3, dung_luong=shutil.disk_usage):
+    da_xoa = []
+    thu_muc = cac_thu_muc_ngay(goc)
+    while True:
+        du = dung_luong(goc)
+        trong_pct = 100 * du.free / du.total
+        if trong_pct &gt;= trong_toi_thieu_pct:
+            return da_xoa, trong_pct
+        if len(thu_muc) &lt;= giu_it_nhat:              # không xóa sạch: báo động cho người vận hành
+            print(f"  CẢNH BÁO: ổ vẫn chỉ trống {trong_pct:.1f}% nhưng chỉ còn {len(thu_muc)} ngày ảnh")
+            return da_xoa, trong_pct
+        _, p = thu_muc.pop(0)
+        xoa_mot_ngay(con, p)
+        da_xoa.append(p.name)
+
+
+# --- Dựng 40 ngày ảnh giả (mỗi ngày 3 ảnh x 100 KB) và bản ghi trỏ tới chúng
+rng = np.random.default_rng(2)
+hom_nay = date(2026, 10, 9)
+for k in range(40):
+    ngay = hom_nay - timedelta(days=k)
+    for j in range(3):
+        td = f"{ngay.isoformat()}/050000_{j:03d}_SN{k:03d}{j}_thieu_vat.jpg"
+        f = THU_MUC_ANH / td
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_bytes(rng.bytes(100 * 1024))
+        con.execute(SQL_THEM, (f"{ngay.isoformat()}T05:00:00.000", "VIS-01", f"SN{k:03d}{j}", "NG",
+                               "thieu_vat", 9.8, 41.0, "VONG_DEM_10", td))
+con.commit()
+print("Ban đầu:", len(cac_thu_muc_ngay(THU_MUC_ANH)), "ngày ảnh")
+
+# 1) Theo tuổi: giữ 30 ngày
+xoa = don_theo_tuoi(con, THU_MUC_ANH, giu_ngay=30, hom_nay=hom_nay)
+print(f"Theo tuổi: xóa {len(xoa)} ngày, từ {xoa[0]} đến {xoa[-1]}")
+
+# 2) Theo dung lượng: "ổ giả" 12 MB, cần trống ít nhất 40%
+DungLuong = namedtuple("DungLuong", "total used free")
+
+
+def o_dia_gia(goc, tong=12 * 1024 * 1024):
+    dung = sum(f.stat().st_size for f in goc.rglob("*") if f.is_file())
+    return DungLuong(tong, dung, tong - dung)
+
+
+xoa, trong = don_theo_dung_luong(con, THU_MUC_ANH, trong_toi_thieu_pct=40, dung_luong=o_dia_gia)
+print(f"Theo dung lượng: xóa thêm {len(xoa)} ngày ({xoa[0]} … {xoa[-1]}), ổ trống {trong:.1f}%")
+print("Còn lại:", len(cac_thu_muc_ngay(THU_MUC_ANH)), "ngày, cũ nhất", cac_thu_muc_ngay(THU_MUC_ANH)[0][0])
+con_tro = [p for (p,) in con.execute("SELECT duong_dan_anh FROM kiem_tra WHERE duong_dan_anh IS NOT NULL")]
+tro_hong = [p for p in con_tro if not (THU_MUC_ANH / p).exists()]
+print("Bản ghi còn trỏ tới ảnh:", len(con_tro), "| trỏ tới file không tồn tại:", len(tro_hong))
+
+# Ổ đĩa thật (kết quả tùy máy)
+du = shutil.disk_usage(".")
+print(f"Ổ thật: tổng {du.total / 1e9:.0f} GB, trống {100 * du.free / du.total:.0f}%")</code></pre>
+<pre><code class="language-text">Ban đầu: 40 ngày ảnh
+Theo tuổi: xóa 9 ngày, từ 2026-08-31 đến 2026-09-08
+Theo dung lượng: xóa thêm 11 ngày (2026-09-09 … 2026-09-19), ổ trống 40.7%
+Còn lại: 20 ngày, cũ nhất 2026-09-20
+Bản ghi còn trỏ tới ảnh: 60 | trỏ tới file không tồn tại: 0
+Ổ thật: tổng 271 GB, trống 12%</code></pre>
+<p>Dòng cuối (ổ thật) tùy máy. Ba chi tiết an toàn trong code: chỉ xóa thư mục có tên đúng mẫu ngày (một thư mục "backup" ai đó tạo trong <code>anh/</code> sẽ không bị đụng tới); cập nhật <code>duong_dan_anh = NULL</code> cho bản ghi có ảnh bị xóa để CSDL không trỏ tới file không tồn tại (kiểm tra cuối cho kết quả 0); và giữ tối thiểu vài ngày gần nhất. Nếu cần biết "đã từng có ảnh nhưng đã xóa", thêm cột trạng thái thay vì đặt NULL.</p>
+<div class="tip"><strong>Chạy dọn khi nào?</strong>Lúc khởi động chương trình, rồi định kỳ (ví dụ mỗi giờ) trong thread nền. Đừng chạy giữa chu kỳ kiểm tra: xóa hàng nghìn file có thể mất vài giây. Đặt thư mục dữ liệu trên ổ riêng, không chung ổ hệ điều hành: ổ dữ liệu đầy thì trạm vẫn chạy và báo lỗi, ổ hệ điều hành đầy thì cả máy có thể treo.</div>
+
+<h2 id="7-ghi-nen-khong-de-o-dia-lam-cham-cycle-time">7. Ghi nền: không để ổ đĩa làm chậm cycle time</h2>
+<p>Ghi một ảnh PNG 5 MP có thể mất hàng chục đến hàng trăm ms tùy ổ đĩa, và thỉnh thoảng lâu hơn nhiều (ổ đang bận, phần mềm diệt virus quét file mới). Nếu ghi ngay trong vòng lặp kiểm tra, một lần chậm như vậy làm trễ kết quả gửi PLC và gây TIMEOUT. Giải pháp: vòng lặp kiểm tra chỉ <strong>đẩy</strong> bản ghi vào hàng đợi (vài µs) rồi đi tiếp; một thread riêng lấy ra, ghi ảnh, ghi CSDL, gom commit.</p>
+<pre><code class="language-python">import queue
+import sqlite3
+import threading
+import time
+from datetime import datetime, timedelta
+
+
+SQL_THEM_TEN = """INSERT INTO kiem_tra (thoi_gian, tram, ma_sp, ket_qua, ma_loi, gia_tri, tg_xu_ly_ms, recipe,
+                  duong_dan_anh) VALUES (:thoi_gian, :tram, :ma_sp, :ket_qua, :ma_loi, :gia_tri, :tg_xu_ly_ms,
+                  :recipe, :duong_dan_anh)"""          # tham số theo tên: truyền thẳng một dict
+
+
+class GhiNen(threading.Thread):
+    """Thread ghi đĩa: nhận bản ghi qua hàng đợi, lưu ảnh NG và gom commit SQLite."""
+
+    def __init__(self, duong_dan_db, thu_muc_anh, kich_thuoc_hang_doi=200, gom=50, chu_ky_commit=0.5):
+        super().__init__(daemon=True)
+        self.hang_doi = queue.Queue(maxsize=kich_thuoc_hang_doi)
+        self.duong_dan_db, self.thu_muc_anh = duong_dan_db, thu_muc_anh
+        self.gom, self.chu_ky_commit = gom, chu_ky_commit
+        self.so_ghi = self.so_anh = self.so_bo = 0
+
+    def gui(self, ban_ghi, anh=None):
+        """Gọi từ vòng lặp kiểm tra: KHÔNG BAO GIỜ chặn. Đầy hàng đợi thì bỏ ảnh, giữ kết quả."""
+        try:
+            self.hang_doi.put_nowait((ban_ghi, anh))
+        except queue.Full:
+            self.so_bo += 1
+
+    def dung(self):
+        self.hang_doi.put((None, None))           # "viên thuốc độc": báo thread kết thúc
+        self.join(timeout=10)
+
+    def run(self):
+        con = mo_csdl(self.duong_dan_db)          # kết nối SQLite tạo TRONG thread dùng nó
+        cho_commit = 0
+        t_commit = time.monotonic()
+        while True:
+            try:
+                ban_ghi, anh = self.hang_doi.get(timeout=self.chu_ky_commit)
+                if ban_ghi is None:               # tín hiệu dừng
+                    break
+                self._ghi_mot(con, ban_ghi, anh)
+                cho_commit += 1
+            except queue.Empty:                   # rảnh: không có gì mới
+                pass
+            if cho_commit and (cho_commit &gt;= self.gom or time.monotonic() - t_commit &gt;= self.chu_ky_commit):
+                con.commit()                      # gom: tối đa 50 dòng hoặc 0,5 s một lần commit
+                cho_commit, t_commit = 0, time.monotonic()
+        con.commit()
+        con.close()
+
+    def _ghi_mot(self, con, ban_ghi, anh):
+        if anh is not None:
+            try:
+                luu_anh(anh, ban_ghi["duong_dan_anh"])
+                self.so_anh += 1
+            except OSError:
+                ban_ghi["duong_dan_anh"] = None   # ổ đầy / lỗi ghi: mất ảnh nhưng KHÔNG mất kết quả
+        con.execute(SQL_THEM_TEN, ban_ghi)
+        self.so_ghi += 1
+
+
+# Vòng lặp "kiểm tra" giả: 300 sản phẩm, cứ 50 cái có 1 NG kèm ảnh
+ghi = GhiNen(GOC / "ket_qua.db", THU_MUC_ANH)
+ghi.start()
+anh_ng = anh[::2, ::2].copy()                     # ảnh 640x512 từ phần trước
+t_sp = datetime(2026, 10, 9, 14, 0, 0)
+thoi_gian_gui = []
+for i in range(300):
+    ng = i % 50 == 49
+    ma_sp = f"SN9{i:04d}"
+    ban_ghi = {"thoi_gian": t_sp.isoformat(timespec="milliseconds"), "tram": "VIS-01", "ma_sp": ma_sp,
+               "ket_qua": "NG" if ng else "OK", "ma_loi": "thieu_vat" if ng else None, "gia_tri": 10.0,
+               "tg_xu_ly_ms": 40.0, "recipe": "VONG_DEM_10",
+               "duong_dan_anh": duong_dan_anh(t_sp, ma_sp, "thieu_vat") if ng else None}
+    t0 = time.perf_counter()
+    ghi.gui(ban_ghi, anh_ng if ng else None)
+    thoi_gian_gui.append(time.perf_counter() - t0)
+    t_sp += timedelta(seconds=1)
+    time.sleep(0.002)                             # giả lập thời gian chụp + xử lý của trạm
+ghi.dung()
+
+print(f"Đã ghi {ghi.so_ghi} bản ghi, {ghi.so_anh} ảnh NG, bỏ {ghi.so_bo}")
+tg = sorted(thoi_gian_gui)
+print(f"Mỗi lần gửi: trung vị {tg[len(tg) // 2] * 1e6:.0f} µs, lớn nhất {tg[-1] * 1e6:.0f} µs")
+n = con.execute("SELECT COUNT(*) FROM kiem_tra WHERE thoi_gian &gt;= '2026-10-09T14' AND ket_qua = 'NG'").fetchone()[0]
+print("Đọc lại từ kết nối khác: NG chiều 2026-10-09 =", n)</code></pre>
+<pre><code class="language-text">Đã ghi 300 bản ghi, 6 ảnh NG, bỏ 0
+Mỗi lần gửi: trung vị 32 µs, lớn nhất 1559 µs
+Đọc lại từ kết nối khác: NG chiều 2026-10-09 = 6</code></pre>
+<p>Thời gian mỗi lần gửi tùy máy, nhưng cỡ µs đến vài chục µs ở trung vị. Giá trị lớn nhất có thể lên vài ms: thread trong Python dùng chung một khóa GIL, nên khi thread ghi đang chạy code Python, vòng lặp chính phải chờ tới lượt. Vẫn nhỏ hơn rất nhiều so với ghi trực tiếp; nếu cần chặt chẽ hơn nữa thì dùng tiến trình riêng (<code>multiprocessing</code>). Các quyết định thiết kế trong <code>GhiNen</code>:</p>
+<ul>
+  <li><strong>Hàng đợi có giới hạn</strong> (<code>maxsize</code>) và <code>put_nowait</code>: nếu ổ đĩa chết, hàng đợi đầy và trạm <em>bỏ bản ghi, đếm số lần bỏ</em> thay vì ăn hết RAM rồi treo. Kết quả OK/NG vẫn đã gửi PLC, nên đây là chọn lựa an toàn; hãy báo động khi <code>so_bo</code> tăng.</li>
+  <li><strong>Kết nối SQLite tạo trong chính thread ghi</strong>: mặc định đối tượng kết nối không được dùng chéo giữa các thread (<code>check_same_thread</code>). Đọc báo cáo từ thread khác thì mở kết nối khác, WAL cho phép điều đó.</li>
+  <li><strong>Lỗi ghi ảnh không làm mất kết quả</strong>: bắt <code>OSError</code>, đặt đường dẫn ảnh NULL, vẫn ghi bản ghi.</li>
+  <li><strong>Dừng sạch</strong>: gửi <code>None</code> vào hàng đợi, thread ghi nốt những gì đang chờ, commit, đóng CSDL. Gọi <code>dung()</code> khi tắt chương trình, nếu không các bản ghi cuối chưa commit sẽ mất.</li>
+  <li><strong>Tham số theo tên</strong> (<code>:thoi_gian</code>) cho phép truyền thẳng một <code>dict</code>, không sợ nhầm thứ tự cột.</li>
+</ul>
+
+<h2 id="8-loi-thuong-gap">8. Lỗi thường gặp</h2>
+<table>
+  <tr><th>Hiện tượng</th><th>Nguyên nhân</th><th>Cách xử lý</th></tr>
+  <tr><td>Trạm chạy chậm dần theo tháng</td><td>Một thư mục chứa hàng trăm nghìn ảnh; truy vấn không có chỉ mục</td><td>Thư mục theo ngày; chỉ mục theo thời gian; điều kiện khoảng thời gian</td></tr>
+  <tr><td><code>database is locked</code></td><td>Có người mở CSDL để sửa, chế độ journal mặc định</td><td>WAL, <code>timeout</code> khi kết nối, giao dịch ngắn</td></tr>
+  <tr><td>Ổ đầy, trạm dừng giữa đêm</td><td>Chỉ dọn theo tuổi, hoặc không dọn</td><td>Thêm dọn theo dung lượng trống + báo động</td></tr>
+  <tr><td>Mất bản ghi cuối khi tắt chương trình</td><td>Không commit / không chờ thread ghi</td><td>Gọi <code>dung()</code> trong khối <code>finally</code></td></tr>
+  <tr><td>Bản ghi trỏ tới ảnh không còn</td><td>Dọn ảnh mà không cập nhật CSDL</td><td>Xóa ảnh và cập nhật CSDL cùng một hàm</td></tr>
+  <tr><td><code>ProgrammingError: SQLite objects created in a thread...</code></td><td>Dùng một kết nối cho nhiều thread</td><td>Mỗi thread một kết nối</td></tr>
+  <tr><td>Giờ trong CSDL lệch giờ trong log PLC</td><td>Đồng hồ máy không đồng bộ, lẫn UTC và giờ địa phương</td><td>NTP; quy ước rõ múi giờ</td></tr>
+</table>
+
+<h2 id="9-bai-tap">9. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Viết truy vấn tìm 3 giờ có tỷ lệ NG cao nhất trong ba ngày 06–08/10, chỉ xét những giờ có ít nhất 100 sản phẩm.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">for ngay_gio, tong, ng, pct in con.execute("""
+        SELECT strftime('%Y-%m-%d %Hh', thoi_gian) AS gio, COUNT(*) AS tong,
+               SUM(ket_qua = 'NG') AS ng, ROUND(100.0 * SUM(ket_qua = 'NG') / COUNT(*), 2) AS pct
+        FROM kiem_tra
+        WHERE thoi_gian &gt;= '2026-10-06' AND thoi_gian &lt; '2026-10-09'
+        GROUP BY gio HAVING tong &gt;= 100
+        ORDER BY pct DESC, gio LIMIT 3"""):
+    print(ngay_gio, tong, ng, f"{pct}%")</code></pre>
+<pre><code class="language-text">2026-10-07 11h 180 10 5.56%
+2026-10-07 12h 180 10 5.56%
+2026-10-07 13h 180 10 5.56%</code></pre>
+<p><code>HAVING</code> lọc sau khi nhóm (loại các giờ lẻ có vài sản phẩm, tỷ lệ dễ nhảy vọt). Thêm <code>gio</code> vào <code>ORDER BY</code> để các giờ bằng nhau luôn ra cùng thứ tự. Cả ba giờ đều cuối ca ngày 07: gợi ý kiểm tra xem có gì thay đổi cuối ca (đèn nóng lên, bụi, đổi lô nguyên liệu).</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Trạm chạy 2 ca × 8 giờ, 2 s/sản phẩm, 3% NG. Lưu PNG cho mọi ảnh NG (khoảng 2,5 MB mỗi ảnh) và JPEG 90 cho 1% sản phẩm OK (khoảng 0,6 MB). Ổ dữ liệu 500 GB, luôn chừa 20% trống. Giữ được khoảng bao nhiêu ngày? Khách hàng yêu cầu 90 ngày thì có đủ không?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">sp_moi_ngay = 16 * 3600 / 2                     # 2 ca x 8 giờ, 2 s/sản phẩm
+mb_ng = sp_moi_ngay * 0.03 * 2.5                # 3% NG, PNG khoảng 2,5 MB
+mb_ok = sp_moi_ngay * 0.01 * 0.6                # lưu mẫu 1% OK, JPEG 90 khoảng 0,6 MB
+gb_ngay = (mb_ng + mb_ok) / 1024
+dung_duoc = 500 * 0.8                           # ổ 500 GB, chừa 20% trống
+print(f"{sp_moi_ngay:.0f} SP/ngày → {gb_ngay:.2f} GB ảnh/ngày → giữ được khoảng {dung_duoc / gb_ngay:.0f} ngày")</code></pre>
+<pre><code class="language-text">28800 SP/ngày → 2.28 GB ảnh/ngày → giữ được khoảng 176 ngày</code></pre>
+<p>Khoảng 176 ngày, đủ cho yêu cầu 90 ngày với dư địa gần gấp đôi. Nhưng chỉ cần một ngày tỷ lệ NG tăng lên 20% (ví dụ đèn hỏng), lượng ảnh ngày đó tăng gần 7 lần: đó là lý do vẫn phải có lớp dọn theo dung lượng và báo động.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Đồng nghiệp đề xuất lưu ảnh thẳng vào SQLite dưới dạng BLOB cho "gọn một file". Nêu ưu nhược điểm và lựa chọn của bạn.</p>
+<details><summary>Xem đáp án</summary>
+<ul>
+  <li>Ưu: một file duy nhất, xóa bản ghi là xóa ảnh, không lệch giữa CSDL và thư mục.</li>
+  <li>Nhược: file CSDL phình hàng trăm GB, sao lưu và chép đi rất nặng; xóa dữ liệu không trả lại dung lượng cho ổ nếu không chạy <code>VACUUM</code> (mất nhiều thời gian và cần thêm chỗ trống); không mở ảnh trực tiếp bằng trình xem ảnh; một lỗi hỏng file mất cả kết quả lẫn ảnh.</li>
+  <li>Lựa chọn hợp lý cho trạm vision: ảnh trong thư mục theo ngày, CSDL chỉ lưu đường dẫn tương đối; dọn ảnh và cập nhật CSDL trong cùng một hàm như mục 6. BLOB chỉ hợp với ảnh rất nhỏ (ví dụ ảnh thu nhỏ vài KB để hiển thị nhanh).</li>
+</ul>
+</details>
+</div>
+
+<h2 id="tom-tat">Tóm tắt</h2>
+<ul>
+  <li>SQLite: một file, có sẵn trong Python, giao dịch an toàn; bật WAL + <code>synchronous=NORMAL</code>; chỉ mục theo thời gian.</li>
+  <li>Ghi bằng tham số (<code>?</code> hoặc <code>:ten</code>), gom nhiều dòng trong một giao dịch; truy vấn theo khoảng thời gian để dùng được chỉ mục.</li>
+  <li>Ảnh NG: thư mục theo ngày, tên file tự mô tả, đường dẫn tương đối trong CSDL; PNG cho ảnh gốc cần phân tích lại, JPEG 85–90 cho ảnh xem.</li>
+  <li>Dọn ảnh theo tuổi (tên thư mục) và theo dung lượng trống (<code>shutil.disk_usage</code>), cập nhật CSDL khi xóa, giữ tối thiểu vài ngày, báo động.</li>
+  <li>Mọi việc ghi đĩa ra thread nền với hàng đợi có giới hạn; kết nối SQLite tạo trong thread dùng nó; dừng sạch để không mất bản ghi cuối.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Dự án chặng 9: trạm vision hoàn chỉnh với PLC mô phỏng</strong>, ghép Modbus TCP, xử lý ảnh, SQLite và ảnh NG thành một chương trình chạy ổn định.</p>
+
+      </div>
+      <div class="lesson-done" data-course="vision-engineer"><button type="button" class="lesson-done-btn" data-lesson-done="tich-hop-8-luu-ket-qua-sqlite-anh-ng" aria-pressed="false"><span class="box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></span><span class="off">Đánh dấu đã học xong</span><span class="on">Đã học xong bài này</span></button><a class="btn lg" href="../hoc/tich-hop-9-du-an-tram-vision-mo-phong.html">Bài tiếp theo<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a></div>
+      <footer class="article-foot">
+        <div class="tags"><a class="tag" href="../search.html?q=Python">#Python</a><a class="tag" href="../search.html?q=Industrial Vision">#Industrial Vision</a><a class="tag" href="../search.html?q=Machine Vision">#Machine Vision</a></div>
+        <div class="share">
+      <span>Chia sẻ:</span>
+      <a class="share-btn fb" href="https://www.facebook.com/sharer/sharer.php?u=https://hocfree.vn/hoc/tich-hop-8-luu-ket-qua-sqlite-anh-ng.html" target="_blank" rel="noopener" aria-label="Chia sẻ Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8z"/></svg></a>
+      <a class="share-btn x" href="https://twitter.com/intent/tweet?url=https://hocfree.vn/hoc/tich-hop-8-luu-ket-qua-sqlite-anh-ng.html" target="_blank" rel="noopener" aria-label="Chia sẻ X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+      <button class="share-btn copy-link" data-url="https://hocfree.vn/hoc/tich-hop-8-luu-ket-qua-sqlite-anh-ng.html" aria-label="Sao chép liên kết"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+    </div>
+      </footer>
+      <div class="author-box">
+        <span class="avatar lg" aria-hidden="true">HF</span>
+        <div>
+          <strong>Ban biên tập HọcFree</strong>
+          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và ngoại ngữ, hoàn toàn miễn phí.</p>
+        </div>
+      </div>
+      <nav class="pager lesson-pager" aria-label="Bài học trước/sau"><a class="prev" href="../kien-thuc/mes-truy-xuat-nguon-goc-vision.html"><span>← Bài trước · Bài 7</span>MES và truy xuất nguồn gốc</a><a class="next" href="../hoc/tich-hop-9-du-an-tram-vision-mo-phong.html"><span>Bài tiếp → · Bài 9</span>Dự án chặng 9: trạm vision hoàn chỉnh với PLC mô phỏng</a></nav>
+    </article>
+    <aside class="sidebar course-side" data-course="vision-engineer">
+      <section class="widget course-toc">
+        <p class="widget-title">Chặng 9/14 · Vision Engineer</p>
+        <a class="course-toc-title" href="../lo-trinh/vision-engineer/plc-robot-mes.html">PLC / Robot / MES</a>
+        <div class="lc" data-lesson-count="tich-hop-1-io-so-va-handshake-plc giao-tiep-camera-vision-voi-plc tich-hop-3-modbus-tcp-python opc-ua-cho-ky-su-vision tich-hop-5-tcp-socket-gui-toa-do-robot vision-dan-huong-robot-gap-vat mes-truy-xuat-nguon-goc-vision tich-hop-8-luu-ket-qua-sqlite-anh-ng tich-hop-9-du-an-tram-vision-mo-phong"><div class="lc-bar"><span data-lc-bar></span></div><span data-lc-text>0/9 bài</span></div>
+        <ol class="toc-lessons"><li data-lesson="tich-hop-1-io-so-va-handshake-plc"><a href="../hoc/tich-hop-1-io-so-va-handshake-plc.html"><span class="tn">1</span><span class="tt">I/O số và handshake với PLC</span></a></li><li data-lesson="giao-tiep-camera-vision-voi-plc"><a href="../kien-thuc/giao-tiep-camera-vision-voi-plc.html"><span class="tn">2</span><span class="tt">Các chuẩn giao tiếp: Modbus TCP, EtherNet/IP, PROFINET</span></a></li><li data-lesson="tich-hop-3-modbus-tcp-python"><a href="../hoc/tich-hop-3-modbus-tcp-python.html"><span class="tn">3</span><span class="tt">Modbus TCP bằng Python với pymodbus</span></a></li><li data-lesson="opc-ua-cho-ky-su-vision"><a href="../kien-thuc/opc-ua-cho-ky-su-vision.html"><span class="tn">4</span><span class="tt">OPC UA cho kỹ sư Vision</span></a></li><li data-lesson="tich-hop-5-tcp-socket-gui-toa-do-robot"><a href="../hoc/tich-hop-5-tcp-socket-gui-toa-do-robot.html"><span class="tn">5</span><span class="tt">TCP socket: gửi kết quả và tọa độ cho robot</span></a></li><li data-lesson="vision-dan-huong-robot-gap-vat"><a href="../hoc/vision-dan-huong-robot-gap-vat.html"><span class="tn">6</span><span class="tt">Vision dẫn hướng robot gắp vật</span></a></li><li data-lesson="mes-truy-xuat-nguon-goc-vision"><a href="../kien-thuc/mes-truy-xuat-nguon-goc-vision.html"><span class="tn">7</span><span class="tt">MES và truy xuất nguồn gốc</span></a></li><li data-lesson="tich-hop-8-luu-ket-qua-sqlite-anh-ng" class="is-current"><a href="../hoc/tich-hop-8-luu-ket-qua-sqlite-anh-ng.html" aria-current="page"><span class="tn">8</span><span class="tt">Lưu kết quả và ảnh NG: SQLite, thư mục, dọn ổ đĩa</span></a></li><li data-lesson="tich-hop-9-du-an-tram-vision-mo-phong"><a href="../hoc/tich-hop-9-du-an-tram-vision-mo-phong.html"><span class="tn">9</span><span class="tt">Dự án chặng 9: trạm vision hoàn chỉnh với PLC mô phỏng</span></a></li></ol>
+        <a class="more" href="../lo-trinh/vision-engineer.html">Xem toàn bộ lộ trình<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a>
+      </section>
+    </aside>
+  </div>
+  <section class="band">
+    <div class="container">
+      <div class="section-title"><h2>Có thể bạn quan tâm</h2></div>
+      <div class="card-grid"><article class="card">
+  <a class="thumb" href="../hoc/python-1-cai-dat-python-va-vs-code.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-1-cai-dat-python-va-vs-code.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-1-cai-dat-python-va-vs-code.html">Python cơ bản: cài Python, VS Code và chạy chương trình đầu tiên</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>7 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/python-2-bien-kieu-du-lieu-toan-tu.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-2-bien-kieu-du-lieu-toan-tu.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-2-bien-kieu-du-lieu-toan-tu.html">Python cơ bản: biến, kiểu dữ liệu và toán tử</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/python-3-re-nhanh-va-vong-lap.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-3-re-nhanh-va-vong-lap.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-3-re-nhanh-va-vong-lap.html">Python cơ bản: rẽ nhánh và vòng lặp</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article></div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <a class="logo" href="../"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+      <p>HọcFree.vn – nền tảng học miễn phí về AI, lập trình, Computer Vision, Machine Vision, tin tức AI và ngoại ngữ dành cho người Việt.</p>
+    </div>
+    <div><h3>Học &amp; thực hành</h3><ul><li><a href="../hoc/">Học AI &amp; Lập trình</a></li><li><a href="../projects/">Projects</a></li><li><a href="../lo-trinh/">Learning Paths</a></li></ul></div>
+    <div><h3>Khám phá</h3><ul><li><a href="../kien-thuc/">Kiến thức</a></li><li><a href="../tin-tuc-ai/">Tin tức AI</a></li><li><a href="../ngoai-ngu/">Ngoại ngữ</a></li><li><a href="../tai-nguyen/">Tài nguyên</a></li></ul></div>
+    <div><h3>Bài mới</h3><ul><li><a href="../hoc/python-1-cai-dat-python-va-vs-code.html">Python cơ bản: cài Python, VS Code và chạy chương trình đầu tiên</a></li><li><a href="../hoc/python-2-bien-kieu-du-lieu-toan-tu.html">Python cơ bản: biến, kiểu dữ liệu và toán tử</a></li><li><a href="../hoc/python-3-re-nhanh-va-vong-lap.html">Python cơ bản: rẽ nhánh và vòng lặp</a></li><li><a href="../hoc/python-4-list-tuple-dict-set.html">Python cơ bản: list, tuple, dict và set</a></li></ul></div>
+    <div>
+      <h3>HọcFree</h3>
+      <ul>
+        <li><a href="../gioi-thieu.html">Giới thiệu</a></li>
+        <li><a href="../search.html">Tìm kiếm</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">© 2026 HọcFree.vn · Kiến thức là để chia sẻ.</div>
+  </div>
+</footer>
+<button class="to-top" aria-label="Lên đầu trang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<script src="../assets/js/search-data.js?v=20261009" defer></script>
+<script src="../assets/js/main.js?v=20261009" defer></script>
+</body>
+</html>

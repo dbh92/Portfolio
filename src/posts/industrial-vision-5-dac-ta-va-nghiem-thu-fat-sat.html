@@ -1,0 +1,284 @@
+<p>Bạn đã biết tính thời gian (bài "Trigger, encoder và cycle time") và viết tiêu chí OK/NG bằng con số (bài "Tiêu chí OK/NG, escape và overkill"). Giờ là lúc gom tất cả vào <strong>một tài liệu mà hai bên cùng ký</strong>: đặc tả kỹ thuật của trạm, và kế hoạch chứng minh trạm đạt đặc tả đó qua hai lần nghiệm thu, FAT tại xưởng của bạn và SAT tại nhà máy khách hàng. Đây là kỹ năng phân biệt người "làm được demo" với kỹ sư giao được dự án: không có đặc tả, dự án không bao giờ kết thúc, vì luôn có thêm một yêu cầu "tưởng là hiển nhiên".</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Viết được đặc tả có đủ đầu vào, tiêu chí, hiệu năng, giao tiếp, mỗi yêu cầu có mã, phương pháp kiểm và tiêu chí đạt; chuẩn bị được bộ mẫu chuẩn (OK, NG, giới hạn, mẫu đo); thiết kế và tính được kết quả các bài thử độ lặp lại, phát hiện lỗi; phân biệt FAT và SAT.</div>
+
+<h2>1. Từ yêu cầu khách hàng đến đặc tả kỹ thuật</h2>
+<p>Thường có hai tài liệu:</p>
+<ul>
+  <li><strong>Đặc tả yêu cầu người dùng (URS, User Requirement Specification)</strong> do khách hàng viết: họ muốn gì, bằng ngôn ngữ của họ. Nhiều nhà máy nhỏ không có URS, chỉ có email như ở bài tập chặng 4.</li>
+  <li><strong>Đặc tả chức năng/kỹ thuật</strong> (thường gọi FS hoặc FDS, Functional Design Specification) do bên cung cấp viết: trạm làm gì, làm thế nào, đạt con số nào, kiểm chứng ra sao. Khách hàng duyệt và ký. Đây là tài liệu bạn viết trong bài này.</li>
+</ul>
+<p>Một yêu cầu tốt trong đặc tả có bốn phần: <strong>mã</strong> (để truy vết), <strong>phát biểu</strong> dùng chữ "phải", <strong>phương pháp kiểm</strong> (thử nghiệm, kiểm tra, phân tích, trình diễn), và <strong>tiêu chí đạt</strong> bằng con số.</p>
+<table>
+  <tr><th>Yêu cầu kém</th><th>Yêu cầu kiểm chứng được</th></tr>
+  <tr><td>Trạm chạy nhanh, đáp ứng dây chuyền</td><td><strong>R-PER-01</strong>: Thời gian từ trigger tới khi kết quả có ở PLC phải ≤ 250 ms ở trường hợp chậm nhất. Kiểm: thử 10.000 ảnh liên tục, ghi thời gian từng ảnh. Đạt: giá trị lớn nhất ≤ 250 ms.</td></tr>
+  <tr><td>Phát hiện chính xác các lỗi</td><td><strong>R-DET-01</strong>: Trạm phải phát hiện mọi mẫu trong bộ mẫu NG (danh mục phụ lục B). Kiểm: mỗi mẫu chạy 10 lần ở vị trí, hướng khác nhau. Đạt: 0 lần sót.</td></tr>
+  <tr><td>Kết nối với PLC</td><td><strong>R-COM-02</strong>: Kết quả gửi qua tín hiệu số OK/NG (24 V, PNP) và qua bảng dữ liệu Modbus TCP theo phụ lục D, kèm ID sản phẩm. Kiểm: thử với PLC thật hoặc giả lập. Đạt: 1000/1000 kết quả đúng ID.</td></tr>
+  <tr><td>Hoạt động ổn định</td><td><strong>R-REL-01</strong>: Trạm phải chạy liên tục 8 giờ ở năng suất tối đa không treo, không mất kết quả. Đạt: 0 sản phẩm thiếu kết quả, 0 lần khởi động lại.</td></tr>
+</table>
+
+<h2>2. Mẫu đặc tả: các mục bắt buộc</h2>
+<table>
+  <tr><th>Mục</th><th>Nội dung chính</th></tr>
+  <tr><td>1. Phạm vi</td><td>Trạm làm gì; <strong>những gì không thuộc phạm vi</strong> (ghi rõ, ví dụ "không đo đường kính lỗ"); giai đoạn</td></tr>
+  <tr><td>2. Đầu vào: sản phẩm</td><td>Danh sách mã sản phẩm, bản vẽ, kích thước, vật liệu, màu, biến thể; số mã tối đa trong tương lai</td></tr>
+  <tr><td>3. Đầu vào: điều kiện sản xuất</td><td>Năng suất tối đa, tốc độ băng tải và có đổi tốc độ không, khoảng cách sản phẩm, độ lệch vị trí/hướng, cách cấp sản phẩm</td></tr>
+  <tr><td>4. Đầu vào: môi trường và tiện ích</td><td>Ánh sáng xưởng, nhiệt độ, độ ẩm, bụi, rung, nước; nguồn điện, khí nén; không gian lắp đặt</td></tr>
+  <tr><td>5. Tiêu chí kiểm tra</td><td>Bảng tiêu chí lỗi: mã lỗi, đại lượng, giới hạn, vùng, số lượng cho phép, mẫu giới hạn tham chiếu (bài trước)</td></tr>
+  <tr><td>6. Hiệu năng</td><td>Cycle time, độ trễ, escape/overkill trên bộ mẫu, độ lặp lại đo (%GRR, Cg/Cgk), thời gian đổi mã, độ sẵn sàng</td></tr>
+  <tr><td>7. Giao tiếp</td><td>Danh sách I/O (tên, chiều, mức điện áp, kiểu PNP/NPN, giản đồ thời gian), giao thức, bảng địa chỉ dữ liệu, handshake, mã lỗi, dữ liệu gửi MES</td></tr>
+  <tr><td>8. Hành vi khi lỗi</td><td>Thiếu kết quả, mất trigger, mất kết nối, camera lỗi, đèn hỏng: trạm làm gì (mặc định NG, báo động, dừng dây chuyền?)</td></tr>
+  <tr><td>9. HMI và dữ liệu</td><td>Màn hình, ngôn ngữ, phân quyền (vận hành, kỹ thuật, quản trị), quản lý công thức sản phẩm, lưu ảnh (loại nào, bao lâu), nhật ký thay đổi tham số</td></tr>
+  <tr><td>10. Phần cứng và an toàn</td><td>Danh sách thiết bị, tủ điện, cấp bảo vệ (IP), che chắn ánh sáng, an toàn điện và an toàn mắt với đèn mạnh</td></tr>
+  <tr><td>11. Tài liệu, đào tạo, bảo hành</td><td>Hướng dẫn vận hành, bảo trì, sao lưu; số buổi đào tạo; thời hạn và phạm vi bảo hành</td></tr>
+  <tr><td>12. Nghiệm thu</td><td>Bộ mẫu chuẩn, kịch bản FAT, kịch bản SAT, tiêu chí đạt, người ký</td></tr>
+</table>
+<div class="warn"><strong>Mục "ngoài phạm vi" quan trọng như mục "trong phạm vi"</strong>Phần lớn tranh cãi cuối dự án đến từ những thứ không ai viết ra: "tôi tưởng trạm kiểm luôn mặt sau", "tôi tưởng đổi mã sản phẩm không cần kỹ sư". Hãy liệt kê rõ những gì trạm <em>không</em> làm, và những gì cần khách hàng cung cấp (mẫu, PLC, nguồn khí, người tham gia nghiệm thu).</div>
+
+<h2>3. Bộ mẫu chuẩn</h2>
+<p>Nghiệm thu chỉ có ý nghĩa khi cả hai bên dùng chung một bộ mẫu đã thống nhất. Bộ mẫu thường gồm:</p>
+<table>
+  <tr><th>Loại mẫu</th><th>Mục đích</th><th>Số lượng gợi ý</th></tr>
+  <tr><td><strong>Mẫu OK chuẩn</strong> (golden sample)</td><td>Cài đặt, kiểm tra hằng ngày, đo overkill</td><td>30–100+, phủ các biến thể (màu, lô, cavity)</td></tr>
+  <tr><td><strong>Mẫu NG theo loại lỗi</strong></td><td>Chứng minh phát hiện từng loại lỗi</td><td>Mỗi loại 3–10+, lỗi ở nhiều vị trí khác nhau</td></tr>
+  <tr><td><strong>Mẫu giới hạn</strong> (limit sample)</td><td>Một cặp sát ranh giới: "vừa OK" và "vừa NG", kiểm tra ngưỡng</td><td>1–3 cặp mỗi tiêu chí quan trọng</td></tr>
+  <tr><td><strong>Mẫu đo chuẩn</strong> (master)</td><td>Kích thước đã đo bằng thiết bị chuẩn (CMM, máy đo quang học) có chứng nhận; dùng cho bài thử độ lặp lại, độ lệch</td><td>1 master + 10 sản phẩm trải khắp dải dung sai</td></tr>
+</table>
+<p>Quy tắc quản lý mẫu: mỗi mẫu có mã, nhãn, ảnh, mô tả lỗi và kích thước đo; QA khách hàng ký xác nhận phân loại; cất trong hộp bảo vệ; ghi rõ ai giữ. Mẫu NG <strong>tạo nhân tạo</strong> (vẽ bút lên sản phẩm, cắt bớt ngàm) chỉ dùng khi không có lỗi thật, và phải được khách hàng chấp nhận là đại diện cho lỗi thật. Mẫu bị trầy xước, bẩn dần theo thời gian: kiểm tra lại định kỳ.</p>
+
+<h2>4. Kịch bản thử 1: độ lặp lại phép đo</h2>
+<p>Với hạng mục đo kích thước, câu hỏi là: trạm cho cùng một sản phẩm cùng một con số bao nhiêu lần? Kịch bản phổ biến: <strong>10 sản phẩm × 30 lần</strong>, mỗi lần lấy sản phẩm ra và nạp lại (đặt lên băng tải, cho chạy qua trạm), để tính cả ảnh hưởng của vị trí đặt. 10 sản phẩm nên trải khắp dải dung sai và đã được đo bằng thiết bị chuẩn. Mô phỏng một trạm đo kích thước 25,00 ± 0,05 mm có lệch hệ thống +0,004 mm và sai số ngẫu nhiên σ = 0,0025 mm:</p>
+<pre><code class="language-python">import numpy as np
+
+rng = np.random.default_rng(11)
+DANH_DINH, DUNG_SAI = 25.00, 0.05          # mm: kích thước 25,00 ± 0,05 → dải T = 0,10 mm
+T = 2 * DUNG_SAI
+SO_SP, SO_LAN = 10, 30                     # 10 sản phẩm × 30 lần nạp lại mỗi sản phẩm
+
+# Giá trị "thật" của 10 sản phẩm (đo bằng máy CMM), trải khắp dải dung sai
+gia_tri_that = rng.uniform(24.96, 25.04, SO_SP)
+# Trạm vision: lệch hệ thống +0,004 mm, sai số ngẫu nhiên σ = 0,0025 mm mỗi lần nạp
+do = gia_tri_that[:, None] + 0.004 + rng.normal(0, 0.0025, (SO_SP, SO_LAN))
+np.savetxt("lap_lai_10x30.csv", do, delimiter=",", fmt="%.4f")
+
+print("sp | CMM     | TB vision | lệch    | σ       | khoảng (max-min)")
+for i in range(SO_SP):
+    d = do[i]
+    print(f"{i + 1:2d} | {gia_tri_that[i]:.4f} | {d.mean():.4f}   | {d.mean() - gia_tri_that[i]:+.4f} |"
+          f" {d.std(ddof=1):.4f}  | {np.ptp(d):.4f}")
+
+s_lap = np.sqrt(np.mean(do.var(axis=1, ddof=1)))         # σ lặp lại gộp (pooled) của 10 sản phẩm
+grr = 6 * s_lap / T * 100                                 # %GRR so với dải dung sai (chỉ thành phần lặp lại)
+lech_tb = np.mean(do.mean(axis=1) - gia_tri_that)
+print(f"\nσ lặp lại gộp: {s_lap:.4f} mm | 6σ = {6 * s_lap:.4f} mm = {grr:.1f}% dải dung sai")
+print(f"Lệch hệ thống trung bình so với CMM: {lech_tb:+.4f} mm")
+print("Đánh giá %GRR:", "đạt (≤ 10%)" if grr &lt;= 10 else "có điều kiện (10–30%)" if grr &lt;= 30 else "KHÔNG ĐẠT (&gt; 30%)")</code></pre>
+<pre><code class="language-text">sp | CMM     | TB vision | lệch    | σ       | khoảng (max-min)
+ 1 | 24.9703 | 24.9740   | +0.0037 | 0.0021  | 0.0087
+ 2 | 24.9999 | 25.0039   | +0.0040 | 0.0021  | 0.0079
+ 3 | 25.0081 | 25.0126   | +0.0045 | 0.0027  | 0.0095
+ 4 | 24.9623 | 24.9666   | +0.0043 | 0.0024  | 0.0100
+ 5 | 24.9718 | 24.9760   | +0.0041 | 0.0027  | 0.0107
+ 6 | 25.0343 | 25.0381   | +0.0039 | 0.0015  | 0.0060
+ 7 | 24.9656 | 24.9698   | +0.0042 | 0.0024  | 0.0084
+ 8 | 24.9704 | 24.9739   | +0.0035 | 0.0025  | 0.0101
+ 9 | 25.0359 | 25.0404   | +0.0045 | 0.0023  | 0.0098
+10 | 25.0098 | 25.0136   | +0.0038 | 0.0027  | 0.0136
+
+σ lặp lại gộp: 0.0024 mm | 6σ = 0.0142 mm = 14.2% dải dung sai
+Lệch hệ thống trung bình so với CMM: +0.0040 mm
+Đánh giá %GRR: có điều kiện (10–30%)</code></pre>
+<p>Cách đọc:</p>
+<ul>
+  <li><strong>σ lặp lại</strong> khoảng 0,0024 mm cho mọi sản phẩm. 6σ = 0,0142 mm, chiếm 14,2% dải dung sai 0,10 mm. Con số này gọi là <strong>%GRR</strong> (gauge repeatability and reproducibility) so với dung sai. Theo hướng dẫn phân tích hệ thống đo (MSA) của AIAG được dùng rộng rãi trong công nghiệp ô tô: dưới 10% là tốt, 10–30% có thể chấp nhận tùy tầm quan trọng của kích thước và chi phí, trên 30% là không chấp nhận.</li>
+  <li>Ở đây ta mới tính thành phần <strong>lặp lại</strong> (cùng trạm, nạp lại nhiều lần). Gauge R&amp;R đầy đủ còn có thành phần <strong>tái lập</strong> (reproducibility): với thước cầm tay là giữa các người đo; với trạm vision tự động thường thay bằng giữa các ngày, các ca, hoặc giữa hai trạm giống nhau. Hai thành phần được tách bằng phân tích phương sai; chi tiết thống kê nằm ngoài phạm vi bài này.</li>
+  <li><strong>Lệch hệ thống</strong> +0,004 mm lặp lại ở mọi sản phẩm: đó là sai số hiệu chuẩn, không phải nhiễu. Nó không làm %GRR xấu đi, nhưng làm mọi kết quả đo bị dịch, và được kiểm tra bằng bài thử với mẫu chuẩn dưới đây.</li>
+</ul>
+<p>Bài thử bổ sung hay dùng là <strong>nghiên cứu hệ đo loại 1</strong>: đo một mẫu chuẩn 50 lần, tính Cg (độ chụm so với dung sai) và Cgk (thêm ảnh hưởng của độ lệch). Công thức phổ biến lấy 20% dải dung sai so với 6 lần độ lệch chuẩn, yêu cầu thường gặp là Cg, Cgk ≥ 1,33:</p>
+<pre><code class="language-python">import numpy as np
+
+# Nghiên cứu hệ đo loại 1 (type-1 gauge study): đo 1 mẫu chuẩn (master) 50 lần, không nạp lại
+rng = np.random.default_rng(3)
+GIA_TRI_CHUAN = 25.000                  # mm, giá trị mẫu chuẩn có chứng nhận đo
+T = 0.10                                # mm, dải dung sai của kích thước
+do = GIA_TRI_CHUAN + 0.004 + rng.normal(0, 0.002, 50)
+
+
+def cg_cgk(m, chuan, T):
+    s = m.std(ddof=1)
+    lech = m.mean() - chuan
+    cg = 0.2 * T / (6 * s)                      # cách tính phổ biến: 20% dải dung sai so với 6s
+    cgk = (0.1 * T - abs(lech)) / (3 * s)
+    return s, lech, cg, cgk
+
+
+for ten, m in (("trước bù lệch", do), ("sau bù lệch -0,004 mm", do - 0.004)):
+    s, lech, cg, cgk = cg_cgk(m, GIA_TRI_CHUAN, T)
+    ket_luan = "đạt" if min(cg, cgk) &gt;= 1.33 else "KHÔNG ĐẠT"
+    print(f"{ten:22s}: s = {s:.4f}, lệch = {lech:+.4f} → Cg = {cg:.2f}, Cgk = {cgk:.2f} ({ket_luan}, yêu cầu ≥ 1,33)")</code></pre>
+<pre><code class="language-text">trước bù lệch         : s = 0.0022, lệch = +0.0040 → Cg = 1.51, Cgk = 0.90 (KHÔNG ĐẠT, yêu cầu ≥ 1,33)
+sau bù lệch -0,004 mm : s = 0.0022, lệch = +0.0000 → Cg = 1.51, Cgk = 1.50 (đạt, yêu cầu ≥ 1,33)</code></pre>
+<p>Cg đạt nhưng Cgk không đạt: trạm đủ chụm nhưng bị lệch. Sửa bằng bù lệch (offset) từ hiệu chuẩn với mẫu chuẩn, rồi <strong>chạy lại 50 lần mới</strong> để xác nhận (trong code ta trừ trên cùng dữ liệu chỉ để minh họa). Nếu Cg không đạt, bù lệch không cứu được: phải giảm nhiễu (chiếu sáng, độ phân giải, đồ gá, thuật toán).</p>
+
+<h2>5. Kịch bản thử 2: phát hiện lỗi và loại nhầm</h2>
+<p>Với hạng mục kiểm lỗi, kịch bản phổ biến: mỗi mẫu NG chạy qua trạm nhiều lần (ví dụ 10 lần), mỗi lần đặt vị trí, hướng khác nhau trong phạm vi đặc tả; mẫu OK cũng chạy nhiều lần để đo loại nhầm. Ví dụ dùng bộ mẫu của trạm vỏ remote ở bài tập chặng 4: 5 loại lỗi × 4 mẫu, 50 mẫu OK. Tiêu chí: (1) mọi mẫu NG phát hiện 10/10 lần; (2) loại nhầm trên mẫu OK ≤ 0,5% số lần chạy.</p>
+<pre><code class="language-python">import numpy as np
+
+rng = np.random.default_rng(2024)
+SO_LAN = 10                                         # mỗi mẫu chạy 10 lần, đổi vị trí/hướng mỗi lần
+# Bộ mẫu NG: (mã mẫu, loại lỗi, xác suất trạm phát hiện mỗi lần) — xác suất chỉ dùng để mô phỏng
+MAU_NG = [(f"NG-{loai}-{k}", loai, 0.90 if (loai, k) == ("ba-via", 3) else 1.0)
+          for loai in ("thiếu ngàm", "short shot", "ba-via", "vết đen", "lỗ bị bịt")
+          for k in range(1, 5)]
+MAU_OK = [f"OK-{k:02d}" for k in range(1, 51)]
+P_LOAI_NHAM = 0.002                                 # xác suất một lần chạy mẫu OK bị báo NG
+
+# --- chạy thử (mô phỏng)
+kq_ng = {ma: rng.random(SO_LAN) &lt; p for ma, _, p in MAU_NG}        # True = phát hiện
+kq_ok = {ma: rng.random(SO_LAN) &lt; P_LOAI_NHAM for ma in MAU_OK}     # True = loại nhầm
+
+# --- đánh giá theo tiêu chí nghiệm thu
+print("Loại lỗi           | lần phát hiện / lần chạy")
+for loai in dict.fromkeys(l for _, l, _ in MAU_NG):
+    ma_loai = [ma for ma, l, _ in MAU_NG if l == loai]
+    phat_hien = sum(kq_ng[ma].sum() for ma in ma_loai)
+    print(f"{loai:18s} | {phat_hien:3d} / {len(ma_loai) * SO_LAN}")
+sot = {ma: int((~v).sum()) for ma, v in kq_ng.items() if (~v).any()}
+nham = sum(int(v.sum()) for v in kq_ok.values())
+tong_ok = len(MAU_OK) * SO_LAN
+print(f"Mẫu NG bị sót: {sot if sot else 'không có'}")
+print(f"Loại nhầm trên mẫu OK: {nham} / {tong_ok} lần chạy = {nham / tong_ok:.2%}")
+dat_1 = not sot                                     # tiêu chí 1: mọi mẫu NG phát hiện 10/10 lần
+dat_2 = nham / tong_ok &lt;= 0.005                     # tiêu chí 2: loại nhầm ≤ 0,5% số lần chạy OK
+print(f"Tiêu chí 1 (NG 10/10): {'ĐẠT' if dat_1 else 'KHÔNG ĐẠT'} | "
+      f"Tiêu chí 2 (overkill ≤ 0,5%): {'ĐẠT' if dat_2 else 'KHÔNG ĐẠT'}")</code></pre>
+<pre><code class="language-text">Loại lỗi           | lần phát hiện / lần chạy
+thiếu ngàm         |  40 / 40
+short shot         |  40 / 40
+ba-via             |  39 / 40
+vết đen            |  40 / 40
+lỗ bị bịt          |  40 / 40
+Mẫu NG bị sót: {'NG-ba-via-3': 1}
+Loại nhầm trên mẫu OK: 1 / 500 lần chạy = 0.20%
+Tiêu chí 1 (NG 10/10): KHÔNG ĐẠT | Tiêu chí 2 (overkill ≤ 0,5%): ĐẠT</code></pre>
+<p>Mẫu NG-ba-via-3 bị sót 1/10 lần: tiêu chí 1 không đạt. Cách xử lý đúng quy trình:</p>
+<ol>
+  <li>Ghi nhận vào biên bản, không xóa kết quả.</li>
+  <li>Xem ảnh lần bị sót: lỗi nằm sát ngưỡng? Do vị trí đặt? Do chiếu sáng ở góc đó? Hay mẫu này thực ra là mẫu giới hạn bị phân loại sai?</li>
+  <li>Sửa nguyên nhân, rồi <strong>chạy lại toàn bộ</strong> bộ mẫu NG và OK, không chỉ mẫu bị sót. Chỉnh ngưỡng để bắt một mẫu có thể làm tăng loại nhầm ở mẫu khác; chỉ chạy lại toàn bộ mới phát hiện được.</li>
+</ol>
+<p>Nhớ lại bài trước: 200 lần chạy NG không lọt chỉ chứng minh escape dưới khoảng 1,5% (quy tắc 3/n), và đó là khi coi 200 lần chạy là độc lập, trong khi thực tế chỉ có 20 mẫu lỗi khác nhau. Bộ mẫu nghiệm thu chứng minh trạm <em>làm đúng chức năng</em> trên các lỗi đã biết; tỉ lệ ppm trong sản xuất được theo dõi tiếp sau khi bàn giao.</p>
+
+<h2>6. Các kịch bản thử khác</h2>
+<table>
+  <tr><th>Kịch bản</th><th>Cách làm</th><th>Tiêu chí ví dụ</th></tr>
+  <tr><td>Năng suất và thời gian</td><td>Chạy ở tốc độ tối đa (hoặc giả lập trigger) ≥ 1 giờ; ghi thời gian từng ảnh</td><td>Max ≤ ngân sách thời gian; 0 sản phẩm thiếu kết quả; số trigger = số kết quả</td></tr>
+  <tr><td>Độ bền vị trí</td><td>Đặt mẫu lệch ± giới hạn đặc tả theo x, y, góc</td><td>Kết quả không đổi trong toàn dải lệch</td></tr>
+  <tr><td>Ánh sáng môi trường</td><td>Bật/tắt đèn xưởng, mở cửa, đèn pin chiếu vào khu vực</td><td>Không thay đổi kết quả trên bộ mẫu</td></tr>
+  <tr><td>Hành vi khi lỗi</td><td>Rút cáp mạng, rút cáp camera, tắt nguồn đèn, gửi trigger kép</td><td>Báo lỗi trong ≤ 2 s; sản phẩm liên quan mặc định NG; tự phục hồi hoặc hướng dẫn rõ</td></tr>
+  <tr><td>Đổi mã sản phẩm</td><td>Người vận hành đổi công thức theo hướng dẫn</td><td>≤ 5 phút, không cần kỹ sư, kết quả đúng ngay sản phẩm đầu</td></tr>
+  <tr><td>Khởi động lại</td><td>Tắt nguồn toàn trạm, bật lại</td><td>Tự chạy về trạng thái sẵn sàng trong ≤ 3 phút, giữ nguyên tham số</td></tr>
+  <tr><td>Dữ liệu và phân quyền</td><td>Kiểm tra ảnh NG được lưu, nhật ký thay đổi tham số, người vận hành không sửa được ngưỡng</td><td>Đúng theo mục 9 của đặc tả</td></tr>
+</table>
+
+<h2>7. FAT và SAT</h2>
+<table>
+  <tr><th></th><th>FAT (Factory Acceptance Test)</th><th>SAT (Site Acceptance Test)</th></tr>
+  <tr><td>Ở đâu</td><td>Xưởng của bên cung cấp</td><td>Nhà máy khách hàng, trên dây chuyền thật</td></tr>
+  <tr><td>Khi nào</td><td>Trước khi giao hàng</td><td>Sau lắp đặt và chạy thử (commissioning)</td></tr>
+  <tr><td>Điều kiện</td><td>Mẫu thật của khách hàng, băng tải thử hoặc đồ gá, PLC thật hoặc giả lập, ánh sáng xưởng bên cung cấp</td><td>Tốc độ thật, rung thật, ánh sáng thật, PLC/MES thật, người vận hành thật</td></tr>
+  <tr><td>Kiểm cái gì</td><td>Chức năng, bộ mẫu chuẩn, độ lặp lại, thời gian, hành vi khi lỗi, HMI, tài liệu</td><td>Lặp lại các bài thử chính trong điều kiện thật + tích hợp + chạy sản xuất thực tế (ví dụ vài ca) và so với kiểm tra thủ công + đào tạo</td></tr>
+  <tr><td>Mục đích</td><td>Tìm và sửa lỗi khi còn rẻ, trước khi mang ra hiện trường</td><td>Xác nhận trạm đạt đặc tả trong môi trường sản xuất; là điều kiện bàn giao và thanh toán</td></tr>
+  <tr><td>Kết quả</td><td>Biên bản FAT, danh sách tồn đọng (punch list), quyết định cho giao hàng</td><td>Biên bản SAT, ngày bắt đầu bảo hành</td></tr>
+</table>
+<p>Trình tự điển hình: đặc tả được ký → thiết kế → chế tạo → thử nội bộ → <strong>FAT</strong> → giao hàng → lắp đặt, chạy thử → <strong>SAT</strong> → bàn giao, bảo hành. Lỗi tìm thấy ở FAT tốn vài giờ để sửa; cùng lỗi đó tìm thấy ở SAT có thể tốn một chuyến công tác và một ngày dừng dây chuyền của khách hàng.</p>
+<p>Đầu ra của mỗi lần nghiệm thu là một <strong>ma trận truy xuất</strong>: mỗi yêu cầu trong đặc tả, phương pháp, giới hạn, kết quả đo, đạt hay không. Yêu cầu không đạt vào danh sách tồn đọng kèm người chịu trách nhiệm và hạn xử lý:</p>
+<pre><code class="language-python"># Ma trận truy xuất yêu cầu → kết quả thử: đầu ra cuối cùng của FAT/SAT
+YEU_CAU = [  # (mã, yêu cầu, phương pháp kiểm, giới hạn, kết quả đo, so sánh)
+    ("R-PER-01", "Thời gian xử lý chậm nhất, ms (10.000 ảnh)", "Thử", 1500, 820, "&lt;="),
+    ("R-PER-02", "Số sản phẩm thiếu kết quả, chạy liên tục 4 h", "Thử", 0, 0, "&lt;="),
+    ("R-DET-01", "Số lần sót trên bộ mẫu NG (20 mẫu × 10)", "Thử", 0, 1, "&lt;="),
+    ("R-DET-02", "Overkill trên bộ mẫu OK (50 mẫu × 10), %", "Thử", 0.5, 0.2, "&lt;="),
+    ("R-MEA-01", "%GRR kích thước 25,00 ± 0,05 mm", "Thử", 30, 14.2, "&lt;="),
+    ("R-COM-01", "Thời gian báo lỗi khi mất kết nối PLC, s", "Thử", 2, 0.6, "&lt;="),
+    ("R-DAT-01", "Số ngày lưu ảnh NG", "Kiểm tra cấu hình", 30, 60, "&gt;="),
+]
+dat = 0
+ton_dong = []
+for ma, mo_ta, pp, gh, kq, ss in YEU_CAU:
+    ok = kq &lt;= gh if ss == "&lt;=" else kq &gt;= gh
+    dat += ok
+    if not ok:
+        ton_dong.append(ma)
+    print(f"{ma} | {mo_ta:45s} | {pp:17s} | {ss} {gh:&lt;6} | {kq:&lt;6} | {'ĐẠT' if ok else 'KHÔNG ĐẠT'}")
+print(f"\nĐạt {dat}/{len(YEU_CAU)}. Tồn đọng (punch list): {', '.join(ton_dong) or 'không'}")</code></pre>
+<pre><code class="language-text">R-PER-01 | Thời gian xử lý chậm nhất, ms (10.000 ảnh)    | Thử               | &lt;= 1500   | 820    | ĐẠT
+R-PER-02 | Số sản phẩm thiếu kết quả, chạy liên tục 4 h  | Thử               | &lt;= 0      | 0      | ĐẠT
+R-DET-01 | Số lần sót trên bộ mẫu NG (20 mẫu × 10)       | Thử               | &lt;= 0      | 1      | KHÔNG ĐẠT
+R-DET-02 | Overkill trên bộ mẫu OK (50 mẫu × 10), %      | Thử               | &lt;= 0.5    | 0.2    | ĐẠT
+R-MEA-01 | %GRR kích thước 25,00 ± 0,05 mm               | Thử               | &lt;= 30     | 14.2   | ĐẠT
+R-COM-01 | Thời gian báo lỗi khi mất kết nối PLC, s      | Thử               | &lt;= 2      | 0.6    | ĐẠT
+R-DAT-01 | Số ngày lưu ảnh NG                            | Kiểm tra cấu hình | &gt;= 30     | 60     | ĐẠT
+
+Đạt 6/7. Tồn đọng (punch list): R-DET-01</code></pre>
+<p>Hai bên có thể thỏa thuận cho giao hàng có điều kiện với tồn đọng nhỏ, nhưng phải ghi rõ trong biên bản và đóng tồn đọng trước hoặc trong SAT.</p>
+
+<h2>8. Sai lầm thường gặp</h2>
+<ul>
+  <li><strong>Không có bộ mẫu thống nhất</strong> trước FAT; đến ngày nghiệm thu khách hàng mang tới mẫu lỗi mới chưa từng thấy.</li>
+  <li><strong>Tiêu chí đạt không có con số</strong>: "trạm chạy ổn định", "phát hiện tốt".</li>
+  <li><strong>Chỉ thử ở điều kiện đẹp</strong>: mẫu đặt đúng tâm, đèn xưởng tắt, tốc độ chậm.</li>
+  <li><strong>Chỉnh tham số trong lúc nghiệm thu</strong> rồi chỉ chạy lại mẫu bị sai.</li>
+  <li><strong>Bỏ qua bài thử hành vi khi lỗi</strong>: trạm đạt mọi bài thử chức năng nhưng khi rút cáp mạng thì cho qua mọi sản phẩm.</li>
+  <li><strong>Không lưu bằng chứng</strong>: ảnh, log, file kết quả của bài thử phải được lưu cùng biên bản.</li>
+</ul>
+
+<h2>9. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Viết lại thành yêu cầu kiểm chứng được (có mã, phương pháp kiểm, tiêu chí đạt): (a) "trạm đổi mã sản phẩm dễ dàng"; (b) "trạm lưu đủ dữ liệu để truy xuất"; (c) "trạm không bị ảnh hưởng bởi ánh sáng xưởng".</p>
+<details><summary>Xem đáp án</summary>
+<ul>
+  <li>(a) <strong>R-OPS-01</strong>: Người vận hành (không phải kỹ sư) phải đổi được công thức cho mọi mã trong danh mục phụ lục A bằng ≤ 3 thao tác trên HMI, trong ≤ 5 phút. Kiểm: trình diễn với 2 người vận hành đã được đào tạo, 3 lần đổi mã. Đạt: mọi lần ≤ 5 phút và sản phẩm đầu tiên sau đổi mã cho kết quả đúng trên bộ mẫu của mã mới.</li>
+  <li>(b) <strong>R-DAT-02</strong>: Với mỗi sản phẩm, trạm phải lưu thời gian, ID, mã sản phẩm, kết quả, mã lỗi, giá trị đo vào cơ sở dữ liệu ≥ 90 ngày; ảnh NG lưu ≥ 30 ngày. Kiểm: kiểm tra cấu hình + truy vấn thử 10 sản phẩm bất kỳ sau khi chạy 1 giờ. Đạt: 10/10 bản ghi đầy đủ, ảnh NG mở được.</li>
+  <li>(c) <strong>R-ENV-01</strong>: Kết quả trên bộ mẫu chuẩn không thay đổi khi ánh sáng xưởng thay đổi giữa tắt hoàn toàn và bật toàn bộ, kể cả khi có đèn pin chiếu vào cửa trạm. Kiểm: chạy bộ mẫu 3 lần ở mỗi điều kiện. Đạt: kết quả giống hệt nhau, không loại nhầm, không sót.</li>
+</ul>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Đọc file <code>lap_lai_10x30.csv</code> do mục 4 tạo ra, giả sử dung sai bị siết lại còn ± 0,02 mm. Tính lại %GRR và kết luận. Trạm còn dùng được cho kích thước này không?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import numpy as np
+
+do = np.loadtxt("lap_lai_10x30.csv", delimiter=",")
+s_lap = np.sqrt(np.mean(do.var(axis=1, ddof=1)))
+for dung_sai in (0.05, 0.02):
+    grr = 6 * s_lap / (2 * dung_sai) * 100
+    print(f"± {dung_sai} mm: %GRR = {grr:.1f}%")</code></pre>
+<pre><code class="language-text">± 0.05 mm: %GRR = 14.2%
+± 0.02 mm: %GRR = 35.5%</code></pre>
+<p>Với ± 0,02 mm, %GRR khoảng 35%, vượt ngưỡng 30%: trạm không đủ tin cậy để quyết định OK/NG cho kích thước này. Cùng một trạm, cùng độ lặp lại, nhưng dung sai chặt hơn thì không đạt. Đây là lý do %GRR luôn phải tính theo dung sai cụ thể, không có trạm nào "đạt GRR" chung chung.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Lập danh sách ít nhất 6 việc khác nhau giữa FAT và SAT cho trạm kiểm tra vỏ remote (bài tập chặng 4), nói rõ việc nào chỉ làm được ở SAT.</p>
+<details><summary>Xem đáp án</summary>
+<ul>
+  <li>Bộ mẫu chuẩn, độ lặp lại, hành vi khi lỗi: làm ở FAT, lặp lại phần chính ở SAT.</li>
+  <li>Thời gian xử lý: FAT với trigger giả lập ở năng suất tối đa; SAT với robot và băng tải thật.</li>
+  <li><strong>Chỉ ở SAT</strong>: robot thật dừng trên camera mặt dưới, rung của máy ép, ánh sáng nhà xưởng thật, nhiệt độ gần máy ép.</li>
+  <li><strong>Chỉ ở SAT</strong>: tích hợp với PLC/MES thật của khách hàng (ở FAT thường dùng PLC giả lập).</li>
+  <li><strong>Chỉ ở SAT</strong>: chạy sản xuất thật vài ca và so kết quả trạm với kiểm tra thủ công của QC (đếm sản phẩm lỗi QC bắt được mà trạm bỏ qua, và ngược lại).</li>
+  <li><strong>Chỉ ở SAT</strong>: đào tạo người vận hành và kỹ thuật trên trạm đã lắp; bàn giao tài liệu, bản sao lưu.</li>
+</ul>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Đặc tả gồm: phạm vi (và ngoài phạm vi), đầu vào (sản phẩm, sản xuất, môi trường), tiêu chí kiểm tra, hiệu năng, giao tiếp, hành vi khi lỗi, HMI/dữ liệu, phần cứng, tài liệu, nghiệm thu.</li>
+  <li>Mỗi yêu cầu có mã, chữ "phải", phương pháp kiểm và tiêu chí đạt bằng con số.</li>
+  <li>Bộ mẫu chuẩn: OK, NG theo loại, mẫu giới hạn, mẫu đo chuẩn; được ký xác nhận và quản lý.</li>
+  <li>Độ lặp lại: 10 sản phẩm × 30 lần, %GRR so với dung sai (&lt; 10% tốt, 10–30% có điều kiện, &gt; 30% không đạt); mẫu chuẩn 50 lần cho Cg/Cgk ≥ 1,33.</li>
+  <li>Phát hiện lỗi: mỗi mẫu NG nhiều lần, nhiều vị trí; sai thì sửa nguyên nhân và chạy lại toàn bộ.</li>
+  <li>FAT tại xưởng bên cung cấp, trước giao hàng; SAT tại nhà máy khách hàng, điều kiện thật, là điều kiện bàn giao.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Bài tập chặng 5: viết đặc tả một trạm kiểm tra</strong> nắp chai, áp dụng toàn bộ chặng này.</p>

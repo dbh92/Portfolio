@@ -1,0 +1,264 @@
+<p>Bài tập tổng kết chặng 5 "Industrial Vision". Bạn sẽ viết <strong>đặc tả kỹ thuật hoàn chỉnh</strong> cho một trạm kiểm tra nắp chai, với tiêu chí nghiệm thu đo được và kế hoạch FAT. Đây là trạm bạn đã gặp ở bài đầu chặng 4, "Hệ thống Machine Vision gồm những gì?", nhưng giờ ở mức một dự án thật: nhiều lỗi, hai mã sản phẩm, băng tải đổi tốc độ, cần gạt cách xa camera. Bạn dùng toàn bộ các bài của chặng: "Trigger, encoder và cycle time", "Đèn strobe và đồng bộ trigger", "Tiêu chí OK/NG, escape và overkill" (cùng bài "Precision, Recall và ma trận nhầm lẫn"), và "Đặc tả kỹ thuật và nghiệm thu FAT/SAT". Tài liệu bạn viết ở đây sẽ là đầu vào cho các chặng 6 (chọn camera, ống kính, đèn) và 9 (tích hợp PLC).</p>
+<div class="tip"><strong>Sản phẩm bạn nộp</strong>Một tài liệu đặc tả 4–6 trang có mã yêu cầu, bảng tiêu chí lỗi, bảng hiệu năng, danh sách I/O và dữ liệu, hành vi khi lỗi, bộ mẫu chuẩn, kế hoạch FAT (lịch, người tham gia, điều kiện vào/ra, danh sách bài thử) và phác thảo SAT.</div>
+
+<h2>1. Yêu cầu</h2>
+<h3>Thông tin đầu vào (khách hàng đã cung cấp)</h3>
+<table>
+  <tr><th>Hạng mục</th><th>Thông tin</th></tr>
+  <tr><td>Sản phẩm</td><td>Chai PET 500 ml và 1,5 L, nắp vặn nhựa Ø30 mm có vòng an toàn; 2 màu nắp: xanh dương, đỏ (mỗi mã sản phẩm một màu)</td></tr>
+  <tr><td>Năng suất</td><td>Định mức 400 chai/phút; kế hoạch có thể tăng 10% trong 2 năm</td></tr>
+  <tr><td>Băng tải</td><td>Pitch trung bình 100 mm; tốc độ thay đổi khi máy dán nhãn phía sau đầy hoặc trống; có thể dừng, khởi động lại; dẫn hướng hai bên, chai lệch ngang ± 2 mm</td></tr>
+  <tr><td>Vị trí</td><td>Ngay sau máy đóng nắp; chai có thể ướt, có giọt nước trên nắp; gần cửa sổ</td></tr>
+  <tr><td>Loại hàng</td><td>Cần gạt (pusher) khí nén có sẵn, cách vị trí đặt camera 1,2 m, thời gian đáp ứng 25 ms; thùng NG có cảm biến xác nhận</td></tr>
+  <tr><td>Encoder</td><td>Có thể lắp encoder 1200 PPR trên con lăn chu vi 300 mm</td></tr>
+  <tr><td>PLC</td><td>PLC của dây chuyền hỗ trợ Modbus TCP và có bộ đếm tốc độ cao</td></tr>
+  <tr><td>Lỗi cần bắt</td><td>Thiếu nắp; nắp vặn chưa chặt (nắp "cao"); nắp nghiêng; sai màu nắp so với mã đang chạy; vòng an toàn bị đứt</td></tr>
+  <tr><td>Mục tiêu</td><td>Không khiếu nại về nắp; QC hiện bắt lỗi bằng mắt và tay; loại nhầm không được làm đầy thùng NG quá nhanh</td></tr>
+</table>
+<h3>Nhiệm vụ</h3>
+<table>
+  <tr><th>#</th><th>Việc phải làm</th><th>Đầu ra</th></tr>
+  <tr><td>1</td><td>Tính các con số thiết kế: chu kỳ, tốc độ băng tải, thời gian phơi sáng tối đa, hạn chót kết quả, số chai trên đường tới cần gạt, thông số encoder, độ phân giải</td><td>Bảng tính</td></tr>
+  <tr><td>2</td><td>Viết phạm vi, ngoài phạm vi, giả định, điều khách hàng phải cung cấp</td><td>Mục 1 của đặc tả</td></tr>
+  <tr><td>3</td><td>Định nghĩa từng lỗi bằng đại lượng đo được, giới hạn, mẫu giới hạn</td><td>Bảng tiêu chí lỗi</td></tr>
+  <tr><td>4</td><td>Viết yêu cầu hiệu năng, giao tiếp, hành vi khi lỗi, HMI/dữ liệu, mỗi yêu cầu có mã, phương pháp kiểm, tiêu chí đạt</td><td>Các bảng yêu cầu</td></tr>
+  <tr><td>5</td><td>Liệt kê bộ mẫu chuẩn với số lượng</td><td>Bảng mẫu</td></tr>
+  <tr><td>6</td><td>Lập kế hoạch FAT: lịch, người tham gia, điều kiện bắt đầu/kết thúc, danh sách bài thử có tiêu chí đạt; phác thảo SAT</td><td>Kế hoạch FAT/SAT</td></tr>
+</table>
+
+<h2>2. Kiến thức sử dụng</h2>
+<ul>
+  <li><strong>Trigger, encoder và cycle time</strong>: ngân sách thời gian, hạn chót, encoder, theo dõi sản phẩm, nguyên tắc thiếu kết quả thì loại.</li>
+  <li><strong>Đèn strobe và đồng bộ trigger</strong>: thời gian chiếu sáng tối đa để ảnh không nhòe.</li>
+  <li><strong>Tiêu chí OK/NG, escape và overkill</strong>: tiêu chí đo được, dải bảo vệ, mẫu giới hạn, quy tắc 3/n.</li>
+  <li><strong>Đặc tả kỹ thuật và nghiệm thu FAT/SAT</strong>: mẫu đặc tả 12 mục, bộ mẫu chuẩn, bài thử lặp lại và phát hiện, FAT/SAT, ma trận truy xuất.</li>
+  <li><strong>5 nhóm bài toán Machine Vision</strong> (chặng 4): nắp cao/nghiêng là đo lường, thiếu nắp là có/không, màu là nhận dạng.</li>
+</ul>
+
+<h2>3. Gợi ý thiết kế</h2>
+<ul>
+  <li><strong>Thiết kế cho năng suất tương lai</strong> (400 × 1,1 = 440, làm tròn lên 450 chai/phút), không phải năng suất hôm nay.</li>
+  <li><strong>Nắp cao và nắp nghiêng</strong> là bài đo chiều cao: nhìn ngang với đèn nền, đo khoảng cách từ <em>vòng đỡ cổ chai</em> (neck support ring, phần nhựa nhô ra dưới nắp, vị trí cố định so với ren) tới đỉnh nắp. Một camera nhìn ngang không thấy nghiêng theo hướng vuông góc với nó: cần hai góc nhìn lệch nhau 90°.</li>
+  <li><strong>Vòng an toàn</strong> cần nhìn 360°; hãy cân nhắc chi phí số camera hoặc gương, và có thể đưa ra ngoài phạm vi giai đoạn 1 kèm lý do.</li>
+  <li><strong>Giọt nước, cửa sổ</strong>: hai rủi ro môi trường phải có yêu cầu riêng (che chắn, thổi khí làm khô, thử với nắp ướt).</li>
+  <li><strong>Hai mã sản phẩm</strong>: công thức (recipe) chọn từ PLC; trạm phải biết mã đang chạy để kiểm màu và chiều cao danh định.</li>
+  <li><strong>Nghiệm thu cả cần gạt</strong>: trạm phát hiện đúng mà cần gạt gạt nhầm chai là trạm hỏng. Một bài SAT kinh điển: thả chai NG đã đánh dấu vào dòng sản xuất ở tốc độ thật và đếm số chai vào thùng NG.</li>
+</ul>
+<p>Khung tài liệu gợi ý (đánh số theo mẫu 12 mục ở bài trước):</p>
+<pre><code class="language-text">ĐẶC TẢ KỸ THUẬT TRẠM KIỂM TRA NẮP CHAI – phiên bản 0.1 – ngày …
+1. Phạm vi, ngoài phạm vi, giả định, khách hàng cung cấp
+2–4. Đầu vào: sản phẩm, điều kiện sản xuất, môi trường
+5. Tiêu chí kiểm tra (bảng mã lỗi)
+6. Hiệu năng (R-PER, R-DET, R-MEA, R-OVK)
+7. Giao tiếp (bảng I/O, bảng thanh ghi Modbus, handshake)
+8. Hành vi khi lỗi (R-SAF)
+9. HMI và dữ liệu (R-HMI, R-DAT)
+10. Phần cứng sơ bộ và lắp đặt
+11. Tài liệu, đào tạo, bảo hành
+12. Nghiệm thu: bộ mẫu, FAT, SAT
+Phụ lục: ma trận truy xuất yêu cầu → bài thử</code></pre>
+
+<h2>4. Lời giải mẫu</h2>
+<p>Hãy tự viết ít nhất 60 phút trước khi mở. Lời giải là một phương án hợp lý; các con số (giới hạn, tỉ lệ) là ví dụ cần thống nhất với khách hàng thật.</p>
+<details><summary>Xem lời giải mẫu: đặc tả và kế hoạch FAT đầy đủ</summary>
+
+<h3>Tính toán thiết kế</h3>
+<pre><code class="language-python"># Tính toán thiết kế cho trạm kiểm tra nắp chai (số liệu đề bài)
+CHAI_PHUT = 400            # năng suất định mức
+DU_TRU = 1.125             # thiết kế cho 450 chai/phút (dự trữ 12,5%)
+PITCH = 100.0              # mm
+GAT_MM, GAT_MS = 1200.0, 25.0      # cần gạt cách camera 1,2 m, đáp ứng 25 ms
+PPR, NHAN, CHU_VI = 1200, 4, 300.0  # encoder trên con lăn chu vi 300 mm
+FOV_MM, PX = 50.0, 1280    # camera nhìn ngang: FOV ngang 50 mm, 1280 pixel
+NHOE_PX = 0.5              # nhòe cho phép (pixel)
+
+cp = CHAI_PHUT * DU_TRU
+chu_ky = 60_000 / cp
+v = cp / 60 * PITCH                               # mm/s
+mm_px = FOV_MM / PX
+dem_mm = PPR * NHAN / CHU_VI
+print(f"Thiết kế {cp:.0f} chai/phút: chu kỳ {chu_ky:.1f} ms, băng tải {v:.0f} mm/s ({v * 0.06:.0f} m/phút)")
+print(f"Độ phân giải {mm_px:.4f} mm/px; phơi sáng/chớp đèn ≤ {NHOE_PX * mm_px / v * 1e6:.0f} µs")
+print(f"Hạn chót kết quả: {GAT_MM / v * 1000 - GAT_MS:.0f} ms sau trigger;"
+      f" {GAT_MM / PITCH:.0f} chai nằm giữa camera và cần gạt")
+print(f"Encoder: {dem_mm:.0f} xung/mm, camera → cần gạt {GAT_MM * dem_mm:.0f} xung,"
+      f" phát lệnh sớm {v * GAT_MS / 1000 * dem_mm:.0f} xung ở tốc độ thiết kế")
+print(f"Tần số đếm tối đa: {v * dem_mm / 1000:.1f} kHz")
+for ten, gh in (("nắp cao (giới hạn +0,8 mm)", 0.8), ("nắp nghiêng (chênh 0,8 mm)", 0.8)):
+    print(f"{ten}: giới hạn = {gh / mm_px:.1f} px; sai số cho phép (1/10) = {gh / 10 / mm_px:.1f} px")</code></pre>
+<pre><code class="language-text">Thiết kế 450 chai/phút: chu kỳ 133.3 ms, băng tải 750 mm/s (45 m/phút)
+Độ phân giải 0.0391 mm/px; phơi sáng/chớp đèn ≤ 26 µs
+Hạn chót kết quả: 1575 ms sau trigger; 12 chai nằm giữa camera và cần gạt
+Encoder: 16 xung/mm, camera → cần gạt 19200 xung, phát lệnh sớm 300 xung ở tốc độ thiết kế
+Tần số đếm tối đa: 12.0 kHz
+nắp cao (giới hạn +0,8 mm): giới hạn = 20.5 px; sai số cho phép (1/10) = 2.0 px
+nắp nghiêng (chênh 0,8 mm): giới hạn = 20.5 px; sai số cho phép (1/10) = 2.0 px</code></pre>
+<ul>
+  <li>Chu kỳ 133 ms ở 450 chai/phút: ràng buộc chính là nhịp, không phải hạn chót (1,5 s). Ngân sách xử lý thiết kế ≤ 100 ms từ trigger tới kết quả ở PLC, chạy pipeline, ba camera xử lý song song.</li>
+  <li>Thời gian chiếu sáng ≤ 26 µs: bắt buộc dùng đèn chớp đồng bộ với camera (bài "Đèn strobe và đồng bộ trigger").</li>
+  <li>12 chai nằm giữa camera và cần gạt, băng tải đổi tốc độ: bắt buộc theo dõi bằng encoder; 12 kHz nằm trong khả năng bộ đếm tốc độ cao thông dụng (phải kiểm tra thông số PLC thật).</li>
+  <li>Giới hạn nắp cao 0,8 mm = 20,5 px; sai số cho phép 2 px: khả thi với đo cạnh trên ảnh đèn nền.</li>
+</ul>
+
+<h3>1. Phạm vi</h3>
+<ul>
+  <li><strong>Trong phạm vi</strong>: kiểm 100% chai sau máy đóng nắp với 4 hạng mục: thiếu nắp (D01), nắp cao (D02), nắp nghiêng (D03), sai màu nắp (D04); loại chai NG bằng cần gạt có sẵn; lưu dữ liệu và ảnh.</li>
+  <li><strong>Ngoài phạm vi giai đoạn 1</strong>: vòng an toàn đứt (cần 4 camera hoặc hệ gương để phủ 360°, chi phí gần gấp đôi; đề xuất làm giai đoạn 2 sau khi có dữ liệu tần suất lỗi này), mức nước trong chai, mã in trên nắp, lỗi ren.</li>
+  <li><strong>Giả định</strong>: chai đứng thẳng, lệch ngang ≤ ± 2 mm, khoảng cách giữa hai chai ≥ 20 mm tại vị trí trigger; đường kính nắp và chiều cao danh định theo bản vẽ khách hàng cung cấp cho từng mã.</li>
+  <li><strong>Khách hàng cung cấp</strong>: bản vẽ chai/nắp, bộ mẫu (mục 12) trước FAT 2 tuần, lắp encoder và cấp nguồn khí, chương trình PLC phần theo dõi chai và điều khiển cần gạt (theo bảng giao tiếp mục 7), người tham gia FAT/SAT.</li>
+</ul>
+
+<h3>2–4. Đầu vào</h3>
+<table>
+  <tr><th>Mã</th><th>Nội dung</th></tr>
+  <tr><td>IN-01</td><td>2 mã sản phẩm: 500 ml nắp xanh dương, 1,5 L nắp đỏ; chiều cao danh định H0 (vòng đỡ → đỉnh nắp) theo bản vẽ mỗi mã; thêm mã mới bằng công thức, không sửa phần mềm</td></tr>
+  <tr><td>IN-02</td><td>Năng suất thiết kế 450 chai/phút, pitch tối thiểu 80 mm; băng tải 0–45 m/phút, có dừng/khởi động</td></tr>
+  <tr><td>IN-03</td><td>Môi trường: nhiệt độ 15–40 °C, độ ẩm cao, nắp có thể ướt, ánh sáng cửa sổ thay đổi theo giờ; trạm có vỏ che sáng, cấp bảo vệ thiết bị tại vị trí ướt tối thiểu IP65</td></tr>
+</table>
+
+<h3>5. Tiêu chí kiểm tra</h3>
+<table>
+  <tr><th>Mã</th><th>Lỗi</th><th>Đại lượng đo</th><th>NG khi</th><th>Mẫu giới hạn</th></tr>
+  <tr><td>D01</td><td>Thiếu nắp</td><td>Có vật thể nắp phía trên vòng đỡ cổ chai (nhìn ngang và nhìn từ trên)</td><td>Không tìm thấy nắp</td><td>Không cần</td></tr>
+  <tr><td>D02</td><td>Nắp cao</td><td>H = khoảng cách từ mặt trên vòng đỡ tới điểm cao nhất của nắp, lấy giá trị lớn nhất của 2 góc nhìn</td><td>H − H0 ≥ 0,8 mm</td><td>+0,6 mm (OK), +1,0 mm (NG)</td></tr>
+  <tr><td>D03</td><td>Nắp nghiêng</td><td>Chênh lệch chiều cao mép nắp hai bên trong mỗi góc nhìn</td><td>Chênh ≥ 0,8 mm ở bất kỳ góc nhìn nào (≈ 1,5° với nắp Ø30)</td><td>0,5 mm (OK), 1,1 mm (NG)</td></tr>
+  <tr><td>D04</td><td>Sai màu nắp</td><td>Màu trung bình vùng nắp so với vùng màu đã dạy từ ≥ 20 nắp đúng màu của công thức</td><td>Nằm ngoài vùng màu của công thức đang chạy</td><td>Nắp của mã còn lại</td></tr>
+</table>
+<p>Ghi chú: ngưỡng phần mềm cho D02, D03 được đặt thấp hơn giới hạn đặc tả một dải bảo vệ ước tính từ bài thử độ lặp lại (ví dụ 3σ), và được ghi trong biên bản FAT.</p>
+
+<h3>6. Hiệu năng</h3>
+<table>
+  <tr><th>Mã</th><th>Yêu cầu</th><th>Phương pháp</th><th>Tiêu chí đạt</th></tr>
+  <tr><td>R-PER-01</td><td>Xử lý liên tục ở 450 chai/phút</td><td>Thử FAT với trigger giả lập 1 giờ (27.000 chai)</td><td>0 trigger bị bỏ qua, 0 chai thiếu kết quả</td></tr>
+  <tr><td>R-PER-02</td><td>Độ trễ trigger → kết quả có ở PLC</td><td>Ghi thời gian 10.000 lần liên tiếp</td><td>Lớn nhất ≤ 100 ms</td></tr>
+  <tr><td>R-DET-01</td><td>Phát hiện D01–D04 trên bộ mẫu NG</td><td>Mỗi mẫu 10 lần, xoay chai ngẫu nhiên</td><td>0 lần sót</td></tr>
+  <tr><td>R-DET-02</td><td>Mẫu giới hạn</td><td>Mỗi mẫu 10 lần</td><td>Mẫu "vừa OK" 10/10 OK; mẫu "vừa NG" 10/10 NG</td></tr>
+  <tr><td>R-MEA-01</td><td>Độ lặp lại chiều cao H</td><td>10 chai × 30 lần nạp lại, mỗi mã</td><td>σ ≤ 0,027 mm (6σ ≤ 20% của 0,8 mm)</td></tr>
+  <tr><td>R-OVK-01</td><td>Loại nhầm trên mẫu OK (FAT)</td><td>200 chai OK × 5 lần</td><td>≤ 1 lần / 1000</td></tr>
+  <tr><td>R-OVK-02</td><td>Loại nhầm trong sản xuất (SAT)</td><td>3 ca, QC kiểm lại 100% thùng NG</td><td>Chai OK bị loại ≤ 0,1% sản lượng</td></tr>
+  <tr><td>R-REJ-01</td><td>Loại đúng chai ở tốc độ thật</td><td>SAT: thả 50 chai NG đánh dấu vào dòng, ở tốc độ cao nhất và khi băng tải đang tăng/giảm tốc</td><td>50/50 vào thùng NG; 0 chai OK đánh dấu bên cạnh bị gạt</td></tr>
+  <tr><td>R-ENV-01</td><td>Không phụ thuộc ánh sáng môi trường và nắp ướt</td><td>Chạy bộ mẫu khi mở/đóng rèm, đèn xưởng bật/tắt; bộ mẫu OK phun nước</td><td>Kết quả như R-DET-01, R-OVK-01</td></tr>
+</table>
+
+<h3>7. Giao tiếp</h3>
+<table>
+  <tr><th>Tín hiệu</th><th>Chiều</th><th>Loại</th><th>Mô tả</th></tr>
+  <tr><td>TRIG</td><td>Cảm biến → camera</td><td>Số 24 V, PNP</td><td>Cạnh lên khi cổ chai cắt tia; trigger phần cứng đồng thời cho cả 3 camera</td></tr>
+  <tr><td>READY</td><td>Vision → PLC</td><td>Số 24 V</td><td>Mức cao khi trạm sẵn sàng nhận trigger</td></tr>
+  <tr><td>RESULT_VALID, RESULT_NG</td><td>Vision → PLC</td><td>Số 24 V</td><td>Xung VALID 10 ms; NG đặt trước VALID và giữ đến hết xung</td></tr>
+  <tr><td>Thanh ghi kết quả</td><td>Vision → PLC</td><td>Modbus TCP</td><td>ID chai (đếm trigger, 16 bit), mã kết quả (0 = OK, bit 1–4 = D01–D04), H − H0 (× 0,01 mm), chênh nghiêng (× 0,01 mm), mã công thức đang dùng</td></tr>
+  <tr><td>Công thức</td><td>PLC → Vision</td><td>Modbus TCP</td><td>Mã sản phẩm đang chạy; vision xác nhận lại bằng thanh ghi mã công thức</td></tr>
+  <tr><td>Heartbeat</td><td>Hai chiều</td><td>Modbus TCP</td><td>Bộ đếm tăng mỗi 500 ms; mất 3 nhịp = mất kết nối</td></tr>
+</table>
+<p>PLC giữ hàng đợi theo dõi chai bằng số đếm encoder (16 xung/mm, cần gạt ở 19.200 xung, phát lệnh sớm theo tốc độ đo được); so ID trong kết quả với ID trong hàng đợi.</p>
+
+<h3>8. Hành vi khi lỗi</h3>
+<table>
+  <tr><th>Mã</th><th>Tình huống</th><th>Hành vi bắt buộc</th></tr>
+  <tr><td>R-SAF-01</td><td>Chai tới cần gạt mà chưa có kết quả, hoặc ID không khớp</td><td>Gạt chai (NG), tăng bộ đếm "thiếu kết quả", báo động trên HMI</td></tr>
+  <tr><td>R-SAF-02</td><td>≥ 5 chai liên tiếp thiếu kết quả, mất heartbeat, camera hoặc đèn lỗi</td><td>Báo động, yêu cầu PLC dừng băng tải trong ≤ 2 s</td></tr>
+  <tr><td>R-SAF-03</td><td>Mã công thức vision khác mã PLC</td><td>Không cho chạy (READY thấp), báo lỗi công thức</td></tr>
+  <tr><td>R-SAF-04</td><td>Cảm biến thùng NG không xác nhận chai đã bị gạt</td><td>Báo động, dừng băng tải</td></tr>
+</table>
+
+<h3>9. HMI và dữ liệu</h3>
+<ul>
+  <li><strong>R-HMI-01</strong>: 3 cấp quyền: vận hành (xem, đổi công thức), kỹ thuật (chỉnh ngưỡng trong giới hạn cho phép), quản trị. Mọi thay đổi tham số ghi nhật ký: ai, lúc nào, giá trị cũ/mới.</li>
+  <li><strong>R-HMI-02</strong>: Hiển thị ảnh NG gần nhất kèm mã lỗi, bộ đếm OK/NG theo loại lỗi, bộ đếm trigger/kết quả/gạt/xác nhận thùng NG.</li>
+  <li><strong>R-DAT-01</strong>: Lưu kết quả từng chai 90 ngày; ảnh NG 30 ngày; tự xóa dữ liệu cũ, cảnh báo khi ổ đĩa trên 80%.</li>
+  <li><strong>R-CHG-01</strong>: Người vận hành đổi mã trong ≤ 5 phút không cần kỹ sư (thường tự động theo PLC).</li>
+</ul>
+
+<h3>10–11. Phần cứng sơ bộ, tài liệu</h3>
+<ul>
+  <li>2 camera đơn sắc nhìn ngang, đặt ±45° so với hướng băng tải (lệch nhau 90°), mỗi camera một đèn nền đối diện, đèn chớp; 1 camera màu nhìn từ trên xuống với đèn vòng/đèn vòm để kiểm màu và xác nhận có nắp. Độ phân giải khoảng 1,3 MP cho FOV ngang 50 mm (chi tiết chọn ở chặng 6).</li>
+  <li>PC công nghiệp, vỏ che sáng bằng thép không gỉ, thổi khí làm khô đỉnh nắp trước camera (nếu thử nghiệm cho thấy giọt nước gây loại nhầm).</li>
+  <li>Tài liệu: hướng dẫn vận hành tiếng Việt, hướng dẫn bảo trì (vệ sinh kính, kiểm tra hằng ngày bằng mẫu chuẩn), bản sao lưu cấu hình, sơ đồ điện. Đào tạo 2 buổi cho vận hành và bảo trì. Bảo hành 12 tháng từ ngày ký SAT.</li>
+</ul>
+
+<h3>12. Bộ mẫu chuẩn và kế hoạch FAT</h3>
+<table>
+  <tr><th>Mẫu</th><th>Số lượng</th><th>Ghi chú</th></tr>
+  <tr><td>OK</td><td>100 chai mỗi mã (200)</td><td>Từ nhiều lô nắp khác nhau</td></tr>
+  <tr><td>D01 thiếu nắp</td><td>5 mỗi mã</td><td>Chai rỗng hoặc có nước</td></tr>
+  <tr><td>D02 nắp cao</td><td>5 mỗi mã, H − H0 từ +1,0 đến +3,0 mm</td><td>Đo H bằng thước đo cao/máy đo, ghi lên nhãn</td></tr>
+  <tr><td>D03 nắp nghiêng</td><td>5 mỗi mã</td><td>Nghiêng theo nhiều hướng</td></tr>
+  <tr><td>D04 sai màu</td><td>5 mỗi mã (nắp của mã kia)</td><td></td></tr>
+  <tr><td>Mẫu giới hạn</td><td>D02: +0,6 / +1,0 mm; D03: 0,5 / 1,1 mm</td><td>QA khách hàng ký xác nhận</td></tr>
+  <tr><td>Mẫu đo</td><td>10 chai mỗi mã, H đo bằng thiết bị chuẩn</td><td>Cho R-MEA-01</td></tr>
+</table>
+<p>Ước lượng khối lượng bài thử FAT để lên lịch:</p>
+<pre><code class="language-python">import math
+
+# Kế hoạch bài thử FAT: số mẫu × số lần chạy, thời gian ước tính, và escape chứng minh được
+GIAY_MOI_LAN = 6           # nạp tay 1 chai lên băng tải thử, chạy qua trạm, lấy ra
+BAI_THU = [  # (tên, số mẫu, số lần mỗi mẫu, loại)
+    ("Phát hiện: thiếu nắp", 10, 10, "NG"),
+    ("Phát hiện: nắp cao +1,0..+3,0 mm", 10, 10, "NG"),
+    ("Phát hiện: nắp nghiêng", 10, 10, "NG"),
+    ("Phát hiện: sai màu nắp (2 màu)", 10, 10, "NG"),
+    ("Mẫu giới hạn D02, D03 (2 cặp vừa OK/vừa NG)", 4, 10, "GH"),
+    ("Overkill: chai OK, 100 mỗi mã", 200, 5, "OK"),
+    ("Độ lặp lại chiều cao nắp (2 mã)", 20, 30, "DO"),
+]
+tong_lan, tong_ng = 0, 0
+for ten, n_mau, n_lan, loai in BAI_THU:
+    lan = n_mau * n_lan
+    tong_lan += lan
+    tong_ng += lan if loai == "NG" else 0
+    print(f"{ten:45s} {n_mau:4d} × {n_lan:2d} = {lan:5d} lần")
+print(f"Tổng {tong_lan} lần chạy ≈ {tong_lan * GIAY_MOI_LAN / 3600:.1f} giờ nạp tay")
+print(f"{tong_ng} lần chạy NG, 0 sót → escape &lt; {1 - 0.05 ** (1 / tong_ng):.2%} (95%, coi các lần độc lập)")
+print(f"Overkill cho phép ≤ 0,1% của 1000 lần chạy OK → tối đa {math.floor(0.001 * 1000)} lần")</code></pre>
+<pre><code class="language-text">Phát hiện: thiếu nắp                            10 × 10 =   100 lần
+Phát hiện: nắp cao +1,0..+3,0 mm                10 × 10 =   100 lần
+Phát hiện: nắp nghiêng                          10 × 10 =   100 lần
+Phát hiện: sai màu nắp (2 màu)                  10 × 10 =   100 lần
+Mẫu giới hạn D02, D03 (2 cặp vừa OK/vừa NG)      4 × 10 =    40 lần
+Overkill: chai OK, 100 mỗi mã                  200 ×  5 =  1000 lần
+Độ lặp lại chiều cao nắp (2 mã)                 20 × 30 =   600 lần
+Tổng 2040 lần chạy ≈ 3.4 giờ nạp tay
+400 lần chạy NG, 0 sót → escape &lt; 0.75% (95%, coi các lần độc lập)
+Overkill cho phép ≤ 0,1% của 1000 lần chạy OK → tối đa 1 lần</code></pre>
+<p>Khoảng 3,5 giờ nạp tay, cộng thời gian ghi chép, phân tích và chạy lại: lịch FAT 3 ngày là hợp lý. Nếu có băng tải vòng (loop) đưa chai chạy lặp lại tự động, thời gian giảm mạnh. Lưu ý 400 lần chạy NG chỉ chứng minh escape dưới 0,75% với giả định các lần độc lập; đây là bằng chứng chức năng, tỉ lệ ppm được theo dõi trong sản xuất.</p>
+<table>
+  <tr><th>Mục</th><th>Nội dung</th></tr>
+  <tr><td>Điều kiện bắt đầu FAT</td><td>Đặc tả đã ký; bộ mẫu đã nhận, dán nhãn, đo và ký trước 2 tuần; báo cáo thử nội bộ đạt; PLC giả lập (hoặc PLC mẫu) chạy được bảng giao tiếp mục 7; kịch bản FAT đã được khách hàng duyệt</td></tr>
+  <tr><td>Người tham gia</td><td>Bên cung cấp: quản lý dự án, kỹ sư vision, kỹ sư điện. Khách hàng: QA (ký phân loại mẫu và kết quả), bảo trì, đại diện sản xuất</td></tr>
+  <tr><td>Ngày 1</td><td>Kiểm tra phần cứng, đi dây, an toàn; R-MEA-01 (độ lặp lại); hiệu chuẩn, chốt dải bảo vệ</td></tr>
+  <tr><td>Ngày 2</td><td>R-DET-01, R-DET-02, R-OVK-01, R-ENV-01 (mô phỏng ánh sáng, nắp ướt), R-CHG-01</td></tr>
+  <tr><td>Ngày 3</td><td>R-PER-01, R-PER-02 (trigger giả lập); R-SAF-01…04 (rút cáp, tắt đèn, sai công thức, trigger kép); HMI, phân quyền, dữ liệu; rà tài liệu; lập biên bản và danh sách tồn đọng</td></tr>
+  <tr><td>Điều kiện kết thúc</td><td>Mọi yêu cầu đạt, hoặc tồn đọng chỉ gồm mục nhỏ không ảnh hưởng phát hiện/an toàn, có người chịu trách nhiệm và hạn xử lý trước SAT; biên bản có chữ ký hai bên; lưu ảnh, log, file kết quả</td></tr>
+  <tr><td>Quy tắc khi không đạt</td><td>Ghi nhận, phân tích nguyên nhân, sửa, chạy lại <strong>toàn bộ</strong> nhóm bài thử liên quan; mọi thay đổi tham số ghi vào biên bản</td></tr>
+</table>
+<h3>Phác thảo SAT</h3>
+<ul>
+  <li>Lặp lại R-DET-01, R-DET-02, R-MEA-01 (rút gọn) trên dây chuyền thật sau lắp đặt.</li>
+  <li>R-REJ-01: 50 chai NG đánh dấu thả vào dòng ở tốc độ cao nhất và khi băng tải đang đổi tốc độ.</li>
+  <li>R-OVK-02: chạy sản xuất 3 ca, QC kiểm lại toàn bộ thùng NG; song song QC lấy mẫu ngẫu nhiên chai đã qua trạm để tìm lỗi lọt.</li>
+  <li>Kiểm tra tích hợp PLC thật: đổi công thức, dừng/khởi động băng tải, mất kết nối.</li>
+  <li>Đào tạo, bàn giao tài liệu và bản sao lưu; ký biên bản SAT, bắt đầu bảo hành.</li>
+</ul>
+</details>
+
+<h2>5. Tự đánh giá</h2>
+<table>
+  <tr><th>Tiêu chí</th><th>Đạt khi</th><th>Điểm</th></tr>
+  <tr><td>Tính toán thiết kế</td><td>Dùng năng suất tương lai; có chu kỳ, phơi sáng tối đa, hạn chót, số chai trên đường, encoder (xung/mm, xung tới cần gạt, phát lệnh sớm), độ phân giải so với giới hạn</td><td>15</td></tr>
+  <tr><td>Phạm vi</td><td>Có trong phạm vi, ngoài phạm vi kèm lý do, giả định, khách hàng cung cấp</td><td>10</td></tr>
+  <tr><td>Tiêu chí lỗi</td><td>Mỗi lỗi có đại lượng, cách đo, giới hạn, mẫu giới hạn; nhận ra cần 2 góc nhìn cho nắp nghiêng</td><td>15</td></tr>
+  <tr><td>Hiệu năng</td><td>Mỗi yêu cầu có mã, phương pháp, tiêu chí đạt bằng con số; có cả FAT và SAT; có bài thử cần gạt ở tốc độ thật</td><td>15</td></tr>
+  <tr><td>Giao tiếp và hành vi khi lỗi</td><td>Có bảng I/O, dữ liệu kèm ID, heartbeat, công thức; thiếu kết quả thì loại; xác nhận thùng NG</td><td>15</td></tr>
+  <tr><td>Bộ mẫu</td><td>Có OK, NG từng loại, mẫu giới hạn, mẫu đo; số lượng hợp lý; ai ký, ai giữ</td><td>10</td></tr>
+  <tr><td>Kế hoạch FAT</td><td>Có điều kiện bắt đầu/kết thúc, người tham gia, lịch, danh sách bài thử, quy tắc khi không đạt; ước lượng được thời gian</td><td>15</td></tr>
+  <tr><td>Trình bày</td><td>Có phiên bản, ngày, ma trận truy xuất yêu cầu → bài thử</td><td>5</td></tr>
+</table>
+<p>Từ 80/100 trở lên: tài liệu của bạn đủ để gửi khách hàng duyệt. Dưới 60: đọc lại bài "Đặc tả kỹ thuật và nghiệm thu FAT/SAT", đặc biệt bảng 12 mục và mục hành vi khi lỗi.</p>
+
+<h2>6. Mở rộng</h2>
+<ul>
+  <li>Viết thêm phần đặc tả cho giai đoạn 2: kiểm vòng an toàn 360°. Tính số camera cần thiết (hoặc phương án gương), độ phân giải để thấy cầu nối vòng an toàn bị đứt, và cập nhật ngân sách thời gian.</li>
+  <li>Viết bảng thanh ghi Modbus chi tiết (địa chỉ, kiểu dữ liệu, đơn vị, chiều đọc/ghi) cho mục 7; bạn sẽ hiện thực nó ở chặng 9 với một PLC giả lập bằng Python.</li>
+  <li>Viết script Python đọc file kết quả thử (CSV: mã mẫu, lần chạy, kết quả) và tự động in ma trận truy xuất yêu cầu → đạt/không đạt như ở bài trước, để biên bản FAT được tạo từ dữ liệu, không gõ tay.</li>
+</ul>
+<p>Hoàn thành bài này là xong chặng 5. Chặng tiếp theo, <strong>Camera / Lens / Lighting</strong>, dạy cách chọn đúng camera, ống kính và đèn cho đặc tả bạn vừa viết.</p>

@@ -1,0 +1,211 @@
+<p>Đến đây bạn đã biết một trạm Machine Vision gồm những khối nào (bài 1) và yêu cầu của khách hàng thuộc nhóm bài toán nào (bài 2). Câu hỏi tiếp theo, thường được hỏi ngay trong buổi họp đầu tiên: <strong>làm bằng gì?</strong> Thư viện thương mại như HALCON, VisionPro; thư viện mã nguồn mở như OpenCV mà bạn đã học ở Giai đoạn 1; hay một smart camera cấu hình bằng chuột? Không có câu trả lời đúng cho mọi dự án. Bài này cho bạn tiêu chí để chọn, cách tính chi phí theo số trạm, và những điều cần biết về bản quyền để không gặp rắc rối khi giao hệ thống cho khách hàng.</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>So sánh được thư viện thương mại và mã nguồn mở theo năng lực, chi phí, rủi ro; giải thích smart camera là gì và khi nào nên dùng; tự lập bảng chi phí và ma trận quyết định để chọn công cụ cho một dự án cụ thể.</div>
+
+<h2>1. Bốn lựa chọn chính</h2>
+<table>
+  <tr><th>Lựa chọn</th><th>Ví dụ</th><th>Cách làm việc</th></tr>
+  <tr><td><strong>Thư viện thương mại</strong></td><td>MVTec HALCON, Cognex VisionPro, Matrox Imaging Library (MIL)</td><td>Viết chương trình (C++, C#/.NET, một số có Python) gọi các hàm/công cụ đã được tối ưu; thường kèm môi trường thử nghiệm tương tác (ví dụ HDevelop của HALCON)</td></tr>
+  <tr><td><strong>Phần mềm cấu hình trên PC</strong></td><td>Các phần mềm kéo thả của hãng thư viện hoặc hãng camera</td><td>Ghép các công cụ thành luồng xử lý bằng giao diện, ít hoặc không viết code</td></tr>
+  <tr><td><strong>Smart camera / vision sensor</strong></td><td>Cognex (dòng In-Sight), Keyence, Omron, SICK, Teledyne DALSA…</td><td>Camera có bộ xử lý và phần mềm bên trong, cấu hình qua máy tính, chạy độc lập, nối thẳng PLC</td></tr>
+  <tr><td><strong>Mã nguồn mở</strong></td><td>OpenCV, scikit-image, NumPy; PyTorch, ONNX Runtime, OpenVINO cho AI; Tesseract, zxing-cpp cho đọc chữ, đọc mã</td><td>Tự ghép thuật toán, tự viết giao diện, I/O, lưu trữ; toàn quyền kiểm soát</td></tr>
+</table>
+<p>Dù chọn gì, việc lấy ảnh từ camera công nghiệp đi qua <strong>SDK của hãng camera</strong> (ví dụ pylon của Basler, có gói Python <code>pypylon</code>; Spinnaker của Teledyne FLIR; MVS của Hikrobot) hoặc qua chuẩn chung <strong>GenICam</strong> (thư viện Python <code>harvesters</code>, thư viện Aravis trên Linux). Thư viện thương mại thường tích hợp sẵn việc lấy ảnh từ camera chuẩn GigE Vision, USB3 Vision; với OpenCV bạn tự viết lớp lấy ảnh từ SDK. <code>cv2.VideoCapture</code> bạn dùng với webcam ở Giai đoạn 1 <strong>không</strong> phải cách điều khiển camera công nghiệp (trigger, exposure, gain) trong trạm thật.</p>
+
+<h2>2. Thư viện thương mại so với mã nguồn mở</h2>
+<table>
+  <tr><th>Tiêu chí</th><th>Thư viện thương mại (HALCON, VisionPro, MIL…)</th><th>Mã nguồn mở (OpenCV + hệ sinh thái Python/C++)</th></tr>
+  <tr><td>Chi phí bản quyền</td><td>Bản quyền phát triển (cho máy kỹ sư) + <strong>bản quyền runtime cho mỗi máy chạy</strong>; module nâng cao (3D, deep learning) có thể tính riêng</td><td>Miễn phí với giấy phép dễ dãi (OpenCV dùng Apache 2.0 từ bản 4.5); vẫn phải kiểm tra giấy phép từng thư viện kèm theo</td></tr>
+  <tr><td>Công cụ "khó" có sẵn</td><td>Khớp mẫu hình dạng bất biến xoay/tỉ lệ có subpixel, công cụ đo cạnh, hiệu chuẩn, đọc mã 2D khó (khắc laser, in chấm), OCR công nghiệp, 3D, deep learning: đã tối ưu, đã được kiểm chứng ở rất nhiều nhà máy</td><td>Có nhiều khối cơ bản tốt (lọc, hình thái học, contour, hiệu chuẩn camera, khớp mẫu đơn giản, đọc QR); các công cụ "công nghiệp" như khớp hình dạng xoay tự do có subpixel thường phải tự xây hoặc ghép thêm</td></tr>
+  <tr><td>Tốc độ phát triển</td><td>Nhanh với bài khó: thử công cụ trên ảnh thật trong IDE tương tác trong vài giờ</td><td>Nhanh với bài đơn giản; chậm và rủi ro với bài khó vì phải tự viết, tự kiểm chứng</td></tr>
+  <tr><td>Hỗ trợ</td><td>Hỗ trợ kỹ thuật của hãng và nhà phân phối, tài liệu đầy đủ, có cam kết vòng đời sản phẩm</td><td>Cộng đồng, tài liệu mở, mã nguồn để tự đọc; không có ai chịu trách nhiệm thay bạn</td></tr>
+  <tr><td>Phụ thuộc</td><td>Phụ thuộc hãng: đổi phiên bản, đổi chính sách bản quyền, khóa bản quyền (dongle USB) bị mất hoặc hỏng làm trạm ngừng</td><td>Không khóa; nhưng phụ thuộc năng lực đội ngũ của bạn để bảo trì code</td></tr>
+  <tr><td>Tùy biến</td><td>Cao trong phạm vi API; thuật toán bên trong là hộp đen</td><td>Toàn quyền, kể cả sửa thuật toán, chạy trên máy nhúng, tích hợp AI tùy ý</td></tr>
+  <tr><td>Khách hàng nhìn nhận</td><td>Nhiều nhà máy (nhất là FDI) có danh sách thiết bị/phần mềm chuẩn, đôi khi bắt buộc một hãng cụ thể</td><td>Cần chứng minh độ tin cậy bằng kết quả nghiệm thu, tài liệu, bảo hành của chính bạn</td></tr>
+</table>
+<p>Một cách nhìn thực tế: thư viện thương mại là <strong>mua thời gian và giảm rủi ro</strong> cho phần thuật toán khó; mã nguồn mở là <strong>đổi công kỹ sư lấy chi phí bản quyền và sự tự chủ</strong>. Nhiều công ty tích hợp hệ thống ở Việt Nam dùng cả hai: OpenCV/Python để thử nghiệm nhanh và cho bài đơn giản, thư viện thương mại cho bài đo chính xác hoặc định vị khó, smart camera cho trạm nhỏ, lặp lại nhiều.</p>
+
+<h2>3. Smart camera: khi nào là lựa chọn tốt nhất?</h2>
+<p><strong>Smart camera</strong> là camera công nghiệp tích hợp bộ xử lý, bộ nhớ, phần mềm vision và cổng I/O. Bạn cấu hình trên PC (chọn công cụ, vẽ ROI, đặt ngưỡng), tải chương trình xuống camera, rồi rút PC ra: camera tự nhận trigger, xử lý và xuất OK/NG cho PLC. <strong>Vision sensor</strong> là dạng đơn giản hơn nữa, thường chỉ có vài công cụ (có/không, đếm, đọc mã) và cấu hình rất nhanh.</p>
+<table>
+  <tr><th>Ưu điểm</th><th>Nhược điểm</th></tr>
+  <tr><td>
+    <ul>
+      <li>Gọn: không cần PC, tủ điện nhỏ, ít dây</li>
+      <li>I/O số và giao thức công nghiệp (PROFINET, EtherNet/IP…) thường có sẵn</li>
+      <li>Triển khai nhanh, kỹ thuật viên bảo trì được, có thể thay camera dự phòng và nạp lại chương trình</li>
+      <li>Ổn định: hệ thống nhúng, không có hệ điều hành PC cập nhật bất ngờ</li>
+    </ul>
+  </td><td>
+    <ul>
+      <li>Sức xử lý giới hạn: thêm công cụ là thời gian xử lý tăng; cần thử với cycle time thật</li>
+      <li>Chỉ dùng được bộ công cụ hãng cung cấp; thuật toán đặc biệt rất khó hoặc không làm được</li>
+      <li>Mỗi điểm nhìn một camera; trạm nhiều góc chụp thành nhiều thiết bị</li>
+      <li>Lưu ảnh dài hạn, thống kê, kết nối MES thường phải thêm PC hoặc phần mềm riêng</li>
+      <li>Phụ thuộc hệ sinh thái một hãng</li>
+    </ul>
+  </td></tr>
+</table>
+<p><strong>Nên dùng smart camera khi</strong>: bài toán thuộc nhóm có/không, đọc mã, đo đơn giản, định vị cơ bản; một hoặc hai điểm nhìn; nhiều trạm giống nhau; đội bảo trì của nhà máy không lập trình; khách hàng đã chuẩn hóa một hãng. <strong>Nên dùng PC + camera rời khi</strong>: nhiều camera, thuật toán đặc biệt hoặc AI nặng, cần lưu và phân tích nhiều dữ liệu, cần giao diện riêng, hoặc thời gian xử lý trên smart camera không đạt.</p>
+
+<h2>4. Bảng quyết định nhanh</h2>
+<table>
+  <tr><th>Tình huống dự án</th><th>Gợi ý</th><th>Lý do</th></tr>
+  <tr><td>1 trạm kiểm tra có nắp, có nhãn, đọc mã vạch; nhà máy muốn tự bảo trì</td><td>Smart camera hoặc vision sensor</td><td>Bài dễ, cần nhanh và dễ thay thế</td></tr>
+  <tr><td>Đo 15 kích thước trên chi tiết cơ khí, dung sai ± 0,01 mm, 2 camera</td><td>PC + thư viện thương mại (hoặc OpenCV nếu đội rất mạnh về đo lường)</td><td>Cần đo subpixel, hiệu chuẩn, fitting đã kiểm chứng</td></tr>
+  <tr><td>Robot gắp chi tiết xoay tự do trên băng tải</td><td>PC + thư viện có khớp mẫu hình dạng mạnh; hoặc smart camera dòng cao cấp nếu đủ nhanh</td><td>Khớp mẫu bất biến xoay ổn định là phần khó nhất</td></tr>
+  <tr><td>Kiểm lỗi bề mặt đa dạng, hình dạng lỗi khó mô tả bằng luật</td><td>PC có GPU + deep learning (mã nguồn mở hoặc công cụ DL thương mại)</td><td>Luật cổ điển khó bao phủ biến thể lỗi</td></tr>
+  <tr><td>Sản phẩm thương mại của công ty bạn, bán 100+ trạm giống nhau</td><td>OpenCV/mã nguồn mở, có thể trên máy nhúng</td><td>Bản quyền runtime nhân theo số trạm; công phát triển chia đều cho nhiều trạm</td></tr>
+  <tr><td>Thử nghiệm khả thi trong 2 tuần trước khi báo giá</td><td>Python + OpenCV, kết hợp bản dùng thử của thư viện thương mại</td><td>Nhanh, rẻ; sau đó chọn công cụ sản xuất dựa trên kết quả</td></tr>
+</table>
+
+<h2>5. Tính chi phí theo số trạm</h2>
+<p>Chi phí thật không chỉ là giá bản quyền. Gồm: phí một lần (bản quyền phát triển), chi phí mỗi trạm (phần cứng, bản quyền runtime), giờ kỹ sư phát triển, và giờ bảo trì nhiều năm. Mô hình sau dùng <strong>số liệu giả định</strong> để minh họa phương pháp; khi làm thật, thay bằng báo giá bạn nhận được và ước lượng giờ công của đội bạn.</p>
+<pre><code class="language-python"># Mô hình tổng chi phí 3 năm (TCO) theo số trạm giống nhau.
+# ĐƠN VỊ GIẢ ĐỊNH để minh họa phương pháp, không phải giá thật: hãy thay bằng báo giá bạn nhận được.
+GIO_CONG = 0.2                     # chi phí 1 giờ kỹ sư (đơn vị)
+SO_NAM = 3
+
+
+def tco(p, so_tram):
+    if p is None:                  # phương án không đáp ứng được bài toán này
+        return None
+    return (p["mot_lan"] + p["gio_dev"] * GIO_CONG
+            + so_tram * (p["moi_tram"] + p["gio_bt"] * GIO_CONG * SO_NAM))
+
+
+def in_bang(ten, phuong_an):
+    print(f"== {ten}")
+    print("Số trạm | " + " | ".join(f"{k:&gt;12s}" for k in phuong_an))
+    for n in (1, 3, 10, 30):
+        gia = {k: tco(p, n) for k, p in phuong_an.items()}
+        kha_thi = {k: v for k, v in gia.items() if v is not None}
+        re_nhat = min(kha_thi, key=kha_thi.get)
+        o = " | ".join(f"{'không đạt':&gt;12s}" if v is None else f"{v:12.0f}" for v in gia.values())
+        print(f"{n:7d} | {o}   ← rẻ nhất: {re_nhat}")
+
+
+# mot_lan: bản quyền phát triển; moi_tram: phần cứng + bản quyền runtime; gio_dev: giờ phát triển;
+# gio_bt: giờ bảo trì mỗi trạm mỗi năm
+in_bang("Bài toán đơn giản: có/không + đọc mã", {
+    "Thư viện TM": {"mot_lan": 40, "moi_tram": 18 + 15, "gio_dev": 120, "gio_bt": 4},
+    "OpenCV": {"mot_lan": 0, "moi_tram": 18, "gio_dev": 200, "gio_bt": 6},
+    "Smart camera": {"mot_lan": 0, "moi_tram": 30, "gio_dev": 40, "gio_bt": 2},
+})
+in_bang("Bài toán khó: định vị chi tiết xoay tự do + đo subpixel ± 0,01 mm", {
+    "Thư viện TM": {"mot_lan": 40, "moi_tram": 18 + 15, "gio_dev": 300, "gio_bt": 6},
+    "OpenCV": {"mot_lan": 0, "moi_tram": 18, "gio_dev": 1400, "gio_bt": 16},
+    "Smart camera": None,
+})</code></pre>
+<pre><code class="language-text">== Bài toán đơn giản: có/không + đọc mã
+Số trạm |  Thư viện TM |       OpenCV | Smart camera
+      1 |           99 |           62 |           39   ← rẻ nhất: Smart camera
+      3 |          170 |          105 |          102   ← rẻ nhất: Smart camera
+     10 |          418 |          256 |          320   ← rẻ nhất: OpenCV
+     30 |         1126 |          688 |          944   ← rẻ nhất: OpenCV
+== Bài toán khó: định vị chi tiết xoay tự do + đo subpixel ± 0,01 mm
+Số trạm |  Thư viện TM |       OpenCV | Smart camera
+      1 |          137 |          308 |    không đạt   ← rẻ nhất: Thư viện TM
+      3 |          210 |          363 |    không đạt   ← rẻ nhất: Thư viện TM
+     10 |          466 |          556 |    không đạt   ← rẻ nhất: Thư viện TM
+     30 |         1198 |         1108 |    không đạt   ← rẻ nhất: OpenCV</code></pre>
+<p>Hai bài học rút ra từ mô hình (với số liệu giả định này):</p>
+<ul>
+  <li><strong>Bài toán đơn giản, ít trạm</strong>: smart camera rẻ nhất vì gần như không tốn công phát triển. Khi số trạm tăng, chi phí phần cứng mỗi trạm chiếm ưu thế và OpenCV trên phần cứng rẻ hơn thắng.</li>
+  <li><strong>Bài toán khó</strong>: thư viện thương mại rẻ nhất cho tới khoảng 20 trạm, vì 1400 giờ tự xây công cụ khớp mẫu và đo subpixel là rất đắt (và rủi ro không thể hiện trong bảng: có thể làm mãi không đạt độ ổn định). Chỉ khi nhân bản rất nhiều trạm, mã nguồn mở mới bù lại.</li>
+</ul>
+
+<h2>6. Ma trận quyết định có trọng số</h2>
+<p>Chi phí không phải tiêu chí duy nhất. Cách làm phổ biến: (1) loại trước các phương án <strong>không đạt tiêu chí bắt buộc</strong> (không đủ nhanh, không đọc được mã, khách hàng không cho phép); (2) chấm điểm các phương án còn lại theo tiêu chí có trọng số phù hợp dự án.</p>
+<pre><code class="language-python"># Ma trận quyết định có trọng số cho dự án: 3 trạm kiểm tra nhãn + đọc mã, đội bảo trì không lập trình.
+# Trọng số theo DỰ ÁN, điểm 1–5 do nhóm bạn đánh giá sau khi thử với mẫu thật.
+TIEU_CHI = {               # tiêu chí: trọng số (tổng = 100)
+    "Đáp ứng thuật toán": 30,
+    "Thời gian triển khai": 20,
+    "Chi phí 3 năm": 20,
+    "Kỹ năng đội bảo trì": 15,
+    "Mở rộng, tùy biến": 15,
+}
+DIEM = {                   # cùng thứ tự tiêu chí ở trên
+    "Thư viện TM": [5, 4, 2, 3, 4],
+    "OpenCV": [3, 2, 4, 2, 5],
+    "Smart camera": [4, 5, 4, 5, 2],
+}
+trong_so = list(TIEU_CHI.values())
+ket_qua = {k: sum(w * d for w, d in zip(trong_so, ds)) / 100 for k, ds in DIEM.items()}
+for ten, diem in sorted(ket_qua.items(), key=lambda kv: -kv[1]):
+    print(f"{ten:13s} {diem:.2f} / 5")</code></pre>
+<pre><code class="language-text">Smart camera  4.05 / 5
+Thư viện TM   3.75 / 5
+OpenCV        3.15 / 5</code></pre>
+<p>Với dự án nhiều trạm giống nhau, đội bảo trì không lập trình, smart camera dẫn đầu. Đổi trọng số (ví dụ dự án nghiên cứu, cần tùy biến cao, "Mở rộng, tùy biến" = 35) thì thứ hạng đổi. Giá trị của ma trận không nằm ở con số cuối, mà ở chỗ buộc cả nhóm <strong>nói rõ điều gì quan trọng</strong> trước khi chọn, và để lại lý do bằng văn bản cho khách hàng.</p>
+
+<h2>7. Bản quyền: những điều phải kiểm tra</h2>
+<ul>
+  <li><strong>Runtime license cho mọi máy chạy</strong>, kể cả PC dự phòng và máy chạy offline để phân tích ảnh. Hỏi rõ: bản quyền gắn dongle USB hay gắn phần cứng máy? Thay mainboard có phải kích hoạt lại không? Ai giữ bản quyền khi bàn giao: bạn hay khách hàng?</li>
+  <li><strong>Phiên bản</strong>: chương trình viết cho một phiên bản thư viện có thể cần bản quyền mới khi nâng cấp. Ghi rõ phiên bản trong tài liệu bàn giao.</li>
+  <li><strong>Module riêng</strong>: deep learning, 3D, OCR nâng cao có thể là bản quyền riêng. Hỏi nhà phân phối trước khi báo giá.</li>
+  <li><strong>Giấy phép mã nguồn mở</strong>: Apache 2.0, BSD, MIT là giấy phép dễ dãi, dùng thương mại được (giữ thông báo bản quyền). GPL, AGPL là giấy phép "copyleft": phân phối phần mềm có dùng chúng có thể buộc bạn công bố mã nguồn của mình. Ví dụ hay gặp: thư viện YOLO của Ultralytics dùng AGPL-3.0 (hoặc mua giấy phép thương mại); PyQt dùng GPL hoặc giấy phép thương mại, trong khi PySide dùng LGPL. Không chắc thì hỏi bộ phận pháp lý trước khi bàn giao.</li>
+  <li><strong>Mô hình AI huấn luyện sẵn</strong> có giấy phép riêng, có khi khác giấy phép của mã nguồn.</li>
+</ul>
+<div class="warn"><strong>Rủi ro hay bị quên</strong>Trạm dùng dongle bản quyền: dongle bị rút ra mang đi, hoặc cổng USB hỏng, chương trình không chạy và dây chuyền dừng. Trong thiết kế, đặt dongle ở vị trí khóa được trong tủ điện, ghi vào hướng dẫn bảo trì, và hỏi hãng quy trình thay thế khẩn cấp.</div>
+
+<h2>8. Sai lầm thường gặp</h2>
+<ul>
+  <li><strong>Chọn theo thói quen</strong> ("công ty mình chỉ dùng X") mà không kiểm tra X có làm được bài này trong cycle time không.</li>
+  <li><strong>Đánh giá smart camera chỉ với một công cụ</strong>, rồi thêm 8 công cụ khi triển khai và vượt cycle time.</li>
+  <li><strong>Báo giá OpenCV "miễn phí"</strong> mà quên giờ công tự xây giao diện, lưu ảnh, giao tiếp PLC, nhật ký lỗi, quản lý công thức sản phẩm. Phần thuật toán thường chỉ là một phần nhỏ khối lượng code của trạm hoàn chỉnh.</li>
+  <li><strong>Không làm thử trên ảnh thật</strong> trước khi chốt công cụ. Hầu hết hãng và nhà phân phối có bản dùng thử hoặc hỗ trợ làm thử; hãy dùng.</li>
+</ul>
+
+<h2>9. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Chọn công cụ và nêu hai lý do cho mỗi dự án: (a) nhà máy bánh kẹo cần 12 trạm giống nhau kiểm tra hạn sử dụng in trên gói, đội bảo trì là thợ điện; (b) công ty bạn phát triển máy kiểm tra ngoại quan để bán cho nhiều khách hàng; (c) kiểm tra 40 chân linh kiện bị cong, cần đo khoảng cách chân chính xác 0,02 mm, chỉ 1 máy.</p>
+<details><summary>Xem đáp án</summary>
+<ul>
+  <li>(a) <strong>Smart camera có OCR/OCV</strong>: nhiều trạm giống nhau, bảo trì không lập trình, bài toán thuộc nhóm nhận dạng cơ bản. Kiểm tra thời gian xử lý với tốc độ đóng gói thật.</li>
+  <li>(b) <strong>Mã nguồn mở</strong> (OpenCV, có thể kèm AI): bản quyền runtime sẽ nhân theo mỗi máy bán ra; công ty có thời gian đầu tư phát triển và giữ toàn quyền sản phẩm. Nếu cần một công cụ khó, có thể mua riêng thư viện cho công cụ đó và tính vào giá máy.</li>
+  <li>(c) <strong>PC + thư viện thương mại</strong>: đo chính xác cần công cụ đo cạnh, fitting, hiệu chuẩn đã kiểm chứng; chỉ 1 máy nên phí bản quyền nhỏ so với giờ công tự xây.</li>
+</ul>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Trong mô hình chi phí ở mục 5, kịch bản "bài toán khó": tìm số trạm nhỏ nhất mà OpenCV rẻ hơn thư viện thương mại. Viết vòng lặp tìm điểm hòa vốn.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">GIO_CONG, SO_NAM = 0.2, 3
+tm = {"mot_lan": 40, "moi_tram": 33, "gio_dev": 300, "gio_bt": 6}
+cv = {"mot_lan": 0, "moi_tram": 18, "gio_dev": 1400, "gio_bt": 16}
+
+
+def tco(p, n):
+    return p["mot_lan"] + p["gio_dev"] * GIO_CONG + n * (p["moi_tram"] + p["gio_bt"] * GIO_CONG * SO_NAM)
+
+
+n = 1
+while tco(cv, n) &gt;= tco(tm, n):
+    n += 1
+print(f"OpenCV rẻ hơn từ {n} trạm: {tco(cv, n):.0f} so với {tco(tm, n):.0f}")</code></pre>
+<pre><code class="language-text">OpenCV rẻ hơn từ 21 trạm: 860 so với 869</code></pre>
+<p>Kiểm tra bằng tay: phần cố định của thư viện thương mại là 40 + 300 × 0,2 = 100, của OpenCV là 1400 × 0,2 = 280, chênh 180. Mỗi trạm thư viện thương mại tốn 33 + 6 × 0,2 × 3 = 36,6, OpenCV tốn 18 + 16 × 0,2 × 3 = 27,6, tức rẻ hơn 9. Hòa vốn khi 9n = 180, n = 20; từ trạm thứ 21 OpenCV rẻ hơn. Nhớ rằng con số này chưa tính rủi ro tự xây công cụ không đạt yêu cầu.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Đồng nghiệp dùng PyQt5 làm giao diện và một mô hình YOLO của Ultralytics để phát hiện lỗi, rồi đóng gói phần mềm bán kèm máy cho khách hàng. Bạn cần kiểm tra những gì về bản quyền?</p>
+<details><summary>Xem đáp án</summary>
+<ul>
+  <li>PyQt5 dùng GPL v3 hoặc giấy phép thương mại: phân phối phần mềm đóng gói kèm PyQt5 mà không công bố mã nguồn theo GPL thì cần mua giấy phép thương mại; hoặc chuyển sang PySide (LGPL, cần tuân thủ điều kiện LGPL như cho phép thay thư viện).</li>
+  <li>Ultralytics YOLO dùng AGPL-3.0: dùng trong sản phẩm thương mại đóng mã thường cần giấy phép doanh nghiệp của Ultralytics. Xem điều khoản hiện hành trên trang chính thức.</li>
+  <li>Trọng số mô hình huấn luyện sẵn và bộ dữ liệu dùng để huấn luyện cũng có giấy phép riêng.</li>
+  <li>Lập danh sách tất cả thư viện kèm giấy phép (một bảng "bill of materials" phần mềm) đưa vào hồ sơ bàn giao.</li>
+</ul>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Bốn lựa chọn: thư viện thương mại, phần mềm cấu hình, smart camera/vision sensor, mã nguồn mở. Nhiều dự án kết hợp vài lựa chọn.</li>
+  <li>Thư viện thương mại mua thời gian và giảm rủi ro cho thuật toán khó; mã nguồn mở đổi công kỹ sư lấy chi phí bản quyền và sự tự chủ.</li>
+  <li>Smart camera hợp với bài toán vừa phải, ít điểm nhìn, nhiều trạm giống nhau, đội bảo trì không lập trình; luôn thử với cycle time thật.</li>
+  <li>Tính tổng chi phí theo số trạm và số năm, không chỉ giá bản quyền; loại phương án không đạt tiêu chí bắt buộc rồi mới chấm điểm có trọng số.</li>
+  <li>Kiểm tra bản quyền runtime, dongle, module riêng và giấy phép mã nguồn mở (đặc biệt GPL/AGPL) trước khi bàn giao.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Bài tập chặng 4: phân tích một yêu cầu kiểm tra</strong>, nơi bạn dùng cả ba bài của chặng để biến một email khách hàng thành đề xuất kỹ thuật.</p>

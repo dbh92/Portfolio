@@ -1,0 +1,241 @@
+<p>Đây là bài tập tổng kết chặng 4 "Machine Vision". Trong công việc thật, dự án nào cũng bắt đầu bằng một email hoặc một cuộc gọi mơ hồ kiểu "anh làm giúp em cái camera kiểm tra lỗi". Kỹ sư giỏi không lao vào code ngay, mà <strong>biến yêu cầu đó thành bài toán kỹ thuật có con số</strong>, chỉ ra rủi ro, đặt đúng câu hỏi, rồi mới đề xuất hướng giải và phần cứng sơ bộ. Bạn sẽ dùng cả ba bài của chặng: sơ đồ khối hệ thống, 5 nhóm bài toán và bảng chấm độ khó, cách chọn công cụ. Kết quả của bài này chính là đầu vào cho chặng 5 "Industrial Vision", nơi bạn viết đặc tả kỹ thuật và tiêu chí nghiệm thu.</p>
+<div class="tip"><strong>Sản phẩm bạn nộp</strong>Một "phiếu phân tích yêu cầu" 2–3 trang theo mẫu ở mục 3: bài toán kỹ thuật, tính toán sơ bộ, sổ rủi ro, danh sách câu hỏi cho khách hàng, hướng giải và phần cứng đề xuất, bước tiếp theo.</div>
+
+<h2>1. Yêu cầu</h2>
+<p>Bạn nhận được email sau từ phòng chất lượng của một nhà máy ép nhựa (khách hàng giả định):</p>
+<pre><code class="language-text">Chào anh,
+
+Bên em sản xuất vỏ remote (nắp trên) cho một khách hàng điện tử. Hiện tại có 3 bạn
+QC ngồi kiểm ngoại quan 100% ở cuối máy ép số 7, nhưng tháng vừa rồi khách hàng vẫn
+khiếu nại lỗi lọt ra ngoài khoảng 500 ppm, chủ yếu là vết đen, ba-via và thiếu ngàm.
+
+Bên em muốn lắp hệ thống camera kiểm tra tự động 100%, phát hiện TẤT CẢ lỗi ngoại quan,
+đồng thời đo luôn 2 lỗ vít Ø3,2 ± 0,05 mm. Mục tiêu là giảm 3 bạn QC xuống 1 bạn.
+
+Thông tin:
+- Sản phẩm: 120 × 45 × 12 mm, nhựa ABS, có 2 màu đen và trắng, bề mặt vân nhám.
+- Mặt dưới có 4 ngàm cài.
+- Khuôn 4 cavity, chu kỳ ép khoảng 30 giây. Robot gắp sản phẩm ra đặt lên băng tải.
+- Lỗi hay gặp: vết đen ≥ 0,3 mm, ba-via ≥ 0,2 mm, thiếu nhựa (short shot), gãy ngàm,
+  trầy xước.
+
+Bên em mong lắp xong trong 2 tháng, ngân sách có hạn. Anh tư vấn giúp em phương án nhé.
+
+Cảm ơn anh.
+Phòng QA</code></pre>
+<p>Nhiệm vụ của bạn:</p>
+<table>
+  <tr><th>#</th><th>Việc phải làm</th><th>Đầu ra</th></tr>
+  <tr><td>1</td><td>Tóm tắt mục tiêu thật của khách hàng (kinh doanh, không phải kỹ thuật)</td><td>2–3 câu</td></tr>
+  <tr><td>2</td><td>Tách email thành danh sách hạng mục kiểm tra, xếp mỗi hạng mục vào nhóm bài toán, ghi con số đã có và con số còn thiếu</td><td>Bảng hạng mục</td></tr>
+  <tr><td>3</td><td>Tính FOV, mm/pixel, số pixel trên lỗi, khả năng đo lỗ; tính chu kỳ cho mỗi sản phẩm</td><td>Bảng tính + code</td></tr>
+  <tr><td>4</td><td>Chấm độ khó từng hạng mục theo bảng 8 yếu tố của bài "5 nhóm bài toán Machine Vision"</td><td>Điểm + kết luận</td></tr>
+  <tr><td>5</td><td>Lập sổ rủi ro (khả năng × ảnh hưởng) và danh sách ít nhất 10 câu hỏi cần làm rõ</td><td>Sổ rủi ro, danh sách câu hỏi</td></tr>
+  <tr><td>6</td><td>Đề xuất hướng giải, phần cứng sơ bộ (camera, ống kính, đèn, xử lý, I/O, loại hàng), công cụ phần mềm, phạm vi giai đoạn 1</td><td>Sơ đồ khối + bảng phần cứng</td></tr>
+  <tr><td>7</td><td>Đề xuất bước tiếp theo trước khi báo giá</td><td>Kế hoạch 3–5 bước</td></tr>
+</table>
+
+<h2>2. Kiến thức sử dụng</h2>
+<ul>
+  <li><strong>Hệ thống Machine Vision gồm những gì?</strong>: sơ đồ khối, chuỗi sự kiện từ cảm biến đến loại hàng, vai trò của chiếu sáng.</li>
+  <li><strong>5 nhóm bài toán Machine Vision và cách giải</strong>: phân nhóm, con số kinh nghiệm cho độ phân giải (≥ 3 pixel trên lỗi; sai số đo ≤ 1/10 dải dung sai), bảng chấm độ khó.</li>
+  <li><strong>Halcon, VisionPro, OpenCV, smart camera: chọn công cụ</strong>: tiêu chí chọn, chi phí theo số trạm, bản quyền.</li>
+  <li>Giai đoạn 1: blob analysis, morphology, tổ chức pipeline: để hình dung thuật toán khả thi cho từng hạng mục.</li>
+</ul>
+
+<h2>3. Gợi ý thiết kế: mẫu phiếu phân tích</h2>
+<p>Chép mẫu này vào tài liệu của bạn và điền đầy đủ. Mỗi ô trống là một thứ bạn phải tính, suy luận, hoặc biến thành câu hỏi cho khách hàng.</p>
+<pre><code class="language-text">PHIẾU PHÂN TÍCH YÊU CẦU KIỂM TRA
+1. Mục tiêu kinh doanh      : ...
+2. Sản phẩm và sản xuất     : kích thước, vật liệu, màu, số mã, nhịp, cách cấp sản phẩm
+3. Hạng mục kiểm tra
+   | # | Hạng mục | Nhóm bài toán | Con số đã có | Con số còn thiếu | Mặt / góc nhìn |
+4. Tính toán sơ bộ          : FOV, mm/px, px trên lỗi, sai số đo cho phép, chu kỳ
+5. Độ khó                   : điểm 0–16 từng hạng mục, kết luận
+6. Sổ rủi ro                : rủi ro | khả năng 1–3 | ảnh hưởng 1–3 | cách giảm
+7. Câu hỏi cho khách hàng   : nhóm theo: sản phẩm, lỗi, sản xuất, tích hợp, nghiệm thu, thương mại
+8. Hướng giải đề xuất       : sơ đồ khối, phần cứng, phần mềm, phạm vi giai đoạn 1 / ngoài phạm vi
+9. Bước tiếp theo           : ...</code></pre>
+<p>Một vài gợi ý trước khi làm:</p>
+<ul>
+  <li><strong>Đọc kỹ từng cụm từ</strong> "TẤT CẢ lỗi", "đo luôn", "2 màu", "bề mặt vân nhám", "mặt dưới có 4 ngàm". Mỗi cụm từ là một rủi ro hoặc một yêu cầu phần cứng.</li>
+  <li><strong>Chu kỳ</strong>: khuôn 4 cavity, 30 giây một lần ép, nghĩa là 4 sản phẩm mỗi 30 giây. Hãy tính thời gian cho mỗi sản phẩm và tự hỏi: tốc độ có phải vấn đề không?</li>
+  <li><strong>Hai mặt</strong>: mặt trên có lỗi ngoại quan và lỗ; mặt dưới có ngàm. Một camera nhìn từ trên không thấy ngàm. Robot đã có sẵn: có tận dụng được không?</li>
+  <li><strong>Đo lỗ</strong>: dùng script dưới đây để kiểm tra xem camera nhìn toàn sản phẩm có đo được lỗ ± 0,05 mm không.</li>
+</ul>
+<pre><code class="language-python"># Tính nhanh FOV và độ phân giải cho camera nhìn toàn bộ mặt trên vỏ remote
+SP_DAI, SP_RONG = 120, 45          # mm, kích thước sản phẩm
+LECH = 3                           # mm, sản phẩm lệch vị trí tối đa mỗi phía
+BIEN = 1.10                        # chừa thêm 10% biên
+
+fov_x = (SP_DAI + 2 * LECH) * BIEN
+fov_y = (SP_RONG + 2 * LECH) * BIEN
+print(f"FOV tối thiểu: {fov_x:.1f} × {fov_y:.1f} mm")
+
+CAM = {"1,3 MP": (1280, 1024), "2,3 MP": (1920, 1200), "5 MP": (2448, 2048), "12 MP": (4096, 3000)}
+
+
+def danh_gia(mm_px):
+    """Lỗi: cần ≥ 3 px trên lỗi. Đo: sai số cho phép = dải dung sai / 10, cần ≥ 0,5 px."""
+    o = []
+    for ten, kt in (("vết đen 0,3", 0.3), ("ba-via 0,2", 0.2)):
+        px = kt / mm_px
+        o.append(f"{ten}: {px:4.1f} px {'đạt' if px &gt;= 3 else 'KHÔNG'}")
+    sai_so_px = (0.1 / 10) / mm_px                 # lỗ Ø3,2 ± 0,05 → dải 0,1 mm
+    o.append(f"đo lỗ: sai số cho phép {sai_so_px:.2f} px {'đạt' if sai_so_px &gt;= 0.5 else 'KHÔNG'}")
+    return " | ".join(o)
+
+
+for ten, (w, h) in CAM.items():
+    mm_px = max(fov_x / w, fov_y / h)          # FOV phải lọt cả hai chiều
+    print(f"{ten:6s} {mm_px:.4f} mm/px | {danh_gia(mm_px)}")
+
+# Phương án riêng cho lỗ: camera 5 MP, FOV nhỏ 15 mm chỉ nhìn vùng một lỗ
+mm_px_lo = 15 / 2048
+print(f"Camera lỗ (FOV 15 mm, 5 MP): {mm_px_lo:.4f} mm/px, "
+      f"sai số cho phép {(0.1 / 10) / mm_px_lo:.2f} px")</code></pre>
+<pre><code class="language-text">FOV tối thiểu: 138.6 × 56.1 mm
+1,3 MP 0.1083 mm/px | vết đen 0,3:  2.8 px KHÔNG | ba-via 0,2:  1.8 px KHÔNG | đo lỗ: sai số cho phép 0.09 px KHÔNG
+2,3 MP 0.0722 mm/px | vết đen 0,3:  4.2 px đạt | ba-via 0,2:  2.8 px KHÔNG | đo lỗ: sai số cho phép 0.14 px KHÔNG
+5 MP   0.0566 mm/px | vết đen 0,3:  5.3 px đạt | ba-via 0,2:  3.5 px đạt | đo lỗ: sai số cho phép 0.18 px KHÔNG
+12 MP  0.0338 mm/px | vết đen 0,3:  8.9 px đạt | ba-via 0,2:  5.9 px đạt | đo lỗ: sai số cho phép 0.30 px KHÔNG
+Camera lỗ (FOV 15 mm, 5 MP): 0.0073 mm/px, sai số cho phép 1.37 px</code></pre>
+<p>Kết luận từ bảng tính bạn cần tự viết ra: camera nào là tối thiểu cho lỗi ngoại quan, và vì sao không camera nào nhìn toàn sản phẩm đo được lỗ. Tiêu chí "sai số cho phép ≥ 0,5 pixel" chừa hệ số an toàn so với độ lặp lại lý tưởng 0,1–0,25 pixel của đo subpixel, vì đo đường kính có hai mép, có sai số hiệu chuẩn, và mép lỗ nhựa thường bo tròn, có bóng.</p>
+
+<h2>4. Lời giải mẫu</h2>
+<p>Hãy tự làm ít nhất 60 phút trước khi mở lời giải. Lời giải dưới đây là <em>một</em> phương án hợp lý, không phải phương án duy nhất.</p>
+<details><summary>Xem lời giải mẫu: phiếu phân tích đầy đủ</summary>
+
+<h3>1. Mục tiêu kinh doanh</h3>
+<p>Giảm khiếu nại lọt lỗi từ khoảng 500 ppm xuống mức khách hàng của họ chấp nhận (cần hỏi con số), và giảm nhân lực QC từ 3 xuống 1 người. Yêu cầu ngầm: trạm không được loại nhầm nhiều đến mức người QC còn lại phải kiểm lại cả đống hàng, nếu không mục tiêu giảm người thất bại.</p>
+
+<h3>2. Sản phẩm và sản xuất</h3>
+<ul>
+  <li>Vỏ ABS 120 × 45 × 12 mm, 2 màu (đen, trắng), bề mặt vân nhám. Mặt trên: ngoại quan + 2 lỗ vít. Mặt dưới: 4 ngàm.</li>
+  <li>Khuôn 4 cavity, chu kỳ ép 30 s → 4 sản phẩm/30 s → trung bình <strong>7,5 s mỗi sản phẩm</strong>. Tốc độ không phải vấn đề; bài toán bị giới hạn bởi <em>chất lượng ảnh</em>, không phải thời gian.</li>
+  <li>Robot gắp 4 sản phẩm ra khỏi khuôn cùng lúc rồi đặt lên băng tải. Cần biết số cavity của từng sản phẩm để truy lỗi theo cavity (lỗi ép nhựa thường gắn với một cavity cụ thể).</li>
+</ul>
+
+<h3>3. Hạng mục kiểm tra</h3>
+<table>
+  <tr><th>#</th><th>Hạng mục</th><th>Nhóm</th><th>Con số đã có</th><th>Còn thiếu</th><th>Mặt</th></tr>
+  <tr><td>1</td><td>Vết đen</td><td>Kiểm lỗi</td><td>≥ 0,3 mm</td><td>Đo theo đường kính hay chiều dài? Bao nhiêu vết thì NG? Trên màu đen có áp dụng không?</td><td>Trên</td></tr>
+  <tr><td>2</td><td>Ba-via (flash)</td><td>Kiểm lỗi / đo</td><td>≥ 0,2 mm</td><td>Ở mép ngoài hay quanh lỗ? Chiều nhô ra hay độ dày?</td><td>Mép, quanh lỗ</td></tr>
+  <tr><td>3</td><td>Thiếu nhựa (short shot)</td><td>Kiểm lỗi / có-không</td><td>Không</td><td>Vị trí hay xảy ra (thường ở cuối dòng chảy nhựa, ngàm, gân mỏng)</td><td>Cả hai</td></tr>
+  <tr><td>4</td><td>Gãy / thiếu ngàm</td><td>Có/không</td><td>4 ngàm</td><td>Gãy một phần thì sao? Chiều cao ngàm tối thiểu?</td><td>Dưới</td></tr>
+  <tr><td>5</td><td>Trầy xước</td><td>Kiểm lỗi</td><td>Không</td><td>Kích thước, độ sâu, vùng nào quan trọng (mặt hiển thị so với mặt khuất)</td><td>Trên</td></tr>
+  <tr><td>6</td><td>Đo lỗ Ø3,2 ± 0,05</td><td>Đo lường</td><td>Dung sai</td><td>Hiện đo bằng gì, tần suất? Lỗ có từng sai kích thước chưa?</td><td>Trên</td></tr>
+  <tr><td>7</td><td>"Tất cả lỗi ngoại quan"</td><td>Kiểm lỗi</td><td>Không</td><td>Danh mục lỗi đầy đủ kèm mẫu thật và mẫu giới hạn</td><td>?</td></tr>
+</table>
+
+<h3>4. Tính toán sơ bộ</h3>
+<ul>
+  <li>FOV mặt trên tối thiểu khoảng 139 × 56 mm (sản phẩm + lệch ± 3 mm + 10% biên).</li>
+  <li>Camera 5 MP: 0,057 mm/px → vết đen 0,3 mm ≈ 5,3 px, ba-via 0,2 mm ≈ 3,5 px. Đạt mức tối thiểu nhưng ba-via sát giới hạn. Camera 12 MP cho 0,034 mm/px (ba-via ≈ 5,9 px), dư địa tốt hơn, đổi lại ảnh lớn hơn (vẫn thừa thời gian với 7,5 s/sản phẩm).</li>
+  <li>Đo lỗ: dải dung sai 0,1 mm → sai số cho phép 0,01 mm. Với 5 MP chỉ còn 0,18 px, với 12 MP 0,30 px: <strong>không đạt</strong> với hệ số an toàn đã chọn. Cần camera riêng FOV nhỏ (khoảng 15 mm, 0,0073 mm/px, sai số cho phép 1,37 px) cho mỗi lỗ, kèm đèn nền hoặc đèn đồng trục và ống kính telecentric, hoặc đưa hạng mục đo ra khỏi phạm vi kiểm 100% (xem mục 8).</li>
+  <li>Chu kỳ: 7,5 s/sản phẩm. Xử lý ảnh 12 MP cho kiểm lỗi cỡ vài trăm ms trên PC: dư rất nhiều.</li>
+</ul>
+
+<h3>5. Độ khó (thang 0–16)</h3>
+<table>
+  <tr><th>Hạng mục</th><th>Điểm</th><th>Lý do chính</th></tr>
+  <tr><td>Thiếu/gãy ngàm (mặt dưới)</td><td>4: dễ</td><td>Có/không trên vị trí đã biết; đèn nền hoặc đèn góc thấp; chỉ cần góc nhìn mặt dưới</td></tr>
+  <tr><td>Vết đen trên vỏ trắng</td><td>7: trung bình</td><td>Tương phản tốt, nhưng vân nhám gây nhiễu; cần mẫu để chỉnh ngưỡng</td></tr>
+  <tr><td>Vết đen trên vỏ đen</td><td>13: khó</td><td>Gần như không có tương phản; có thể chỉ thấy được nếu vết đen có độ bóng khác bề mặt</td></tr>
+  <tr><td>Ba-via, thiếu nhựa ở mép</td><td>7: trung bình</td><td>Đèn nền cho biên dạng sắc nét; ba-via 0,2 mm cần ≥ 5 MP</td></tr>
+  <tr><td>Trầy xước</td><td>12: khó</td><td>Không có định nghĩa, phụ thuộc góc nhìn, vân nhám</td></tr>
+  <tr><td>Đo lỗ ± 0,05 mm 100%</td><td>9: trung bình–khó</td><td>Cần camera riêng, hiệu chuẩn, nghiệm thu đo lường</td></tr>
+</table>
+
+<h3>6. Sổ rủi ro</h3>
+<pre><code class="language-python"># Sổ rủi ro: khả năng xảy ra (1–3) × mức ảnh hưởng (1–3) → ưu tiên xử lý
+RUI_RO = [
+    ("Vết đen trên vỏ màu đen gần như không có tương phản", 3, 3),
+    ("Yêu cầu 'mọi lỗi ngoại quan' không có định nghĩa, không có mẫu", 3, 3),
+    ("Đo lỗ ± 0,05 mm không đạt với camera nhìn toàn sản phẩm", 3, 2),
+    ("Ngàm mặt dưới bị che, cần góc nhìn thứ hai", 2, 3),
+    ("Bề mặt vân nhám (texture) gây báo lỗi giả", 2, 2),
+    ("Robot không có thời gian dừng trên camera mặt dưới", 1, 2),
+    ("Đổi màu sản phẩm cần đổi công thức (recipe) đèn và ngưỡng", 2, 1),
+]
+for ten, kn, ah in sorted(RUI_RO, key=lambda r: -r[1] * r[2]):
+    muc = "CAO" if kn * ah &gt;= 6 else "TB" if kn * ah &gt;= 3 else "THẤP"
+    print(f"[{muc:4s}] {kn}×{ah}={kn * ah}  {ten}")</code></pre>
+<pre><code class="language-text">[CAO ] 3×3=9  Vết đen trên vỏ màu đen gần như không có tương phản
+[CAO ] 3×3=9  Yêu cầu 'mọi lỗi ngoại quan' không có định nghĩa, không có mẫu
+[CAO ] 3×2=6  Đo lỗ ± 0,05 mm không đạt với camera nhìn toàn sản phẩm
+[CAO ] 2×3=6  Ngàm mặt dưới bị che, cần góc nhìn thứ hai
+[TB  ] 2×2=4  Bề mặt vân nhám (texture) gây báo lỗi giả
+[THẤP] 1×2=2  Robot không có thời gian dừng trên camera mặt dưới
+[THẤP] 2×1=2  Đổi màu sản phẩm cần đổi công thức (recipe) đèn và ngưỡng</code></pre>
+<p>Cách giảm cho các rủi ro mức CAO:</p>
+<ul>
+  <li><strong>Vết đen trên vỏ đen</strong>: làm thử với nhiều kiểu đèn (góc thấp, vòm, phân cực) trên mẫu thật; nếu không đạt, thống nhất với khách hàng rằng hạng mục này chỉ áp dụng cho vỏ trắng ở giai đoạn 1.</li>
+  <li><strong>"Mọi lỗi"</strong>: yêu cầu danh mục lỗi bằng văn bản, mỗi loại có định nghĩa bằng con số và mẫu giới hạn. Lỗi không có trong danh mục nằm ngoài phạm vi nghiệm thu.</li>
+  <li><strong>Đo lỗ</strong>: đề xuất camera riêng hoặc kiểm tra lấy mẫu bằng thiết bị đo hiện có; lỗ do khuôn quyết định nên thường ổn định, sai lệch hay đến từ mòn khuôn hoặc chốt gãy (có thể phát hiện bằng có/không: lỗ bị bịt).</li>
+  <li><strong>Ngàm mặt dưới</strong>: dùng robot sẵn có giữ sản phẩm trên một camera nhìn lên (chụp khi robot dừng hoặc đi chậm), không cần cơ cấu lật.</li>
+</ul>
+
+<h3>7. Câu hỏi cho khách hàng</h3>
+<ol>
+  <li><strong>Lỗi</strong>: Có danh mục lỗi chính thức của khách hàng điện tử không? Xin bản sao và 20–50 mẫu mỗi loại lỗi, cộng 100+ mẫu OK của cả hai màu.</li>
+  <li>Vết đen 0,3 mm đo thế nào (đường kính tương đương, chiều dài lớn nhất)? Có giới hạn số vết không? Vùng nào trên sản phẩm là "mặt A" quan trọng?</li>
+  <li>Với vỏ đen, "vết đen" có còn là lỗi không? Hiện QC phát hiện bằng cách nào?</li>
+  <li>Trầy xước: kích thước tối thiểu, có phân biệt theo vùng không? Có mẫu giới hạn (limit sample) đã được khách hàng ký duyệt chưa?</li>
+  <li>Mục tiêu lọt lỗi cụ thể là bao nhiêu ppm? Tỷ lệ loại nhầm chấp nhận được là bao nhiêu % (để người QC còn lại kiểm lại kịp)?</li>
+  <li><strong>Sản xuất</strong>: Có bao nhiêu mã sản phẩm sẽ chạy trên máy này trong 2 năm tới? Đổi màu bao lâu một lần?</li>
+  <li>Robot hãng gì, điều khiển ra sao, có thể thêm điểm dừng trên camera không? Ai được phép sửa chương trình robot?</li>
+  <li>Sản phẩm NG xử lý thế nào: thùng loại riêng theo loại lỗi, hay chỉ một thùng? Có cần ghi số cavity không (khuôn có khắc số cavity không)?</li>
+  <li><strong>Đo lỗ</strong>: hiện đo bằng gì, tần suất ra sao, đã từng có lỗ sai kích thước chưa? Có thể chuyển sang kiểm tra lấy mẫu không?</li>
+  <li><strong>Tích hợp</strong>: PLC máy ép/băng tải hãng gì, giao thức gì? Có cần gửi dữ liệu lên MES/hệ thống quản lý chất lượng không? Lưu ảnh bao lâu?</li>
+  <li><strong>Nghiệm thu</strong>: tiêu chí nghiệm thu là gì, chạy thử bao lâu, ai ký? Khách hàng điện tử có yêu cầu đánh giá hệ thống đo (gauge R&amp;R) không?</li>
+  <li><strong>Thương mại</strong>: "2 tháng" là lắp xong hay nghiệm thu xong? Ngân sách dự kiến cỡ nào để chọn đúng hướng phần cứng?</li>
+</ol>
+
+<h3>8. Hướng giải đề xuất</h3>
+<pre><code class="language-text">Máy ép → Robot gắp 4 sp ──(dừng 0,5 s trên Camera 2 nhìn lên: ngàm, short shot mặt dưới)
+                       └─▶ đặt lên băng tải → Cảm biến quang → Camera 1 nhìn xuống (mặt trên)
+                                                       → PC công nghiệp → PLC → cửa gạt NG
+                                                       → lưu ảnh NG, thống kê theo cavity</code></pre>
+<table>
+  <tr><th>Khối</th><th>Đề xuất sơ bộ</th><th>Ghi chú</th></tr>
+  <tr><td>Camera 1 (mặt trên)</td><td>Đơn sắc, 12 MP (tối thiểu 5 MP), màn trập global, GigE</td><td>Sản phẩm dừng hoặc chạy chậm; nếu chạy, tính thời gian phơi sáng chống nhòe</td></tr>
+  <tr><td>Chiếu sáng mặt trên</td><td>Thử nghiệm: đèn vòm (dome) cho vết đen trên nền nhám; đèn góc thấp cho xước; đèn nền dưới băng tải trong suốt cho biên dạng ba-via</td><td>Có thể cần 2–3 lần chụp với đèn khác nhau cho cùng sản phẩm (thời gian cho phép)</td></tr>
+  <tr><td>Camera 2 (mặt dưới)</td><td>Đơn sắc 2–5 MP, đèn vòng hoặc góc thấp, chụp khi robot dừng</td><td>Kiểm có/không 4 ngàm, short shot</td></tr>
+  <tr><td>Đo lỗ</td><td><strong>Ngoài phạm vi giai đoạn 1</strong>; giai đoạn 1 chỉ kiểm "lỗ thông/không bị bịt". Phương án đo 100%: 2 camera FOV ~15 mm + ống kính telecentric</td><td>Quyết định sau khi khách hàng trả lời câu hỏi 9</td></tr>
+  <tr><td>Xử lý</td><td>PC công nghiệp, Python/OpenCV cho có/không và biên dạng; cân nhắc deep learning hoặc thư viện thương mại cho vết đen/xước nếu luật cổ điển không đạt</td><td>Quyết định sau thử nghiệm khả thi</td></tr>
+  <tr><td>I/O</td><td>I/O số 24 V cho trigger và kết quả; mạng công nghiệp hoặc TCP cho mã lỗi, số cavity</td><td>Theo PLC hiện có</td></tr>
+  <tr><td>Loại hàng</td><td>Cửa gạt hoặc van thổi trên băng tải, thùng NG có khóa</td><td>Sản phẩm NG không được quay lại dòng OK</td></tr>
+</table>
+<p><strong>Phạm vi giai đoạn 1</strong> (cam kết nghiệm thu): ngàm, short shot, ba-via mép ngoài, vết đen trên vỏ trắng, lỗ bị bịt. <strong>Đánh giá thêm</strong> (không cam kết đến khi có kết quả thử): vết đen trên vỏ đen, trầy xước. <strong>Ngoài phạm vi</strong>: đo đường kính lỗ 100%.</p>
+
+<h3>9. Bước tiếp theo</h3>
+<ol>
+  <li>Gửi khách hàng danh sách câu hỏi, xin mẫu (OK + mọi loại lỗi, cả hai màu).</li>
+  <li>Thử nghiệm khả thi 1–2 tuần trong phòng lab: thử đèn, chụp ảnh, đo khoảng hở điểm OK/NG cho từng hạng mục.</li>
+  <li>Báo cáo kết quả thử kèm ảnh, chốt phạm vi giai đoạn 1 với khách hàng bằng văn bản.</li>
+  <li>Viết đặc tả kỹ thuật và tiêu chí nghiệm thu (chặng 5), rồi mới báo giá chính thức và cam kết thời gian.</li>
+</ol>
+<p>Lưu ý về "2 tháng": với hai hạng mục khó còn chưa chắc làm được, cam kết lắp xong toàn bộ trong 2 tháng là rủi ro lớn. Đề xuất mốc: 2–3 tuần thử nghiệm và chốt phạm vi, sau đó mới tính tiến độ thi công.</p>
+</details>
+
+<h2>5. Tự đánh giá</h2>
+<table>
+  <tr><th>Tiêu chí</th><th>Đạt khi</th><th>Điểm</th></tr>
+  <tr><td>Mục tiêu kinh doanh</td><td>Nêu được cả giảm lọt lỗi lẫn giảm người, và nhận ra loại nhầm cao sẽ phá mục tiêu giảm người</td><td>10</td></tr>
+  <tr><td>Bảng hạng mục</td><td>Đủ 6–7 hạng mục, đúng nhóm bài toán, có cột "còn thiếu" và mặt/góc nhìn</td><td>15</td></tr>
+  <tr><td>Tính toán</td><td>FOV có tính lệch vị trí và biên; mm/px theo cả hai chiều; kết luận đúng về ba-via và đo lỗ; tính chu kỳ 7,5 s</td><td>20</td></tr>
+  <tr><td>Rủi ro</td><td>Có ít nhất 5 rủi ro, có chấm điểm, có cách giảm cho rủi ro cao; nhận ra vấn đề vỏ đen và "mọi lỗi"</td><td>15</td></tr>
+  <tr><td>Câu hỏi</td><td>Ít nhất 10 câu, phủ đủ nhóm: lỗi, sản xuất, đo lường, tích hợp, nghiệm thu, thương mại</td><td>15</td></tr>
+  <tr><td>Hướng giải</td><td>Có góc nhìn mặt dưới, đèn hợp lý cho từng loại lỗi, chọn công cụ có lý do, xác định phạm vi giai đoạn 1 và ngoài phạm vi</td><td>15</td></tr>
+  <tr><td>Bước tiếp theo</td><td>Có thử nghiệm khả thi với mẫu thật trước khi báo giá; xử lý thẳng thắn mốc 2 tháng</td><td>10</td></tr>
+</table>
+<p>Từ 80/100 trở lên: bạn đã phân tích như một kỹ sư ứng dụng (application engineer) có kinh nghiệm. Dưới 60: đọc lại bài 2 của chặng, đặc biệt phần con số độ phân giải và bảng chấm độ khó.</p>
+
+<h2>6. Mở rộng</h2>
+<ul>
+  <li>Viết <strong>email trả lời</strong> khách hàng (tối đa 1 trang): cảm ơn, tóm tắt hiểu biết, nêu 5 câu hỏi quan trọng nhất, đề xuất buổi thử nghiệm với mẫu thật. Đây là kỹ năng giao tiếp quan trọng ngang kỹ năng kỹ thuật.</li>
+  <li>Tạo ảnh mô phỏng vỏ trắng có vân nhám (nhiễu Gauss lọc mờ) với vài vết đen 0,3 mm ở độ phân giải 0,057 mm/px; thử phát hiện bằng black-hat (morphology) + blob và đo khoảng hở điểm giữa vết đen và vân nhám.</li>
+  <li>Phân tích thêm một yêu cầu khác cùng mẫu phiếu: "kiểm tra hộp sữa giấy có ống hút dán đúng vị trí và in đúng hạn sử dụng, 12.000 hộp/giờ". Lưu ý chu kỳ lúc này chỉ còn 300 ms.</li>
+</ul>
+<p>Hoàn thành bài này là xong chặng 4. Chặng tiếp theo bắt đầu với bài <strong>Trigger, encoder và cycle time</strong>.</p>

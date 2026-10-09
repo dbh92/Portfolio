@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="vi" data-root="../">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Template matching trong OpenCV: định vị chi tiết trên dây chuyền</title>
+<meta name="description" content="Dùng matchTemplate đúng cách: chọn phương pháp chịu thay đổi ánh sáng, tìm nhiều vật với NMS, tăng tốc bằng kim tự tháp và dời ROI theo vị trí vật.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://hocfree.vn/hoc/do-luong-2-template-matching.html">
+<meta property="og:site_name" content="HọcFree">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Template matching trong OpenCV: định vị chi tiết trên dây chuyền">
+<meta property="og:description" content="Dùng matchTemplate đúng cách: chọn phương pháp chịu thay đổi ánh sáng, tìm nhiều vật với NMS, tăng tốc bằng kim tự tháp và dời ROI theo vị trí vật.">
+<meta property="og:url" content="https://hocfree.vn/hoc/do-luong-2-template-matching.html">
+<meta property="og:image" content="https://hocfree.vn/assets/images/posts/do-luong-2-template-matching.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="Template matching trong OpenCV: định vị chi tiết trên dây chuyền">
+<meta property="og:locale" content="vi_VN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Template matching trong OpenCV: định vị chi tiết trên dây chuyền">
+<meta name="twitter:description" content="Dùng matchTemplate đúng cách: chọn phương pháp chịu thay đổi ánh sáng, tìm nhiều vật với NMS, tăng tốc bằng kim tự tháp và dời ROI theo vị trí vật.">
+<meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/do-luong-2-template-matching.jpg">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/fonts.css?v=20261009">
+<link rel="stylesheet" href="../assets/css/style.css?v=20261009">
+<script>try{var t=localStorage.getItem('hf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
+<meta property="article:published_time" content="2026-10-09">
+<meta property="article:section" content="Học AI &amp; Lập trình">
+<meta property="article:tag" content="Machine Vision">
+<meta property="article:tag" content="OpenCV">
+<meta property="article:tag" content="Python">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "Template matching trong OpenCV: định vị chi tiết trên dây chuyền", "description": "Dùng matchTemplate đúng cách: chọn phương pháp chịu thay đổi ánh sáng, tìm nhiều vật với NMS, tăng tốc bằng kim tự tháp và dời ROI theo vị trí vật.", "image": ["https://hocfree.vn/assets/images/posts/do-luong-2-template-matching.jpg"], "datePublished": "2026-10-09", "dateModified": "2026-10-09", "inLanguage": "vi", "articleSection": "Học AI & Lập trình", "keywords": "Machine Vision, OpenCV, Python", "wordCount": 4909, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/hoc/do-luong-2-template-matching.html"}, "isPartOf": {"@type": "Course", "name": "Trở thành Vision Engineer", "url": "https://hocfree.vn/lo-trinh/vision-engineer.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Learning Paths", "item": "https://hocfree.vn/lo-trinh/"}, {"@type": "ListItem", "position": 3, "name": "Trở thành Vision Engineer", "item": "https://hocfree.vn/lo-trinh/vision-engineer.html"}, {"@type": "ListItem", "position": 4, "name": "Chặng 7: Measurement / Matching / OCR", "item": "https://hocfree.vn/lo-trinh/vision-engineer/measurement-matching-ocr.html"}, {"@type": "ListItem", "position": 5, "name": "Template matching trong OpenCV: định vị chi tiết trên dây chuyền"}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div class="progress" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="container wide header-top">
+    <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="nav-scrim" hidden></div>
+    <a class="logo" href="../" aria-label="HọcFree – Trang chủ"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+    <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
+    <div class="header-actions">
+      <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="login-link" href="../dang-nhap.html">Đăng nhập</a>
+      <a class="btn start-btn" href="../lo-trinh/">Bắt đầu học</a>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="container wide">
+      <nav class="site-nav" id="site-nav" aria-label="Menu chính">
+        <div class="drawer-head">
+          <a class="logo" href="../" tabindex="-1"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+          <button class="icon-btn nav-close" aria-label="Đóng menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <button type="button" class="drawer-search search-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Tìm bài học, chủ đề…</span></button>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="../">Trang chủ</a></li><li class="nav-item has-panel is-mega"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-hoc">Học AI &amp; Lập trình<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel mega" id="nav-panel-hoc">
+  <div class="container wide mega-inner">
+    <div class="mega-groups"><div class="mega-group"><a class="mega-group-title" href="../hoc/#programming">Programming</a><ul><li><a href="../hoc/python.html">Python</a></li><li><a href="../hoc/csharp.html">C#</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#ai-machine-learning">AI &amp; Machine Learning</a><ul><li><a href="../hoc/machine-learning.html">Machine Learning</a></li><li><a href="../hoc/deep-learning.html">Deep Learning</a></li><li><a href="../hoc/pytorch.html">PyTorch</a></li><li><a href="../hoc/generative-ai.html">Generative AI</a></li><li><a href="../hoc/llm-ai-agents.html">LLM / AI Agents</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#computer-vision">Computer Vision</a><ul><li><a href="../hoc/opencv.html">OpenCV</a></li><li><a href="../hoc/image-processing.html">Image Processing</a></li><li><a href="../hoc/computer-vision.html">Computer Vision</a></li><li><a href="../hoc/ocr.html">OCR</a></li><li><a href="../hoc/object-detection.html">Object Detection</a></li><li><a href="../hoc/segmentation.html">Segmentation</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#vision-engineering">Vision Engineering</a><ul><li><a href="../hoc/machine-vision.html">Machine Vision</a></li><li><a href="../hoc/ai-vision.html">AI Vision</a></li><li><a href="../hoc/industrial-vision.html">Industrial Vision</a></li><li><a href="../hoc/camera-lens.html">Camera &amp; Lens</a></li><li><a href="../hoc/lighting.html">Lighting</a></li><li><a href="../hoc/calibration.html">Calibration</a></li><li><a href="../hoc/plc-robot-mes.html">PLC / Robot / MES</a></li><li><a href="../hoc/vision-deployment.html">Vision Deployment</a></li></ul></div></div>
+    <a class="feature-card" href="../lo-trinh/vision-engineer.html">
+  <span class="feature-eyebrow">⭐ Learning Path nổi bật</span>
+  <span class="feature-title">Trở thành Vision Engineer</span>
+  <span class="feature-sub">Machine Vision + AI Vision + Industrial Automation</span>
+  <span class="feature-desc">Lộ trình thực chiến từ Python, OpenCV và Machine Vision đến Deep Learning, AI Vision, Camera, PLC, Robot và triển khai hệ thống Vision trong nhà máy.</span>
+  <span class="feature-chain" aria-label="Các chặng chính"><span>Python</span><i aria-hidden="true">→</i><span>OpenCV</span><i aria-hidden="true">→</i><span>Machine Vision</span><i aria-hidden="true">→</i><span>AI Vision</span><i aria-hidden="true">→</i><span class="chain-goal">🎯 Vision Engineer</span></span>
+  <span class="feature-meta">14 chặng · 5 giai đoạn · ~12 tháng</span>
+  <span class="feature-cta">Xem lộ trình →</span>
+</a>
+  </div>
+  <div class="mega-foot"><div class="container wide mega-foot-inner"><ol class="journey compact" aria-label="Học, thực hành, trở thành kỹ sư"><li><a href="../hoc/" aria-current="step"><span class="journey-n">1</span><span class="journey-t"><b>Học</b><small>Học AI &amp; Lập trình</small></span></a></li><li><a href="../projects/"><span class="journey-n">2</span><span class="journey-t"><b>Thực hành</b><small>Projects</small></span></a></li><li><a href="../lo-trinh/"><span class="journey-n">3</span><span class="journey-t"><b>Trở thành kỹ sư</b><small>Learning Paths</small></span></a></li></ol><a class="panel-all" href="../hoc/">Xem tất cả Học AI &amp; Lập trình →</a></div></div>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-projects">Projects<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-projects">
+  <p class="panel-kicker"><span>Bước 2 · Thực hành</span>Áp dụng vào dự án thật</p>
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../projects/ai-projects.html"><span class="drop-label">AI Projects</span><span class="drop-desc">Ứng dụng ML và LLM, từ ý tưởng đến bản demo</span></a></li><li><a class="drop-link" href="../projects/computer-vision-projects.html"><span class="drop-label">Computer Vision Projects</span><span class="drop-desc">Phát hiện, nhận dạng và theo dõi đối tượng</span></a></li><li><a class="drop-link" href="../projects/industrial-vision-projects.html"><span class="drop-label">Industrial Vision Projects</span><span class="drop-desc">Đo kích thước, kiểm tra lỗi, đọc mã trên dây chuyền</span></a></li></ul></div></div>
+  <a class="panel-all" href="../projects/">Xem tất cả Projects →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger is-active" aria-expanded="false" aria-controls="nav-panel-lo-trinh" aria-current="true">Learning Paths<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-lo-trinh">
+  <p class="panel-kicker"><span>Bước 3 · Trở thành kỹ sư</span>Định hướng nghề nghiệp</p>
+  <ul class="drop-list"><li><a class="drop-link is-flagship" href="../lo-trinh/vision-engineer.html"><span class="drop-label">⭐ Trở thành Vision Engineer</span><span class="drop-desc">Machine Vision + AI Vision + Industrial Automation · 14 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/#python-developer"><span class="drop-label">Python Developer<span class="badge-soon">Sắp ra mắt</span></span><span class="drop-desc">Python, công cụ, tự động hóa</span></a></li></ul>
+  <a class="panel-all" href="../lo-trinh/">Xem tất cả lộ trình →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-kien-thuc">Kiến thức<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-kien-thuc">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Lĩnh vực</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/programming.html"><span class="drop-label">Programming</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-machine-learning.html"><span class="drop-label">AI / Machine Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/deep-learning.html"><span class="drop-label">Deep Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/machine-vision.html"><span class="drop-label">Machine Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-vision.html"><span class="drop-label">AI Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/industrial-automation.html"><span class="drop-label">Industrial Automation</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Công cụ &amp; mẹo</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/tools-frameworks.html"><span class="drop-label">Tools &amp; Frameworks</span></a></li><li><a class="drop-link" href="../kien-thuc/tips-tricks.html"><span class="drop-label">Tips &amp; Tricks</span></a></li></ul></div></div>
+  <a class="panel-all" href="../kien-thuc/">Xem tất cả Kiến thức →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tin-tuc-ai">Tin tức AI<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tin-tuc-ai">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tin-tuc-ai/ai-news.html"><span class="drop-label">AI News</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-models.html"><span class="drop-label">AI Models</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/technology.html"><span class="drop-label">Technology</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/robotics.html"><span class="drop-label">Robotics</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-industry.html"><span class="drop-label">AI Industry</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tin-tuc-ai/">Xem tất cả Tin tức AI →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-ngoai-ngu">Ngoại ngữ<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-ngoai-ngu">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/english.html"><span class="drop-label">English</span><span class="drop-desc">Lộ trình 700 TOEIC, phương pháp học, giáo trình HF-700TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chinese.html"><span class="drop-label">Chinese</span><span class="drop-desc">Lộ trình HSK3, phương pháp học, giáo trình HF-HSK3</span></a></li></ul></div></div>
+  <a class="panel-all" href="../ngoai-ngu/">Xem tất cả Ngoại ngữ →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tai-nguyen">Tài nguyên<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tai-nguyen">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tai-nguyen/source-code.html"><span class="drop-label">Source Code</span><span class="drop-desc">Mã nguồn mẫu đi kèm bài học</span></a></li><li><a class="drop-link" href="../tai-nguyen/dataset.html"><span class="drop-label">Dataset</span><span class="drop-desc">Bộ dữ liệu ảnh để luyện tập</span></a></li><li><a class="drop-link" href="../tai-nguyen/cheat-sheets.html"><span class="drop-label">Cheat Sheets</span><span class="drop-desc">Tóm tắt nhanh trong một trang</span></a></li><li><a class="drop-link" href="../tai-nguyen/documentation.html"><span class="drop-label">Documentation</span><span class="drop-desc">Tài liệu tra cứu thư viện, API</span></a></li><li><a class="drop-link" href="../tai-nguyen/ebook.html"><span class="drop-label">Ebook / Tài liệu</span><span class="drop-desc">Sách và tài liệu tham khảo</span></a></li><li><a class="drop-link" href="../tai-nguyen/ai-tools.html"><span class="drop-label">AI Tools</span><span class="drop-desc">Công cụ AI hữu ích cho việc học</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tai-nguyen/">Xem tất cả Tài nguyên →</a>
+</div></li></ul>
+        <div class="drawer-foot">
+          <a class="btn ghost" href="../dang-nhap.html">Đăng nhập</a>
+          <a class="btn" href="../lo-trinh/">Bắt đầu học</a>
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+<div class="search-dialog" hidden>
+  <div class="search-scrim"></div>
+  <div class="search-box" role="dialog" aria-modal="true" aria-label="Tìm kiếm">
+    <form class="search-form" action="../search.html" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" placeholder="Tìm bài học, chủ đề, bài viết…" autocomplete="off" aria-label="Từ khóa tìm kiếm" aria-controls="search-suggest">
+      <button type="button" class="icon-btn search-close" aria-label="Đóng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </form>
+    <div class="search-suggest" id="search-suggest" aria-live="polite">
+      <div class="search-empty">
+        <p class="search-group-title">Chủ đề phổ biến</p>
+        <div class="chips"><a class="chip" href="../hoc/python.html">Python</a><a class="chip" href="../hoc/opencv.html">OpenCV</a><a class="chip" href="../hoc/machine-vision.html">Machine Vision</a><a class="chip" href="../hoc/deep-learning.html">Deep Learning</a><a class="chip" href="../hoc/ai-vision.html">AI Vision</a><a class="chip" href="../hoc/object-detection.html">Object Detection</a><a class="chip" href="../hoc/pytorch.html">PyTorch</a><a class="chip" href="../ngoai-ngu/english.html">English</a></div>
+        <p class="search-group-title">Lộ trình nổi bật</p>
+        <a class="search-item" href="../lo-trinh/vision-engineer.html"><span class="search-ico" aria-hidden="true">⭐</span><span>Trở thành Vision Engineer<small>Learning Path · Machine Vision + AI Vision + Industrial Automation</small></span></a>
+      </div>
+    </div>
+    <div class="search-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> chọn</span><span><kbd>Enter</kbd> mở</span><span><kbd>Esc</kbd> đóng</span></div>
+  </div>
+</div>
+<main id="main">
+  <div class="container layout article-layout">
+    <article class="article">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../lo-trinh/">Learning Paths</a><span>/</span><a href="../lo-trinh/vision-engineer.html">Vision Engineer</a><span>/</span><a href="../lo-trinh/vision-engineer/measurement-matching-ocr.html">Chặng 7: Measurement / Matching / OCR</a></nav>
+      <header class="article-head">
+        <div class="course-bar" data-course="vision-engineer"><a class="course-chip" href="../lo-trinh/vision-engineer/measurement-matching-ocr.html">⭐ Vision Engineer · Chặng 7</a><span class="lesson-no">Bài 2/8</span><span class="kind kind-lesson">Bài học</span><span class="lesson-min"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></svg>~75 phút</span></div>
+        <h1>Template matching trong OpenCV: định vị chi tiết trên dây chuyền</h1>
+        <p class="lead">Dùng matchTemplate đúng cách: chọn phương pháp chịu thay đổi ánh sáng, tìm nhiều vật với NMS, tăng tốc bằng kim tự tháp và dời ROI theo vị trí vật.</p>
+        <div class="article-meta">
+          <span class="avatar" aria-hidden="true">HF</span>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>28 phút đọc</span></div>
+        </div>
+      </header>
+      <figure class="article-cover">
+        <img src="../assets/images/posts/do-luong-2-template-matching.webp" alt="Template matching trong OpenCV: định vị chi tiết trên dây chuyền" width="1200" height="675" fetchpriority="high" decoding="async">
+      </figure>
+      <section class="lesson-goals" aria-label="Mục tiêu bài học"><h2>Học xong bài này, bạn sẽ</h2><ul><li>Dùng matchTemplate và chọn phương pháp</li><li>Tìm nhiều đối tượng, loại trùng</li><li>Hiểu giới hạn khi vật xoay, đổi tỉ lệ</li></ul><p class="goals-before">Nên học trước: <a href="../hoc/do-luong-1-do-canh-subpixel-fitting.html">Đo cạnh subpixel, fitting đường thẳng và đường tròn</a></p></section>
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol class="toc-plain"><li><a href="#1-anh-mau-bo-mach-co-5-con-chip">1. Ảnh mẫu: bo mạch có 5 con chip</a></li><li><a href="#2-matchtemplate-va-minmaxloc">2. matchTemplate và minMaxLoc</a></li><li><a href="#3-chon-phuong-phap-so-khop">3. Chọn phương pháp so khớp</a></li><li><a href="#4-tim-nhieu-vat-va-loai-trung-nms">4. Tìm nhiều vật và loại trùng (NMS)</a></li><li><a href="#5-vi-tri-subpixel-cua-dinh">5. Vị trí subpixel của đỉnh</a></li><li><a href="#6-tang-toc-bang-kim-tu-thap-anh-coarse-to-fine">6. Tăng tốc bằng kim tự tháp ảnh (coarse-to-fine)</a></li><li><a href="#7-gioi-han-vat-xoay-va-doi-ti-le">7. Giới hạn: vật xoay và đổi tỉ lệ</a></li><li><a href="#8-tham-so-mask-bo-qua-phan-nen-trong-template">8. Tham số mask: bỏ qua phần nền trong template</a></li><li><a href="#9-doi-roi-theo-vi-tri-vat-position-tracking">9. Dời ROI theo vị trí vật (position tracking)</a></li><li><a href="#10-loi-thuong-gap">10. Lỗi thường gặp</a></li><li><a href="#bai-tap">Bài tập</a></li><li><a href="#tom-tat">Tóm tắt</a></li></ol></details>
+      <div class="prose">
+<p>Bài đo cạnh subpixel giả định bạn biết cạnh nằm ở đâu để đặt đường quét. Trên dây chuyền thật, vật không bao giờ nằm đúng một chỗ: đồ gá có khe hở, băng tải xê dịch vài milimét, khay linh kiện lệch. Vì vậy hầu hết chương trình kiểm tra bắt đầu bằng bước <strong>định vị</strong> (locate): tìm vật trong ảnh, rồi dời mọi công cụ đo, kiểm tra theo vị trí đó. Công cụ định vị đơn giản và nhanh nhất là <strong>template matching</strong>: lấy một ảnh mẫu nhỏ (template) và trượt nó trên toàn ảnh để tìm chỗ giống nhất. Bài này dạy bạn dùng nó đúng cách, và quan trọng không kém, biết khi nào nó <em>không</em> dùng được.</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Viết được hàm tìm tất cả chi tiết giống mẫu trong ảnh, trả về vị trí và điểm số, loại kết quả trùng; chọn đúng phương pháp so khớp khi ánh sáng thay đổi; dời vùng kiểm tra (ROI) theo vị trí tìm được; và đo được giới hạn khi vật xoay hoặc đổi tỉ lệ.</div>
+
+<h2 id="1-anh-mau-bo-mach-co-5-con-chip">1. Ảnh mẫu: bo mạch có 5 con chip</h2>
+<p>Ta tạo một bo mạch giả: nền xám có đường mạch (trace), độ sáng thay đổi chậm, một nhãn trắng sáng, và 5 con chip giống hệt nhau ở các vị trí biết trước. Template là ảnh của một con chip chụp trên "mẫu chuẩn" (golden sample), có viền nền xung quanh.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+
+def ve_chip():
+    """Ảnh mẫu 56×80: thân chip tối, 2 hàng chân sáng, chấm đánh dấu chân 1, chữ IC7."""
+    c = np.full((56, 80), 120, np.uint8)                       # nền bo mạch quanh chip
+    cv2.rectangle(c, (12, 10), (67, 45), 45, -1)                # thân chip
+    for i in range(6):
+        x = 16 + i * 9
+        cv2.rectangle(c, (x, 3), (x + 4, 9), 205, -1)           # chân trên
+        cv2.rectangle(c, (x, 46), (x + 4, 52), 205, -1)         # chân dưới
+    cv2.circle(c, (20, 18), 3, 150, -1)                         # chấm chân 1
+    cv2.putText(c, "IC7", (30, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.45, 150, 1, cv2.LINE_AA)
+    return c
+
+
+def ve_nen(rng, h=480, w=640):
+    y, x = np.mgrid[0:h, 0:w]
+    nen = (120 + 10 * np.sin(x / 90.0) + 8 * np.cos(y / 70.0)).astype(np.float32)
+    for _ in range(25):                                         # đường mạch ngang / dọc
+        x1, y1 = int(rng.integers(0, w)), int(rng.integers(0, h))
+        if rng.random() &lt; 0.5:
+            x2, y2 = x1 + int(rng.integers(-200, 200)), y1
+        else:
+            x2, y2 = x1, y1 + int(rng.integers(-200, 200))
+        cv2.line(nen, (x1, y1), (x2, y2), 150, 3)
+    return nen
+
+
+rng = np.random.default_rng(7)
+nen = ve_nen(rng)
+cv2.rectangle(nen, (470, 330), (610, 450), 235, -1)             # nhãn trắng
+chip = ve_chip()
+VI_TRI = [(40, 40), (300, 60), (150, 250), (420, 200), (60, 380)]  # góc trên-trái từng chip
+for x, y in VI_TRI:
+    o = nen[y:y + 56, x:x + 80]
+    nen[y:y + 56, x:x + 80] = np.where(chip != 120, chip, o)     # chỉ dán phần chip, giữ nền
+anh = np.clip(nen + rng.normal(0, 4, nen.shape), 0, 255).astype(np.uint8)
+cv2.imwrite("bo_mach.png", anh)
+cv2.imwrite("mau_chip.png", chip)
+print("Đã lưu bo_mach.png", anh.shape, "và mau_chip.png", chip.shape)</code></pre>
+<pre><code class="language-text">Đã lưu bo_mach.png (480, 640) và mau_chip.png (56, 80)</code></pre>
+
+<h2 id="2-matchtemplate-va-minmaxloc">2. matchTemplate và minMaxLoc</h2>
+<p><code>cv2.matchTemplate(anh, mau, phuong_phap)</code> đặt template lên mọi vị trí có thể và tính một điểm số. Kết quả là ảnh điểm số kích thước <strong>(H − h + 1) × (W − w + 1)</strong>; giá trị tại (x, y) ứng với template đặt có <strong>góc trên-trái</strong> tại (x, y), không phải tâm. <code>cv2.minMaxLoc</code> trả về giá trị nhỏ nhất, lớn nhất và vị trí của chúng.</p>
+<pre><code class="language-python">import cv2
+
+anh = cv2.imread("bo_mach.png", cv2.IMREAD_GRAYSCALE)
+mau = cv2.imread("mau_chip.png", cv2.IMREAD_GRAYSCALE)
+h, w = mau.shape
+
+kq = cv2.matchTemplate(anh, mau, cv2.TM_CCOEFF_NORMED)
+print("ảnh", anh.shape, "| mẫu", mau.shape, "| bản đồ điểm", kq.shape)
+min_v, max_v, min_loc, max_loc = cv2.minMaxLoc(kq)
+x, y = max_loc
+print(f"tốt nhất tại góc trên-trái ({x}, {y}), tâm ({x + w / 2:.1f}, {y + h / 2:.1f}), điểm {max_v:.4f}")
+
+ve = cv2.cvtColor(anh, cv2.COLOR_GRAY2BGR)
+cv2.rectangle(ve, (x, y), (x + w, y + h), (0, 255, 0), 2)
+cv2.imwrite("ket_qua_1.png", ve)</code></pre>
+<pre><code class="language-text">ảnh (480, 640) | mẫu (56, 80) | bản đồ điểm (425, 561)
+tốt nhất tại góc trên-trái (150, 250), tâm (190.0, 278.0), điểm 0.9962</code></pre>
+<p>Kết quả trúng một trong 5 chip (vị trí (150, 250) có trong danh sách). Với 5 chip giống nhau, chip nào có điểm cao nhất chỉ phụ thuộc nhiễu và nền xung quanh, nên <code>minMaxLoc</code> chỉ hợp khi trong ảnh có <strong>đúng một</strong> vật cần tìm. Mục 4 xử lý trường hợp nhiều vật.</p>
+
+<h2 id="3-chon-phuong-phap-so-khop">3. Chọn phương pháp so khớp</h2>
+<p>OpenCV có 6 phương pháp. Gọi T là template, I là vùng ảnh dưới template, tổng lấy trên mọi pixel của template:</p>
+<table>
+  <tr><th>Phương pháp</th><th>Công thức (ý tưởng)</th><th>Tốt nhất là</th><th>Bất biến với</th></tr>
+  <tr><td><code>TM_SQDIFF</code></td><td>Σ (T − I)²</td><td>nhỏ nhất (0 = giống hệt)</td><td>không</td></tr>
+  <tr><td><code>TM_SQDIFF_NORMED</code></td><td>Σ (T − I)² / √(ΣT²·ΣI²)</td><td>nhỏ nhất</td><td>gần như không</td></tr>
+  <tr><td><code>TM_CCORR</code></td><td>Σ T·I</td><td>lớn nhất</td><td>không, ưu tiên vùng sáng</td></tr>
+  <tr><td><code>TM_CCORR_NORMED</code></td><td>Σ T·I / √(ΣT²·ΣI²)</td><td>lớn nhất (≤ 1)</td><td>nhân độ sáng (gain)</td></tr>
+  <tr><td><code>TM_CCOEFF</code></td><td>Σ (T − T̄)(I − Ī)</td><td>lớn nhất</td><td>cộng độ sáng (offset)</td></tr>
+  <tr><td><code>TM_CCOEFF_NORMED</code></td><td>tương quan chuẩn hóa (NCC), trong [−1, 1]</td><td>lớn nhất</td><td><strong>cả gain và offset</strong></td></tr>
+</table>
+<p><code>TM_CCOEFF_NORMED</code> chính là <strong>hệ số tương quan</strong> giữa template và vùng ảnh: trừ trung bình (bỏ offset) rồi chia độ lệch chuẩn (bỏ gain). Vì vậy khi đèn yếu đi hoặc mạnh lên, điểm số gần như không đổi và bạn dùng được một ngưỡng cố định, ví dụ 0,8. Hãy kiểm chứng: chạy 6 phương pháp trên ảnh gốc và ảnh tối đi (độ sáng × 0,5 + 15), đo điểm tại một chip và điểm "tốt nhất" ở vùng nền (không có chip).</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+anh = cv2.imread("bo_mach.png", cv2.IMREAD_GRAYSCALE)
+mau = cv2.imread("mau_chip.png", cv2.IMREAD_GRAYSCALE)
+VI_TRI = [(40, 40), (300, 60), (150, 250), (420, 200), (60, 380)]
+toi = np.clip(anh.astype(np.float32) * 0.5 + 15, 0, 255).astype(np.uint8)   # đèn yếu đi
+
+nen = np.ones((anh.shape[0] - 55, anh.shape[1] - 79), bool)                 # vùng không có chip
+for x, y in VI_TRI:
+    nen[max(0, y - 30):y + 30, max(0, x - 40):x + 40] = False
+
+print(f"{'phương pháp':17s} {'ảnh':5s} {'đúng?':6s} {'điểm tại chip':&gt;13s} {'tốt nhất ở nền':&gt;14s}")
+for ten in ["TM_SQDIFF", "TM_SQDIFF_NORMED", "TM_CCORR", "TM_CCORR_NORMED", "TM_CCOEFF", "TM_CCOEFF_NORMED"]:
+    pp = getattr(cv2, ten)
+    for nhan, I in (("gốc", anh), ("tối", toi)):
+        kq = cv2.matchTemplate(I, mau, pp)
+        mn, mx, lmn, lmx = cv2.minMaxLoc(kq)
+        nho_la_tot = pp in (cv2.TM_SQDIFF, cv2.TM_SQDIFF_NORMED)
+        bx, by = lmn if nho_la_tot else lmx
+        dung = any(abs(bx - x) &lt;= 3 and abs(by - y) &lt;= 3 for x, y in VI_TRI)
+        nen_tot = kq[nen].min() if nho_la_tot else kq[nen].max()
+        print(f"{ten:17s} {nhan:5s} {'có' if dung else 'SAI':6s} {kq[40, 40]:13.4g} {nen_tot:14.4g}")</code></pre>
+<pre><code class="language-text">phương pháp       ảnh   đúng?  điểm tại chip tốt nhất ở nền
+TM_SQDIFF         gốc   có         3.406e+05       1.03e+07
+TM_SQDIFF         tối   có         6.901e+06      9.879e+06
+TM_SQDIFF_NORMED  gốc   có          0.006147         0.1923
+TM_SQDIFF_NORMED  tối   có            0.2017         0.2328
+TM_CCORR          gốc   SAI        5.531e+07      1.011e+08
+TM_CCORR          tối   SAI        3.401e+07      5.689e+07
+TM_CCORR_NORMED   gốc   có            0.9982         0.9041
+TM_CCORR_NORMED   tối   có            0.9941         0.9073
+TM_CCOEFF         gốc   có         1.186e+07      4.464e+06
+TM_CCOEFF         tối   có         5.929e+06      2.232e+06
+TM_CCOEFF_NORMED  gốc   có            0.9916         0.4265
+TM_CCOEFF_NORMED  tối   có            0.9915         0.4267</code></pre>
+<p>Đọc bảng như một kỹ sư:</p>
+<ul>
+  <li><code>TM_CCORR</code> <strong>sai cả hai lần</strong>: tích T·I lớn nhất ở nhãn trắng, không phải ở chip. Đừng dùng nó để định vị.</li>
+  <li><code>TM_SQDIFF</code> và <code>TM_CCOEFF</code> vẫn tìm đúng, nhưng giá trị điểm đổi theo độ sáng (SQDIFF tại chip tăng khoảng 20 lần, CCOEFF giảm một nửa), nên không thể đặt một ngưỡng cố định "có chip / không có chip".</li>
+  <li><code>TM_SQDIFF_NORMED</code> vẫn đúng nhưng khi ảnh tối, điểm tại chip (0,20) gần sát điểm tốt nhất ở nền (0,23): biên an toàn gần như mất hết, tối thêm chút nữa là bắt nhầm.</li>
+  <li><code>TM_CCORR_NORMED</code> bất biến với gain, nhưng nền cũng đạt điểm rất cao (khoảng 0,9) vì mọi vùng ảnh đều dương: độ phân biệt kém.</li>
+  <li><code>TM_CCOEFF_NORMED</code>: điểm tại chip không đổi giữa hai ảnh, nền chỉ khoảng 0,4. Đây là lựa chọn mặc định cho định vị công nghiệp.</li>
+</ul>
+<div class="warn"><strong>Template phẳng làm hỏng NCC</strong>Nếu template gần như đồng màu (độ lệch chuẩn bằng 0), mẫu số của <code>TM_CCOEFF_NORMED</code> bằng 0 và điểm số vô nghĩa. Chọn template có chi tiết rõ: góc, chữ, lỗ, cạnh theo cả hai hướng. Một template chỉ có cạnh thẳng đứng sẽ "trượt" dọc theo cạnh mà điểm không đổi, vị trí theo trục dọc không xác định.</div>
+
+<h2 id="4-tim-nhieu-vat-va-loai-trung-nms">4. Tìm nhiều vật và loại trùng (NMS)</h2>
+<p>Cách ngây thơ là lấy mọi vị trí có điểm ≥ ngưỡng. Nhưng quanh mỗi vật, điểm số là một "ngọn đồi": các vị trí lệch 1–2 pixel cũng vượt ngưỡng, nên một chip cho ra hàng chục kết quả. Ta cần <strong>non-maximum suppression</strong> (NMS, loại bỏ không cực đại): sắp xếp ứng viên theo điểm giảm dần, giữ ứng viên tốt nhất, xóa mọi ứng viên chồng lấn nhiều với nó, lặp lại.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+
+def iou(a, b):
+    """Tỉ lệ giao / hợp của hai khung (x, y, w, h)."""
+    x1, y1 = max(a[0], b[0]), max(a[1], b[1])
+    x2, y2 = min(a[0] + a[2], b[0] + b[2]), min(a[1] + a[3], b[1] + b[3])
+    giao = max(0, x2 - x1) * max(0, y2 - y1)
+    return giao / (a[2] * a[3] + b[2] * b[3] - giao)
+
+
+def tim_tat_ca(anh, mau, nguong=0.8, iou_max=0.3):
+    h, w = mau.shape[:2]
+    kq = cv2.matchTemplate(anh, mau, cv2.TM_CCOEFF_NORMED)
+    ys, xs = np.where(kq &gt;= nguong)
+    ung_vien = sorted(zip(kq[ys, xs], xs, ys), reverse=True)     # điểm giảm dần
+    giu = []
+    for s, x, y in ung_vien:
+        hop = (int(x), int(y), w, h)
+        if all(iou(hop, g[1]) &lt;= iou_max for g in giu):
+            giu.append((float(s), hop))
+    return giu, len(ung_vien)
+
+
+anh = cv2.imread("bo_mach.png", cv2.IMREAD_GRAYSCALE)
+mau = cv2.imread("mau_chip.png", cv2.IMREAD_GRAYSCALE)
+ket_qua, so_ung_vien = tim_tat_ca(anh, mau)
+print("số vị trí vượt ngưỡng 0.8:", so_ung_vien, "→ sau NMS:", len(ket_qua))
+for s, (x, y, w, h) in sorted(ket_qua, key=lambda k: (k[1][1] // 100, k[1][0])):   # theo hàng rồi cột
+    print(f"  chip tại ({x:3d}, {y:3d})  điểm {s:.3f}")</code></pre>
+<pre><code class="language-text">số vị trí vượt ngưỡng 0.8: 45 → sau NMS: 5
+  chip tại ( 40,  40)  điểm 0.992
+  chip tại (300,  60)  điểm 0.987
+  chip tại (150, 250)  điểm 0.996
+  chip tại (420, 200)  điểm 0.984
+  chip tại ( 60, 380)  điểm 0.989</code></pre>
+<p>NMS ở trên có độ phức tạp O(N·K) (N ứng viên, K vật giữ lại), đủ nhanh vì N chỉ vài trăm. Nếu ngưỡng thấp làm N lên hàng chục nghìn, hãy lọc trước bằng cực đại cục bộ: chỉ giữ pixel bằng giá trị của <code>cv2.dilate(kq, kernel)</code> tại đó. OpenCV cũng có sẵn <code>cv2.dnn.NMSBoxes(boxes, scores, nguong_diem, nguong_iou)</code> làm đúng việc này (thường dùng với mô hình phát hiện vật ở giai đoạn Deep Learning).</p>
+<div class="tip"><strong>Chọn ngưỡng điểm như thế nào?</strong>Chạy trên vài chục ảnh OK thật, ghi lại điểm thấp nhất của vật đúng (ví dụ 0,93) và điểm cao nhất ở chỗ không có vật (ví dụ 0,45). Đặt ngưỡng ở khoảng giữa, nghiêng về phía vật đúng, ví dụ 0,75. Nếu hai khoảng này sát nhau, đừng chỉnh ngưỡng mà hãy sửa template hoặc chiếu sáng.</div>
+
+<h2 id="5-vi-tri-subpixel-cua-dinh">5. Vị trí subpixel của đỉnh</h2>
+<p>Đỉnh điểm số nằm ở pixel nguyên. Giống như với cạnh ở bài trước, ta nội suy parabol theo x và theo y quanh đỉnh để có vị trí dưới pixel. Thử với chip dời đi một lượng lẻ biết trước (dùng <code>cv2.warpAffine</code> để dịch ảnh 0,4 px theo x và 0,7 px theo y):</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+
+def dinh_subpixel(kq, x, y):
+    """Nội suy parabol 1D theo x và theo y quanh đỉnh (x, y) của bản đồ điểm."""
+    dx = dy = 0.0
+    if 0 &lt; x &lt; kq.shape[1] - 1:
+        a, b, c = kq[y, x - 1], kq[y, x], kq[y, x + 1]
+        dx = 0.5 * (a - c) / (a - 2 * b + c)
+    if 0 &lt; y &lt; kq.shape[0] - 1:
+        a, b, c = kq[y - 1, x], kq[y, x], kq[y + 1, x]
+        dy = 0.5 * (a - c) / (a - 2 * b + c)
+    return x + dx, y + dy
+
+
+anh = cv2.imread("bo_mach.png", cv2.IMREAD_GRAYSCALE)
+mau = cv2.imread("mau_chip.png", cv2.IMREAD_GRAYSCALE)
+for tx, ty in ((0.4, 0.7), (-0.3, 0.2), (0.5, -0.5)):
+    M = np.float32([[1, 0, tx], [0, 1, ty]])
+    dich = cv2.warpAffine(anh, M, (anh.shape[1], anh.shape[0]), flags=cv2.INTER_CUBIC,
+                          borderMode=cv2.BORDER_REFLECT)
+    kq = cv2.matchTemplate(dich, mau, cv2.TM_CCOEFF_NORMED)
+    vung = kq[230:270, 130:170]                                 # quanh chip thứ 3 (150, 250)
+    _, _, _, (x, y) = cv2.minMaxLoc(vung)
+    x, y = x + 130, y + 230
+    sx, sy = dinh_subpixel(kq, x, y)
+    print(f"thật ({150 + tx:.2f}, {250 + ty:.2f}) | nguyên ({x}, {y}) | subpixel ({sx:.2f}, {sy:.2f})")</code></pre>
+<pre><code class="language-text">thật (150.40, 250.70) | nguyên (150, 251) | subpixel (150.33, 250.78)
+thật (149.70, 250.20) | nguyên (150, 250) | subpixel (149.78, 250.14)
+thật (150.50, 249.50) | nguyên (150, 250) | subpixel (150.49, 249.51)</code></pre>
+<p>Sai số giảm từ cỡ 0,5 px xuống cỡ 0,1 px. Đủ tốt để đặt ROI và caliper; nhưng đừng dùng vị trí template matching làm kết quả đo kích thước. Phép đo chính xác luôn làm bằng caliper và fitting trên cạnh thật như bài trước, template chỉ cho biết "đặt thước ở đâu".</p>
+
+<h2 id="6-tang-toc-bang-kim-tu-thap-anh-coarse-to-fine">6. Tăng tốc bằng kim tự tháp ảnh (coarse-to-fine)</h2>
+<p>Chi phí <code>matchTemplate</code> tỉ lệ với (số vị trí) × (số pixel template). Giảm ảnh và template đi 2 lần mỗi chiều thì cả hai giảm 4 lần, tổng chi phí giảm khoảng 16 lần. Ý tưởng <strong>coarse-to-fine</strong>: tìm thô trên ảnh nhỏ (<code>cv2.pyrDown</code> hai lần, tức 1/4 kích thước), rồi tinh chỉnh trên ảnh gốc chỉ trong một cửa sổ nhỏ quanh vị trí thô.</p>
+<pre><code class="language-python">import time
+
+import cv2
+import numpy as np
+
+mau = cv2.imread("mau_chip.png", cv2.IMREAD_GRAYSCALE)
+h, w = mau.shape
+# Ảnh lớn 1200×1600 (gần 2 MP) có đúng một chip, góc trên-trái tại (1013, 677)
+rng = np.random.default_rng(3)
+y, x = np.mgrid[0:1200, 0:1600]
+anh = (120 + 10 * np.sin(x / 90.0) + 8 * np.cos(y / 70.0)).astype(np.float32)
+o = anh[677:733, 1013:1093]
+anh[677:733, 1013:1093] = np.where(mau != 120, mau, o)
+anh = np.clip(anh + rng.normal(0, 4, anh.shape), 0, 255).astype(np.uint8)
+
+
+def tim_day_du(anh, mau):
+    kq = cv2.matchTemplate(anh, mau, cv2.TM_CCOEFF_NORMED)
+    _, s, _, (x, y) = cv2.minMaxLoc(kq)
+    return x, y, s
+
+
+def tim_kim_tu_thap(anh, mau, cap=2, le=6):
+    a, m = anh, mau
+    for _ in range(cap):
+        a, m = cv2.pyrDown(a), cv2.pyrDown(m)
+    _, _, _, (x, y) = cv2.minMaxLoc(cv2.matchTemplate(a, m, cv2.TM_CCOEFF_NORMED))
+    k = 2 ** cap
+    x0, y0 = max(0, x * k - le), max(0, y * k - le)            # cửa sổ tinh chỉnh trên ảnh gốc
+    cua_so = anh[y0:y0 + h + 2 * le, x0:x0 + w + 2 * le]
+    _, s, _, (dx, dy) = cv2.minMaxLoc(cv2.matchTemplate(cua_so, mau, cv2.TM_CCOEFF_NORMED))
+    return x0 + dx, y0 + dy, s
+
+
+for ten, ham in (("đầy đủ", tim_day_du), ("kim tự tháp", tim_kim_tu_thap)):
+    t0 = time.perf_counter()
+    for _ in range(10):
+        x, y, s = ham(anh, mau)
+    ms = (time.perf_counter() - t0) / 10 * 1000
+    print(f"{ten:12s}: ({x}, {y}) điểm {s:.4f}, {ms:.2f} ms/lần")</code></pre>
+<pre><code class="language-text">đầy đủ      : (1013, 677) điểm 0.9877, 68.18 ms/lần
+kim tự tháp : (1013, 677) điểm 0.9877, 5.22 ms/lần</code></pre>
+<p>Thời gian phụ thuộc máy (con số trên chỉ để tham khảo, máy bạn sẽ khác), nhưng việc kim tự tháp nhanh hơn nhiều lần thì ổn định. Vị trí và điểm cuối cùng giống hệt cách đầy đủ vì bước tinh chỉnh chạy trên ảnh gốc. Hai lưu ý:</p>
+<ul>
+  <li>Template ở cấp thô phải còn đủ chi tiết. Template 80×56 xuống 20×14 vẫn nhận ra chip; template 30×20 xuống 8×5 thì gần như mất hết, khi đó chỉ nên dùng 1 cấp.</li>
+  <li>Khi có nhiều vật, ở cấp thô hãy giữ <em>mọi</em> ứng viên vượt một ngưỡng thấp hơn (ví dụ 0,6), rồi tinh chỉnh từng ứng viên ở cấp gốc với ngưỡng thật.</li>
+</ul>
+<p>Với ảnh 5 MP và template lớn, khác biệt còn lớn hơn và thường quyết định trạm có đạt cycle time hay không. OpenCV tự dùng biến đổi Fourier (DFT) cho template lớn, nhưng kim tự tháp vẫn là bước tối ưu quan trọng nhất.</p>
+
+<h2 id="7-gioi-han-vat-xoay-va-doi-ti-le">7. Giới hạn: vật xoay và đổi tỉ lệ</h2>
+<p>Template matching so sánh từng pixel ở <strong>đúng hướng và đúng kích thước</strong> của template. Đo xem điểm số giảm thế nào khi chip xoay hoặc to nhỏ khác đi (ví dụ đổi khoảng cách camera, hoặc lô linh kiện kích thước khác):</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+mau = cv2.imread("mau_chip.png", cv2.IMREAD_GRAYSCALE)
+rng = np.random.default_rng(1)
+
+
+def canh(goc=0.0, ti_le=1.0):
+    """Ảnh 240×320 nền 120 có một chip ở tâm, xoay `goc` độ, phóng `ti_le` lần."""
+    nen = np.full((240, 320), 120, np.uint8)
+    nen[92:148, 120:200] = mau
+    M = cv2.getRotationMatrix2D((160, 120), goc, ti_le)
+    anh = cv2.warpAffine(nen, M, (320, 240), flags=cv2.INTER_LINEAR, borderValue=120)
+    return np.clip(anh + rng.normal(0, 4, anh.shape), 0, 255).astype(np.uint8)
+
+
+print(" biến đổi        điểm cao nhất   tâm tìm được    lệch tâm")
+for goc, tl in ((0, 1), (5, 1), (10, 1), (20, 1), (45, 1), (0, 0.9), (0, 1.1), (0, 0.8)):
+    kq = cv2.matchTemplate(canh(goc, tl), mau, cv2.TM_CCOEFF_NORMED)
+    _, s, _, (x, y) = cv2.minMaxLoc(kq)
+    cx, cy = x + 40, y + 28
+    print(f" xoay {goc:2d}°, ×{tl:.1f}    {s:6.3f}        ({cx:3d}, {cy:3d})       {np.hypot(cx - 160, cy - 120):5.1f} px")</code></pre>
+<pre><code class="language-text">biến đổi        điểm cao nhất   tâm tìm được    lệch tâm
+ xoay  0°, ×1.0     0.997        (160, 120)         0.0 px
+ xoay  5°, ×1.0     0.790        (160, 120)         0.0 px
+ xoay 10°, ×1.0     0.653        (156, 121)         4.1 px
+ xoay 20°, ×1.0     0.502        (160, 120)         0.0 px
+ xoay 45°, ×1.0     0.338        (160, 119)         1.0 px
+ xoay  0°, ×0.9     0.699        (160, 120)         0.0 px
+ xoay  0°, ×1.1     0.721        (160, 120)         0.0 px
+ xoay  0°, ×0.8     0.491        (155, 124)         6.4 px</code></pre>
+<p>Điểm số tụt rất nhanh: xoay 5° còn 0,79, xoay 10° còn 0,65, xoay 20° còn 0,50, gần bằng điểm cao nhất của vùng nền trên bo mạch ở mục 3 (0,43). Đổi tỉ lệ ±10% cũng chỉ còn khoảng 0,7. Vị trí ở đây vẫn gần đúng vì ảnh thử chỉ có một chip trên nền phẳng; trên bo mạch thật, với ngưỡng 0,8 chương trình sẽ báo "không tìm thấy" ngay từ khi chip xoay 5°, còn nếu hạ ngưỡng xuống 0,5 thì sẽ bắt nhầm nền. Với chip này, quy tắc thực tế: template matching thường chỉ tin cậy khi vật xoay trong khoảng vài độ và tỉ lệ thay đổi dưới khoảng 5%. Con số chính xác phụ thuộc kích thước và chi tiết của template: template càng lớn, chi tiết càng mảnh thì càng nhạy với xoay (điểm ở xa tâm dịch nhiều hơn khi xoay).</p>
+<p>Ba cách xử lý khi vật có thể xoay:</p>
+<table>
+  <tr><th>Cách</th><th>Ưu</th><th>Nhược</th></tr>
+  <tr><td>Đồ gá cơ khí giữ góc cố định</td><td>Rẻ nhất, ổn định nhất</td><td>Không phải lúc nào cũng làm được</td></tr>
+  <tr><td>Thư viện template xoay sẵn (mỗi 2–5°) và scale</td><td>Dùng lại được matchTemplate</td><td>Chậm tỉ lệ với số góc × số tỉ lệ</td></tr>
+  <tr><td>Feature matching (ORB) hoặc shape-based matching</td><td>Bất biến xoay, có góc chính xác</td><td>Phức tạp hơn; xem bài tiếp theo</td></tr>
+</table>
+
+<h2 id="8-tham-so-mask-bo-qua-phan-nen-trong-template">8. Tham số mask: bỏ qua phần nền trong template</h2>
+<p>Template luôn là hình chữ nhật, nhưng vật thì không. Với vật tròn (nút nhấn, nắp chai, đầu nối), các góc của template chứa nền, và nếu nền ở dây chuyền khác nền lúc chụp template (băng tải bẩn, khay khác màu), điểm số bị kéo xuống. Tham số <code>mask</code> của <code>matchTemplate</code> chỉ tính các pixel mà mask khác 0.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+# Template: nút tròn có ký hiệu, chụp trên nền phẳng 120
+mau = np.full((61, 61), 120, np.uint8)
+cv2.circle(mau, (30, 30), 26, 60, -1)
+cv2.circle(mau, (30, 30), 26, 200, 3)
+cv2.line(mau, (30, 14), (30, 30), 220, 4)
+cv2.ellipse(mau, (30, 33), (12, 12), 0, -60, 240, 220, 3)      # ký hiệu nút nguồn
+mask = np.zeros_like(mau)
+cv2.circle(mask, (30, 30), 28, 255, -1)                         # chỉ lấy phần nút
+
+# Ảnh sản xuất: nút nằm trên khay có sọc đậm
+rng = np.random.default_rng(5)
+anh = np.full((200, 300), 120, np.uint8)
+anh[:, ::8] = 30
+anh[:, 1::8] = 30                                               # sọc tối
+nut = anh[70:131, 120:181]
+nut[mask &gt; 0] = mau[mask &gt; 0]                                   # dán đúng phần nút
+anh = np.clip(anh + rng.normal(0, 4, anh.shape), 0, 255).astype(np.uint8)
+
+for ten, m in (("không mask", None), ("có mask", mask)):
+    kq = cv2.matchTemplate(anh, mau, cv2.TM_CCOEFF_NORMED, mask=m)
+    kq = np.nan_to_num(kq, nan=-1.0, posinf=-1.0, neginf=-1.0)   # mask có thể sinh NaN ở vùng phẳng
+    _, s, _, (x, y) = cv2.minMaxLoc(kq)
+    print(f"{ten:11s}: tìm thấy tại ({x}, {y}), điểm {s:.3f}   (thật: (120, 70))")</code></pre>
+<pre><code class="language-text">không mask : tìm thấy tại (120, 70), điểm 0.889   (thật: (120, 70))
+có mask    : tìm thấy tại (120, 70), điểm 0.999   (thật: (120, 70))</code></pre>
+<ul>
+  <li>Mask giữ điểm số cao vì chỉ so phần thuộc vật. Không có mask, phần sọc ở góc template làm điểm giảm, và với nền phức tạp hơn có thể làm định vị sai.</li>
+  <li>Tài liệu OpenCV cũ ghi mask chỉ hỗ trợ <code>TM_SQDIFF</code> và <code>TM_CCORR_NORMED</code>; các bản 4.x về sau hỗ trợ mask cho mọi phương pháp. Nếu phải dùng bản cũ, hãy kiểm tra lại trên phiên bản của bạn.</li>
+  <li>Với mask, các vùng ảnh phẳng có thể cho NaN hoặc vô cực (chia cho 0). Luôn lọc bằng <code>np.nan_to_num</code> trước <code>minMaxLoc</code>.</li>
+</ul>
+
+<h2 id="9-doi-roi-theo-vi-tri-vat-position-tracking">9. Dời ROI theo vị trí vật (position tracking)</h2>
+<p>Ứng dụng quan trọng nhất của template matching trong trạm kiểm tra: tạo một <strong>hệ tọa độ gắn với vật</strong> (trong phần mềm thương mại gọi là fixture, position tracking hay alignment). Lúc cài đặt, bạn định nghĩa mọi ROI kiểm tra <em>tương đối</em> so với vị trí template trên ảnh mẫu chuẩn. Lúc chạy, tìm template, tính độ lệch (dx, dy), rồi dời mọi ROI theo đó. Ví dụ: kiểm tra đủ 12 chân của chip, trong khi chip nằm lệch 17 px sang phải và 9 px lên trên so với lúc cài đặt, và chân thứ 4 hàng dưới bị thiếu.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+mau = cv2.imread("mau_chip.png", cv2.IMREAD_GRAYSCALE)
+rng = np.random.default_rng(11)
+
+
+def chup(dx, dy, thieu_chan=None):
+    """Ảnh 200×260 nền 120, chip ở (90+dx, 70+dy); có thể làm mất một chân dưới."""
+    anh = np.full((200, 260), 120, np.uint8)
+    chip = mau.copy()
+    if thieu_chan is not None:
+        x = 16 + thieu_chan * 9
+        chip[46:53, x:x + 5] = 120
+    anh[70 + dy:126 + dy, 90 + dx:170 + dx] = chip
+    return np.clip(anh + rng.normal(0, 4, anh.shape), 0, 255).astype(np.uint8)
+
+
+# --- Cài đặt trên ảnh mẫu chuẩn ---
+chuan = chup(0, 0)
+_, _, _, goc_chuan = cv2.minMaxLoc(cv2.matchTemplate(chuan, mau, cv2.TM_CCOEFF_NORMED))
+ROI_CHAN = [(16 + i * 9, yy, 5, 7) for yy in (3, 46) for i in range(6)]   # tương đối so với template
+print("vị trí template trên ảnh chuẩn:", goc_chuan)
+
+
+def kiem_tra(anh, theo_doi=True):
+    if theo_doi:
+        kq = cv2.matchTemplate(anh, mau, cv2.TM_CCOEFF_NORMED)
+        _, s, _, (x, y) = cv2.minMaxLoc(kq)
+        if s &lt; 0.7:
+            return "NG: không tìm thấy chip", []
+    else:
+        x, y = goc_chuan                                         # ROI cố định như lúc cài đặt
+    thieu = []
+    for i, (rx, ry, rw, rh) in enumerate(ROI_CHAN):
+        sang = anh[y + ry:y + ry + rh, x + rx:x + rx + rw].mean()
+        if sang &lt; 165:                                           # chân đủ phải sáng khoảng 205
+            thieu.append(i)
+    return ("OK" if not thieu else "NG"), thieu
+
+
+san_xuat = chup(17, -9, thieu_chan=3)
+for theo_doi in (False, True):
+    kq, thieu = kiem_tra(san_xuat, theo_doi)
+    print(f"{'có' if theo_doi else 'không'} dời ROI: {kq}, ROI báo thiếu chân: {thieu}")</code></pre>
+<pre><code class="language-text">vị trí template trên ảnh chuẩn: (90, 70)
+không dời ROI: NG, ROI báo thiếu chân: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+có dời ROI: NG, ROI báo thiếu chân: [9]</code></pre>
+<p>Không dời ROI, gần như mọi ROI rơi ra ngoài chân và chương trình báo NG sai hàng loạt (overkill), dù lỗi thật chỉ là một chân (số 9 = chân thứ 4 hàng dưới). Có dời ROI, chỉ đúng chân thiếu bị báo. Đây là cấu trúc của hầu hết chương trình kiểm tra: <strong>định vị → dời công cụ → kiểm tra/đo → quyết định</strong>. Dự án cuối chặng (đọc số seri) cũng định vị vùng chữ theo cách này.</p>
+<div class="tip"><strong>Định vị phải tự kiểm tra chính nó</strong>Nếu điểm định vị thấp hơn ngưỡng, đừng tiếp tục kiểm tra với vị trí sai: báo NG "không định vị được" (hoặc mã lỗi riêng cho PLC) và lưu ảnh. Khi vật có thể xoay, cần thêm góc vào phép dời (ma trận xoay + tịnh tiến); bài sau sẽ lấy được góc đó.</div>
+
+<h2 id="10-loi-thuong-gap">10. Lỗi thường gặp</h2>
+<table>
+  <tr><th>Lỗi</th><th>Triệu chứng</th><th>Cách sửa</th></tr>
+  <tr><td>Nhầm góc trên-trái với tâm</td><td>ROI và khung vẽ lệch nửa template</td><td>Tâm = (x + w/2, y + h/2)</td></tr>
+  <tr><td>Dùng <code>max_loc</code> với <code>TM_SQDIFF</code></td><td>Luôn tìm sai</td><td>SQDIFF: tốt nhất là <code>min_loc</code></td></tr>
+  <tr><td>Template cắt quá sát vật hoặc chứa vùng hay thay đổi (bóng đổ, chữ in lô)</td><td>Điểm dao động giữa các sản phẩm</td><td>Chọn vùng ổn định, có chi tiết theo cả hai hướng; dùng mask</td></tr>
+  <tr><td>Template ảnh màu, ảnh xám hoặc ngược lại</td><td>Lỗi kiểu dữ liệu hoặc số kênh</td><td>Cùng kiểu, cùng số kênh; thường dùng ảnh xám</td></tr>
+  <tr><td>Một ngưỡng cố định cho mọi template</td><td>Template A ổn, template B báo sai</td><td>Thống kê điểm OK/nền riêng cho từng template</td></tr>
+  <tr><td>Vật xoay vài độ mà vẫn dùng template thẳng</td><td>Điểm tụt, thỉnh thoảng không tìm thấy</td><td>Đồ gá, template xoay, hoặc phương pháp bất biến xoay</td></tr>
+</table>
+
+<h2 id="bai-tap">Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Trạm kiểm tra nhãn chai: đèn vòng LED đã dùng 2 năm, độ sáng giảm dần; nắp chai có thể xoay tự do nhưng nhãn luôn dán thẳng. Bạn cần định vị logo trên nhãn. Chọn phương pháp so khớp nào và vì sao? Có cần mask không?</p>
+<details><summary>Xem đáp án</summary>
+<p>Dùng <code>TM_CCOEFF_NORMED</code>: bất biến với gain và offset nên chịu được đèn yếu dần, ngưỡng điểm cố định vẫn dùng được. Logo trên nhãn dán thẳng nên không cần xử lý xoay (việc nắp xoay không ảnh hưởng nếu ROI tìm kiếm chỉ chứa nhãn). Cần mask nếu logo không phải hình chữ nhật và nền nhãn quanh logo có thể thay đổi (ví dụ in mã lô, ngày sản xuất sát logo); nếu xung quanh logo luôn là nền trắng cố định thì không cần. Ngoài ra vẫn nên giám sát độ sáng (bài kiểm soát ánh sáng môi trường) để thay đèn trước khi tương phản quá thấp.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Viết hàm <code>tim_lap(anh, mau, nguong, toi_da)</code> tìm nhiều vật theo cách khác NMS: lặp <code>minMaxLoc</code>, mỗi lần tìm được thì xóa (gán −1) vùng kích thước template quanh đỉnh trên bản đồ điểm, dừng khi điểm &lt; ngưỡng hoặc đủ <code>toi_da</code> vật. So kết quả với mục 4.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import cv2
+
+
+def tim_lap(anh, mau, nguong=0.8, toi_da=20):
+    h, w = mau.shape[:2]
+    kq = cv2.matchTemplate(anh, mau, cv2.TM_CCOEFF_NORMED)
+    ds = []
+    while len(ds) &lt; toi_da:
+        _, s, _, (x, y) = cv2.minMaxLoc(kq)
+        if s &lt; nguong:
+            break
+        ds.append((x, y, round(s, 3)))
+        kq[max(0, y - h // 2):y + h // 2 + 1, max(0, x - w // 2):x + w // 2 + 1] = -1
+    return ds
+
+
+anh = cv2.imread("bo_mach.png", cv2.IMREAD_GRAYSCALE)
+mau = cv2.imread("mau_chip.png", cv2.IMREAD_GRAYSCALE)
+print(sorted(tim_lap(anh, mau)))</code></pre>
+<pre><code class="language-text">[(40, 40, 0.992), (60, 380, 0.989), (150, 250, 0.996), (300, 60, 0.987), (420, 200, 0.984)]</code></pre>
+<p>Cùng 5 vị trí như NMS. Cách này đơn giản, tự nhiên trả về theo thứ tự điểm giảm dần và có giới hạn số vật; nhược điểm là xóa một vùng cố định nên hai vật nằm sát nhau hơn nửa template có thể bị mất một.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Trên ảnh 2448×2048, template 200×150. Bạn muốn hỗ trợ vật xoay ±30° bằng thư viện template xoay. Từ bảng ở mục 7, bước góc nên là bao nhiêu và cần bao nhiêu template? Ước lượng chi phí so với một lần matchTemplate, và đề xuất cách giảm.</p>
+<details><summary>Xem đáp án</summary>
+<p>Ở mục 7, xoay 5° đã làm điểm giảm rõ rệt; để vật nằm giữa hai góc mẫu vẫn có điểm cao, sai lệch tối đa nên khoảng 1–2°, tức bước góc khoảng 2–4°. Lấy bước 2°: từ −30° đến +30° cần 31 template, chi phí khoảng 31 lần một lần matchTemplate. Template 200×150 còn lớn hơn chip trong bài nên càng nhạy với xoay, có thể phải dùng bước nhỏ hơn. Giảm chi phí: (1) kim tự tháp, ở cấp thô template nhỏ hơn nên chịu xoay tốt hơn, dùng bước góc lớn (ví dụ 8°) rồi chỉ tinh chỉnh góc quanh ứng viên tốt ở cấp gốc; (2) giới hạn vùng tìm kiếm bằng ROI; (3) cân nhắc phương pháp bất biến xoay ở bài sau.</p>
+</details>
+</div>
+
+<h2 id="tom-tat">Tóm tắt</h2>
+<ul>
+  <li><code>matchTemplate</code> trả về bản đồ điểm kích thước (H − h + 1) × (W − w + 1), tọa độ là góc trên-trái của template.</li>
+  <li>Mặc định dùng <code>TM_CCOEFF_NORMED</code>: bất biến với gain và offset, điểm trong [−1, 1], đặt ngưỡng cố định được. Tránh <code>TM_CCORR</code>.</li>
+  <li>Nhiều vật: ngưỡng + NMS (hoặc lặp minMaxLoc và xóa vùng). Ngưỡng chọn từ thống kê điểm OK và điểm nền.</li>
+  <li>Nội suy parabol quanh đỉnh cho vị trí subpixel; kim tự tháp ảnh tăng tốc nhiều lần.</li>
+  <li>Template matching nhạy với xoay và đổi tỉ lệ: chỉ tin cậy trong vài độ và vài phần trăm tỉ lệ.</li>
+  <li><code>mask</code> bỏ qua nền trong template; nhớ lọc NaN.</li>
+  <li>Định vị → dời ROI → kiểm tra là khung của hầu hết chương trình kiểm tra.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Feature matching và shape matching khi vật xoay</strong>, giải quyết đúng giới hạn bạn vừa đo ở mục 7.</p>
+
+      </div>
+      <div class="lesson-done" data-course="vision-engineer"><button type="button" class="lesson-done-btn" data-lesson-done="do-luong-2-template-matching" aria-pressed="false"><span class="box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></span><span class="off">Đánh dấu đã học xong</span><span class="on">Đã học xong bài này</span></button><a class="btn lg" href="../hoc/do-luong-3-feature-va-shape-matching.html">Bài tiếp theo<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a></div>
+      <footer class="article-foot">
+        <div class="tags"><a class="tag" href="../search.html?q=Machine Vision">#Machine Vision</a><a class="tag" href="../search.html?q=OpenCV">#OpenCV</a><a class="tag" href="../search.html?q=Python">#Python</a></div>
+        <div class="share">
+      <span>Chia sẻ:</span>
+      <a class="share-btn fb" href="https://www.facebook.com/sharer/sharer.php?u=https://hocfree.vn/hoc/do-luong-2-template-matching.html" target="_blank" rel="noopener" aria-label="Chia sẻ Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8z"/></svg></a>
+      <a class="share-btn x" href="https://twitter.com/intent/tweet?url=https://hocfree.vn/hoc/do-luong-2-template-matching.html" target="_blank" rel="noopener" aria-label="Chia sẻ X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+      <button class="share-btn copy-link" data-url="https://hocfree.vn/hoc/do-luong-2-template-matching.html" aria-label="Sao chép liên kết"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+    </div>
+      </footer>
+      <div class="author-box">
+        <span class="avatar lg" aria-hidden="true">HF</span>
+        <div>
+          <strong>Ban biên tập HọcFree</strong>
+          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và ngoại ngữ, hoàn toàn miễn phí.</p>
+        </div>
+      </div>
+      <nav class="pager lesson-pager" aria-label="Bài học trước/sau"><a class="prev" href="../hoc/do-luong-1-do-canh-subpixel-fitting.html"><span>← Bài trước · Bài 1</span>Đo cạnh subpixel, fitting đường thẳng và đường tròn</a><a class="next" href="../hoc/do-luong-3-feature-va-shape-matching.html"><span>Bài tiếp → · Bài 3</span>Feature matching và shape matching khi vật xoay</a></nav>
+    </article>
+    <aside class="sidebar course-side" data-course="vision-engineer">
+      <section class="widget course-toc">
+        <p class="widget-title">Chặng 7/14 · Vision Engineer</p>
+        <a class="course-toc-title" href="../lo-trinh/vision-engineer/measurement-matching-ocr.html">Measurement / Matching / OCR</a>
+        <div class="lc" data-lesson-count="do-luong-1-do-canh-subpixel-fitting do-luong-2-template-matching do-luong-3-feature-va-shape-matching doc-ma-qr-datamatrix-tren-bao-bi ocr-trong-cong-nghiep ocr-tesseract-tien-xu-ly-anh ocr-deep-learning-paddleocr-easyocr doc-so-seri-linh-kien-ocr-ocv"><div class="lc-bar"><span data-lc-bar></span></div><span data-lc-text>0/8 bài</span></div>
+        <ol class="toc-lessons"><li data-lesson="do-luong-1-do-canh-subpixel-fitting"><a href="../hoc/do-luong-1-do-canh-subpixel-fitting.html"><span class="tn">1</span><span class="tt">Đo cạnh subpixel, fitting đường thẳng và đường tròn</span></a></li><li data-lesson="do-luong-2-template-matching" class="is-current"><a href="../hoc/do-luong-2-template-matching.html" aria-current="page"><span class="tn">2</span><span class="tt">Template matching: định vị chi tiết</span></a></li><li data-lesson="do-luong-3-feature-va-shape-matching"><a href="../hoc/do-luong-3-feature-va-shape-matching.html"><span class="tn">3</span><span class="tt">Feature matching và shape matching khi vật xoay</span></a></li><li data-lesson="doc-ma-qr-datamatrix-tren-bao-bi"><a href="../projects/doc-ma-qr-datamatrix-tren-bao-bi.html"><span class="tn">4</span><span class="tt">Đọc mã QR và DataMatrix</span></a></li><li data-lesson="ocr-trong-cong-nghiep"><a href="../kien-thuc/ocr-trong-cong-nghiep.html"><span class="tn">5</span><span class="tt">OCR và OCV trong công nghiệp</span></a></li><li data-lesson="ocr-tesseract-tien-xu-ly-anh"><a href="../hoc/ocr-tesseract-tien-xu-ly-anh.html"><span class="tn">6</span><span class="tt">OCR với Tesseract và tiền xử lý</span></a></li><li data-lesson="ocr-deep-learning-paddleocr-easyocr"><a href="../hoc/ocr-deep-learning-paddleocr-easyocr.html"><span class="tn">7</span><span class="tt">OCR bằng Deep Learning</span></a></li><li data-lesson="doc-so-seri-linh-kien-ocr-ocv"><a href="../projects/doc-so-seri-linh-kien-ocr-ocv.html"><span class="tn">8</span><span class="tt">Dự án chặng 7: đọc và xác minh số seri</span></a></li></ol>
+        <a class="more" href="../lo-trinh/vision-engineer.html">Xem toàn bộ lộ trình<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a>
+      </section>
+    </aside>
+  </div>
+  <section class="band">
+    <div class="container">
+      <div class="section-title"><h2>Có thể bạn quan tâm</h2></div>
+      <div class="card-grid"><article class="card">
+  <a class="thumb" href="../hoc/python-1-cai-dat-python-va-vs-code.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-1-cai-dat-python-va-vs-code.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-1-cai-dat-python-va-vs-code.html">Python cơ bản: cài Python, VS Code và chạy chương trình đầu tiên</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>7 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/python-2-bien-kieu-du-lieu-toan-tu.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-2-bien-kieu-du-lieu-toan-tu.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-2-bien-kieu-du-lieu-toan-tu.html">Python cơ bản: biến, kiểu dữ liệu và toán tử</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/python-3-re-nhanh-va-vong-lap.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-3-re-nhanh-va-vong-lap.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-3-re-nhanh-va-vong-lap.html">Python cơ bản: rẽ nhánh và vòng lặp</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article></div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <a class="logo" href="../"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+      <p>HọcFree.vn – nền tảng học miễn phí về AI, lập trình, Computer Vision, Machine Vision, tin tức AI và ngoại ngữ dành cho người Việt.</p>
+    </div>
+    <div><h3>Học &amp; thực hành</h3><ul><li><a href="../hoc/">Học AI &amp; Lập trình</a></li><li><a href="../projects/">Projects</a></li><li><a href="../lo-trinh/">Learning Paths</a></li></ul></div>
+    <div><h3>Khám phá</h3><ul><li><a href="../kien-thuc/">Kiến thức</a></li><li><a href="../tin-tuc-ai/">Tin tức AI</a></li><li><a href="../ngoai-ngu/">Ngoại ngữ</a></li><li><a href="../tai-nguyen/">Tài nguyên</a></li></ul></div>
+    <div><h3>Bài mới</h3><ul><li><a href="../hoc/python-1-cai-dat-python-va-vs-code.html">Python cơ bản: cài Python, VS Code và chạy chương trình đầu tiên</a></li><li><a href="../hoc/python-2-bien-kieu-du-lieu-toan-tu.html">Python cơ bản: biến, kiểu dữ liệu và toán tử</a></li><li><a href="../hoc/python-3-re-nhanh-va-vong-lap.html">Python cơ bản: rẽ nhánh và vòng lặp</a></li><li><a href="../hoc/python-4-list-tuple-dict-set.html">Python cơ bản: list, tuple, dict và set</a></li></ul></div>
+    <div>
+      <h3>HọcFree</h3>
+      <ul>
+        <li><a href="../gioi-thieu.html">Giới thiệu</a></li>
+        <li><a href="../search.html">Tìm kiếm</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">© 2026 HọcFree.vn · Kiến thức là để chia sẻ.</div>
+  </div>
+</footer>
+<button class="to-top" aria-label="Lên đầu trang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<script src="../assets/js/search-data.js?v=20261009" defer></script>
+<script src="../assets/js/main.js?v=20261009" defer></script>
+</body>
+</html>

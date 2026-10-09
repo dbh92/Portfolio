@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="vi" data-root="../">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Đo cạnh subpixel, fitting đường thẳng và đường tròn với OpenCV</title>
+<meta name="description" content="Tìm cạnh chính xác dưới 1 pixel bằng caliper, fit đường thẳng và đường tròn bằng bình phương tối thiểu, loại ba via và đánh giá độ lặp lại phép đo.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://hocfree.vn/hoc/do-luong-1-do-canh-subpixel-fitting.html">
+<meta property="og:site_name" content="HọcFree">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Đo cạnh subpixel, fitting đường thẳng và đường tròn với OpenCV">
+<meta property="og:description" content="Tìm cạnh chính xác dưới 1 pixel bằng caliper, fit đường thẳng và đường tròn bằng bình phương tối thiểu, loại ba via và đánh giá độ lặp lại phép đo.">
+<meta property="og:url" content="https://hocfree.vn/hoc/do-luong-1-do-canh-subpixel-fitting.html">
+<meta property="og:image" content="https://hocfree.vn/assets/images/posts/do-luong-1-do-canh-subpixel-fitting.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="Đo cạnh subpixel, fitting đường thẳng và đường tròn với OpenCV">
+<meta property="og:locale" content="vi_VN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Đo cạnh subpixel, fitting đường thẳng và đường tròn với OpenCV">
+<meta name="twitter:description" content="Tìm cạnh chính xác dưới 1 pixel bằng caliper, fit đường thẳng và đường tròn bằng bình phương tối thiểu, loại ba via và đánh giá độ lặp lại phép đo.">
+<meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/do-luong-1-do-canh-subpixel-fitting.jpg">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/fonts.css?v=20261009">
+<link rel="stylesheet" href="../assets/css/style.css?v=20261009">
+<script>try{var t=localStorage.getItem('hf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
+<meta property="article:published_time" content="2026-10-09">
+<meta property="article:section" content="Học AI &amp; Lập trình">
+<meta property="article:tag" content="Machine Vision">
+<meta property="article:tag" content="Đo lường">
+<meta property="article:tag" content="OpenCV">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "Đo cạnh subpixel, fitting đường thẳng và đường tròn với OpenCV", "description": "Tìm cạnh chính xác dưới 1 pixel bằng caliper, fit đường thẳng và đường tròn bằng bình phương tối thiểu, loại ba via và đánh giá độ lặp lại phép đo.", "image": ["https://hocfree.vn/assets/images/posts/do-luong-1-do-canh-subpixel-fitting.jpg"], "datePublished": "2026-10-09", "dateModified": "2026-10-09", "inLanguage": "vi", "articleSection": "Học AI & Lập trình", "keywords": "Machine Vision, Đo lường, OpenCV", "wordCount": 6922, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/hoc/do-luong-1-do-canh-subpixel-fitting.html"}, "isPartOf": {"@type": "Course", "name": "Trở thành Vision Engineer", "url": "https://hocfree.vn/lo-trinh/vision-engineer.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Learning Paths", "item": "https://hocfree.vn/lo-trinh/"}, {"@type": "ListItem", "position": 3, "name": "Trở thành Vision Engineer", "item": "https://hocfree.vn/lo-trinh/vision-engineer.html"}, {"@type": "ListItem", "position": 4, "name": "Chặng 7: Measurement / Matching / OCR", "item": "https://hocfree.vn/lo-trinh/vision-engineer/measurement-matching-ocr.html"}, {"@type": "ListItem", "position": 5, "name": "Đo cạnh subpixel, fitting đường thẳng và đường tròn với OpenCV"}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div class="progress" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="container wide header-top">
+    <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="nav-scrim" hidden></div>
+    <a class="logo" href="../" aria-label="HọcFree – Trang chủ"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+    <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
+    <div class="header-actions">
+      <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="login-link" href="../dang-nhap.html">Đăng nhập</a>
+      <a class="btn start-btn" href="../lo-trinh/">Bắt đầu học</a>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="container wide">
+      <nav class="site-nav" id="site-nav" aria-label="Menu chính">
+        <div class="drawer-head">
+          <a class="logo" href="../" tabindex="-1"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+          <button class="icon-btn nav-close" aria-label="Đóng menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <button type="button" class="drawer-search search-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Tìm bài học, chủ đề…</span></button>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="../">Trang chủ</a></li><li class="nav-item has-panel is-mega"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-hoc">Học AI &amp; Lập trình<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel mega" id="nav-panel-hoc">
+  <div class="container wide mega-inner">
+    <div class="mega-groups"><div class="mega-group"><a class="mega-group-title" href="../hoc/#programming">Programming</a><ul><li><a href="../hoc/python.html">Python</a></li><li><a href="../hoc/csharp.html">C#</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#ai-machine-learning">AI &amp; Machine Learning</a><ul><li><a href="../hoc/machine-learning.html">Machine Learning</a></li><li><a href="../hoc/deep-learning.html">Deep Learning</a></li><li><a href="../hoc/pytorch.html">PyTorch</a></li><li><a href="../hoc/generative-ai.html">Generative AI</a></li><li><a href="../hoc/llm-ai-agents.html">LLM / AI Agents</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#computer-vision">Computer Vision</a><ul><li><a href="../hoc/opencv.html">OpenCV</a></li><li><a href="../hoc/image-processing.html">Image Processing</a></li><li><a href="../hoc/computer-vision.html">Computer Vision</a></li><li><a href="../hoc/ocr.html">OCR</a></li><li><a href="../hoc/object-detection.html">Object Detection</a></li><li><a href="../hoc/segmentation.html">Segmentation</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#vision-engineering">Vision Engineering</a><ul><li><a href="../hoc/machine-vision.html">Machine Vision</a></li><li><a href="../hoc/ai-vision.html">AI Vision</a></li><li><a href="../hoc/industrial-vision.html">Industrial Vision</a></li><li><a href="../hoc/camera-lens.html">Camera &amp; Lens</a></li><li><a href="../hoc/lighting.html">Lighting</a></li><li><a href="../hoc/calibration.html">Calibration</a></li><li><a href="../hoc/plc-robot-mes.html">PLC / Robot / MES</a></li><li><a href="../hoc/vision-deployment.html">Vision Deployment</a></li></ul></div></div>
+    <a class="feature-card" href="../lo-trinh/vision-engineer.html">
+  <span class="feature-eyebrow">⭐ Learning Path nổi bật</span>
+  <span class="feature-title">Trở thành Vision Engineer</span>
+  <span class="feature-sub">Machine Vision + AI Vision + Industrial Automation</span>
+  <span class="feature-desc">Lộ trình thực chiến từ Python, OpenCV và Machine Vision đến Deep Learning, AI Vision, Camera, PLC, Robot và triển khai hệ thống Vision trong nhà máy.</span>
+  <span class="feature-chain" aria-label="Các chặng chính"><span>Python</span><i aria-hidden="true">→</i><span>OpenCV</span><i aria-hidden="true">→</i><span>Machine Vision</span><i aria-hidden="true">→</i><span>AI Vision</span><i aria-hidden="true">→</i><span class="chain-goal">🎯 Vision Engineer</span></span>
+  <span class="feature-meta">14 chặng · 5 giai đoạn · ~12 tháng</span>
+  <span class="feature-cta">Xem lộ trình →</span>
+</a>
+  </div>
+  <div class="mega-foot"><div class="container wide mega-foot-inner"><ol class="journey compact" aria-label="Học, thực hành, trở thành kỹ sư"><li><a href="../hoc/" aria-current="step"><span class="journey-n">1</span><span class="journey-t"><b>Học</b><small>Học AI &amp; Lập trình</small></span></a></li><li><a href="../projects/"><span class="journey-n">2</span><span class="journey-t"><b>Thực hành</b><small>Projects</small></span></a></li><li><a href="../lo-trinh/"><span class="journey-n">3</span><span class="journey-t"><b>Trở thành kỹ sư</b><small>Learning Paths</small></span></a></li></ol><a class="panel-all" href="../hoc/">Xem tất cả Học AI &amp; Lập trình →</a></div></div>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-projects">Projects<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-projects">
+  <p class="panel-kicker"><span>Bước 2 · Thực hành</span>Áp dụng vào dự án thật</p>
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../projects/ai-projects.html"><span class="drop-label">AI Projects</span><span class="drop-desc">Ứng dụng ML và LLM, từ ý tưởng đến bản demo</span></a></li><li><a class="drop-link" href="../projects/computer-vision-projects.html"><span class="drop-label">Computer Vision Projects</span><span class="drop-desc">Phát hiện, nhận dạng và theo dõi đối tượng</span></a></li><li><a class="drop-link" href="../projects/industrial-vision-projects.html"><span class="drop-label">Industrial Vision Projects</span><span class="drop-desc">Đo kích thước, kiểm tra lỗi, đọc mã trên dây chuyền</span></a></li></ul></div></div>
+  <a class="panel-all" href="../projects/">Xem tất cả Projects →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger is-active" aria-expanded="false" aria-controls="nav-panel-lo-trinh" aria-current="true">Learning Paths<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-lo-trinh">
+  <p class="panel-kicker"><span>Bước 3 · Trở thành kỹ sư</span>Định hướng nghề nghiệp</p>
+  <ul class="drop-list"><li><a class="drop-link is-flagship" href="../lo-trinh/vision-engineer.html"><span class="drop-label">⭐ Trở thành Vision Engineer</span><span class="drop-desc">Machine Vision + AI Vision + Industrial Automation · 14 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/#python-developer"><span class="drop-label">Python Developer<span class="badge-soon">Sắp ra mắt</span></span><span class="drop-desc">Python, công cụ, tự động hóa</span></a></li></ul>
+  <a class="panel-all" href="../lo-trinh/">Xem tất cả lộ trình →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-kien-thuc">Kiến thức<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-kien-thuc">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Lĩnh vực</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/programming.html"><span class="drop-label">Programming</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-machine-learning.html"><span class="drop-label">AI / Machine Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/deep-learning.html"><span class="drop-label">Deep Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/machine-vision.html"><span class="drop-label">Machine Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-vision.html"><span class="drop-label">AI Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/industrial-automation.html"><span class="drop-label">Industrial Automation</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Công cụ &amp; mẹo</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/tools-frameworks.html"><span class="drop-label">Tools &amp; Frameworks</span></a></li><li><a class="drop-link" href="../kien-thuc/tips-tricks.html"><span class="drop-label">Tips &amp; Tricks</span></a></li></ul></div></div>
+  <a class="panel-all" href="../kien-thuc/">Xem tất cả Kiến thức →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tin-tuc-ai">Tin tức AI<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tin-tuc-ai">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tin-tuc-ai/ai-news.html"><span class="drop-label">AI News</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-models.html"><span class="drop-label">AI Models</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/technology.html"><span class="drop-label">Technology</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/robotics.html"><span class="drop-label">Robotics</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-industry.html"><span class="drop-label">AI Industry</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tin-tuc-ai/">Xem tất cả Tin tức AI →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-ngoai-ngu">Ngoại ngữ<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-ngoai-ngu">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/english.html"><span class="drop-label">English</span><span class="drop-desc">Lộ trình 700 TOEIC, phương pháp học, giáo trình HF-700TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chinese.html"><span class="drop-label">Chinese</span><span class="drop-desc">Lộ trình HSK3, phương pháp học, giáo trình HF-HSK3</span></a></li></ul></div></div>
+  <a class="panel-all" href="../ngoai-ngu/">Xem tất cả Ngoại ngữ →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tai-nguyen">Tài nguyên<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tai-nguyen">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tai-nguyen/source-code.html"><span class="drop-label">Source Code</span><span class="drop-desc">Mã nguồn mẫu đi kèm bài học</span></a></li><li><a class="drop-link" href="../tai-nguyen/dataset.html"><span class="drop-label">Dataset</span><span class="drop-desc">Bộ dữ liệu ảnh để luyện tập</span></a></li><li><a class="drop-link" href="../tai-nguyen/cheat-sheets.html"><span class="drop-label">Cheat Sheets</span><span class="drop-desc">Tóm tắt nhanh trong một trang</span></a></li><li><a class="drop-link" href="../tai-nguyen/documentation.html"><span class="drop-label">Documentation</span><span class="drop-desc">Tài liệu tra cứu thư viện, API</span></a></li><li><a class="drop-link" href="../tai-nguyen/ebook.html"><span class="drop-label">Ebook / Tài liệu</span><span class="drop-desc">Sách và tài liệu tham khảo</span></a></li><li><a class="drop-link" href="../tai-nguyen/ai-tools.html"><span class="drop-label">AI Tools</span><span class="drop-desc">Công cụ AI hữu ích cho việc học</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tai-nguyen/">Xem tất cả Tài nguyên →</a>
+</div></li></ul>
+        <div class="drawer-foot">
+          <a class="btn ghost" href="../dang-nhap.html">Đăng nhập</a>
+          <a class="btn" href="../lo-trinh/">Bắt đầu học</a>
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+<div class="search-dialog" hidden>
+  <div class="search-scrim"></div>
+  <div class="search-box" role="dialog" aria-modal="true" aria-label="Tìm kiếm">
+    <form class="search-form" action="../search.html" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" placeholder="Tìm bài học, chủ đề, bài viết…" autocomplete="off" aria-label="Từ khóa tìm kiếm" aria-controls="search-suggest">
+      <button type="button" class="icon-btn search-close" aria-label="Đóng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </form>
+    <div class="search-suggest" id="search-suggest" aria-live="polite">
+      <div class="search-empty">
+        <p class="search-group-title">Chủ đề phổ biến</p>
+        <div class="chips"><a class="chip" href="../hoc/python.html">Python</a><a class="chip" href="../hoc/opencv.html">OpenCV</a><a class="chip" href="../hoc/machine-vision.html">Machine Vision</a><a class="chip" href="../hoc/deep-learning.html">Deep Learning</a><a class="chip" href="../hoc/ai-vision.html">AI Vision</a><a class="chip" href="../hoc/object-detection.html">Object Detection</a><a class="chip" href="../hoc/pytorch.html">PyTorch</a><a class="chip" href="../ngoai-ngu/english.html">English</a></div>
+        <p class="search-group-title">Lộ trình nổi bật</p>
+        <a class="search-item" href="../lo-trinh/vision-engineer.html"><span class="search-ico" aria-hidden="true">⭐</span><span>Trở thành Vision Engineer<small>Learning Path · Machine Vision + AI Vision + Industrial Automation</small></span></a>
+      </div>
+    </div>
+    <div class="search-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> chọn</span><span><kbd>Enter</kbd> mở</span><span><kbd>Esc</kbd> đóng</span></div>
+  </div>
+</div>
+<main id="main">
+  <div class="container layout article-layout">
+    <article class="article">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../lo-trinh/">Learning Paths</a><span>/</span><a href="../lo-trinh/vision-engineer.html">Vision Engineer</a><span>/</span><a href="../lo-trinh/vision-engineer/measurement-matching-ocr.html">Chặng 7: Measurement / Matching / OCR</a></nav>
+      <header class="article-head">
+        <div class="course-bar" data-course="vision-engineer"><a class="course-chip" href="../lo-trinh/vision-engineer/measurement-matching-ocr.html">⭐ Vision Engineer · Chặng 7</a><span class="lesson-no">Bài 1/8</span><span class="kind kind-lesson">Bài học</span><span class="lesson-min"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></svg>~90 phút</span></div>
+        <h1>Đo cạnh subpixel, fitting đường thẳng và đường tròn với OpenCV</h1>
+        <p class="lead">Tìm cạnh chính xác dưới 1 pixel bằng caliper, fit đường thẳng và đường tròn bằng bình phương tối thiểu, loại ba via và đánh giá độ lặp lại phép đo.</p>
+        <div class="article-meta">
+          <span class="avatar" aria-hidden="true">HF</span>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>39 phút đọc</span></div>
+        </div>
+      </header>
+      <figure class="article-cover">
+        <img src="../assets/images/posts/do-luong-1-do-canh-subpixel-fitting.webp" alt="Đo cạnh subpixel, fitting đường thẳng và đường tròn với OpenCV" width="1200" height="675" fetchpriority="high" decoding="async">
+      </figure>
+      <section class="lesson-goals" aria-label="Mục tiêu bài học"><h2>Học xong bài này, bạn sẽ</h2><ul><li>Tìm vị trí cạnh chính xác dưới 1 pixel</li><li>Fit đường thẳng, đường tròn bằng bình phương tối thiểu</li><li>Đo khoảng cách, đường kính ổn định</li></ul><p class="goals-before">Nên học trước: <a href="../hoc/camera-8-bai-tap-chon-cau-hinh.html">Bài tập chặng 6: chọn camera, ống kính, đèn cho bài toán thật</a></p></section>
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol class="toc-plain"><li><a href="#1-vi-sao-can-subpixel">1. Vì sao cần subpixel?</a></li><li><a href="#2-canh-trong-anh-that-khong-phai-bac-thang">2. Cạnh trong ảnh thật không phải bậc thang</a></li><li><a href="#3-tim-canh-subpixel-tren-profile-1d">3. Tìm cạnh subpixel trên profile 1D</a></li><li><a href="#4-anh-mau-2d-voi-dap-an-biet-truoc">4. Ảnh mẫu 2D với đáp án biết trước</a></li><li><a href="#5-caliper-quet-profile-vuong-goc-voi-canh">5. Caliper: quét profile vuông góc với cạnh</a></li><li><a href="#6-fit-duong-thang-va-do-khoang-cach">6. Fit đường thẳng và đo khoảng cách</a></li><li><a href="#7-fit-duong-tron-kasa-va-so-voi-contour">7. Fit đường tròn: Kasa và so với contour</a></li><li><a href="#8-ba-via-va-diem-nhieu-fit-ben-vung">8. Ba via và điểm nhiễu: fit bền vững</a></li><li><a href="#9-do-lap-lai-do-30-lan-xem-do-lech-chuan">9. Độ lặp lại: đo 30 lần, xem độ lệch chuẩn</a></li><li><a href="#10-loi-thuong-gap">10. Lỗi thường gặp</a></li><li><a href="#bai-tap">Bài tập</a></li><li><a href="#tom-tat">Tóm tắt</a></li></ol></details>
+      <div class="prose">
+<p>Đến chặng này bạn đã biết tìm vật bằng ngưỡng và contour, và ở chặng Camera, ống kính, chiếu sáng bạn đã chọn được cấu hình quang học cho bài đo. Nhưng nếu đo kích thước bằng contour, kết quả chỉ chính xác đến <strong>±1 pixel</strong> ở mỗi cạnh, trong khi bản vẽ kỹ thuật thường ghi dung sai ±0,02 mm. Bài này dạy kỹ thuật mà mọi phần mềm đo công nghiệp đều dùng: <strong>tìm cạnh subpixel</strong> (chính xác dưới 1 pixel) dọc theo các đường quét, rồi <strong>fitting</strong> (khớp) đường thẳng, đường tròn bằng bình phương tối thiểu để có kết quả ổn định. Mọi ví dụ chạy trên ảnh tổng hợp mà ta biết chính xác "đáp án thật", nên bạn sẽ thấy rõ sai số của từng cách.</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Viết được bộ công cụ đo gồm: hàm tìm cạnh subpixel trên một đường quét (caliper), hàm fit đường thẳng và đường tròn, loại điểm nhiễu do ba via, và đánh giá độ lặp lại của phép đo bằng độ lệch chuẩn.</div>
+
+<h2 id="1-vi-sao-can-subpixel">1. Vì sao cần subpixel?</h2>
+<p>Ví dụ thực tế: đo chiều rộng một thanh đồng 10,00 mm, dung sai ±0,03 mm. Camera 1280 px nhìn trường nhìn (FOV) 64 mm, vậy 1 pixel = 64 / 1280 = <strong>0,05 mm</strong>.</p>
+<table>
+  <tr><th>Cách đo</th><th>Sai số mỗi cạnh</th><th>Sai số chiều rộng (2 cạnh)</th><th>So với dung sai ±0,03 mm</th></tr>
+  <tr><td>Contour / ngưỡng, pixel nguyên</td><td>±0,5 px = ±0,025 mm</td><td>tới ±0,05 mm</td><td>Không dùng được</td></tr>
+  <tr><td>Cạnh subpixel 0,05 px + fitting</td><td>±0,0025 mm</td><td>khoảng ±0,005 mm</td><td>Đủ dùng</td></tr>
+</table>
+<p>Quy tắc kinh nghiệm trong đo lường: độ phân giải của hệ đo nên nhỏ hơn khoảng <strong>1/10 khoảng dung sai</strong>. Khoảng dung sai ở đây là 0,06 mm, vậy hệ đo cần phân biệt được cỡ 0,006 mm, tức khoảng 0,12 px. Không có subpixel thì phải tăng độ phân giải camera lên vài lần, đắt và chậm hơn nhiều.</p>
+<p>Hai khái niệm phải tách bạch ngay từ đầu:</p>
+<ul>
+  <li><strong>Độ lặp lại (repeatability)</strong>: đo cùng một vật nhiều lần, kết quả dao động bao nhiêu (độ lệch chuẩn σ). Subpixel và fitting chủ yếu cải thiện cái này.</li>
+  <li><strong>Độ chính xác (accuracy)</strong>: trung bình kết quả lệch bao nhiêu so với giá trị thật. Sai lệch hệ thống được bù bằng hiệu chuẩn với mẫu chuẩn (chặng Calibration).</li>
+</ul>
+
+<h2 id="2-canh-trong-anh-that-khong-phai-bac-thang">2. Cạnh trong ảnh thật không phải bậc thang</h2>
+<p>Subpixel làm được là nhờ cạnh trong ảnh có <strong>vùng chuyển tiếp</strong>: mỗi pixel cảm biến lấy trung bình ánh sáng trên diện tích của nó, ống kính lại làm mờ thêm một chút. Pixel nằm vắt ngang cạnh sẽ có mức xám trung gian, và mức xám đó "mã hóa" vị trí cạnh bên trong pixel. Ta mô phỏng đúng quá trình này: vẽ cạnh ở độ phân giải cao gấp 16 lần (siêu lấy mẫu), lấy trung bình từng nhóm 16 điểm thành 1 pixel, rồi làm mờ Gaussian như ống kính.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+S = 16   # siêu lấy mẫu: mỗi pixel camera gồm 16 điểm con
+
+
+def tao_profile(x_canh, n=40, toi=40, sang=200, sigma=0.8):
+    """Profile 1D: trái tối, phải sáng, cạnh thật nằm tại tọa độ x_canh.
+    Quy ước OpenCV: tâm pixel i ở tọa độ i, pixel i phủ đoạn [i-0.5, i+0.5)."""
+    u = (np.arange(n * S) + 0.5) / S - 0.5            # tọa độ tâm các điểm con
+    cao = np.where(u &gt;= x_canh, sang, toi).astype(np.float32)
+    p = cao.reshape(n, S).mean(axis=1)                 # cảm biến: trung bình trên diện tích pixel
+    return cv2.GaussianBlur(p.reshape(1, -1), (0, 0), sigma).ravel()   # ống kính làm mờ
+
+
+p = tao_profile(20.3)
+for i in range(16, 25):
+    print(f"pixel {i}: {p[i]:6.1f}")</code></pre>
+<pre><code class="language-text">pixel 16:   40.0
+pixel 17:   40.0
+pixel 18:   40.7
+pixel 19:   50.4
+pixel 20:   95.1
+pixel 21:  166.7
+pixel 22:  197.1
+pixel 23:  199.9
+pixel 24:  200.0</code></pre>
+<p>Cạnh thật ở 20,3 nhưng không có pixel nào "nhảy" từ 40 lên 200: các pixel 18–22 có mức trung gian. Nếu chỉ phân ngưỡng ở 120, ta chỉ biết cạnh nằm giữa pixel 20 và 21 (sai số tới 0,5 px). Thông tin vị trí chính xác nằm trong <em>hình dạng</em> của vùng chuyển tiếp.</p>
+<div class="warn"><strong>Subpixel không phải phép màu</strong>Nó cần ba điều kiện: tương phản cạnh đủ lớn so với nhiễu, không bão hòa (vùng sáng chạm 255 làm profile bị cắt phẳng), và ảnh được lấy nét tốt. Ảnh mờ làm cạnh trải rộng nhiều pixel, gradient thấp, nhiễu chiếm ưu thế (bài tập 1 cho bạn thấy con số). Đèn nền (backlight) cho cạnh tương phản cao và sắc nét là lựa chọn số một cho bài đo, như bạn đã học ở bài 7 kiểu chiếu sáng.</div>
+
+<h2 id="3-tim-canh-subpixel-tren-profile-1d">3. Tìm cạnh subpixel trên profile 1D</h2>
+<p>Cạnh là nơi mức xám thay đổi nhanh nhất, tức đỉnh của <strong>gradient</strong> (đạo hàm). Các bước:</p>
+<ol>
+  <li>Tính gradient bằng sai phân trung tâm: g[i] = (p[i+1] − p[i−1]) / 2.</li>
+  <li>Tìm pixel k có |g| lớn nhất (vị trí nguyên).</li>
+  <li>Khớp một parabol qua 3 điểm g[k−1], g[k], g[k+1]; đỉnh parabol nằm tại k + δ với
+  <br><strong>δ = (g[k−1] − g[k+1]) / (2·(g[k−1] − 2·g[k] + g[k+1]))</strong>, luôn trong khoảng (−0,5; 0,5).</li>
+</ol>
+<p>Cách thứ hai đơn giản hơn: tìm nơi profile cắt mức 50% giữa tối và sáng, nội suy tuyến tính giữa hai pixel. Ta so sánh cả ba cách (pixel nguyên, 50%, parabol) với vị trí thật khi dời cạnh từng 0,1 px:</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+S = 16
+
+
+def tao_profile(x_canh, n=40, toi=40, sang=200, sigma=0.8):
+    u = (np.arange(n * S) + 0.5) / S - 0.5
+    cao = np.where(u &gt;= x_canh, sang, toi).astype(np.float32)
+    p = cao.reshape(n, S).mean(axis=1)
+    return cv2.GaussianBlur(p.reshape(1, -1), (0, 0), sigma).ravel()
+
+
+def canh_parabol(p):
+    """Vị trí cạnh subpixel = đỉnh parabol khớp qua 3 điểm gradient quanh cực đại."""
+    p = np.asarray(p, np.float64)
+    g = np.zeros_like(p)
+    g[1:-1] = np.abs(p[2:] - p[:-2]) / 2
+    k = int(np.argmax(g))
+    a, b, c = g[k - 1], g[k], g[k + 1]
+    return k + 0.5 * (a - c) / (a - 2 * b + c)
+
+
+def canh_50(p):
+    """Vị trí profile cắt mức 50% (nội suy tuyến tính), cho cạnh tối → sáng."""
+    muc = (p.min() + p.max()) / 2
+    i = int(np.where((p[:-1] &lt; muc) &amp; (p[1:] &gt;= muc))[0][0])
+    return i + (muc - p[i]) / (p[i + 1] - p[i])
+
+
+print(" thật   nguyên   50%     parabol")
+sai = {"nguyên": [], "50%": [], "parabol": []}
+for x in np.arange(20.0, 21.0, 0.1):
+    p = tao_profile(x)
+    k = int(np.argmax(np.abs(np.gradient(p))))       # pixel có gradient lớn nhất (vị trí nguyên)
+    a, b = canh_50(p), canh_parabol(p)
+    sai["nguyên"].append(k - x); sai["50%"].append(a - x); sai["parabol"].append(b - x)
+    print(f"{x:5.2f}   {k:3d}    {a:6.3f}   {b:6.3f}")
+for ten, e in sai.items():
+    print(f"sai số lớn nhất {ten:8s}: {np.max(np.abs(e)):.3f} px")</code></pre>
+<pre><code class="language-text">thật   nguyên   50%     parabol
+20.00    20    20.000   20.000
+20.10    20    20.157   20.125
+20.20    20    20.226   20.187
+20.30    20    20.348   20.312
+20.40    20    20.402   20.375
+20.50    20    20.500   20.500
+20.60    21    20.598   20.625
+20.70    21    20.652   20.687
+20.80    21    20.774   20.812
+20.90    21    20.843   20.875
+sai số lớn nhất nguyên  : 0.500 px
+sai số lớn nhất 50%     : 0.057 px
+sai số lớn nhất parabol : 0.025 px</code></pre>
+<p>Trên ảnh không nhiễu, parabol cho sai số lớn nhất 0,025 px, tốt hơn 20 lần so với vị trí nguyên (0,5 px). Cách cắt mức 50% cũng tốt (0,057 px) nhưng phụ thuộc vào việc biết đúng mức tối và mức sáng, vốn thay đổi theo đèn và bề mặt vật. Sai số còn lại là <strong>sai số hệ thống</strong> của phép nội suy, phụ thuộc vị trí cạnh trong pixel (khi cạnh nằm đúng tâm hoặc đúng biên pixel thì sai số bằng 0). Bây giờ thêm nhiễu cảm biến, điều luôn có trong ảnh thật:</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+S = 16
+
+
+def tao_profile(x_canh, n=40, toi=40, sang=200, sigma=0.8):
+    u = (np.arange(n * S) + 0.5) / S - 0.5
+    cao = np.where(u &gt;= x_canh, sang, toi).astype(np.float32)
+    p = cao.reshape(n, S).mean(axis=1)
+    return cv2.GaussianBlur(p.reshape(1, -1), (0, 0), sigma).ravel()
+
+
+def canh_parabol(p):
+    p = np.asarray(p, np.float64)
+    g = np.zeros_like(p)
+    g[1:-1] = np.abs(p[2:] - p[:-2]) / 2
+    k = int(np.argmax(g))
+    a, b, c = g[k - 1], g[k], g[k + 1]
+    return k + 0.5 * (a - c) / (a - 2 * b + c)
+
+
+rng = np.random.default_rng(1)
+sach = tao_profile(20.3)
+for nhieu in (1, 3, 8):
+    kq = [canh_parabol(sach + rng.normal(0, nhieu, sach.size)) for _ in range(1000)]
+    print(f"nhiễu σ={nhieu} mức xám: trung bình {np.mean(kq):.3f}, độ lệch chuẩn {np.std(kq):.3f} px")</code></pre>
+<pre><code class="language-text">nhiễu σ=1 mức xám: trung bình 20.314, độ lệch chuẩn 0.021 px
+nhiễu σ=3 mức xám: trung bình 20.318, độ lệch chuẩn 0.064 px
+nhiễu σ=8 mức xám: trung bình 20.345, độ lệch chuẩn 0.171 px</code></pre>
+<p>Tương phản cạnh ở đây là 160 mức xám. Độ lệch chuẩn của vị trí cạnh tăng gần tỉ lệ thuận với nhiễu và tỉ lệ nghịch với tương phản. Hai hệ quả thực tế: (1) tăng tương phản bằng chiếu sáng có lợi hơn mọi thuật toán; (2) một điểm cạnh đơn lẻ vẫn dao động, nên ta không đo bằng 1 điểm mà <strong>fit</strong> qua hàng chục điểm (mục 5).</p>
+
+<h2 id="4-anh-mau-2d-voi-dap-an-biet-truoc">4. Ảnh mẫu 2D với đáp án biết trước</h2>
+<p>Ảnh mô phỏng trạm đo dùng đèn nền: nền sáng 210, vật tối 40. Có một thanh kim loại rộng đúng <strong>80,4 px</strong>, nghiêng 3°, và một đĩa tròn đường kính <strong>120,5 px</strong>, tâm (290,37; 148,62). Ảnh thứ hai có thêm <strong>ba via</strong> (burr, gờ thừa kim loại) trên cạnh phải của thanh và trên mép đĩa, để luyện kỹ thuật loại điểm nhiễu. Khối này chạy vài giây vì vẽ ở độ phân giải gấp 8 lần.</p>
+<pre><code class="language-python">import math
+
+import cv2
+import numpy as np
+
+W, H, S = 400, 300, 8
+GOC = math.radians(3.0)                     # thanh nghiêng 3°
+TAM_THANH, RONG = (120.0, 150.0), 80.4
+TAM_DIA, BAN_KINH = (290.37, 148.62), 60.25
+
+
+def ve_mau(bavia=False):
+    xs = ((np.arange(W * S) + 0.5) / S - 0.5).astype(np.float32)
+    ys = ((np.arange(H * S) + 0.5) / S - 0.5).astype(np.float32)
+    X, Y = np.meshgrid(xs, ys)
+    d = (X - TAM_THANH[0]) * math.cos(GOC) + (Y - TAM_THANH[1]) * math.sin(GOC)   # khoảng cách tới trục thanh
+    vat = np.abs(d) &lt;= RONG / 2
+    vat |= (X - TAM_DIA[0]) ** 2 + (Y - TAM_DIA[1]) ** 2 &lt;= BAN_KINH ** 2
+    if bavia:
+        e = (Y - TAM_THANH[1]) * math.cos(GOC) - (X - TAM_THANH[0]) * math.sin(GOC)  # tọa độ dọc cạnh
+        vat |= (d &gt; RONG / 2) &amp; (d &lt; RONG / 2 + 3.0 * (1 - np.abs(e - 50) / 8))     # gờ cao 3 px
+        r = np.hypot(X - TAM_DIA[0], Y - TAM_DIA[1])
+        a = np.degrees(np.arctan2(Y - TAM_DIA[1], X - TAM_DIA[0]))
+        vat |= (r &lt; BAN_KINH + 3.0 * (1 - np.abs(a + 45) / 5)) &amp; (np.abs(a + 45) &lt; 5)   # gờ trên mép đĩa
+    cao = np.where(vat, 40, 210).astype(np.float32)
+    anh = cv2.resize(cao, (W, H), interpolation=cv2.INTER_AREA)    # trung bình 8×8 điểm con
+    return cv2.GaussianBlur(anh, (0, 0), 0.8)                      # ống kính
+
+
+rng = np.random.default_rng(0)
+sach = ve_mau()
+np.save("mau_sach.npy", sach)                                     # dùng lại ở mục 8
+cv2.imwrite("mau.png", np.clip(sach + rng.normal(0, 2, sach.shape), 0, 255).round().astype(np.uint8))
+bv = ve_mau(bavia=True)
+cv2.imwrite("mau_bavia.png", np.clip(bv + rng.normal(0, 2, bv.shape), 0, 255).round().astype(np.uint8))
+print("Đã lưu mau.png, mau_bavia.png, mau_sach.npy")
+print(f"Đáp án: rộng thanh {RONG} px, góc cạnh {90 + 3.0:.1f}°, đường kính đĩa {2 * BAN_KINH} px")</code></pre>
+<pre><code class="language-text">Đã lưu mau.png, mau_bavia.png, mau_sach.npy
+Đáp án: rộng thanh 80.4 px, góc cạnh 93.0°, đường kính đĩa 120.5 px</code></pre>
+
+<h2 id="5-caliper-quet-profile-vuong-goc-voi-canh">5. Caliper: quét profile vuông góc với cạnh</h2>
+<p>Trong ảnh 2D, ta không tìm cạnh trên cả ảnh mà đặt các <strong>đường quét</strong> ngắn cắt ngang cạnh cần đo, gần như vuông góc với nó. Mỗi đường quét cho 1 điểm cạnh subpixel. Công cụ này trong phần mềm thương mại gọi là <strong>caliper</strong> (thước cặp) hoặc edge tool. Ta lấy mẫu mức xám dọc đường quét bằng <code>cv2.remap</code>: hàm này đọc ảnh tại tọa độ thực bất kỳ (nội suy), nên đường quét có thể nghiêng tùy ý.</p>
+<p>Tham số quan trọng là <strong>cực tính</strong> (polarity): theo chiều quét, cạnh đi từ tối sang sáng (+1) hay sáng sang tối (−1). Khai báo đúng cực tính giúp caliper không bắt nhầm cạnh khác ở gần.</p>
+<pre><code class="language-python">import math
+
+import cv2
+import numpy as np
+
+
+def tim_canh(anh, tam, huong, dai=40, cuc=0, nguong=10):
+    """Quét đoạn dài `dai` px qua điểm `tam` theo `huong`.
+    cuc: +1 tối→sáng, -1 sáng→tối, 0 cả hai. Trả về (x, y) subpixel hoặc None."""
+    hx, hy = np.asarray(huong, np.float64) / np.hypot(*huong)
+    t = np.arange(-dai / 2, dai / 2 + 1)
+    mx = (tam[0] + t * hx).astype(np.float32).reshape(1, -1)
+    my = (tam[1] + t * hy).astype(np.float32).reshape(1, -1)
+    p = cv2.remap(anh, mx, my, cv2.INTER_CUBIC).ravel().astype(np.float64)
+    g = np.zeros_like(p)
+    g[1:-1] = (p[2:] - p[:-2]) / 2
+    g = np.abs(g) if cuc == 0 else g * cuc
+    k = int(np.argmax(g))
+    if g[k] &lt; nguong or k &lt; 2 or k &gt; len(g) - 3:
+        return None                                   # không có cạnh đủ mạnh
+    a, b, c = g[k - 1], g[k], g[k + 1]
+    s = t[k] + 0.5 * (a - c) / (a - 2 * b + c)
+    return tam[0] + s * hx, tam[1] + s * hy
+
+
+anh = cv2.imread("mau.png", cv2.IMREAD_GRAYSCALE).astype(np.float32)
+trai, phai = [], []
+for y in range(20, 281, 10):                          # 27 đường quét ngang
+    trai.append(tim_canh(anh, (80, y), (1, 0), cuc=-1))   # cạnh trái: nền sáng → vật tối
+    phai.append(tim_canh(anh, (160, y), (1, 0), cuc=+1))  # cạnh phải: vật tối → nền sáng
+trai = np.array([q for q in trai if q is not None], np.float32)
+phai = np.array([q for q in phai if q is not None], np.float32)
+print("số điểm cạnh:", len(trai), len(phai))
+print("3 điểm đầu cạnh trái:", np.round(trai[:3], 3).tolist())
+
+# Đối chiếu đáp án: khoảng cách có dấu từ điểm tới trục thanh phải là ±40.2
+g = math.radians(3.0)
+d = (trai[:, 0] - 120) * math.cos(g) + (trai[:, 1] - 150) * math.sin(g)
+print(f"sai số từng điểm cạnh trái: lớn nhất {np.max(np.abs(d + 40.2)):.3f} px")</code></pre>
+<pre><code class="language-text">số điểm cạnh: 27 27
+3 điểm đầu cạnh trái: [[86.6050033569336, 20.0], [86.03800201416016, 30.0], [85.56099700927734, 40.0]]
+sai số từng điểm cạnh trái: lớn nhất 0.072 px</code></pre>
+<p>Ở đây đường quét nằm ngang còn cạnh nghiêng 3°, vẫn ổn vì điểm tìm được vẫn nằm trên cạnh. Khi cạnh nghiêng nhiều (trên khoảng 20–30°), hãy xoay hướng quét theo pháp tuyến của cạnh, nếu không vùng chuyển tiếp dọc đường quét bị kéo dài và kém chính xác. Trong chương trình thật, vị trí và hướng của các đường quét được đặt theo kết quả định vị vật (template matching, bài sau), không cố định như ví dụ.</p>
+<div class="tip"><strong>Caliper công nghiệp làm thêm gì?</strong>Phần mềm thương mại thường lấy trung bình mức xám trên một dải rộng vài pixel song song với cạnh (projection) trước khi tìm cạnh, nhờ đó nhiễu giảm theo căn bậc hai số đường lấy trung bình. Chúng cũng cho chọn "cạnh đầu tiên", "cạnh mạnh nhất" hoặc "cặp cạnh có khoảng cách gần X" để tránh bắt nhầm.</div>
+
+<h2 id="6-fit-duong-thang-va-do-khoang-cach">6. Fit đường thẳng và đo khoảng cách</h2>
+<p>Có 27 điểm trên mỗi cạnh, ta tìm đường thẳng "đi gần nhất" các điểm theo nghĩa <strong>bình phương tối thiểu</strong>. Lưu ý: không dùng hồi quy <code>y = ax + b</code> vì nó chỉ cực tiểu sai số theo trục y và hỏng hoàn toàn với cạnh gần thẳng đứng như ở đây. Cách đúng là <strong>bình phương tối thiểu toàn phần</strong> (total least squares): cực tiểu tổng bình phương khoảng cách <em>vuông góc</em> từ điểm tới đường. Lời giải: đường đi qua trọng tâm các điểm, hướng là vector riêng lớn nhất của ma trận hiệp phương sai, tính bằng SVD. <code>cv2.fitLine</code> với <code>DIST_L2</code> làm đúng việc này.</p>
+<pre><code class="language-python">import math
+
+import cv2
+import numpy as np
+
+
+def tim_canh(anh, tam, huong, dai=40, cuc=0, nguong=10):
+    hx, hy = np.asarray(huong, np.float64) / np.hypot(*huong)
+    t = np.arange(-dai / 2, dai / 2 + 1)
+    mx = (tam[0] + t * hx).astype(np.float32).reshape(1, -1)
+    my = (tam[1] + t * hy).astype(np.float32).reshape(1, -1)
+    p = cv2.remap(anh, mx, my, cv2.INTER_CUBIC).ravel().astype(np.float64)
+    g = np.zeros_like(p)
+    g[1:-1] = (p[2:] - p[:-2]) / 2
+    g = np.abs(g) if cuc == 0 else g * cuc
+    k = int(np.argmax(g))
+    if g[k] &lt; nguong or k &lt; 2 or k &gt; len(g) - 3:
+        return None
+    a, b, c = g[k - 1], g[k], g[k + 1]
+    s = t[k] + 0.5 * (a - c) / (a - 2 * b + c)
+    return tam[0] + s * hx, tam[1] + s * hy
+
+
+def fit_duong(P):
+    """Bình phương tối thiểu toàn phần bằng SVD. Trả về (điểm trên đường, vector hướng, pháp tuyến)."""
+    P = np.asarray(P, np.float64)
+    c = P.mean(axis=0)
+    _, _, Vt = np.linalg.svd(P - c)
+    v = Vt[0]                                          # hướng có phương sai lớn nhất
+    if v[1] &lt; 0:
+        v = -v                                         # cố định chiều để góc so sánh được
+    return c, v, np.array([-v[1], v[0]])
+
+
+anh = cv2.imread("mau.png", cv2.IMREAD_GRAYSCALE).astype(np.float32)
+trai = np.array([tim_canh(anh, (80, y), (1, 0), cuc=-1) for y in range(20, 281, 10)], np.float32)
+phai = np.array([tim_canh(anh, (160, y), (1, 0), cuc=+1) for y in range(20, 281, 10)], np.float32)
+
+for ten, P in (("trái", trai), ("phải", phai)):
+    vx, vy, x0, y0 = cv2.fitLine(P, cv2.DIST_L2, 0, 0.01, 0.01).ravel()
+    c, v, n = fit_duong(P)
+    goc_cv = math.degrees(math.atan2(vy, vx)) % 180
+    goc_np = math.degrees(math.atan2(v[1], v[0])) % 180
+    print(f"cạnh {ten}: fitLine góc {goc_cv:.3f}°, qua ({x0:.3f}, {y0:.3f}) | "
+          f"SVD góc {goc_np:.3f}°, qua ({c[0]:.3f}, {c[1]:.3f})")
+
+# Khoảng cách giữa hai đường gần song song: chiếu vector nối hai trọng tâm lên pháp tuyến chung
+cT, vT, nT = fit_duong(trai)
+cP, vP, nP = fit_duong(phai)
+n = (nT + nP) / np.linalg.norm(nT + nP)
+rong = abs(np.dot(cP - cT, n))
+lech_song_song = math.degrees(math.acos(min(1.0, abs(np.dot(vT, vP)))))
+print(f"độ rộng {rong:.3f} px (thật 80.4), hai cạnh lệch song song {lech_song_song:.3f}°")
+print(f"quy đổi với 0.05 mm/px: {rong * 0.05:.4f} mm")</code></pre>
+<pre><code class="language-text">cạnh trái: fitLine góc 93.000°, qua (79.743, 150.000) | SVD góc 93.000°, qua (79.743, 150.000)
+cạnh phải: fitLine góc 92.995°, qua (160.258, 150.000) | SVD góc 92.995°, qua (160.258, 150.000)
+độ rộng 80.405 px (thật 80.4), hai cạnh lệch song song 0.005°
+quy đổi với 0.05 mm/px: 4.0202 mm</code></pre>
+<p>Hai cách cho cùng kết quả, góc 93,0° đúng như đáp án (thanh nghiêng 3° so với phương thẳng đứng). Độ rộng sai khác so với giá trị thật chỉ vài phần nghìn pixel. Đây là sức mạnh của fitting: sai số ngẫu nhiên của từng điểm (cỡ vài phần trăm pixel ở mục 3) giảm đi khoảng √N lần khi fit N điểm.</p>
+<div class="warn"><strong>Định nghĩa "khoảng cách" phải rõ</strong>Hai cạnh thật không bao giờ song song tuyệt đối. Bản vẽ ghi "chiều rộng" thì bạn phải thống nhất với QC: khoảng cách trung bình, nhỏ nhất hay lớn nhất dọc chiều dài? Đo tại vị trí nào? Code trên đo khoảng cách giữa hai trọng tâm theo pháp tuyến chung, tương đương khoảng cách trung bình. Nếu cần nhỏ nhất/lớn nhất, hãy tính khoảng cách từ từng điểm cạnh phải đến đường trái rồi lấy min/max.</div>
+
+<h2 id="7-fit-duong-tron-kasa-va-so-voi-contour">7. Fit đường tròn: Kasa và so với contour</h2>
+<p>Với lỗ khoan, trục, vòng đệm, ta đặt các đường quét <strong>theo hướng bán kính</strong> từ một tâm ước lượng (lấy từ contour hoặc định vị), rồi fit đường tròn qua các điểm cạnh. Cách fit nhanh nhất là phương pháp đại số <strong>Kasa</strong>: phương trình đường tròn (x − a)² + (y − b)² = r² viết lại thành</p>
+<p><strong>x² + y² + D·x + E·y + F = 0</strong>, tuyến tính theo D, E, F.</p>
+<p>Mỗi điểm cho một phương trình, giải hệ quá xác định bằng <code>np.linalg.lstsq</code>, rồi suy ra a = −D/2, b = −E/2, r = √(a² + b² − F).</p>
+<pre><code class="language-python">import math
+
+import cv2
+import numpy as np
+
+
+def tim_canh(anh, tam, huong, dai=40, cuc=0, nguong=10):
+    hx, hy = np.asarray(huong, np.float64) / np.hypot(*huong)
+    t = np.arange(-dai / 2, dai / 2 + 1)
+    mx = (tam[0] + t * hx).astype(np.float32).reshape(1, -1)
+    my = (tam[1] + t * hy).astype(np.float32).reshape(1, -1)
+    p = cv2.remap(anh, mx, my, cv2.INTER_CUBIC).ravel().astype(np.float64)
+    g = np.zeros_like(p)
+    g[1:-1] = (p[2:] - p[:-2]) / 2
+    g = np.abs(g) if cuc == 0 else g * cuc
+    k = int(np.argmax(g))
+    if g[k] &lt; nguong or k &lt; 2 or k &gt; len(g) - 3:
+        return None
+    a, b, c = g[k - 1], g[k], g[k + 1]
+    s = t[k] + 0.5 * (a - c) / (a - 2 * b + c)
+    return tam[0] + s * hx, tam[1] + s * hy
+
+
+def fit_tron_kasa(P):
+    P = np.asarray(P, np.float64)
+    x, y = P[:, 0], P[:, 1]
+    A = np.column_stack([x, y, np.ones_like(x)])
+    D, E, F = np.linalg.lstsq(A, -(x ** 2 + y ** 2), rcond=None)[0]
+    a, b = -D / 2, -E / 2
+    return a, b, math.sqrt(a * a + b * b - F)
+
+
+anh8 = cv2.imread("mau.png", cv2.IMREAD_GRAYSCALE)
+anh = anh8.astype(np.float32)
+
+# Bước 1: ước lượng thô bằng contour (pixel nguyên), như ở chặng xử lý ảnh
+_, nhi_phan = cv2.threshold(anh8, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+cs, _ = cv2.findContours(nhi_phan, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+dia = max(cs, key=lambda c: cv2.boundingRect(c)[0])      # contour bên phải là đĩa
+(ex, ey), er = cv2.minEnclosingCircle(dia)
+(fx, fy), (fa, fb), _ = cv2.fitEllipse(dia)
+M = cv2.moments(dia)
+d_dien_tich = 2 * math.sqrt(M["m00"] / math.pi)
+
+# Bước 2: 72 đường quét theo bán kính quanh tâm thô, cạnh tối (trong) → sáng (ngoài)
+P = []
+for a in np.radians(np.arange(0, 360, 5)):
+    u = (math.cos(a), math.sin(a))
+    q = tim_canh(anh, (ex + er * u[0], ey + er * u[1]), u, dai=30, cuc=+1)
+    if q is not None:
+        P.append(q)
+kx, ky, kr = fit_tron_kasa(P)
+
+print("phương pháp              tâm                 đường kính")
+print(f"thật                     (290.370, 148.620)  120.500")
+print(f"minEnclosingCircle       ({ex:.3f}, {ey:.3f})  {2 * er:.3f}")
+print(f"fitEllipse (TB 2 trục)   ({fx:.3f}, {fy:.3f})  {(fa + fb) / 2:.3f}")
+print(f"từ diện tích contour     -                   {d_dien_tich:.3f}")
+print(f"caliper + Kasa ({len(P)} điểm) ({kx:.3f}, {ky:.3f})  {2 * kr:.3f}")</code></pre>
+<pre><code class="language-text">phương pháp              tâm                 đường kính
+thật                     (290.370, 148.620)  120.500
+minEnclosingCircle       (290.372, 148.631)  120.538
+fitEllipse (TB 2 trục)   (290.368, 148.635)  119.577
+từ diện tích contour     -                   119.579
+caliper + Kasa (72 điểm) (290.382, 148.624)  120.506</code></pre>
+<p>Đọc bảng:</p>
+<ul>
+  <li><code>minEnclosingCircle</code> ở đây cho 120,538, gần đúng một cách <em>tình cờ</em>. Nó là đường tròn nhỏ nhất bao mọi điểm contour, nên chỉ do vài điểm ngoài cùng quyết định: một pixel nhiễu hay ba via nhô ra là đường kính nhảy theo (ở mục 9 nó có độ lặp lại kém nhất). Chỉ dùng để ước lượng thô.</li>
+  <li>Contour đi qua tâm các pixel biên của ảnh nhị phân, nên <code>fitEllipse</code> và đường kính quy từ diện tích đều nhỏ hơn thật khoảng 0,9 px, và độ lệch này thay đổi theo ngưỡng nhị phân (mục 9 sẽ chứng minh).</li>
+  <li>Caliper + Kasa: sai số đường kính 0,006 px, tâm lệch khoảng 0,01 px. Trong thực tế vẫn còn sai lệch hệ thống nhỏ do quang học và cách nội suy; phần đó được bù khi hiệu chuẩn hệ đo bằng mẫu chuẩn có kích thước biết trước.</li>
+</ul>
+<div class="tip"><strong>Khi chỉ có một cung tròn</strong>Kasa chính xác khi điểm phủ gần hết đường tròn. Nếu chỉ thấy một cung ngắn (ví dụ góc bo 60°), Kasa bị kéo nhỏ bán kính khi có nhiễu. Khi đó dùng kết quả Kasa làm điểm xuất phát rồi tối ưu sai số hình học (khoảng cách từ điểm tới đường tròn) bằng phương pháp lặp, ví dụ <code>scipy.optimize.least_squares</code>.</div>
+
+<h2 id="8-ba-via-va-diem-nhieu-fit-ben-vung">8. Ba via và điểm nhiễu: fit bền vững</h2>
+<p>Bình phương tối thiểu có điểm yếu chết người: <strong>một điểm sai nặng</strong> (ba via, bụi, vết xước) kéo lệch cả đường fit vì sai số bị bình phương. Ảnh <code>mau_bavia.png</code> có gờ cao 3 px trên cạnh phải của thanh và trên mép đĩa. Cách xử lý phổ biến và dễ giải thích với QC là <strong>loại điểm lặp</strong>: fit, tính phần dư (khoảng cách từng điểm tới đường fit), bỏ các điểm có phần dư lớn hơn k lần độ lệch chuẩn bền vững, fit lại cho tới khi ổn định. Độ lệch chuẩn bền vững tính từ trung vị (MAD), không bị chính điểm nhiễu làm phồng lên: σ ≈ 1,4826 × trung vị(|phần dư|).</p>
+<pre><code class="language-python">import math
+
+import cv2
+import numpy as np
+
+
+def tim_canh(anh, tam, huong, dai=40, cuc=0, nguong=10):
+    hx, hy = np.asarray(huong, np.float64) / np.hypot(*huong)
+    t = np.arange(-dai / 2, dai / 2 + 1)
+    mx = (tam[0] + t * hx).astype(np.float32).reshape(1, -1)
+    my = (tam[1] + t * hy).astype(np.float32).reshape(1, -1)
+    p = cv2.remap(anh, mx, my, cv2.INTER_CUBIC).ravel().astype(np.float64)
+    g = np.zeros_like(p)
+    g[1:-1] = (p[2:] - p[:-2]) / 2
+    g = np.abs(g) if cuc == 0 else g * cuc
+    k = int(np.argmax(g))
+    if g[k] &lt; nguong or k &lt; 2 or k &gt; len(g) - 3:
+        return None
+    a, b, c = g[k - 1], g[k], g[k + 1]
+    s = t[k] + 0.5 * (a - c) / (a - 2 * b + c)
+    return tam[0] + s * hx, tam[1] + s * hy
+
+
+def fit_duong(P):
+    c = P.mean(axis=0)
+    v = np.linalg.svd(P - c)[2][0]
+    return c, v, np.array([-v[1], v[0]])
+
+
+def fit_tron_kasa(P):
+    x, y = P[:, 0], P[:, 1]
+    D, E, F = np.linalg.lstsq(np.column_stack([x, y, np.ones_like(x)]), -(x ** 2 + y ** 2), rcond=None)[0]
+    return np.array([-D / 2, -E / 2]), math.sqrt(D * D / 4 + E * E / 4 - F)
+
+
+def phan_du_duong(P, m):
+    c, v, n = m
+    return np.abs((P - c) @ n)
+
+
+def phan_du_tron(P, m):
+    tam, r = m
+    return np.abs(np.linalg.norm(P - tam, axis=1) - r)
+
+
+def fit_ben_vung(P, ham_fit, ham_phan_du, k=3.0, san=0.05, so_vong=10):
+    """Fit, bỏ điểm có phần dư &gt; k·σ_bền_vững (không nhỏ hơn `san` px), lặp tới khi ổn định."""
+    giu = np.ones(len(P), bool)
+    for _ in range(so_vong):
+        m = ham_fit(P[giu])
+        r = ham_phan_du(P, m)
+        sigma = 1.4826 * np.median(r[giu])
+        moi = r &lt;= max(k * sigma, san)
+        if np.array_equal(moi, giu):
+            break
+        giu = moi
+    return m, giu
+
+
+anh = cv2.imread("mau_bavia.png", cv2.IMREAD_GRAYSCALE).astype(np.float32)
+ys = np.arange(20, 281, 5)                                   # quét dày hơn: 53 đường
+trai = np.array([tim_canh(anh, (80, y), (1, 0), cuc=-1) for y in ys])
+phai = np.array([tim_canh(anh, (160, y), (1, 0), cuc=+1) for y in ys])
+
+mT = fit_duong(trai)
+for ten, mP in (("thường", fit_duong(phai)), ("bền vững", fit_ben_vung(phai, fit_duong, phan_du_duong)[0])):
+    n = (mT[2] + mP[2]) / np.linalg.norm(mT[2] + mP[2])
+    rong = abs(np.dot(mP[0] - mT[0], n))
+    goc = math.degrees(math.atan2(mP[1][1], mP[1][0])) % 180
+    print(f"thanh, fit {ten:9s}: rộng {rong:.3f} px (thật 80.4), góc cạnh phải {goc:.3f}°")
+_, giu = fit_ben_vung(phai, fit_duong, phan_du_duong)
+print("điểm bị loại trên cạnh phải, y =", ys[~giu].tolist())
+
+tam0 = np.array([290.0, 149.0])                              # tâm thô, lấy từ contour như mục 7
+P = []
+for a in np.radians(np.arange(0, 360, 5)):
+    u = np.array([math.cos(a), math.sin(a)])
+    P.append(tim_canh(anh, tam0 + 60 * u, u, dai=30, cuc=+1))
+P = np.array(P)
+(tam, r), giu = fit_ben_vung(P, fit_tron_kasa, phan_du_tron)
+tam_t, r_t = fit_tron_kasa(P)
+print(f"đĩa, Kasa thường  : tâm ({tam_t[0]:.3f}, {tam_t[1]:.3f}), đường kính {2 * r_t:.3f}")
+print(f"đĩa, Kasa bền vững: tâm ({tam[0]:.3f}, {tam[1]:.3f}), đường kính {2 * r:.3f}, loại {np.sum(~giu)} điểm")
+
+vx, vy, x0, y0 = cv2.fitLine(phai.astype(np.float32), cv2.DIST_HUBER, 0, 0.01, 0.01).ravel()
+n = mT[2]
+print(f"thanh, fitLine DIST_HUBER: rộng {abs((x0 - mT[0][0]) * n[0] + (y0 - mT[0][1]) * n[1]):.3f} px")</code></pre>
+<pre><code class="language-text">thanh, fit thường   : rộng 80.477 px (thật 80.4), góc cạnh phải 92.952°
+thanh, fit bền vững : rộng 80.393 px (thật 80.4), góc cạnh phải 92.994°
+điểm bị loại trên cạnh phải, y = [195, 200, 205]
+đĩa, Kasa thường  : tâm (290.434, 148.554), đường kính 120.584
+đĩa, Kasa bền vững: tâm (290.374, 148.615), đường kính 120.501, loại 3 điểm
+thanh, fitLine DIST_HUBER: rộng 80.382 px</code></pre>
+<p>Chỉ 3 trên 53 điểm nằm trên gờ, nhưng fit thường đã làm độ rộng phình thêm 0,077 px (80,477) và góc cạnh lệch 0,05°; đường kính đĩa tăng 0,084 px và tâm lệch theo hướng gờ. Fit bền vững loại đúng 3 điểm trên gờ (y = 195, 200, 205) và đưa kết quả về 80,393 và 120,501. <code>cv2.fitLine</code> có sẵn các hàm khoảng cách bền vững (<code>DIST_HUBER</code>, <code>DIST_FAIR</code>, <code>DIST_WELSCH</code>) giảm trọng số điểm xa; nhưng chúng chỉ <em>giảm</em> ảnh hưởng chứ không loại hẳn, và không trả về danh sách điểm bị loại.</p>
+<div class="tip"><strong>Điểm bị loại cũng là thông tin</strong>Đừng vứt danh sách điểm bị loại. Nếu khách hàng cũng kiểm tra ba via, thì "có ≥ 2 điểm liên tiếp lệch &gt; 0,1 mm khỏi đường fit" chính là tiêu chí NG cho lỗi ba via, đo được vị trí và chiều cao gờ. Ngược lại, khi số điểm bị loại quá nhiều (ví dụ &gt; 30%), đừng tin kết quả đo: có thể caliper đặt sai chỗ hoặc ảnh có vấn đề, hãy báo lỗi đo thay vì báo OK/NG. Khi tỉ lệ điểm nhiễu rất lớn, dùng RANSAC (chọn ngẫu nhiên tập điểm nhỏ, fit, đếm điểm đồng thuận) như bạn sẽ gặp với <code>findHomography</code> ở bài feature matching.</div>
+
+<h2 id="9-do-lap-lai-do-30-lan-xem-do-lech-chuan">9. Độ lặp lại: đo 30 lần, xem độ lệch chuẩn</h2>
+<p>Trạm đo được nghiệm thu dựa trên độ lặp lại: đặt cùng một mẫu, chụp nhiều lần, kết quả phải gần như không đổi. Ta mô phỏng 30 lần chụp cùng một vật với nhiễu cảm biến khác nhau (σ = 3 mức xám), so sánh cách đo bằng contour (pixel nguyên) với cách caliper + fit:</p>
+<pre><code class="language-python">import math
+
+import cv2
+import numpy as np
+
+
+def tim_canh(anh, tam, huong, dai=40, cuc=0, nguong=10):
+    hx, hy = np.asarray(huong, np.float64) / np.hypot(*huong)
+    t = np.arange(-dai / 2, dai / 2 + 1)
+    mx = (tam[0] + t * hx).astype(np.float32).reshape(1, -1)
+    my = (tam[1] + t * hy).astype(np.float32).reshape(1, -1)
+    p = cv2.remap(anh, mx, my, cv2.INTER_CUBIC).ravel().astype(np.float64)
+    g = np.zeros_like(p)
+    g[1:-1] = (p[2:] - p[:-2]) / 2
+    g = np.abs(g) if cuc == 0 else g * cuc
+    k = int(np.argmax(g))
+    if g[k] &lt; nguong or k &lt; 2 or k &gt; len(g) - 3:
+        return None
+    a, b, c = g[k - 1], g[k], g[k + 1]
+    s = t[k] + 0.5 * (a - c) / (a - 2 * b + c)
+    return tam[0] + s * hx, tam[1] + s * hy
+
+
+def fit_duong(P):
+    c = P.mean(axis=0)
+    v = np.linalg.svd(P - c)[2][0]
+    return c, np.array([-v[1], v[0]])
+
+
+def fit_tron_kasa(P):
+    x, y = P[:, 0], P[:, 1]
+    D, E, F = np.linalg.lstsq(np.column_stack([x, y, np.ones_like(x)]), -(x ** 2 + y ** 2), rcond=None)[0]
+    return math.sqrt(D * D / 4 + E * E / 4 - F)
+
+
+def do_mot_anh(anh8, nguong_nhi_phan=None):
+    """Đo một ảnh bằng 2 cách. nguong_nhi_phan=None: Otsu, số: ngưỡng cố định."""
+    kq = {}
+    anh = anh8.astype(np.float32)
+    if nguong_nhi_phan is None:
+        _, bw = cv2.threshold(anh8, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    else:
+        _, bw = cv2.threshold(anh8, nguong_nhi_phan, 255, cv2.THRESH_BINARY_INV)
+    cs, _ = cv2.findContours(bw, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    thanh, dia = sorted([c for c in cs if cv2.contourArea(c) &gt; 1000], key=lambda c: cv2.boundingRect(c)[0])
+    kq["rộng, contour minAreaRect"] = min(cv2.minAreaRect(thanh)[1])
+    kq["rộng, caliper + fit"] = None                                  # điền bên dưới
+    (ex, ey), er = cv2.minEnclosingCircle(dia)
+    kq["Ø, contour minEnclosingCircle"] = 2 * er
+    kq["Ø, contour fitEllipse"] = sum(cv2.fitEllipse(dia)[1]) / 2
+
+    trai = np.array([tim_canh(anh, (80, y), (1, 0), cuc=-1) for y in range(20, 281, 10)])
+    phai = np.array([tim_canh(anh, (160, y), (1, 0), cuc=+1) for y in range(20, 281, 10)])
+    (cT, nT), (cP, nP) = fit_duong(trai), fit_duong(phai)
+    n = (nT + nP) / np.linalg.norm(nT + nP)
+    kq["rộng, caliper + fit"] = abs(np.dot(cP - cT, n))
+    P = []
+    for a in np.radians(np.arange(0, 360, 5)):
+        u = (math.cos(a), math.sin(a))
+        P.append(tim_canh(anh, (ex + er * u[0], ey + er * u[1]), u, dai=30, cuc=+1))
+    kq["Ø, caliper + Kasa"] = 2 * fit_tron_kasa(np.array(P))
+    return kq
+
+
+sach = np.load("mau_sach.npy")
+rng = np.random.default_rng(42)
+lan_do = [do_mot_anh(np.clip(sach + rng.normal(0, 3, sach.shape), 0, 255).round().astype(np.uint8))
+          for _ in range(30)]
+print(f"{'phép đo':31s} {'trung bình':&gt;10s} {'σ (px)':&gt;8s} {'6σ (mm)':&gt;8s}")
+for ten in lan_do[0]:
+    v = [kq[ten] for kq in lan_do]
+    print(f"{ten:31s} {np.mean(v):10.3f} {np.std(v):8.4f} {6 * np.std(v) * 0.05:8.4f}")
+print("giá trị thật: rộng 80.4, Ø 120.5; quy đổi 0.05 mm/px")
+
+print("\nĐèn yếu dần, contour dùng ngưỡng cố định 125:")
+for do_sang in (1.0, 0.85, 0.7):
+    anh8 = np.clip(sach * do_sang + rng.normal(0, 3, sach.shape), 0, 255).round().astype(np.uint8)
+    kq = do_mot_anh(anh8, nguong_nhi_phan=125)
+    print(f"độ sáng {do_sang:4.0%}: rộng contour {kq['rộng, contour minAreaRect']:.2f}, "
+          f"caliper {kq['rộng, caliper + fit']:.2f} | Ø fitEllipse {kq['Ø, contour fitEllipse']:.2f}, "
+          f"Kasa {kq['Ø, caliper + Kasa']:.2f}")</code></pre>
+<pre><code class="language-text">phép đo                         trung bình   σ (px)  6σ (mm)
+rộng, contour minAreaRect           80.490   0.0207   0.0062
+rộng, caliper + fit                 80.398   0.0122   0.0037
+Ø, contour minEnclosingCircle      120.552   0.0355   0.0106
+Ø, contour fitEllipse              119.575   0.0113   0.0034
+Ø, caliper + Kasa                  120.494   0.0094   0.0028
+giá trị thật: rộng 80.4, Ø 120.5; quy đổi 0.05 mm/px
+
+Đèn yếu dần, contour dùng ngưỡng cố định 125:
+độ sáng 100%: rộng contour 80.52, caliper 80.41 | Ø fitEllipse 119.57, Kasa 120.48
+độ sáng  85%: rộng contour 81.06, caliper 80.36 | Ø fitEllipse 120.11, Kasa 120.55
+độ sáng  70%: rộng contour 82.35, caliper 80.41 | Ø fitEllipse 121.21, Kasa 120.46</code></pre>
+<p>Cột 6σ (quy ra mm với 0,05 mm/px) là khoảng dao động gần như toàn bộ các lần đo. Trong nghiệm thu, người ta so nó với khoảng dung sai: với dung sai ±0,03 mm (khoảng 0,06 mm), hệ đo nên có 6σ nhỏ hơn khoảng 10% của 0,06 mm, tối đa 30% thì còn chấp nhận được có điều kiện. Đây là tinh thần của phân tích Gauge R&amp;R mà phòng QC sẽ yêu cầu khi nghiệm thu trạm đo. Đọc kết quả:</p>
+<ul>
+  <li>10% của 0,06 mm là 0,006 mm. Caliper + fit (0,0037) và caliper + Kasa (0,0028) đạt; <code>minAreaRect</code> trên contour (0,0062) chỉ vừa chạm ngưỡng; <code>minEnclosingCircle</code> (0,0106) không đạt.</li>
+  <li><code>fitEllipse</code> có độ lặp lại tốt vì nó cũng fit qua hàng trăm điểm contour. Nhưng nó lệch −0,93 px so với thật, và phần cuối của kết quả cho thấy vấn đề lớn hơn: khi đèn yếu đi 30% mà ngưỡng nhị phân giữ nguyên, đường kính theo contour trôi từ 119,57 lên 121,21 px (0,08 mm), độ rộng từ 80,52 lên 82,35 px. Caliper + fit gần như không đổi vì vị trí đỉnh gradient không phụ thuộc độ sáng tổng thể.</li>
+  <li>Bài học: fitting cho độ lặp lại, còn tìm cạnh trên mức xám (subpixel) cho kết quả không phụ thuộc ngưỡng và độ sáng. Trạm đo cần cả hai. Đèn LED giảm sáng dần theo tuổi thọ là chuyện có thật trong nhà máy.</li>
+</ul>
+
+<h2 id="10-loi-thuong-gap">10. Lỗi thường gặp</h2>
+<table>
+  <tr><th>Lỗi</th><th>Hậu quả</th><th>Cách tránh</th></tr>
+  <tr><td>Ảnh bão hòa (mức 255) ở vùng sáng</td><td>Profile bị cắt phẳng, đỉnh gradient lệch, subpixel sai hệ thống</td><td>Chỉnh exposure để vùng sáng khoảng 200–230</td></tr>
+  <tr><td>Fit <code>y = ax + b</code> cho cạnh gần đứng</td><td>Góc và vị trí sai hoàn toàn</td><td>Dùng <code>cv2.fitLine</code> hoặc SVD (bình phương tối thiểu toàn phần)</td></tr>
+  <tr><td>Không khai báo cực tính caliper</td><td>Bắt nhầm cạnh của vật bên cạnh hoặc bóng đổ</td><td>Luôn đặt cực tính, giới hạn chiều dài đường quét</td></tr>
+  <tr><td>Đo trên ảnh đã qua threshold hoặc JPEG nén mạnh</td><td>Mất thông tin mức xám ở vùng chuyển tiếp, mất subpixel</td><td>Đo trên ảnh xám gốc, lưu ảnh PNG/BMP</td></tr>
+  <tr><td>Ống kính thường, vật thay đổi chiều cao</td><td>Kích thước đổi theo khoảng cách (sai số phối cảnh) dù subpixel tốt</td><td>Cố định chiều cao vật, hoặc dùng ống kính telecentric (chặng 6)</td></tr>
+  <tr><td>Báo kết quả với 4 chữ số thập phân nhưng chưa hiệu chuẩn</td><td>Độ lặp lại tốt nhưng sai hệ thống, QC đo bằng thước kẹp thấy lệch</td><td>Hiệu chuẩn bằng mẫu chuẩn, kiểm tra định kỳ (chặng Calibration)</td></tr>
+</table>
+
+<h2 id="bai-tap">Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Dùng hàm <code>tao_profile</code> ở mục 3 với <code>sigma=0.3</code> (ảnh nét gắt) và <code>sigma=3.0</code> (ảnh mờ). Đo sai số lớn nhất của phương pháp parabol khi dời cạnh từ 20,0 đến 21,0. Ảnh nào cho kết quả tốt hơn, và khi có nhiễu σ = 3 thì sao?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+S = 16
+
+
+def tao_profile(x_canh, n=40, toi=40, sang=200, sigma=0.8):
+    u = (np.arange(n * S) + 0.5) / S - 0.5
+    cao = np.where(u &gt;= x_canh, sang, toi).astype(np.float32)
+    p = cao.reshape(n, S).mean(axis=1)
+    return cv2.GaussianBlur(p.reshape(1, -1), (0, 0), sigma).ravel()
+
+
+def canh_parabol(p):
+    g = np.zeros_like(p, dtype=np.float64)
+    g[1:-1] = np.abs(p[2:] - p[:-2]) / 2
+    k = int(np.argmax(g))
+    a, b, c = g[k - 1], g[k], g[k + 1]
+    return k + 0.5 * (a - c) / (a - 2 * b + c)
+
+
+rng = np.random.default_rng(3)
+for sigma in (0.3, 0.8, 3.0):
+    xs = np.arange(20.0, 21.0, 0.05)
+    loi = max(abs(canh_parabol(tao_profile(x, sigma=sigma)) - x) for x in xs)
+    sach = tao_profile(20.3, sigma=sigma)
+    lech = np.std([canh_parabol(sach + rng.normal(0, 3, sach.size)) for _ in range(500)])
+    print(f"sigma {sigma}: sai số hệ thống lớn nhất {loi:.3f} px, σ khi có nhiễu {lech:.3f} px")</code></pre>
+<pre><code class="language-text">sigma 0.3: sai số hệ thống lớn nhất 0.025 px, σ khi có nhiễu 0.029 px
+sigma 0.8: sai số hệ thống lớn nhất 0.025 px, σ khi có nhiễu 0.063 px
+sigma 3.0: sai số hệ thống lớn nhất 0.025 px, σ khi có nhiễu 0.784 px</code></pre>
+<p>Khi không có nhiễu, ba mức nét cho sai số hệ thống như nhau (0,025 px): nhờ cảm biến lấy trung bình trên diện tích pixel, cạnh rất nét vẫn có pixel trung gian. Khác biệt nằm ở nhiễu: ảnh nét (sigma 0,3) có gradient cao, σ chỉ 0,029 px; ảnh mờ (sigma 3) có gradient thấp và đỉnh bẹt, nhiễu làm vị trí cực đại nhảy vài pixel và parabol 3 điểm không cứu được, σ lên tới 0,78 px. Kết luận thực tế: lấy nét tốt là bắt buộc cho bài đo, và phải khóa vòng lấy nét (như bài độ sâu trường ảnh ở chặng 6). Nếu buộc phải đo trên ảnh hơi mờ, hãy làm trơn profile (lọc Gaussian 1D) trước khi lấy gradient, hoặc nội suy trên cửa sổ rộng hơn 3 điểm.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Viết hàm <code>khoang_cach_min_max(trai, phai)</code> trả về khoảng cách nhỏ nhất và lớn nhất từ các điểm cạnh phải tới đường fit của cạnh trái (dùng ảnh <code>mau.png</code>). Vì sao hai số này chênh nhau dù thanh có hai cạnh song song tuyệt đối?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+
+def tim_canh(anh, tam, huong, dai=40, cuc=0, nguong=10):
+    hx, hy = np.asarray(huong, np.float64) / np.hypot(*huong)
+    t = np.arange(-dai / 2, dai / 2 + 1)
+    mx = (tam[0] + t * hx).astype(np.float32).reshape(1, -1)
+    my = (tam[1] + t * hy).astype(np.float32).reshape(1, -1)
+    p = cv2.remap(anh, mx, my, cv2.INTER_CUBIC).ravel().astype(np.float64)
+    g = np.zeros_like(p)
+    g[1:-1] = (p[2:] - p[:-2]) / 2
+    g = np.abs(g) if cuc == 0 else g * cuc
+    k = int(np.argmax(g))
+    if g[k] &lt; nguong or k &lt; 2 or k &gt; len(g) - 3:
+        return None
+    a, b, c = g[k - 1], g[k], g[k + 1]
+    s = t[k] + 0.5 * (a - c) / (a - 2 * b + c)
+    return tam[0] + s * hx, tam[1] + s * hy
+
+
+def khoang_cach_min_max(trai, phai):
+    c = trai.mean(axis=0)
+    v = np.linalg.svd(trai - c)[2][0]
+    n = np.array([-v[1], v[0]])
+    d = np.abs((phai - c) @ n)
+    return d.min(), d.max()
+
+
+anh = cv2.imread("mau.png", cv2.IMREAD_GRAYSCALE).astype(np.float32)
+trai = np.array([tim_canh(anh, (80, y), (1, 0), cuc=-1) for y in range(20, 281, 10)])
+phai = np.array([tim_canh(anh, (160, y), (1, 0), cuc=+1) for y in range(20, 281, 10)])
+dmin, dmax = khoang_cach_min_max(trai, phai)
+print(f"nhỏ nhất {dmin:.3f} px, lớn nhất {dmax:.3f} px")</code></pre>
+<pre><code class="language-text">nhỏ nhất 80.345 px, lớn nhất 80.465 px</code></pre>
+<p>Chênh lệch đến từ nhiễu của từng điểm cạnh riêng lẻ (không được fit làm trơn). Vì vậy min/max theo điểm luôn "xấu" hơn giá trị thật, và nhạy với nhiễu. Nếu khách hàng yêu cầu đo chiều rộng nhỏ nhất, nên lấy trung bình trượt vài điểm liền kề trước khi lấy min, và ghi rõ cách tính trong tài liệu nghiệm thu.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Hệ đo dùng 0,02 mm/px. Chi tiết lỗ Ø8,00 ± 0,02 mm. Độ lặp lại đường kính đo được là σ = 0,04 px. Hệ đo này có đạt quy tắc 6σ ≤ 10% khoảng dung sai không? Nếu không, bạn có những lựa chọn nào?</p>
+<details><summary>Xem đáp án</summary>
+<p>6σ = 6 × 0,04 × 0,02 = 0,0048 mm. Khoảng dung sai = 0,04 mm, 10% là 0,004 mm. Hệ đo <strong>chưa đạt</strong> mức 10% (đạt 12%), nhưng nằm trong vùng "chấp nhận có điều kiện" (dưới 30%). Lựa chọn cải thiện, theo thứ tự nên thử: (1) tăng tương phản bằng đèn nền và chỉnh exposure, giảm nhiễu; (2) tăng số đường quét (ví dụ từ 72 lên 180 điểm, σ giảm khoảng √2,5 ≈ 1,6 lần); (3) lấy trung bình nhiều ảnh nếu cycle time cho phép; (4) cuối cùng mới tăng độ phân giải camera hoặc thu nhỏ FOV.</p>
+</details>
+</div>
+
+<h2 id="tom-tat">Tóm tắt</h2>
+<ul>
+  <li>Cạnh trong ảnh có vùng chuyển tiếp vài pixel; mức xám trung gian chứa thông tin vị trí dưới pixel.</li>
+  <li>Tìm cạnh subpixel: gradient sai phân trung tâm, lấy đỉnh, nội suy parabol 3 điểm. Sai số cỡ vài phần trăm pixel trên ảnh tốt.</li>
+  <li>Caliper: đường quét ngắn gần vuông góc với cạnh, lấy mẫu bằng <code>cv2.remap</code>, có cực tính và ngưỡng gradient.</li>
+  <li>Fit đường thẳng bằng bình phương tối thiểu toàn phần (<code>cv2.fitLine</code> DIST_L2 hoặc SVD), không dùng <code>y = ax + b</code>.</li>
+  <li>Fit đường tròn bằng Kasa (tuyến tính, nhanh); contour và <code>minEnclosingCircle</code> chỉ dùng ước lượng thô.</li>
+  <li>Ba via và nhiễu: fit bền vững bằng loại điểm lặp với σ từ MAD; theo dõi số điểm bị loại.</li>
+  <li>Nghiệm thu bằng độ lặp lại: đo nhiều lần, so 6σ với khoảng dung sai; sai lệch hệ thống bù bằng hiệu chuẩn.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Template matching: định vị chi tiết</strong>, để các đường quét luôn đặt đúng chỗ dù vật xê dịch trên băng tải.</p>
+
+      </div>
+      <div class="lesson-done" data-course="vision-engineer"><button type="button" class="lesson-done-btn" data-lesson-done="do-luong-1-do-canh-subpixel-fitting" aria-pressed="false"><span class="box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></span><span class="off">Đánh dấu đã học xong</span><span class="on">Đã học xong bài này</span></button><a class="btn lg" href="../hoc/do-luong-2-template-matching.html">Bài tiếp theo<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a></div>
+      <footer class="article-foot">
+        <div class="tags"><a class="tag" href="../search.html?q=Machine Vision">#Machine Vision</a><a class="tag" href="../search.html?q=Đo lường">#Đo lường</a><a class="tag" href="../search.html?q=OpenCV">#OpenCV</a></div>
+        <div class="share">
+      <span>Chia sẻ:</span>
+      <a class="share-btn fb" href="https://www.facebook.com/sharer/sharer.php?u=https://hocfree.vn/hoc/do-luong-1-do-canh-subpixel-fitting.html" target="_blank" rel="noopener" aria-label="Chia sẻ Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8z"/></svg></a>
+      <a class="share-btn x" href="https://twitter.com/intent/tweet?url=https://hocfree.vn/hoc/do-luong-1-do-canh-subpixel-fitting.html" target="_blank" rel="noopener" aria-label="Chia sẻ X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+      <button class="share-btn copy-link" data-url="https://hocfree.vn/hoc/do-luong-1-do-canh-subpixel-fitting.html" aria-label="Sao chép liên kết"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+    </div>
+      </footer>
+      <div class="author-box">
+        <span class="avatar lg" aria-hidden="true">HF</span>
+        <div>
+          <strong>Ban biên tập HọcFree</strong>
+          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và ngoại ngữ, hoàn toàn miễn phí.</p>
+        </div>
+      </div>
+      <nav class="pager lesson-pager" aria-label="Bài học trước/sau"><a class="prev" href="../hoc/camera-8-bai-tap-chon-cau-hinh.html"><span>← Bài trước · Bài 8 · Chặng 6</span>Bài tập chặng 6: chọn camera, ống kính, đèn cho bài toán thật</a><a class="next" href="../hoc/do-luong-2-template-matching.html"><span>Bài tiếp → · Bài 2</span>Template matching: định vị chi tiết</a></nav>
+    </article>
+    <aside class="sidebar course-side" data-course="vision-engineer">
+      <section class="widget course-toc">
+        <p class="widget-title">Chặng 7/14 · Vision Engineer</p>
+        <a class="course-toc-title" href="../lo-trinh/vision-engineer/measurement-matching-ocr.html">Measurement / Matching / OCR</a>
+        <div class="lc" data-lesson-count="do-luong-1-do-canh-subpixel-fitting do-luong-2-template-matching do-luong-3-feature-va-shape-matching doc-ma-qr-datamatrix-tren-bao-bi ocr-trong-cong-nghiep ocr-tesseract-tien-xu-ly-anh ocr-deep-learning-paddleocr-easyocr doc-so-seri-linh-kien-ocr-ocv"><div class="lc-bar"><span data-lc-bar></span></div><span data-lc-text>0/8 bài</span></div>
+        <ol class="toc-lessons"><li data-lesson="do-luong-1-do-canh-subpixel-fitting" class="is-current"><a href="../hoc/do-luong-1-do-canh-subpixel-fitting.html" aria-current="page"><span class="tn">1</span><span class="tt">Đo cạnh subpixel, fitting đường thẳng và đường tròn</span></a></li><li data-lesson="do-luong-2-template-matching"><a href="../hoc/do-luong-2-template-matching.html"><span class="tn">2</span><span class="tt">Template matching: định vị chi tiết</span></a></li><li data-lesson="do-luong-3-feature-va-shape-matching"><a href="../hoc/do-luong-3-feature-va-shape-matching.html"><span class="tn">3</span><span class="tt">Feature matching và shape matching khi vật xoay</span></a></li><li data-lesson="doc-ma-qr-datamatrix-tren-bao-bi"><a href="../projects/doc-ma-qr-datamatrix-tren-bao-bi.html"><span class="tn">4</span><span class="tt">Đọc mã QR và DataMatrix</span></a></li><li data-lesson="ocr-trong-cong-nghiep"><a href="../kien-thuc/ocr-trong-cong-nghiep.html"><span class="tn">5</span><span class="tt">OCR và OCV trong công nghiệp</span></a></li><li data-lesson="ocr-tesseract-tien-xu-ly-anh"><a href="../hoc/ocr-tesseract-tien-xu-ly-anh.html"><span class="tn">6</span><span class="tt">OCR với Tesseract và tiền xử lý</span></a></li><li data-lesson="ocr-deep-learning-paddleocr-easyocr"><a href="../hoc/ocr-deep-learning-paddleocr-easyocr.html"><span class="tn">7</span><span class="tt">OCR bằng Deep Learning</span></a></li><li data-lesson="doc-so-seri-linh-kien-ocr-ocv"><a href="../projects/doc-so-seri-linh-kien-ocr-ocv.html"><span class="tn">8</span><span class="tt">Dự án chặng 7: đọc và xác minh số seri</span></a></li></ol>
+        <a class="more" href="../lo-trinh/vision-engineer.html">Xem toàn bộ lộ trình<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a>
+      </section>
+    </aside>
+  </div>
+  <section class="band">
+    <div class="container">
+      <div class="section-title"><h2>Có thể bạn quan tâm</h2></div>
+      <div class="card-grid"><article class="card">
+  <a class="thumb" href="../hoc/python-1-cai-dat-python-va-vs-code.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-1-cai-dat-python-va-vs-code.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-1-cai-dat-python-va-vs-code.html">Python cơ bản: cài Python, VS Code và chạy chương trình đầu tiên</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>7 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/python-2-bien-kieu-du-lieu-toan-tu.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-2-bien-kieu-du-lieu-toan-tu.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-2-bien-kieu-du-lieu-toan-tu.html">Python cơ bản: biến, kiểu dữ liệu và toán tử</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/python-3-re-nhanh-va-vong-lap.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-3-re-nhanh-va-vong-lap.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-3-re-nhanh-va-vong-lap.html">Python cơ bản: rẽ nhánh và vòng lặp</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article></div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <a class="logo" href="../"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+      <p>HọcFree.vn – nền tảng học miễn phí về AI, lập trình, Computer Vision, Machine Vision, tin tức AI và ngoại ngữ dành cho người Việt.</p>
+    </div>
+    <div><h3>Học &amp; thực hành</h3><ul><li><a href="../hoc/">Học AI &amp; Lập trình</a></li><li><a href="../projects/">Projects</a></li><li><a href="../lo-trinh/">Learning Paths</a></li></ul></div>
+    <div><h3>Khám phá</h3><ul><li><a href="../kien-thuc/">Kiến thức</a></li><li><a href="../tin-tuc-ai/">Tin tức AI</a></li><li><a href="../ngoai-ngu/">Ngoại ngữ</a></li><li><a href="../tai-nguyen/">Tài nguyên</a></li></ul></div>
+    <div><h3>Bài mới</h3><ul><li><a href="../hoc/python-1-cai-dat-python-va-vs-code.html">Python cơ bản: cài Python, VS Code và chạy chương trình đầu tiên</a></li><li><a href="../hoc/python-2-bien-kieu-du-lieu-toan-tu.html">Python cơ bản: biến, kiểu dữ liệu và toán tử</a></li><li><a href="../hoc/python-3-re-nhanh-va-vong-lap.html">Python cơ bản: rẽ nhánh và vòng lặp</a></li><li><a href="../hoc/python-4-list-tuple-dict-set.html">Python cơ bản: list, tuple, dict và set</a></li></ul></div>
+    <div>
+      <h3>HọcFree</h3>
+      <ul>
+        <li><a href="../gioi-thieu.html">Giới thiệu</a></li>
+        <li><a href="../search.html">Tìm kiếm</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">© 2026 HọcFree.vn · Kiến thức là để chia sẻ.</div>
+  </div>
+</footer>
+<button class="to-top" aria-label="Lên đầu trang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<script src="../assets/js/search-data.js?v=20261009" defer></script>
+<script src="../assets/js/main.js?v=20261009" defer></script>
+</body>
+</html>

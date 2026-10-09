@@ -1,0 +1,261 @@
+<p>Bài <em>Chọn camera và ống kính</em> đã nhắc tới ống kính telecentric trong một dòng: "gần như bắt buộc cho đo lường chính xác cao". Câu đó đúng nhưng chưa đủ để ra quyết định. Ống kính telecentric có thể đắt hơn cả camera, loại lớn nặng vài kg, và giới hạn trường nhìn, nên kỹ sư phải <strong>chứng minh bằng số</strong> là bài đo cần nó, hoặc chứng minh là không cần. Bài này cho bạn công cụ để làm việc đó: tính sai số phối cảnh của ống kính thường, hiểu ống kính telecentric khắc phục được gì (và không khắc phục được gì), rồi áp dụng một danh sách kiểm tra cho từng bài đo. Kiến thức về độ sâu trường ảnh ở bài <em>Độ sâu trường ảnh, khẩu độ, lấy nét</em> sẽ được dùng lại.</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Với một bài đo bất kỳ (kích thước, dung sai, dao động chiều cao, khoảng làm việc, độ dày vật), bạn tính được sai số phối cảnh của ống kính thường bằng Python, so với dải dung sai và kết luận: ống kính thường là đủ, cần đồ gá tốt hơn, hay phải dùng telecentric.</div>
+
+<h2>1. Ống kính thường "nhìn" như thế nào?</h2>
+<p>Ống kính thông thường trong Machine Vision (tiếng Anh gọi là <strong>entocentric</strong> hay <em>ống kính tiêu cự cố định</em>) hoạt động giống mô hình <strong>pinhole</strong>: mọi tia sáng chính (chief ray, tia đi qua tâm khẩu độ) hội tụ về một điểm gọi là <strong>tâm chiếu</strong> (về mặt quang học là đồng tử vào, entrance pupil, nằm đâu đó bên trong ống kính). Từ đó suy ra công thức độ phóng đại quen thuộc:</p>
+<pre><code class="language-text">Kích thước trên cảm biến   h' = f · L / Z
+Kích thước trên ảnh (px)   n  = f · L / (Z · p)
+
+L : kích thước thật của vật (mm)
+Z : khoảng cách từ tâm chiếu tới vật (mm), xấp xỉ khoảng làm việc WD
+f : tiêu cự (mm)        p : kích thước pixel trên cảm biến (mm)
+
+Độ phóng đại m = h' / L = f / Z   (gần đúng khi Z ≫ f; công thức thấu kính mỏng cho f / (Z − f))</code></pre>
+<p>Điều quan trọng nằm ở mẫu số: <strong>kích thước ảnh tỉ lệ nghịch với Z</strong>. Bạn hiệu chuẩn thang đo mm/pixel ở một khoảng cách Z₀; nếu vật nằm gần camera hơn một chút, nó hiện to hơn và chương trình báo kích thước lớn hơn thật. Với lấy nét cố định, vị trí tia chính trên cảm biến vẫn tuân theo quy luật 1/Z (ảnh chỉ mờ thêm nếu vật ra khỏi độ sâu trường ảnh), nên ta có công thức sai số rất gọn:</p>
+<pre><code class="language-text">L_đo = L · Z₀ / (Z₀ + ΔZ)        →   sai số tương đối ≈ −ΔZ / Z₀
+
+Ví dụ: chi tiết 20 mm, Z₀ = 200 mm, vật lên/xuống ±1 mm
+        sai số ≈ 1/200 = 0,5 %  →  ±0,1 mm</code></pre>
+<p>Kiểm chứng bằng Python cho cả dải ΔZ:</p>
+<pre><code class="language-python">def kich_thuoc_bieu_kien(L, Z0, dZ):
+    """Kích thước đo được (mm) khi thang đo hiệu chuẩn ở Z0 nhưng vật nằm ở Z0 + dZ (dZ &gt; 0: xa camera hơn)."""
+    return L * Z0 / (Z0 + dZ)
+
+
+L, Z0 = 20.0, 200.0
+print(" dZ (mm) | đo được (mm) | sai số (mm) | sai số (%)")
+for dZ in (-2, -1, -0.5, 0, 0.5, 1, 2):
+    Ld = kich_thuoc_bieu_kien(L, Z0, dZ)
+    print(f"{dZ:+8.1f} | {Ld:12.4f} | {Ld - L:+11.4f} | {100 * (Ld - L) / L:+9.2f}")</code></pre>
+<pre><code class="language-text"> dZ (mm) | đo được (mm) | sai số (mm) | sai số (%)
+    -2.0 |      20.2020 |     +0.2020 |     +1.01
+    -1.0 |      20.1005 |     +0.1005 |     +0.50
+    -0.5 |      20.0501 |     +0.0501 |     +0.25
+    +0.0 |      20.0000 |     +0.0000 |     +0.00
+    +0.5 |      19.9501 |     -0.0499 |     -0.25
+    +1.0 |      19.9005 |     -0.0995 |     -0.50
+    +2.0 |      19.8020 |     -0.1980 |     -0.99</code></pre>
+<p>Nếu dung sai của chi tiết này là ±0,05 mm (dải dung sai 0,1 mm), chỉ riêng việc vật nảy lên xuống ±1 mm trên băng tải đã làm kết quả dao động 0,2 mm, <strong>gấp đôi cả dải dung sai</strong>. Không thuật toán subpixel nào cứu được lỗi này, vì nó nằm trong hình học của phép chiếu, không nằm trong ảnh.</p>
+<div class="warn"><strong>Z không phải khoảng cách từ mặt trước ống kính</strong>Tâm chiếu (đồng tử vào) thường nằm bên trong ống kính, có khi cách mặt trước vài chục mm. Dùng WD đo bằng thước để tính sai số là đủ cho ước lượng, nhưng muốn chính xác hãy đo thang mm/pixel ở hai độ cao khác nhau rồi suy ra Z thật (bài tập 1).</div>
+
+<h2>2. Ba dạng sai số phối cảnh trong nhà máy</h2>
+<table>
+  <tr><th>Dạng</th><th>Nguyên nhân</th><th>Độ lớn (gần đúng)</th><th>Ví dụ</th></tr>
+  <tr><td>Đổi tỉ lệ</td><td>Vật lên/xuống ΔZ so với mặt hiệu chuẩn</td><td>L · ΔZ / Z</td><td>Chi tiết nảy trên băng tải, khay cong, đồ gá mòn</td></tr>
+  <tr><td>Trôi vị trí (parallax)</td><td>Điểm cách trục quang x mm, lên/xuống ΔZ</td><td>x · ΔZ / Z</td><td>Tọa độ gửi robot sai khi vật cao thấp khác nhau</td></tr>
+  <tr><td>Thấy thành bên</td><td>Vật dày hoặc lỗ sâu nằm lệch tâm ảnh: camera nhìn xiên thấy cả thành</td><td>x · t / Z (t: độ dày)</td><td>Bề rộng khối dày, đường kính lỗ xuyên trên tấm thép đổi theo vị trí</td></tr>
+</table>
+<p>Dạng thứ ba khó nhận ra nhất vì nó xảy ra <strong>ngay cả khi vật nằm phẳng tuyệt đối</strong>. Với đèn nền (backlight), bóng của một khối dày được tạo bởi cạnh trên ở phía xa trục và cạnh dưới ở phía gần trục; còn ánh sáng đi qua một lỗ xuyên chỉ lọt qua phần giao của miệng trên và miệng dưới. Mô phỏng bằng mô hình pinhole, hiệu chuẩn ở mặt đỡ (Z₀ = 200 mm):</p>
+<pre><code class="language-python">Z0 = 200.0          # mặt phẳng hiệu chuẩn = mặt đỡ (mặt dưới vật), cách tâm chiếu 200 mm
+
+
+def chieu(x, z):
+    """Ống kính thường (pinhole): điểm ở hoành độ x, cao z trên mặt đỡ → tọa độ quy về mặt Z0 (mm)."""
+    return x * Z0 / (Z0 - z)
+
+
+def rong_khoi(xc, rong, day):
+    """Bề rộng bóng (backlight) của khối hộp rộng `rong`, dày `day`, tâm tại xc."""
+    xs = [chieu(xc + s * rong / 2, z) for s in (-1, 1) for z in (0, day)]
+    return max(xs) - min(xs)
+
+
+def lo_xuyen(xc, d, day):
+    """Đường kính biểu kiến của lỗ xuyên: ánh sáng chỉ lọt qua phần giao của miệng trên và miệng dưới."""
+    trai = max(chieu(xc - d / 2, 0), chieu(xc - d / 2, day))
+    phai = min(chieu(xc + d / 2, 0), chieu(xc + d / 2, day))
+    return phai - trai
+
+
+print("Khối 20 mm, dày 10 mm      |  Lỗ Ø6 mm trên tấm dày 1,5 mm")
+print("tâm x (mm)  rộng đo (mm)   |  tâm x (mm)  Ø đo (mm)")
+for xc_k, xc_l in ((0, 0), (20, 15), (40, 30)):
+    print(f"{xc_k:9.0f}   {rong_khoi(xc_k, 20, 10):11.3f}    |  "
+          f"{xc_l:9.0f}   {lo_xuyen(xc_l, 6, 1.5):8.3f}")</code></pre>
+<pre><code class="language-text">Khối 20 mm, dày 10 mm      |  Lỗ Ø6 mm trên tấm dày 1,5 mm
+tâm x (mm)  rộng đo (mm)   |  tâm x (mm)  Ø đo (mm)
+        0        21.053    |          0      6.000
+       20        21.579    |         15      5.909
+       40        22.632    |         30      5.796</code></pre>
+<ul>
+  <li><strong>Khối dày 10 mm</strong>: ở giữa ảnh, bóng là mặt trên (gần camera hơn 10 mm) nên rộng 21,05 mm. Dời sang mép, camera nhìn thấy cả thành bên, bóng rộng 22,63 mm. Kết quả thay đổi <strong>1,6 mm chỉ vì vị trí trong ảnh</strong>. Hiệu chuẩn lại ở mặt trên cũng không hết, vì phần thành bên thấy được vẫn đổi theo vị trí.</li>
+  <li><strong>Lỗ Ø6 trên tấm 1,5 mm</strong>: ở tâm ảnh đo đúng 6,000; cách tâm 30 mm chỉ còn 5,796 mm, hụt 0,2 mm. Với dung sai lỗ ±0,1 mm, một lỗ hoàn toàn đạt sẽ bị báo NG khi nằm ở mép ảnh: đó là <strong>overkill có hệ thống</strong>, rất khó tìm ra nếu không biết nguyên nhân quang học.</li>
+</ul>
+
+<h2>3. Ống kính telecentric hoạt động thế nào?</h2>
+<p>Ý tưởng: đặt khẩu độ (aperture stop) đúng tại tiêu điểm sau của cụm thấu kính phía trước. Khi đó chỉ những tia đi <strong>song song với trục quang</strong> ở phía vật mới qua được tâm khẩu độ. Mọi tia chính đều song song, nên vật gần hay xa (trong một dải nhất định) đều cho ảnh cùng kích thước, và camera nhìn thẳng xuống mọi điểm trong trường nhìn, không thấy thành bên.</p>
+<pre><code class="language-text">Ống kính thường:       tia chính hội tụ về tâm chiếu → góc nhìn tại điểm cách trục x: α = atan(x / Z)
+                       vật gần hơn ΔZ → ảnh to hơn khoảng ΔZ / Z
+
+Telecentric phía vật:  khẩu độ đặt tại tiêu điểm sau của cụm thấu kính trước
+                       → tia chính song song trục quang (α ≈ 0 trên toàn trường nhìn)
+                       → trong dải telecentric: vật gần hay xa cho ảnh cùng kích thước
+
+Bi-telecentric:        telecentric cả phía vật và phía cảm biến
+                       → thêm: không nhạy với xê dịch nhỏ của cảm biến/vòng nét, độ sáng đều hơn trên ảnh</code></pre>
+<p>Hệ quả trực tiếp của thiết kế này là các tính chất bạn phải nhớ khi đọc datasheet:</p>
+<table>
+  <tr><th>Thông số</th><th>Ý nghĩa</th><th>Hệ quả khi chọn</th></tr>
+  <tr><td><strong>Độ phóng đại cố định</strong> (ví dụ 0,1×; 0,25×; 0,5×; 1×)</td><td>FOV = kích thước cảm biến / m. Không có "tiêu cự" để chọn như ống kính thường</td><td>Chọn cặp cảm biến + độ phóng đại để FOV vừa đủ; muốn đổi FOV phải đổi ống kính</td></tr>
+  <tr><td><strong>Trường nhìn tối đa</strong> (object field, thường ghi theo đường kính)</td><td>Thấu kính trước phải lớn hơn trường nhìn: FOV ≤ đường kính thấu kính trước</td><td>Đường chéo FOV phải nằm gọn trong trường nhìn ghi trên datasheet. FOV 100 mm cần thấu kính trước trên 100 mm</td></tr>
+  <tr><td><strong>Khoảng làm việc cố định</strong></td><td>Ống kính được thiết kế cho một WD danh định</td><td>Phải bố trí cơ khí đúng WD đó, không chỉnh tùy ý như ống kính thường</td></tr>
+  <tr><td><strong>Dải telecentric</strong> và <strong>độ sâu trường ảnh</strong></td><td>Dải Z mà độ phóng đại gần như không đổi; DOF là dải Z mà ảnh còn đủ nét. Hai khái niệm khác nhau</td><td>Dao động chiều cao của vật phải nằm trong cả hai dải. Ống kính có độ phóng đại lớn thường DOF chỉ còn vài phần mm</td></tr>
+  <tr><td><strong>Độ telecentric</strong> (telecentricity, đơn vị độ)</td><td>Góc lớn nhất của tia chính so với trục, ví dụ dưới 0,1°</td><td>Sai số còn lại mỗi cạnh ≈ ΔZ · tan(θ). Góc càng nhỏ càng tốt</td></tr>
+  <tr><td><strong>Méo (distortion)</strong></td><td>Thường rất thấp so với ống kính thường</td><td>Vẫn nên hiệu chuẩn nếu yêu cầu cao (chặng Calibration)</td></tr>
+  <tr><td><strong>Khẩu độ làm việc</strong> (working F-number)</td><td>Thường khẩu độ nhỏ, ít ánh sáng vào</td><td>Cần đèn mạnh hoặc đèn chiếu song song hiệu suất cao</td></tr>
+</table>
+<p>Bảng sau so sánh sai số còn lại của ống kính telecentric với ống kính thường, cùng bài toán chi tiết 20 mm dao động ±1 mm:</p>
+<pre><code class="language-python">import math
+
+dZ = 1.0                                   # vật lên xuống ±1 mm
+L = 20.0
+print("Ống kính thường, Z = 200 mm: tia chính ở mép vật nghiêng "
+      f"{math.degrees(math.atan(L / 2 / 200)):.2f}°, sai số kích thước ±{L * dZ / (200 - dZ):.4f} mm")
+print("Ống kính telecentric:")
+print("độ telecentric | lệch mỗi cạnh (µm) | sai số kích thước tối đa (µm)")
+for theta in (0.05, 0.1, 0.2, 0.5):
+    lech = dZ * math.tan(math.radians(theta)) * 1000
+    print(f"{theta:10.2f}°    | {lech:18.2f} | {2 * lech:20.2f}")</code></pre>
+<pre><code class="language-text">Ống kính thường, Z = 200 mm: tia chính ở mép vật nghiêng 2.86°, sai số kích thước ±0.1005 mm
+Ống kính telecentric:
+độ telecentric | lệch mỗi cạnh (µm) | sai số kích thước tối đa (µm)
+      0.05°    |               0.87 |                 1.75
+      0.10°    |               1.75 |                 3.49
+      0.20°    |               3.49 |                 6.98
+      0.50°    |               8.73 |                17.45</code></pre>
+<p>Ống kính thường có góc tia chính 2,86° ở mép chi tiết; ống kính telecentric tốt có dưới 0,1°, tức là sai số giảm khoảng 30 lần (100 µm xuống còn khoảng 3,5 µm). Lưu ý cột cuối là trường hợp xấu nhất khi hai cạnh đối diện lệch ngược chiều nhau.</p>
+
+<h2>4. Ưu và nhược điểm</h2>
+<table>
+  <tr><th>Ưu điểm</th><th>Nhược điểm</th></tr>
+  <tr><td>Độ phóng đại không đổi trong dải telecentric: vật lên xuống không đổi kích thước đo</td><td>FOV bị giới hạn bởi đường kính thấu kính trước; FOV lớn thì ống kính rất to, nặng (có loại nặng vài kg) và đắt</td></tr>
+  <tr><td>Không thấy thành bên: đo đúng vật dày, lỗ xuyên, chi tiết trụ đứng ở bất kỳ vị trí nào trong ảnh</td><td>Giá thường cao hơn nhiều lần ống kính thường cùng cảm biến; đèn chiếu song song đi kèm cũng đắt</td></tr>
+  <tr><td>Méo rất thấp, độ phóng đại đồng đều trên toàn ảnh</td><td>Khoảng làm việc cố định, chiều dài ống kính lớn: cần không gian cơ khí và giá đỡ chắc</td></tr>
+  <tr><td>Bi-telecentric: ít nhạy với xê dịch nét, độ sáng đều trên ảnh</td><td>Không nhìn được mặt bên của vật (nhược điểm nếu bài toán cần thấy thành, ren, mặt bên)</td></tr>
+  <tr><td>Kết hợp đèn chiếu song song cho biên cạnh rất sắc, ổn định</td><td>Khẩu độ nhỏ nên cần nhiều ánh sáng; DOF có thể nhỏ ở độ phóng đại lớn</td></tr>
+</table>
+
+<h2>5. Đèn đi kèm: vì sao nên dùng đèn nền chiếu song song?</h2>
+<p>Ống kính telecentric chỉ nhận các tia gần như song song với trục. Với <strong>đèn nền khuếch tán</strong> thông thường (bài <em>7 kiểu chiếu sáng</em>), ánh sáng tỏa mọi hướng: phần lớn không đi vào ống kính (lãng phí), và một phần chiếu xiên sẽ phản xạ trên thành bên của vật (mặt trụ của chốt, thành lỗ kim loại) rồi lọt vào ống kính. Kết quả là biên cạnh có viền sáng, vị trí cạnh đo được bị kéo vào trong và thay đổi theo độ bóng bề mặt.</p>
+<p><strong>Đèn nền chiếu song song (collimated backlight, còn gọi telecentric illuminator)</strong> chỉ phát ra chùm tia song song khớp với góc nhận của ống kính:</p>
+<ul>
+  <li>Biên bóng sắc, gần như không có phản xạ từ thành bên, vị trí cạnh không phụ thuộc vật liệu bóng hay mờ.</li>
+  <li>Hiệu suất cao: gần như toàn bộ ánh sáng đi vào ống kính, nên đủ sáng cho thời gian phơi sáng rất ngắn khi vật chạy trên băng tải.</li>
+  <li>Bước sóng ngắn (xanh lá, xanh dương) cho biên sắc hơn một chút do nhiễu xạ nhỏ hơn; đèn xanh lá là lựa chọn phổ biến cho cặp ống kính và đèn telecentric.</li>
+</ul>
+<p>Với bề mặt phẳng phản xạ (wafer, kim loại mài), ống kính telecentric cũng hay đi với <strong>đèn đồng trục</strong> (coaxial): mặt phẳng hiện sáng đều trên toàn trường nhìn vì mọi điểm đều được nhìn thẳng góc.</p>
+<div class="warn"><strong>Căn chỉnh là bắt buộc</strong>Đèn chiếu song song và ống kính telecentric phải đồng trục. Lệch góc một chút là ảnh tối ở một phía hoặc biên không đều. Gá cả hai trên cùng một khung cứng và căn chỉnh bằng ảnh (độ sáng nền đều, biên vật chuẩn sắc đều bốn phía).</div>
+
+<h2>6. Quyết định: có cần telecentric không?</h2>
+<p>Quy tắc kinh nghiệm cho ngân sách sai số: toàn bộ sai số của hệ đo nên nhỏ hơn khoảng <strong>10% dải dung sai</strong>, tối đa khoảng 30% (giống ngưỡng thường dùng khi đánh giá hệ đo bằng Gage R&amp;R). Sai số phối cảnh chỉ là <em>một</em> thành phần, nên nếu riêng nó đã vượt 10% thì phải xử lý. Hàm dưới đây gom các công thức ở mục 2 thành một công cụ quyết định:</p>
+<pre><code class="language-python">def nen_dung_telecentric(ten, L, dung_sai, dZ, Z, day=0.0, x_max=0.0, fov=0.0):
+    """Ước lượng sai số phối cảnh của ống kính thường và gợi ý lựa chọn.
+    L: kích thước cần đo, dung_sai: ± (mm), dZ: dao động chiều cao ± (mm),
+    Z: khoảng cách tâm chiếu tới vật (≈ WD), day: độ dày/chiều sâu thành của đặc trưng,
+    x_max: đặc trưng cách trục quang xa nhất bao nhiêu, fov: trường nhìn cần (mm)."""
+    dai_dung_sai = 2 * dung_sai
+    e_tile = L * dZ / (Z - dZ)                          # đổi tỉ lệ khi vật lên/xuống
+    e_thanh = x_max * day / (Z - day) if day else 0.0   # thấy thành bên khi lệch tâm
+    dai_sai_so = 2 * e_tile + e_thanh                   # dải biến thiên kết quả do phối cảnh
+    ty_le = dai_sai_so / dai_dung_sai
+    if ty_le &lt;= 0.10:
+        goi_y = "ống kính thường đủ (hiệu chuẩn đúng mặt phẳng đo)"
+    elif fov &gt; 100:
+        goi_y = "FOV lớn, telecentric không thực tế: đồ gá cố định chiều cao hoặc đo 3D để bù"
+    elif ty_le &lt;= 0.30:
+        goi_y = "cân nhắc: tăng WD, cố định chiều cao bằng đồ gá, hoặc telecentric"
+    else:
+        goi_y = "cần telecentric"
+    print(f"{ten}: tỉ lệ {e_tile:.4f} mm, thành {e_thanh:.4f} mm → "
+          f"{dai_sai_so:.3f} mm = {100 * ty_le:.0f}% dải dung sai → {goi_y}")
+
+
+nen_dung_telecentric("A. Chốt 20 mm ±0,05", L=20, dung_sai=0.05, dZ=1.0, Z=200, fov=30)
+nen_dung_telecentric("B. Nắp nhựa 150 mm ±0,3", L=150, dung_sai=0.3, dZ=0.2, Z=500, fov=180)
+nen_dung_telecentric("C. Lỗ Ø6 ±0,1 trên tấm 1,5 mm", L=6, dung_sai=0.1, dZ=0.3, Z=250,
+                     day=1.5, x_max=30, fov=70)
+nen_dung_telecentric("D. Khoảng cách lỗ PCB 50 mm ±0,1", L=50, dung_sai=0.1, dZ=0.05, Z=400, fov=70)</code></pre>
+<pre><code class="language-text">A. Chốt 20 mm ±0,05: tỉ lệ 0.1005 mm, thành 0.0000 mm → 0.201 mm = 201% dải dung sai → cần telecentric
+B. Nắp nhựa 150 mm ±0,3: tỉ lệ 0.0600 mm, thành 0.0000 mm → 0.120 mm = 20% dải dung sai → FOV lớn, telecentric không thực tế: đồ gá cố định chiều cao hoặc đo 3D để bù
+C. Lỗ Ø6 ±0,1 trên tấm 1,5 mm: tỉ lệ 0.0072 mm, thành 0.1811 mm → 0.196 mm = 98% dải dung sai → cần telecentric
+D. Khoảng cách lỗ PCB 50 mm ±0,1: tỉ lệ 0.0063 mm, thành 0.0000 mm → 0.013 mm = 6% dải dung sai → ống kính thường đủ (hiệu chuẩn đúng mặt phẳng đo)</code></pre>
+<p>Đọc kết quả như một kỹ sư:</p>
+<ul>
+  <li><strong>A</strong>: chi tiết nhỏ, dung sai chặt, nảy trên băng tải. Telecentric phù hợp: FOV khoảng 30 mm nằm trong tầm ống kính phổ biến.</li>
+  <li><strong>B</strong>: 20% là vùng "cân nhắc", nhưng FOV 180 mm thì telecentric quá cồng kềnh. Giải pháp kinh tế hơn: đồ gá ép phẳng nắp để giảm ΔZ, hoặc tăng khoảng làm việc (sai số tỉ lệ với 1/Z).</li>
+  <li><strong>C</strong>: điều thú vị là sai số do lên xuống chỉ 0,007 mm, nhưng sai số do thấy thành lỗ là 0,18 mm. Đồ gá tốt không giải quyết được dạng sai số này; chỉ có telecentric (hoặc giữ lỗ luôn gần tâm ảnh) mới giải quyết được.</li>
+  <li><strong>D</strong>: đồ gá cứng, chi tiết mỏng: ống kính thường cộng hiệu chuẩn tốt là đủ. Tiết kiệm được chi phí và không gian.</li>
+</ul>
+<p>Danh sách kiểm tra trước khi đặt mua:</p>
+<table>
+  <tr><th>#</th><th>Câu hỏi</th><th>Nếu "có"</th></tr>
+  <tr><td>1</td><td>Sai số phối cảnh (tỉ lệ + thành bên) vượt khoảng 10% dải dung sai?</td><td>Phải xử lý: sang câu 2</td></tr>
+  <tr><td>2</td><td>Có thể giảm ΔZ bằng đồ gá, chặn cứng, hút chân không? Có thể tăng WD?</td><td>Thử phương án cơ khí trước, tính lại</td></tr>
+  <tr><td>3</td><td>Vật dày, có lỗ xuyên, chi tiết trụ đứng, hoặc đặc trưng nằm xa tâm ảnh?</td><td>Telecentric gần như là lựa chọn duy nhất</td></tr>
+  <tr><td>4</td><td>Đường chéo FOV cần thiết có nằm trong trường nhìn của ống kính telecentric khả thi (thực tế thường tới khoảng 100 mm)?</td><td>Nếu không: chia nhiều camera, hoặc đo 3D, hoặc chấp nhận ống kính thường + đồ gá</td></tr>
+  <tr><td>5</td><td>Dao động chiều cao nằm trong cả dải telecentric và DOF của ống kính định chọn?</td><td>Nếu không: chọn độ phóng đại nhỏ hơn hoặc giảm ΔZ</td></tr>
+  <tr><td>6</td><td>Có chỗ cho ống kính dài, khoảng làm việc cố định, và đèn chiếu song song?</td><td>Nếu không: thiết kế lại cơ khí trạm</td></tr>
+  <tr><td>7</td><td>Độ phân giải (mm/pixel) có đủ cho dung sai không?</td><td>Telecentric không thay thế được độ phân giải: kiểm tra riêng (bài tập 3)</td></tr>
+</table>
+
+<h2>7. Những lỗi thường gặp</h2>
+<ul>
+  <li><strong>Hiệu chuẩn ở sai mặt phẳng.</strong> Đặt thước chuẩn trên mặt băng tải nhưng đo mặt trên của chi tiết dày 8 mm ở Z = 300 mm: sai số hệ thống 8/300 ≈ 2,7%. Luôn hiệu chuẩn ở đúng độ cao của đặc trưng cần đo.</li>
+  <li><strong>Nghĩ rằng telecentric thì không cần hiệu chuẩn.</strong> Độ phóng đại thật lệch so với danh định một chút, méo nhỏ nhưng không bằng 0. Vẫn đo vật chuẩn để có thang mm/pixel (bài <em>Quy đổi pixel sang mm và đánh giá sai số</em> ở chặng Calibration).</li>
+  <li><strong>Dùng đèn nền khuếch tán cho chi tiết trụ bóng</strong> với ống kính telecentric rồi thắc mắc vì sao đường kính đo nhỏ hơn thật và đổi theo lô.</li>
+  <li><strong>Nhầm dải telecentric với DOF.</strong> Trong dải telecentric nhưng ngoài DOF: kích thước không đổi nhưng biên mờ, vị trí cạnh kém lặp lại.</li>
+  <li><strong>Chọn telecentric chỉ vì "đo lường thì phải telecentric"</strong> khi chi tiết mỏng nằm trên đồ gá cứng (trường hợp D): tốn tiền, tốn không gian, trường nhìn bị giới hạn mà không thu thêm độ chính xác đáng kể.</li>
+  <li><strong>Đặt ống kính telecentric nặng lên ngàm camera mà không có giá đỡ.</strong> Ống kính dài vài trăm mm treo trên ngàm C-mount sẽ võng và rung; phải đỡ chính thân ống kính.</li>
+</ul>
+
+<h2>8. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Bạn đặt tấm chuẩn trên băng tải và đo được thang 0,05000 mm/pixel. Kê tấm chuẩn cao thêm 10 mm (gần camera hơn), thang đo còn 0,04750 mm/pixel. Tính khoảng cách Z thật từ tâm chiếu tới mặt băng tải. Nếu chi tiết nảy ±0,5 mm, kích thước 30 mm sai bao nhiêu?</p>
+<details><summary>Xem đáp án</summary>
+<p>Thang mm/pixel tỉ lệ thuận với Z (vật xa thì mỗi pixel phủ nhiều mm hơn): s₁/s₂ = Z/(Z − 10) → 0,05/0,0475 = Z/(Z − 10) → Z = 10 · 0,05 / (0,05 − 0,0475) = <strong>200 mm</strong>.</p>
+<pre><code class="language-python">s1, s2, dh = 0.05000, 0.04750, 10.0
+Z = dh * s1 / (s1 - s2)
+L, dZ = 30.0, 0.5
+print(f"Z = {Z:.1f} mm, sai số ±{L * dZ / (Z - dZ):.3f} mm")</code></pre>
+<pre><code class="language-text">Z = 200.0 mm, sai số ±0.075 mm</code></pre>
+<p>Cách đo hai độ cao này cho Z thật của tâm chiếu, chính xác hơn việc đo WD bằng thước từ mặt trước ống kính.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Camera 2448 × 2048 pixel, pixel 3,45 µm. Cần FOV tối thiểu 30 × 25 mm. Danh mục ống kính telecentric có các độ phóng đại 0,2×; 0,25×; 0,3×. Chọn ống kính nào? FOV, kích thước pixel trên vật và đường chéo trường nhìn tối thiểu của ống kính là bao nhiêu?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import math
+
+W, H, p = 2448, 2048, 0.00345              # pixel, pixel, mm
+sw, sh = W * p, H * p                      # kích thước cảm biến (mm)
+print(f"Cảm biến {sw:.2f} × {sh:.2f} mm, cần m ≤ {min(sw / 30, sh / 25):.3f}")
+for m in (0.3, 0.25, 0.2):
+    fw, fh = sw / m, sh / m
+    dat = "đạt" if fw &gt;= 30 and fh &gt;= 25 else "thiếu"
+    print(f"m = {m:.2f}×: FOV {fw:5.1f} × {fh:4.1f} mm, pixel {1000 * p / m:4.1f} µm, "
+          f"chéo {math.hypot(fw, fh):4.1f} mm → {dat}")</code></pre>
+<pre><code class="language-text">Cảm biến 8.45 × 7.07 mm, cần m ≤ 0.282
+m = 0.30×: FOV  28.2 × 23.6 mm, pixel 11.5 µm, chéo 36.7 mm → thiếu
+m = 0.25×: FOV  33.8 × 28.3 mm, pixel 13.8 µm, chéo 44.0 mm → đạt
+m = 0.20×: FOV  42.2 × 35.3 mm, pixel 17.2 µm, chéo 55.1 mm → đạt</code></pre>
+<p>Chọn <strong>0,25×</strong>: đủ FOV mà giữ pixel nhỏ nhất (13,8 µm trên vật). Trường nhìn của ống kính phải phủ đường chéo khoảng 44 mm. 0,2× cũng đủ FOV nhưng phí độ phân giải.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Đo đường kính ngoài vòng bi 40 mm, dung sai ±0,02 mm, vòng bi nằm trên băng tải (ΔZ ±0,5 mm), WD 300 mm, vòng bi cao 12 mm. Có cần telecentric không? Chỉ telecentric có đủ không?</p>
+<details><summary>Xem đáp án</summary>
+<p>Sai số tỉ lệ: 40 · 0,5 / 299,5 ≈ 0,067 mm, dải biến thiên 0,134 mm so với dải dung sai 0,04 mm, tức là hơn <strong>300%</strong>. Thêm vào đó vòng bi cao 12 mm nên camera thường sẽ thấy thành bên. Vậy <strong>bắt buộc telecentric</strong> và đèn nền chiếu song song (mặt trụ thép bóng).</p>
+<p>Nhưng <strong>chưa đủ</strong>: dung sai 0,04 mm, theo quy tắc kinh nghiệm thận trọng "dải dung sai phủ ít nhất khoảng 10 pixel", mỗi pixel phải nhỏ hơn 0,004 mm, tức FOV 50 mm cần khoảng 12.500 pixel một chiều. Phương án thực tế: hai camera telecentric độ phóng đại lớn, mỗi camera chỉ nhìn một mép (đo khoảng cách hai mép bằng hiệu chuẩn chung), kết hợp đo cạnh subpixel và chứng minh độ lặp lại bằng thử nghiệm; hoặc dùng thiết bị đo chuyên dụng (micrometer laser). Telecentric giải quyết hình học, không giải quyết độ phân giải.</p>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Ống kính thường: kích thước ảnh tỉ lệ với 1/Z. Sai số tương đối ≈ ΔZ/Z; chi tiết 20 mm ở 200 mm lên xuống ±1 mm sai ±0,1 mm (±0,5%).</li>
+  <li>Ba dạng sai số phối cảnh: đổi tỉ lệ (L·ΔZ/Z), trôi vị trí (x·ΔZ/Z), thấy thành bên (x·t/Z). Dạng thứ ba xảy ra cả khi vật nằm phẳng.</li>
+  <li>Telecentric phía vật: tia chính song song trục, độ phóng đại cố định trong dải telecentric, không thấy thành bên. Sai số còn lại ≈ ΔZ·tan(θ) mỗi cạnh.</li>
+  <li>Đổi lại: FOV ≤ đường kính thấu kính trước, WD cố định, to, nặng, đắt, ít ánh sáng; nên dùng với đèn nền chiếu song song.</li>
+  <li>Quyết định bằng số: sai số phối cảnh so với dải dung sai (≤ 10% ổn, 10–30% cân nhắc, &gt; 30% phải xử lý); thử giải pháp cơ khí trước nếu sai số chủ yếu do ΔZ.</li>
+  <li>Telecentric không thay thế độ phân giải và không thay thế hiệu chuẩn.</li>
+</ul>
+<p>Bài tiếp theo: <strong>7 kiểu chiếu sáng và khi nào dùng</strong>, nơi bạn chọn đèn theo vật liệu và loại lỗi.</p>
