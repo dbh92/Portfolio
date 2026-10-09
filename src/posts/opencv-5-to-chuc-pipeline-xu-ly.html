@@ -1,0 +1,205 @@
+<p>Thử nghiệm thuật toán trong một file dài 300 dòng thì nhanh, nhưng mang lên trạm thật sẽ gặp đủ thứ: muốn đổi ngưỡng phải sửa code, không biết bước nào chậm, không chạy lại được trên ảnh cũ để tìm lỗi. Bài này dạy cách <strong>tổ chức pipeline xử lý ảnh</strong> như kỹ sư chuyên nghiệp: chia bước rõ ràng, tham số trong file cấu hình, kết quả có cấu trúc, đo thời gian từng bước. Đây là khung bạn sẽ dùng cho mọi dự án về sau.</p>
+
+<h2>1. Pipeline là gì?</h2>
+<p>Hầu hết chương trình kiểm tra có cùng một dòng chảy:</p>
+<pre><code class="language-text">Ảnh vào → Tiền xử lý → Phân tích (tìm vật, đo) → Đánh giá (so tiêu chí) → Kết quả + Ảnh kết quả</code></pre>
+<p>Mỗi bước là <strong>một hàm</strong>: nhận dữ liệu từ bước trước, trả kết quả cho bước sau, không đọc biến toàn cục, không tự in ra màn hình. Nhờ vậy bạn thay thế, kiểm thử, đo thời gian từng bước độc lập.</p>
+
+<h2>2. Tham số vào một chỗ</h2>
+<p>Mọi con số "ma thuật" (ngưỡng 128, diện tích tối thiểu 500, ROI…) phải nằm trong cấu hình, không rải rác trong code. Dùng <code>dataclass</code> để có giá trị mặc định, gợi ý code trong VS Code và kiểm tra hợp lệ:</p>
+<pre><code class="language-python">import json
+from dataclasses import dataclass, asdict, field
+from pathlib import Path
+
+
+@dataclass
+class CauHinh:
+    roi: tuple = (0, 0, 640, 480)          # (x, y, w, h)
+    lam_mo: int = 5                         # kích thước bộ lọc Gaussian, số lẻ
+    nguong: int = 0                         # 0 = tự chọn bằng Otsu
+    dien_tich_min: int = 300
+    so_vat_dung: int = 4                    # số vật phải có trên khay
+    ghi_chu: str = ""
+
+    def kiem_tra(self):
+        if self.lam_mo % 2 == 0 or self.lam_mo &lt; 1:
+            raise ValueError("lam_mo phải là số lẻ ≥ 1")
+        if not 0 &lt;= self.nguong &lt;= 255:
+            raise ValueError("nguong phải trong 0–255")
+        return self
+
+    @classmethod
+    def doc(cls, duong_dan):
+        p = Path(duong_dan)
+        if not p.exists():
+            p.write_text(json.dumps(asdict(cls()), indent=2, ensure_ascii=False), encoding="utf-8")
+            return cls()
+        du_lieu = json.loads(p.read_text(encoding="utf-8"))
+        du_lieu["roi"] = tuple(du_lieu.get("roi", cls.roi))
+        return cls(**du_lieu).kiem_tra()
+
+
+cfg = CauHinh.doc("pipeline.json")
+print(cfg)</code></pre>
+<pre><code class="language-text">CauHinh(roi=(0, 0, 640, 480), lam_mo=5, nguong=0, dien_tich_min=300, so_vat_dung=4, ghi_chu='')</code></pre>
+<p><code>cls(**du_lieu)</code> sẽ báo lỗi ngay nếu file cấu hình có khóa gõ sai (ví dụ <code>"nguog"</code>), thay vì âm thầm dùng giá trị mặc định. Lỗi cấu hình phát hiện lúc khởi động tốt hơn nhiều so với kết quả sai lúc đang chạy.</p>
+
+<h2>3. Kết quả có cấu trúc</h2>
+<pre><code class="language-python">@dataclass
+class KetQua:
+    ok: bool
+    so_vat: int
+    ly_do: str = ""
+    cac_vat: list = field(default_factory=list)      # mỗi vật: dict tâm, diện tích, hộp
+    thoi_gian_ms: dict = field(default_factory=dict) # thời gian từng bước</code></pre>
+<p>Trả về một đối tượng thay vì một chuỗi "OK"/"NG" giúp bước sau (vẽ ảnh, lưu CSV, gửi PLC) có đủ thông tin mà không phải tính lại.</p>
+
+<h2>4. Các bước xử lý</h2>
+<pre><code class="language-python">import time
+import cv2
+import numpy as np
+
+
+def tien_xu_ly(anh, cfg):
+    x, y, w, h = cfg.roi
+    vung = anh[y:y + h, x:x + w]
+    xam = cv2.cvtColor(vung, cv2.COLOR_BGR2GRAY) if vung.ndim == 3 else vung
+    return cv2.GaussianBlur(xam, (cfg.lam_mo, cfg.lam_mo), 0)
+
+
+def tim_vat(xam, cfg):
+    kieu = cv2.THRESH_BINARY + (cv2.THRESH_OTSU if cfg.nguong == 0 else 0)
+    _, nhi_phan = cv2.threshold(xam, cfg.nguong, 255, kieu)
+    contours, _ = cv2.findContours(nhi_phan, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cac_vat = []
+    for c in contours:
+        dt = cv2.contourArea(c)
+        if dt &lt; cfg.dien_tich_min:
+            continue
+        m = cv2.moments(c)
+        cac_vat.append({"tam": (round(m["m10"] / m["m00"]), round(m["m01"] / m["m00"])),
+                        "dien_tich": round(dt), "hop": cv2.boundingRect(c)})
+    return cac_vat
+
+
+def danh_gia(cac_vat, cfg):
+    if len(cac_vat) != cfg.so_vat_dung:
+        return False, f"có {len(cac_vat)} vật, cần {cfg.so_vat_dung}"
+    return True, ""</code></pre>
+<p>Những hàm <code>threshold</code>, <code>findContours</code>, <code>moments</code> sẽ học kỹ ở chặng 3. Ở đây hãy tập trung vào <strong>cấu trúc</strong>: mỗi hàm nhận dữ liệu + cấu hình, trả kết quả.</p>
+
+<h2>5. Hàm điều phối: chạy và đo thời gian</h2>
+<pre><code class="language-python">def kiem_tra(anh, cfg):
+    tg = {}
+    t = time.perf_counter()
+
+    xam = tien_xu_ly(anh, cfg)
+    tg["tien_xu_ly"] = (time.perf_counter() - t) * 1000; t = time.perf_counter()
+
+    cac_vat = tim_vat(xam, cfg)
+    tg["tim_vat"] = (time.perf_counter() - t) * 1000; t = time.perf_counter()
+
+    ok, ly_do = danh_gia(cac_vat, cfg)
+    tg["danh_gia"] = (time.perf_counter() - t) * 1000
+    tg["tong"] = sum(tg.values())
+    return KetQua(ok, len(cac_vat), ly_do, cac_vat, {k: round(v, 2) for k, v in tg.items()})
+
+
+# Ảnh thử: khay có 4 vật sáng
+anh = np.full((480, 640, 3), 50, np.uint8)
+for x in (120, 260, 400, 540):
+    cv2.circle(anh, (x, 240), 40, (210, 210, 210), -1)
+
+kq = kiem_tra(anh, cfg)
+print(kq.ok, kq.so_vat, kq.ly_do)
+print([v["tam"] for v in kq.cac_vat])
+print("Thời gian:", kq.thoi_gian_ms)</code></pre>
+<pre><code class="language-text">True 4
+[(540, 240), (400, 240), (260, 240), (120, 240)]
+Thời gian: {'tien_xu_ly': 1.21, 'tim_vat': 0.85, 'danh_gia': 0.0, 'tong': 2.06}</code></pre>
+<p>Thời gian thực tế tùy máy. Khi dây chuyền yêu cầu xử lý dưới 50 ms mà bạn đang ở 80 ms, bảng thời gian từng bước cho biết <strong>tối ưu chỗ nào</strong> thay vì đoán mò. Để ý thứ tự vật đang ngược (contour trả về theo thứ tự bất kỳ); nếu cần thứ tự từ trái sang phải, sắp xếp: <code>sorted(cac_vat, key=lambda v: v["tam"][0])</code>.</p>
+
+<h2>6. Chạy lại trên ảnh đã lưu (chế độ offline)</h2>
+<p>Pipeline tách rời camera cho phép chạy lại trên thư mục ảnh đã lưu: đây là cách bạn tìm nguyên nhân khi khách hàng báo "hôm qua trạm loại nhầm". Chỉ cần thêm một hàm duyệt thư mục:</p>
+<pre><code class="language-python">def chay_thu_muc(thu_muc, cfg):
+    tong, ng = 0, []
+    for p in sorted(Path(thu_muc).glob("*.png")):
+        anh = cv2.imread(str(p))
+        if anh is None:
+            continue
+        kq = kiem_tra(anh, cfg)
+        tong += 1
+        if not kq.ok:
+            ng.append((p.name, kq.ly_do))
+    return tong, ng
+
+
+Path("anh_thu").mkdir(exist_ok=True)
+for i, so in enumerate([4, 4, 3, 4]):            # ảnh thứ 3 thiếu một vật
+    a = np.full((480, 640, 3), 50, np.uint8)
+    for x in (120, 260, 400, 540)[:so]:
+        cv2.circle(a, (x, 240), 40, (210, 210, 210), -1)
+    cv2.imwrite(f"anh_thu/khay_{i}.png", a)
+
+print(chay_thu_muc("anh_thu", cfg))</code></pre>
+<pre><code class="language-text">(4, [('khay_2.png', 'có 3 vật, cần 4')])</code></pre>
+<p>Khi sửa thuật toán, chạy lại trên bộ ảnh này để chắc chắn sửa lỗi mới không làm hỏng trường hợp cũ. Đây chính là <strong>kiểm thử hồi quy</strong>, và bạn sẽ dùng một bộ "ảnh vàng" như vậy khi nghiệm thu trạm (chặng 5).</p>
+
+<h2>7. Cấu trúc thư mục dự án gợi ý</h2>
+<pre><code class="language-text">tram_dem_vat/
+├── pipeline.json          ← cấu hình (người vận hành chỉnh được)
+├── pipeline.py            ← CauHinh, KetQua, các bước, kiem_tra()
+├── ve.py                  ← vẽ ảnh kết quả (bài trước)
+├── chay_camera.py         ← vòng lặp camera, gọi kiem_tra()
+├── chay_thu_muc.py        ← chạy lại offline trên ảnh đã lưu
+└── anh_vang/              ← bộ ảnh kiểm thử có kết quả biết trước</code></pre>
+<p><code>pipeline.py</code> không biết gì về camera hay giao diện; <code>chay_camera.py</code> không biết gì về thuật toán. Tách như vậy, khi đổi camera hay đổi thuật toán bạn chỉ sửa một file.</p>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Pipeline = chuỗi hàm: tiền xử lý → phân tích → đánh giá → kết quả.</li>
+  <li>Tham số trong file JSON, đọc qua <code>dataclass</code> có kiểm tra hợp lệ.</li>
+  <li>Kết quả là đối tượng có cấu trúc, kèm lý do NG và thời gian từng bước.</li>
+  <li>Tách thuật toán khỏi camera để chạy lại offline và kiểm thử hồi quy.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Thêm tiêu chí diện tích</h3>
+<p>Thêm vào <code>CauHinh</code> hai trường <code>dien_tich_vat_min</code> và <code>dien_tich_vat_max</code>; sửa <code>danh_gia</code> để báo NG kèm lý do nếu có vật nào ngoài khoảng (ví dụ vật bị vỡ, hoặc hai vật dính nhau).</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">@dataclass
+class CauHinh2(CauHinh):
+    dien_tich_vat_min: int = 4000
+    dien_tich_vat_max: int = 6000
+
+
+def danh_gia2(cac_vat, cfg):
+    if len(cac_vat) != cfg.so_vat_dung:
+        return False, f"có {len(cac_vat)} vật, cần {cfg.so_vat_dung}"
+    for v in sorted(cac_vat, key=lambda v: v["tam"][0]):
+        if not cfg.dien_tich_vat_min &lt;= v["dien_tich"] &lt;= cfg.dien_tich_vat_max:
+            return False, f"vật tại {v['tam']} có diện tích {v['dien_tich']}"
+    return True, ""
+
+
+cfg2 = CauHinh2()
+print(danh_gia2(tim_vat(tien_xu_ly(anh, cfg2), cfg2), cfg2))</code></pre>
+<pre><code class="language-text">(True, '')</code></pre>
+<p>Vật tròn bán kính 40 có diện tích khoảng π·40² ≈ 5027 pixel, nằm trong khoảng 4000–6000.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Cảnh báo chậm</h3>
+<p>Thêm trường <code>gioi_han_ms</code> vào cấu hình. Sau khi chạy <code>kiem_tra</code>, nếu thời gian tổng vượt giới hạn thì ghi cảnh báo bằng <code>logging.warning</code> kèm bước chậm nhất.</p>
+<details><summary>Gợi ý</summary>
+<p>Bước chậm nhất: <code>max((k for k in kq.thoi_gian_ms if k != "tong"), key=kq.thoi_gian_ms.get)</code>.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 3. Bộ ảnh vàng</h3>
+<p>Tạo thư mục <code>anh_vang</code> gồm 10 ảnh thử, tên file chứa kết quả mong đợi (<code>khay_01_OK.png</code>, <code>khay_02_NG.png</code>…). Viết script chạy pipeline trên cả thư mục, so kết quả với tên file và in tỉ lệ đúng. Script này phải in 100% trước khi bạn mang thuật toán lên trạm.</p>
+<details><summary>Gợi ý</summary>
+<p>Kết quả mong đợi: <code>p.stem.split("_")[-1] == "OK"</code>. Đếm số ảnh có <code>kq.ok</code> khớp với mong đợi, in danh sách ảnh sai để xem lại.</p>
+</details>
+</div>

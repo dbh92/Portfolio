@@ -1,0 +1,178 @@
+<p>Kết quả kiểm tra phải được <strong>nhìn thấy</strong>: người vận hành cần biết ngay sản phẩm OK hay NG, lỗi nằm ở đâu, đo được bao nhiêu. Kỹ sư cần ảnh kết quả để gỡ lỗi thuật toán và để làm bằng chứng khi khách hàng hỏi. Bài này dạy các hàm vẽ của OpenCV và cách trình bày kết quả rõ ràng, chuyên nghiệp.</p>
+
+<h2>1. Hệ tọa độ và quy ước màu</h2>
+<ul>
+  <li>Hàm vẽ nhận điểm dạng <code>(x, y)</code> (cột, hàng), gốc ở <strong>góc trái trên</strong>, y tăng xuống dưới. Ngược với slicing <code>anh[y, x]</code>.</li>
+  <li>Tọa độ phải là <strong>số nguyên</strong> (<code>int</code>). Kết quả tính toán thường là số thực, phải ép <code>int()</code> hoặc <code>round()</code>, nếu không OpenCV báo lỗi.</li>
+  <li>Màu theo <strong>BGR</strong>: <code>(0, 255, 0)</code> xanh lá, <code>(0, 0, 255)</code> đỏ.</li>
+  <li>Hàm vẽ <strong>sửa trực tiếp</strong> lên ảnh. Muốn giữ ảnh gốc, vẽ lên bản sao <code>anh.copy()</code>.</li>
+</ul>
+
+<h2>2. Các hàm vẽ cơ bản</h2>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+anh = np.full((360, 640, 3), 40, np.uint8)
+XANH, DO, VANG, TRANG = (0, 200, 0), (0, 0, 255), (0, 220, 255), (255, 255, 255)
+
+cv2.line(anh, (20, 30), (620, 30), TRANG, 1)                       # đường thẳng
+cv2.rectangle(anh, (40, 60), (200, 200), XANH, 2)                  # khung, độ dày 2
+cv2.rectangle(anh, (240, 60), (400, 200), DO, -1)                  # -1: tô kín
+cv2.circle(anh, (520, 130), 60, VANG, 2, cv2.LINE_AA)              # LINE_AA: khử răng cưa
+cv2.ellipse(anh, (120, 290), (80, 40), 30, 0, 360, XANH, 2)        # elip xoay 30°
+pts = np.array([[260, 250], [400, 240], [380, 330], [280, 320]], np.int32)
+cv2.polylines(anh, [pts], True, VANG, 2)                           # đa giác khép kín
+cv2.drawMarker(anh, (520, 290), DO, cv2.MARKER_CROSS, 30, 2)       # dấu chữ thập
+cv2.imwrite("cac_hinh.png", anh)</code></pre>
+<p>Tham số chung: ảnh, tọa độ, màu, độ dày (<code>-1</code> là tô kín), kiểu đường (<code>cv2.LINE_AA</code> cho đường mịn khi vẽ đường tròn, đường xiên).</p>
+
+<h2>3. Viết chữ</h2>
+<pre><code class="language-python">anh = np.full((200, 640, 3), 40, np.uint8)
+font = cv2.FONT_HERSHEY_SIMPLEX
+cv2.putText(anh, "OK 12.48 mm", (20, 60), font, 1.2, XANH, 2, cv2.LINE_AA)
+
+# Đo kích thước chữ để vẽ nền phía sau cho dễ đọc
+chu = "NG: xuoc be mat"
+(rong_chu, cao_chu), duoi = cv2.getTextSize(chu, font, 0.9, 2)
+x, y = 20, 140
+cv2.rectangle(anh, (x - 6, y - cao_chu - 8), (x + rong_chu + 6, y + duoi + 4), DO, -1)
+cv2.putText(anh, chu, (x, y), font, 0.9, TRANG, 2, cv2.LINE_AA)
+cv2.imwrite("chu.png", anh)
+print(rong_chu, cao_chu, duoi)   # rộng, cao (pixel) và phần chữ thò xuống dưới đường chân</code></pre>
+<p>Con số in ra phụ thuộc phiên bản OpenCV (OpenCV 5 vẽ chữ khác OpenCV 4), vì vậy đừng gõ cứng kích thước chữ trong code mà luôn đo bằng <code>getTextSize</code>.</p>
+<p>Tọa độ của <code>putText</code> là <strong>góc trái dưới</strong> của dòng chữ (đường chân chữ), không phải góc trái trên như hình chữ nhật. <code>getTextSize</code> cho biết kích thước chữ để vẽ nền cho vừa.</p>
+<div class="warn"><strong>Tiếng Việt có dấu: tùy phiên bản OpenCV</strong>OpenCV 5 vẽ chữ bằng bộ font mới, hiển thị được tiếng Việt có dấu. <strong>OpenCV 4.x</strong> (vẫn rất phổ biến trong nhà máy) chỉ có font ASCII: chữ "xước" sẽ thành dấu hỏi. Nếu chương trình có thể chạy trên máy cài OpenCV 4, hãy dùng chữ không dấu hoặc mã lỗi ngắn (<code>NG_XUOC</code>), hoặc vẽ chữ bằng Pillow như bài tập 3. Kiểm tra phiên bản bằng <code>print(cv2.__version__)</code>.</div>
+
+<h2>4. Vùng tô bán trong suốt</h2>
+<p>Tô kín vùng lỗi sẽ che mất chi tiết. Tô bán trong suốt bằng cách vẽ lên bản sao rồi trộn:</p>
+<pre><code class="language-python">def to_ban_trong(anh, mat_na, mau=(0, 0, 255), alpha=0.4):
+    """Tô màu bán trong suốt lên các pixel thuộc mặt nạ."""
+    lop_mau = anh.copy()
+    lop_mau[mat_na &gt; 0] = mau
+    return cv2.addWeighted(lop_mau, alpha, anh, 1 - alpha, 0)
+
+
+anh = np.full((200, 300, 3), 150, np.uint8)
+mat_na = np.zeros((200, 300), np.uint8)
+cv2.circle(mat_na, (150, 100), 50, 255, -1)        # vùng "lỗi"
+ket_qua = to_ban_trong(anh, mat_na)
+print(anh[100, 150], ket_qua[100, 150], ket_qua[10, 10])</code></pre>
+<pre><code class="language-text">[150 150 150] [ 90  90 192] [150 150 150]</code></pre>
+<p><code>cv2.addWeighted(a, alpha, b, beta, gamma)</code> tính <code>a·alpha + b·beta + gamma</code> cho từng pixel. Pixel trong vùng lỗi thành pha trộn 40% đỏ + 60% ảnh gốc; pixel ngoài vùng giữ nguyên.</p>
+
+<h2>5. Bố cục ảnh kết quả chuyên nghiệp</h2>
+<p>Một ảnh kết quả tốt cho trạm kiểm tra gồm: khung ROI, kết quả từng vùng (xanh = đạt, đỏ = lỗi), giá trị đo, và một thanh trạng thái ghi kết quả tổng, mã sản phẩm, thời gian xử lý. Gói tất cả vào một hàm:</p>
+<pre><code class="language-python">import time
+
+MAU_KQ = {"OK": (0, 200, 0), "NG": (0, 0, 255)}
+
+
+def ve_ket_qua(anh, cac_vung, ket_qua, ma_sp, thoi_gian_ms):
+    """cac_vung: list dict {"hop": (x, y, w, h), "kq": "OK"/"NG", "nhan": str}."""
+    ve = anh.copy()
+    for v in cac_vung:
+        x, y, w, h = v["hop"]
+        mau = MAU_KQ[v["kq"]]
+        cv2.rectangle(ve, (x, y), (x + w, y + h), mau, 2)
+        cv2.putText(ve, v["nhan"], (x, max(18, y - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, mau, 2, cv2.LINE_AA)
+
+    # Thanh trạng thái phía trên
+    cao_thanh = 44
+    thanh = np.full((cao_thanh, ve.shape[1], 3), 30, np.uint8)
+    cv2.rectangle(thanh, (0, 0), (110, cao_thanh), MAU_KQ[ket_qua], -1)
+    cv2.putText(thanh, ket_qua, (22, 32), cv2.FONT_HERSHEY_SIMPLEX, 1.1, (255, 255, 255), 3, cv2.LINE_AA)
+    thong_tin = f"{ma_sp}  |  {thoi_gian_ms:.0f} ms  |  {time.strftime('%Y-%m-%d %H:%M:%S')}"
+    cv2.putText(thanh, thong_tin, (125, 29), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (230, 230, 230), 1, cv2.LINE_AA)
+    return np.vstack([thanh, ve])
+
+
+anh = np.full((300, 520, 3), 70, np.uint8)
+cv2.rectangle(anh, (40, 60), (480, 260), (190, 190, 190), -1)
+cac_vung = [
+    {"hop": (60, 80, 120, 160), "kq": "OK", "nhan": "lo 1: 12.48"},
+    {"hop": (200, 80, 120, 160), "kq": "NG", "nhan": "lo 2: 12.71"},
+    {"hop": (340, 80, 120, 160), "kq": "OK", "nhan": "lo 3: 12.51"},
+]
+ket_qua = "NG" if any(v["kq"] == "NG" for v in cac_vung) else "OK"
+ve = ve_ket_qua(anh, cac_vung, ket_qua, "SP-000128", 37.6)
+cv2.imwrite("ket_qua.png", ve)
+print(ve.shape, ket_qua)</code></pre>
+<pre><code class="language-text">(344, 520, 3) NG</code></pre>
+<p>Nguyên tắc trình bày đã áp dụng:</p>
+<ul>
+  <li><strong>Kết quả tổng to, rõ, ở vị trí cố định</strong>: người vận hành nhìn lướt từ xa vẫn thấy.</li>
+  <li><strong>Hai màu có nghĩa cố định</strong>: xanh lá = đạt, đỏ = lỗi. Đừng dùng đỏ để trang trí.</li>
+  <li>Vẽ lên <strong>bản sao</strong>, giữ nguyên ảnh gốc để lưu và phân tích lại sau.</li>
+  <li>Thanh thông tin <strong>nằm ngoài vùng ảnh</strong> (ghép thêm bằng <code>np.vstack</code>), không che chi tiết sản phẩm.</li>
+  <li>Luôn ghi thời gian xử lý: chỉ số đầu tiên khách hàng hỏi khi tốc độ dây chuyền tăng.</li>
+</ul>
+
+<h2>6. Kích thước nét vẽ theo độ phân giải</h2>
+<p>Ảnh camera 5 MP (2448×2048) khi thu nhỏ để hiển thị thì nét vẽ độ dày 2 gần như biến mất. Tính độ dày và cỡ chữ theo kích thước ảnh:</p>
+<pre><code class="language-python">def thong_so_ve(anh):
+    canh_ngan = min(anh.shape[:2])
+    day = max(1, round(canh_ngan / 400))
+    co_chu = canh_ngan / 800
+    return day, co_chu
+
+
+print(thong_so_ve(np.zeros((480, 640), np.uint8)), thong_so_ve(np.zeros((2048, 2448), np.uint8)))</code></pre>
+<pre><code class="language-text">(1, 0.6) (5, 2.56)</code></pre>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Điểm vẽ là <code>(x, y)</code> số nguyên, màu BGR; hàm vẽ sửa trực tiếp ảnh, nên vẽ lên bản sao.</li>
+  <li><code>rectangle</code>, <code>circle</code>, <code>line</code>, <code>polylines</code>, <code>drawMarker</code>; độ dày <code>-1</code> là tô kín, <code>LINE_AA</code> cho nét mịn.</li>
+  <li><code>putText</code> đặt theo góc trái dưới, không vẽ được tiếng Việt có dấu; <code>getTextSize</code> để vẽ nền chữ.</li>
+  <li>Vùng bán trong suốt: vẽ lên bản sao rồi <code>addWeighted</code>.</li>
+  <li>Ảnh kết quả: kết quả tổng rõ ràng, màu có nghĩa cố định, thông tin không che sản phẩm.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Thước đo trên ảnh</h3>
+<p>Vẽ một đường đo kích thước giữa hai điểm (100, 200) và (500, 200): đường thẳng hai đầu có vạch đứng, ở giữa ghi khoảng cách theo mm biết 1 pixel = 0,05 mm.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+def ve_kich_thuoc(anh, p1, p2, mm_moi_px, mau=(0, 220, 255)):
+    cv2.line(anh, p1, p2, mau, 2, cv2.LINE_AA)
+    for (x, y) in (p1, p2):
+        cv2.line(anh, (x, y - 12), (x, y + 12), mau, 2)
+    dai_mm = np.hypot(p2[0] - p1[0], p2[1] - p1[1]) * mm_moi_px
+    giua = ((p1[0] + p2[0]) // 2, (p1[1] + p2[1]) // 2 - 12)
+    chu = f"{dai_mm:.2f} mm"
+    (w, _), _ = cv2.getTextSize(chu, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
+    cv2.putText(anh, chu, (giua[0] - w // 2, giua[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.7, mau, 2, cv2.LINE_AA)
+    return dai_mm
+
+
+anh = np.full((300, 600, 3), 40, np.uint8)
+print(ve_kich_thuoc(anh, (100, 200), (500, 200), 0.05))</code></pre>
+<pre><code class="language-text">20.0</code></pre>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Lưới ô có kết quả</h3>
+<p>Chia ảnh 600×400 thành 3×2 ô. Ngẫu nhiên (seed 1) đánh một ô là NG. Vẽ khung từng ô màu theo kết quả và tô bán trong suốt ô NG.</p>
+<details><summary>Gợi ý</summary>
+<p>Dùng hai vòng lặp như bài ROI để có tọa độ ô; tạo mặt nạ cho ô NG bằng <code>cv2.rectangle(mat_na, ..., 255, -1)</code> rồi gọi <code>to_ban_trong</code>. Vẽ khung các ô sau khi tô để viền không bị mờ.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 3. Chữ tiếng Việt bằng Pillow (cho OpenCV 4.x)</h3>
+<p>Viết hàm <code>viet_chu_viet(anh_bgr, chu, xy, co_chu, mau_bgr)</code> dùng Pillow (<code>PIL.ImageDraw</code>, <code>ImageFont.truetype</code>) để vẽ chữ có dấu lên ảnh OpenCV. Nhớ đổi BGR ↔ RGB.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python"># (minh họa) cần file font .ttf có tiếng Việt, ví dụ Arial trên Windows: C:/Windows/Fonts/arial.ttf
+from PIL import Image, ImageDraw, ImageFont
+
+def viet_chu_viet(anh_bgr, chu, xy, co_chu=24, mau_bgr=(255, 255, 255), font_path="C:/Windows/Fonts/arial.ttf"):
+    anh_pil = Image.fromarray(cv2.cvtColor(anh_bgr, cv2.COLOR_BGR2RGB))
+    ve = ImageDraw.Draw(anh_pil)
+    font = ImageFont.truetype(font_path, co_chu)
+    ve.text(xy, chu, font=font, fill=mau_bgr[::-1])          # Pillow dùng RGB
+    return cv2.cvtColor(np.array(anh_pil), cv2.COLOR_RGB2BGR)</code></pre>
+<p>Cách này chậm hơn <code>putText</code> vài lần, nên chỉ dùng cho ảnh báo cáo, không dùng trong vòng lặp camera tốc độ cao.</p>
+</details>
+</div>

@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="vi" data-root="../">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dự án chặng 2: công cụ chụp và lưu ảnh kiểm tra OK/NG bằng OpenCV</title>
+<meta name="description" content="Đọc camera hoặc video, chọn ROI bằng chuột, lưu ảnh OK/NG theo ngày bằng một phím, hiển thị FPS, độ sáng, độ nét: công cụ thu dữ liệu cho mọi dự án Vision.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://hocfree.vn/hoc/opencv-du-an-chang-2-cong-cu-chup-anh-kiem-tra.html">
+<meta property="og:site_name" content="HọcFree">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Dự án chặng 2: công cụ chụp và lưu ảnh kiểm tra OK/NG bằng OpenCV">
+<meta property="og:description" content="Đọc camera hoặc video, chọn ROI bằng chuột, lưu ảnh OK/NG theo ngày bằng một phím, hiển thị FPS, độ sáng, độ nét: công cụ thu dữ liệu cho mọi dự án Vision.">
+<meta property="og:url" content="https://hocfree.vn/hoc/opencv-du-an-chang-2-cong-cu-chup-anh-kiem-tra.html">
+<meta property="og:image" content="https://hocfree.vn/assets/images/posts/opencv-du-an-chang-2-cong-cu-chup-anh-kiem-tra.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="Dự án chặng 2: công cụ chụp và lưu ảnh kiểm tra OK/NG bằng OpenCV">
+<meta property="og:locale" content="vi_VN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Dự án chặng 2: công cụ chụp và lưu ảnh kiểm tra OK/NG bằng OpenCV">
+<meta name="twitter:description" content="Đọc camera hoặc video, chọn ROI bằng chuột, lưu ảnh OK/NG theo ngày bằng một phím, hiển thị FPS, độ sáng, độ nét: công cụ thu dữ liệu cho mọi dự án Vision.">
+<meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/opencv-du-an-chang-2-cong-cu-chup-anh-kiem-tra.jpg">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/fonts.css?v=20261009">
+<link rel="stylesheet" href="../assets/css/style.css?v=20261009">
+<script>try{var t=localStorage.getItem('hf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
+<meta property="article:published_time" content="2026-10-09">
+<meta property="article:section" content="Học AI &amp; Lập trình">
+<meta property="article:tag" content="OpenCV">
+<meta property="article:tag" content="Python">
+<meta property="article:tag" content="Computer Vision">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "Dự án chặng 2: công cụ chụp và lưu ảnh kiểm tra OK/NG bằng OpenCV", "description": "Đọc camera hoặc video, chọn ROI bằng chuột, lưu ảnh OK/NG theo ngày bằng một phím, hiển thị FPS, độ sáng, độ nét: công cụ thu dữ liệu cho mọi dự án Vision.", "image": ["https://hocfree.vn/assets/images/posts/opencv-du-an-chang-2-cong-cu-chup-anh-kiem-tra.jpg"], "datePublished": "2026-10-09", "dateModified": "2026-10-09", "inLanguage": "vi", "articleSection": "Học AI & Lập trình", "keywords": "OpenCV, Python, Computer Vision", "wordCount": 1293, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/hoc/opencv-du-an-chang-2-cong-cu-chup-anh-kiem-tra.html"}, "isPartOf": {"@type": "Course", "name": "Trở thành Vision Engineer", "url": "https://hocfree.vn/lo-trinh/vision-engineer.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Learning Paths", "item": "https://hocfree.vn/lo-trinh/"}, {"@type": "ListItem", "position": 3, "name": "Trở thành Vision Engineer", "item": "https://hocfree.vn/lo-trinh/vision-engineer.html"}, {"@type": "ListItem", "position": 4, "name": "Chặng 2: OpenCV", "item": "https://hocfree.vn/lo-trinh/vision-engineer/opencv.html"}, {"@type": "ListItem", "position": 5, "name": "Dự án chặng 2: công cụ chụp và lưu ảnh kiểm tra OK/NG bằng OpenCV"}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div class="progress" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="container wide header-top">
+    <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="nav-scrim" hidden></div>
+    <a class="logo" href="../" aria-label="HọcFree – Trang chủ"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+    <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
+    <div class="header-actions">
+      <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="login-link" href="../dang-nhap.html">Đăng nhập</a>
+      <a class="btn start-btn" href="../lo-trinh/">Bắt đầu học</a>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="container wide">
+      <nav class="site-nav" id="site-nav" aria-label="Menu chính">
+        <div class="drawer-head">
+          <a class="logo" href="../" tabindex="-1"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+          <button class="icon-btn nav-close" aria-label="Đóng menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <button type="button" class="drawer-search search-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Tìm bài học, chủ đề…</span></button>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="../">Trang chủ</a></li><li class="nav-item has-panel is-mega"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-hoc">Học AI &amp; Lập trình<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel mega" id="nav-panel-hoc">
+  <div class="container wide mega-inner">
+    <div class="mega-groups"><div class="mega-group"><a class="mega-group-title" href="../hoc/#programming">Programming</a><ul><li><a href="../hoc/python.html">Python</a></li><li><a href="../hoc/csharp.html">C#</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#ai-machine-learning">AI &amp; Machine Learning</a><ul><li><a href="../hoc/machine-learning.html">Machine Learning</a></li><li><a href="../hoc/deep-learning.html">Deep Learning</a></li><li><a href="../hoc/pytorch.html">PyTorch</a></li><li><a href="../hoc/generative-ai.html">Generative AI</a></li><li><a href="../hoc/llm-ai-agents.html">LLM / AI Agents</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#computer-vision">Computer Vision</a><ul><li><a href="../hoc/opencv.html">OpenCV</a></li><li><a href="../hoc/image-processing.html">Image Processing</a></li><li><a href="../hoc/computer-vision.html">Computer Vision</a></li><li><a href="../hoc/ocr.html">OCR</a></li><li><a href="../hoc/object-detection.html">Object Detection</a></li><li><a href="../hoc/segmentation.html">Segmentation</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#vision-engineering">Vision Engineering</a><ul><li><a href="../hoc/machine-vision.html">Machine Vision</a></li><li><a href="../hoc/ai-vision.html">AI Vision</a></li><li><a href="../hoc/industrial-vision.html">Industrial Vision</a></li><li><a href="../hoc/camera-lens.html">Camera &amp; Lens</a></li><li><a href="../hoc/lighting.html">Lighting</a></li><li><a href="../hoc/calibration.html">Calibration</a></li><li><a href="../hoc/plc-robot-mes.html">PLC / Robot / MES</a></li><li><a href="../hoc/vision-deployment.html">Vision Deployment</a></li></ul></div></div>
+    <a class="feature-card" href="../lo-trinh/vision-engineer.html">
+  <span class="feature-eyebrow">⭐ Learning Path nổi bật</span>
+  <span class="feature-title">Trở thành Vision Engineer</span>
+  <span class="feature-sub">Machine Vision + AI Vision + Industrial Automation</span>
+  <span class="feature-desc">Lộ trình thực chiến từ Python, OpenCV và Machine Vision đến Deep Learning, AI Vision, Camera, PLC, Robot và triển khai hệ thống Vision trong nhà máy.</span>
+  <span class="feature-chain" aria-label="Các chặng chính"><span>Python</span><i aria-hidden="true">→</i><span>OpenCV</span><i aria-hidden="true">→</i><span>Machine Vision</span><i aria-hidden="true">→</i><span>AI Vision</span><i aria-hidden="true">→</i><span class="chain-goal">🎯 Vision Engineer</span></span>
+  <span class="feature-meta">14 chặng · 5 giai đoạn · ~12 tháng</span>
+  <span class="feature-cta">Xem lộ trình →</span>
+</a>
+  </div>
+  <div class="mega-foot"><div class="container wide mega-foot-inner"><ol class="journey compact" aria-label="Học, thực hành, trở thành kỹ sư"><li><a href="../hoc/" aria-current="step"><span class="journey-n">1</span><span class="journey-t"><b>Học</b><small>Học AI &amp; Lập trình</small></span></a></li><li><a href="../projects/"><span class="journey-n">2</span><span class="journey-t"><b>Thực hành</b><small>Projects</small></span></a></li><li><a href="../lo-trinh/"><span class="journey-n">3</span><span class="journey-t"><b>Trở thành kỹ sư</b><small>Learning Paths</small></span></a></li></ol><a class="panel-all" href="../hoc/">Xem tất cả Học AI &amp; Lập trình →</a></div></div>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-projects">Projects<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-projects">
+  <p class="panel-kicker"><span>Bước 2 · Thực hành</span>Áp dụng vào dự án thật</p>
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../projects/ai-projects.html"><span class="drop-label">AI Projects</span><span class="drop-desc">Ứng dụng ML và LLM, từ ý tưởng đến bản demo</span></a></li><li><a class="drop-link" href="../projects/computer-vision-projects.html"><span class="drop-label">Computer Vision Projects</span><span class="drop-desc">Phát hiện, nhận dạng và theo dõi đối tượng</span></a></li><li><a class="drop-link" href="../projects/industrial-vision-projects.html"><span class="drop-label">Industrial Vision Projects</span><span class="drop-desc">Đo kích thước, kiểm tra lỗi, đọc mã trên dây chuyền</span></a></li></ul></div></div>
+  <a class="panel-all" href="../projects/">Xem tất cả Projects →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger is-active" aria-expanded="false" aria-controls="nav-panel-lo-trinh" aria-current="true">Learning Paths<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-lo-trinh">
+  <p class="panel-kicker"><span>Bước 3 · Trở thành kỹ sư</span>Định hướng nghề nghiệp</p>
+  <ul class="drop-list"><li><a class="drop-link is-flagship" href="../lo-trinh/vision-engineer.html"><span class="drop-label">⭐ Trở thành Vision Engineer</span><span class="drop-desc">Machine Vision + AI Vision + Industrial Automation · 14 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/#python-developer"><span class="drop-label">Python Developer<span class="badge-soon">Sắp ra mắt</span></span><span class="drop-desc">Python, công cụ, tự động hóa</span></a></li></ul>
+  <a class="panel-all" href="../lo-trinh/">Xem tất cả lộ trình →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-kien-thuc">Kiến thức<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-kien-thuc">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Lĩnh vực</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/programming.html"><span class="drop-label">Programming</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-machine-learning.html"><span class="drop-label">AI / Machine Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/deep-learning.html"><span class="drop-label">Deep Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/machine-vision.html"><span class="drop-label">Machine Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-vision.html"><span class="drop-label">AI Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/industrial-automation.html"><span class="drop-label">Industrial Automation</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Công cụ &amp; mẹo</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/tools-frameworks.html"><span class="drop-label">Tools &amp; Frameworks</span></a></li><li><a class="drop-link" href="../kien-thuc/tips-tricks.html"><span class="drop-label">Tips &amp; Tricks</span></a></li></ul></div></div>
+  <a class="panel-all" href="../kien-thuc/">Xem tất cả Kiến thức →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tin-tuc-ai">Tin tức AI<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tin-tuc-ai">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tin-tuc-ai/ai-news.html"><span class="drop-label">AI News</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-models.html"><span class="drop-label">AI Models</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/technology.html"><span class="drop-label">Technology</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/robotics.html"><span class="drop-label">Robotics</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-industry.html"><span class="drop-label">AI Industry</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tin-tuc-ai/">Xem tất cả Tin tức AI →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-ngoai-ngu">Ngoại ngữ<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-ngoai-ngu">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/english.html"><span class="drop-label">English</span><span class="drop-desc">Lộ trình 700 TOEIC, phương pháp học, giáo trình HF-700TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chinese.html"><span class="drop-label">Chinese</span><span class="drop-desc">Lộ trình HSK3, phương pháp học, giáo trình HF-HSK3</span></a></li></ul></div></div>
+  <a class="panel-all" href="../ngoai-ngu/">Xem tất cả Ngoại ngữ →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tai-nguyen">Tài nguyên<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tai-nguyen">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tai-nguyen/source-code.html"><span class="drop-label">Source Code</span><span class="drop-desc">Mã nguồn mẫu đi kèm bài học</span></a></li><li><a class="drop-link" href="../tai-nguyen/dataset.html"><span class="drop-label">Dataset</span><span class="drop-desc">Bộ dữ liệu ảnh để luyện tập</span></a></li><li><a class="drop-link" href="../tai-nguyen/cheat-sheets.html"><span class="drop-label">Cheat Sheets</span><span class="drop-desc">Tóm tắt nhanh trong một trang</span></a></li><li><a class="drop-link" href="../tai-nguyen/documentation.html"><span class="drop-label">Documentation</span><span class="drop-desc">Tài liệu tra cứu thư viện, API</span></a></li><li><a class="drop-link" href="../tai-nguyen/ebook.html"><span class="drop-label">Ebook / Tài liệu</span><span class="drop-desc">Sách và tài liệu tham khảo</span></a></li><li><a class="drop-link" href="../tai-nguyen/ai-tools.html"><span class="drop-label">AI Tools</span><span class="drop-desc">Công cụ AI hữu ích cho việc học</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tai-nguyen/">Xem tất cả Tài nguyên →</a>
+</div></li></ul>
+        <div class="drawer-foot">
+          <a class="btn ghost" href="../dang-nhap.html">Đăng nhập</a>
+          <a class="btn" href="../lo-trinh/">Bắt đầu học</a>
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+<div class="search-dialog" hidden>
+  <div class="search-scrim"></div>
+  <div class="search-box" role="dialog" aria-modal="true" aria-label="Tìm kiếm">
+    <form class="search-form" action="../search.html" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" placeholder="Tìm bài học, chủ đề, bài viết…" autocomplete="off" aria-label="Từ khóa tìm kiếm" aria-controls="search-suggest">
+      <button type="button" class="icon-btn search-close" aria-label="Đóng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </form>
+    <div class="search-suggest" id="search-suggest" aria-live="polite">
+      <div class="search-empty">
+        <p class="search-group-title">Chủ đề phổ biến</p>
+        <div class="chips"><a class="chip" href="../hoc/python.html">Python</a><a class="chip" href="../hoc/opencv.html">OpenCV</a><a class="chip" href="../hoc/machine-vision.html">Machine Vision</a><a class="chip" href="../hoc/deep-learning.html">Deep Learning</a><a class="chip" href="../hoc/ai-vision.html">AI Vision</a><a class="chip" href="../hoc/object-detection.html">Object Detection</a><a class="chip" href="../hoc/pytorch.html">PyTorch</a><a class="chip" href="../ngoai-ngu/english.html">English</a></div>
+        <p class="search-group-title">Lộ trình nổi bật</p>
+        <a class="search-item" href="../lo-trinh/vision-engineer.html"><span class="search-ico" aria-hidden="true">⭐</span><span>Trở thành Vision Engineer<small>Learning Path · Machine Vision + AI Vision + Industrial Automation</small></span></a>
+      </div>
+    </div>
+    <div class="search-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> chọn</span><span><kbd>Enter</kbd> mở</span><span><kbd>Esc</kbd> đóng</span></div>
+  </div>
+</div>
+<main id="main">
+  <div class="container layout article-layout">
+    <article class="article">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../lo-trinh/">Learning Paths</a><span>/</span><a href="../lo-trinh/vision-engineer.html">Vision Engineer</a><span>/</span><a href="../lo-trinh/vision-engineer/opencv.html">Chặng 2: OpenCV</a></nav>
+      <header class="article-head">
+        <div class="course-bar" data-course="vision-engineer"><a class="course-chip" href="../lo-trinh/vision-engineer/opencv.html">⭐ Vision Engineer · Chặng 2</a><span class="lesson-no">Bài 6/6</span><span class="kind kind-project">Dự án</span><span class="lesson-min"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></svg>~120 phút</span></div>
+        <h1>Dự án chặng 2: công cụ chụp và lưu ảnh kiểm tra OK/NG bằng OpenCV</h1>
+        <p class="lead">Đọc camera hoặc video, chọn ROI bằng chuột, lưu ảnh OK/NG theo ngày bằng một phím, hiển thị FPS, độ sáng, độ nét: công cụ thu dữ liệu cho mọi dự án Vision.</p>
+        <div class="article-meta">
+          <span class="avatar" aria-hidden="true">HF</span>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+        </div>
+      </header>
+      <figure class="article-cover">
+        <img src="../assets/images/posts/opencv-du-an-chang-2-cong-cu-chup-anh-kiem-tra.webp" alt="Dự án chặng 2: công cụ chụp và lưu ảnh kiểm tra OK/NG bằng OpenCV" width="1200" height="675" fetchpriority="high" decoding="async">
+      </figure>
+      <section class="lesson-goals" aria-label="Mục tiêu bài học"><h2>Học xong bài này, bạn sẽ</h2><ul><li>Đọc camera, chọn ROI bằng chuột</li><li>Lưu ảnh OK/NG vào thư mục có cấu trúc</li><li>Hiển thị thông tin trực tiếp trên khung hình</li></ul><p class="goals-before">Nên học trước: <a href="../hoc/opencv-5-to-chuc-pipeline-xu-ly.html">Tổ chức pipeline xử lý bằng hàm và cấu hình</a></p></section>
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol class="toc-plain"><li><a href="#1-yeu-cau">1. Yêu cầu</a></li><li><a href="#2-kien-thuc-su-dung">2. Kiến thức sử dụng</a></li><li><a href="#3-goi-y-thiet-ke">3. Gợi ý thiết kế</a></li><li><a href="#4-loi-giai-mau">4. Lời giải mẫu</a></li><li><a href="#5-chay-thu-khong-can-camera">5. Chạy thử không cần camera</a></li><li><a href="#6-tu-danh-gia">6. Tự đánh giá</a></li><li><a href="#7-mo-rong">7. Mở rộng</a></li></ol></details>
+      <div class="prose">
+<p>Dự án cuối chặng 2: bạn sẽ viết <strong>công cụ chụp ảnh dữ liệu</strong>. Mọi dự án Vision, từ chỉnh ngưỡng rule-based đến huấn luyện AI, đều bắt đầu bằng việc thu ảnh. Công cụ này đọc camera (hoặc video), cho chọn vùng quan tâm bằng chuột, lưu ảnh OK/NG vào thư mục có cấu trúc chỉ bằng một phím bấm, và hiển thị thông tin ngay trên khung hình. Bạn sẽ dùng lại nó ở chặng 11 khi xây dataset cho AI.</p>
+<div class="tip"><strong>Cách làm</strong>Tự làm trước theo yêu cầu và gợi ý, chỉ mở lời giải khi kẹt. Không có webcam? Dùng một file video bất kỳ: chương trình nhận cả số camera lẫn đường dẫn video.</div>
+
+<h2 id="1-yeu-cau">1. Yêu cầu</h2>
+<table>
+  <tr><th>#</th><th>Yêu cầu</th></tr>
+  <tr><td>1</td><td>Chạy bằng <code>python chup_anh.py 0</code> (camera số 0) hoặc <code>python chup_anh.py video.mp4</code>.</td></tr>
+  <tr><td>2</td><td>Phím <kbd>r</kbd>: chọn ROI bằng chuột; ROI lưu vào <code>chup_anh.json</code> để lần sau dùng lại.</td></tr>
+  <tr><td>3</td><td>Phím <kbd>o</kbd> / <kbd>n</kbd>: lưu ảnh ROI vào <code>dataset/&lt;ngày&gt;/OK/</code> hoặc <code>.../NG/</code>, tên file gồm thời gian đến mili giây, không bao giờ ghi đè.</td></tr>
+  <tr><td>4</td><td>Lưu <strong>ảnh gốc chưa vẽ</strong> (không lưu ảnh đã vẽ khung, chữ).</td></tr>
+  <tr><td>5</td><td>Hiển thị trên khung hình: khung ROI, FPS, số ảnh OK/NG đã lưu, độ sáng và độ nét của ROI, phím tắt.</td></tr>
+  <tr><td>6</td><td>Phím <kbd>q</kbd> hoặc hết video: thoát, giải phóng camera, in tổng kết.</td></tr>
+</table>
+
+<h2 id="2-kien-thuc-su-dung">2. Kiến thức sử dụng</h2>
+<ul>
+  <li>Đọc camera, video, <code>waitKey</code> (chặng 2, bài 1).</li>
+  <li>Cắt ROI an toàn (bài 3), vẽ chữ và khung (bài 4), cấu hình JSON (bài 5).</li>
+  <li><code>pathlib</code>, <code>datetime</code>, chia hàm (chặng 1).</li>
+  <li>Mới: <code>cv2.selectROI</code> cho người dùng kéo chuột chọn vùng, trả về <code>(x, y, w, h)</code>.</li>
+</ul>
+
+<h2 id="3-goi-y-thiet-ke">3. Gợi ý thiết kế</h2>
+<pre><code class="language-text">mo_nguon(arg)            → cv2.VideoCapture từ số camera hoặc đường dẫn
+doc_roi() / luu_roi(roi) → đọc/ghi ROI trong chup_anh.json
+chi_so(vung)             → (độ sáng, độ nét) của ảnh ROI
+luu_anh(vung, nhan)      → ghi file vào dataset/&lt;ngày&gt;/&lt;nhãn&gt;/, trả đường dẫn
+ve_thong_tin(khung, ...) → vẽ ROI và chữ lên BẢN SAO của khung hình
+main()                   → vòng lặp đọc khung → hiển thị → xử lý phím</code></pre>
+<p>Điểm dễ sai nhất: <code>cv2.waitKey()</code> trả về mã phím, phải so với <code>ord("o")</code>. Và chỉ gọi <code>waitKey</code> <strong>một lần mỗi vòng lặp</strong>, lưu vào biến rồi so sánh.</p>
+
+<h2 id="4-loi-giai-mau">4. Lời giải mẫu</h2>
+<details><summary>Xem lời giải đầy đủ (chup_anh.py)</summary>
+<pre><code class="language-python">"""Công cụ chụp ảnh dữ liệu OK/NG từ camera hoặc video.
+
+Chạy: python chup_anh.py 0            (camera số 0)
+      python chup_anh.py video.mp4    (file video)
+Phím: r chọn ROI · o lưu OK · n lưu NG · q thoát
+"""
+import json
+import sys
+import time
+from datetime import datetime
+from pathlib import Path
+
+import cv2
+import numpy as np
+
+FILE_CAU_HINH = Path("chup_anh.json")
+THU_MUC_GOC = Path("dataset")
+CUA_SO = "Chup anh kiem tra"
+
+
+def mo_nguon(arg: str) -&gt; cv2.VideoCapture:
+    nguon = int(arg) if arg.isdigit() else arg
+    cap = cv2.VideoCapture(nguon)
+    if not cap.isOpened():
+        raise SystemExit(f"Không mở được nguồn video: {arg}")
+    return cap
+
+
+def doc_roi():
+    if FILE_CAU_HINH.exists():
+        roi = json.loads(FILE_CAU_HINH.read_text(encoding="utf-8")).get("roi")
+        if roi:
+            return tuple(roi)
+    return None
+
+
+def luu_roi(roi) -&gt; None:
+    FILE_CAU_HINH.write_text(json.dumps({"roi": list(roi)}, indent=2), encoding="utf-8")
+
+
+def cat_roi(khung, roi):
+    if roi is None:
+        return khung
+    x, y, w, h = roi
+    cao, rong = khung.shape[:2]
+    x1, y1, x2, y2 = max(0, x), max(0, y), min(rong, x + w), min(cao, y + h)
+    return khung[y1:y2, x1:x2] if x1 &lt; x2 and y1 &lt; y2 else khung
+
+
+def chi_so(vung) -&gt; tuple[float, float]:
+    xam = cv2.cvtColor(vung, cv2.COLOR_BGR2GRAY)
+    return float(xam.mean()), float(cv2.Laplacian(xam, cv2.CV_64F).var())
+
+
+def luu_anh(vung, nhan: str) -&gt; Path:
+    bay_gio = datetime.now()
+    thu_muc = THU_MUC_GOC / bay_gio.strftime("%Y-%m-%d") / nhan
+    thu_muc.mkdir(parents=True, exist_ok=True)
+    duong_dan = thu_muc / f"{bay_gio.strftime('%H%M%S_%f')[:-3]}_{nhan}.png"
+    dem = 1
+    while duong_dan.exists():                      # phòng khi bấm 2 lần trong cùng 1 ms
+        duong_dan = duong_dan.with_name(f"{duong_dan.stem}_{dem}.png")
+        dem += 1
+    cv2.imwrite(str(duong_dan), vung)
+    return duong_dan
+
+
+def ve_thong_tin(khung, roi, fps, dem, sang, net):
+    ve = khung.copy()
+    if roi:
+        x, y, w, h = roi
+        cv2.rectangle(ve, (x, y), (x + w, y + h), (0, 220, 255), 2)
+    dong = [f"FPS {fps:4.1f}   OK {dem['OK']}   NG {dem['NG']}",
+            f"Sang {sang:5.1f}   Net {net:7.1f}",
+            "r: chon ROI  o: luu OK  n: luu NG  q: thoat"]
+    for i, chu in enumerate(dong):
+        y = 28 + i * 26
+        cv2.putText(ve, chu, (12, y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 4, cv2.LINE_AA)       # viền đen
+        cv2.putText(ve, chu, (12, y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1, cv2.LINE_AA)
+    return ve
+
+
+def main(arg: str = "0") -&gt; dict:
+    cap = mo_nguon(arg)
+    roi = doc_roi()
+    dem = {"OK": 0, "NG": 0}
+    fps, t_truoc = 0.0, time.perf_counter()
+    try:
+        while True:
+            co, khung = cap.read()
+            if not co:
+                print("Hết video hoặc mất kết nối camera")
+                break
+            bay_gio = time.perf_counter()
+            fps = 0.9 * fps + 0.1 / max(bay_gio - t_truoc, 1e-6)      # FPS làm mượt
+            t_truoc = bay_gio
+
+            vung = cat_roi(khung, roi)
+            sang, net = chi_so(vung)
+            cv2.imshow(CUA_SO, ve_thong_tin(khung, roi, fps, dem, sang, net))
+
+            phim = cv2.waitKey(1) &amp; 0xFF
+            if phim == ord("q"):
+                break
+            if phim == ord("r"):
+                chon = cv2.selectROI(CUA_SO, khung, showCrosshair=True)
+                if chon[2] &gt; 0 and chon[3] &gt; 0:
+                    roi = tuple(int(v) for v in chon)
+                    luu_roi(roi)
+                    print("ROI mới:", roi)
+            elif phim in (ord("o"), ord("n")):
+                nhan = "OK" if phim == ord("o") else "NG"
+                p = luu_anh(vung, nhan)          # lưu ảnh gốc, không phải ảnh đã vẽ
+                dem[nhan] += 1
+                print(f"Đã lưu {p}")
+    finally:
+        cap.release()
+        cv2.destroyAllWindows()
+    print(f"Tổng kết: {dem['OK']} ảnh OK, {dem['NG']} ảnh NG trong {THU_MUC_GOC}")
+    return dem
+
+
+if __name__ == "__main__":
+    main(sys.argv[1] if len(sys.argv) &gt; 1 else "0")</code></pre>
+</details>
+
+<h3 id="giai-thich-cac-diem-dang-hoc">Giải thích các điểm đáng học</h3>
+<ul>
+  <li><strong><code>cv2.waitKey(1) &amp; 0xFF</code></strong>: trên một số hệ thống, <code>waitKey</code> trả về số lớn hơn 255; phép <code>&amp; 0xFF</code> giữ lại 8 bit thấp để so sánh với <code>ord()</code> cho đúng.</li>
+  <li><strong><code>try/finally</code></strong> đảm bảo <code>cap.release()</code> luôn chạy. Quên giải phóng camera thì lần chạy sau báo "camera đang bận".</li>
+  <li><strong>Lưu <code>vung</code>, không lưu ảnh đã vẽ</strong>: ảnh dữ liệu dính khung vàng và chữ sẽ làm hỏng việc huấn luyện AI sau này.</li>
+  <li><strong>Tên file theo thời gian đến mili giây</strong> + vòng <code>while</code> kiểm tra tồn tại: không bao giờ ghi đè ảnh đã chụp.</li>
+  <li><strong>FPS làm mượt</strong> bằng trung bình trượt hàm mũ (<code>0,9·cũ + 0,1·mới</code>): số hiển thị ổn định, dễ đọc.</li>
+  <li><strong>Chữ có viền đen</strong> (vẽ hai lần: dày màu đen, mỏng màu trắng): đọc được trên mọi nền, sáng hay tối.</li>
+</ul>
+
+<h2 id="5-chay-thu-khong-can-camera">5. Chạy thử không cần camera</h2>
+<p>Tạo nhanh một video thử 3 giây có vật chuyển động, rồi chạy công cụ trên video đó:</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+viet = cv2.VideoWriter("video_thu.avi", cv2.VideoWriter_fourcc(*"MJPG"), 30, (640, 480))
+for i in range(90):
+    khung = np.full((480, 640, 3), 60, np.uint8)
+    cv2.circle(khung, (50 + i * 6, 240), 40, (220, 220, 220), -1)
+    viet.write(khung)
+viet.release()
+print("Đã tạo video_thu.avi")</code></pre>
+<pre><code class="language-bash">python chup_anh.py video_thu.avi</code></pre>
+
+<h2 id="6-tu-danh-gia">6. Tự đánh giá</h2>
+<table>
+  <tr><th>Tiêu chí</th><th>Đạt khi</th></tr>
+  <tr><td>Nguồn</td><td>Chạy được với cả webcam và file video; báo lỗi rõ khi nguồn không mở được</td></tr>
+  <tr><td>ROI</td><td>Chọn ROI, tắt chương trình, mở lại vẫn nhớ ROI</td></tr>
+  <tr><td>Lưu ảnh</td><td>Bấm <kbd>o</kbd> 10 lần liên tục có đủ 10 file khác nhau, ảnh không có khung vẽ</td></tr>
+  <tr><td>Hiển thị</td><td>FPS, độ sáng, độ nét thay đổi khi che camera hoặc làm mờ ống kính</td></tr>
+  <tr><td>Thoát sạch</td><td>Nhấn <kbd>q</kbd>, chạy lại ngay không bị lỗi camera bận</td></tr>
+</table>
+
+<h2 id="7-mo-rong">7. Mở rộng</h2>
+<ol>
+  <li>Phím <kbd>Space</kbd> bật/tắt <strong>chế độ chụp tự động</strong> mỗi 0,5 giây (dùng khi cần nhiều ảnh nền OK).</li>
+  <li>Cảnh báo đỏ trên màn hình khi độ nét thấp hơn ngưỡng: nhắc người chụp lấy nét lại trước khi lưu.</li>
+  <li>Ghi file <code>nhat_ky.csv</code> mỗi lần lưu ảnh: thời gian, nhãn, độ sáng, độ nét, đường dẫn. Dữ liệu này rất hữu ích khi phân tích dataset ở chặng 11.</li>
+</ol>
+<p>Hoàn thành dự án này là bạn đã xong <strong>chặng 2: OpenCV</strong>. Chặng tiếp theo đi vào xử lý ảnh thực thụ: histogram, lọc nhiễu, tìm cạnh, phân ngưỡng, contour.</p>
+
+      </div>
+      <div class="lesson-done" data-course="vision-engineer"><button type="button" class="lesson-done-btn" data-lesson-done="opencv-du-an-chang-2-cong-cu-chup-anh-kiem-tra" aria-pressed="false"><span class="box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></span><span class="off">Đánh dấu đã học xong</span><span class="on">Đã học xong bài này</span></button><a class="btn lg" href="../hoc/histogram-can-bang-sang-clahe.html">Bài tiếp theo<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a></div>
+      <footer class="article-foot">
+        <div class="tags"><a class="tag" href="../search.html?q=OpenCV">#OpenCV</a><a class="tag" href="../search.html?q=Python">#Python</a><a class="tag" href="../search.html?q=Computer Vision">#Computer Vision</a></div>
+        <div class="share">
+      <span>Chia sẻ:</span>
+      <a class="share-btn fb" href="https://www.facebook.com/sharer/sharer.php?u=https://hocfree.vn/hoc/opencv-du-an-chang-2-cong-cu-chup-anh-kiem-tra.html" target="_blank" rel="noopener" aria-label="Chia sẻ Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8z"/></svg></a>
+      <a class="share-btn x" href="https://twitter.com/intent/tweet?url=https://hocfree.vn/hoc/opencv-du-an-chang-2-cong-cu-chup-anh-kiem-tra.html" target="_blank" rel="noopener" aria-label="Chia sẻ X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+      <button class="share-btn copy-link" data-url="https://hocfree.vn/hoc/opencv-du-an-chang-2-cong-cu-chup-anh-kiem-tra.html" aria-label="Sao chép liên kết"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+    </div>
+      </footer>
+      <div class="author-box">
+        <span class="avatar lg" aria-hidden="true">HF</span>
+        <div>
+          <strong>Ban biên tập HọcFree</strong>
+          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và ngoại ngữ, hoàn toàn miễn phí.</p>
+        </div>
+      </div>
+      <nav class="pager lesson-pager" aria-label="Bài học trước/sau"><a class="prev" href="../hoc/opencv-5-to-chuc-pipeline-xu-ly.html"><span>← Bài trước · Bài 5</span>Tổ chức pipeline xử lý bằng hàm và cấu hình</a><a class="next" href="../hoc/histogram-can-bang-sang-clahe.html"><span>Bài tiếp → · Bài 1 · Chặng 3</span>Histogram và cân bằng sáng</a></nav>
+    </article>
+    <aside class="sidebar course-side" data-course="vision-engineer">
+      <section class="widget course-toc">
+        <p class="widget-title">Chặng 2/14 · Vision Engineer</p>
+        <a class="course-toc-title" href="../lo-trinh/vision-engineer/opencv.html">OpenCV</a>
+        <div class="lc" data-lesson-count="opencv-co-ban-anh-video-camera opencv-2-khong-gian-mau-va-tach-mau opencv-3-roi-resize-xoay-lat opencv-4-ve-ket-qua-len-anh opencv-5-to-chuc-pipeline-xu-ly opencv-du-an-chang-2-cong-cu-chup-anh-kiem-tra"><div class="lc-bar"><span data-lc-bar></span></div><span data-lc-text>0/6 bài</span></div>
+        <ol class="toc-lessons"><li data-lesson="opencv-co-ban-anh-video-camera"><a href="../hoc/opencv-co-ban-anh-video-camera.html"><span class="tn">1</span><span class="tt">Đọc, hiển thị, ghi ảnh, video và camera</span></a></li><li data-lesson="opencv-2-khong-gian-mau-va-tach-mau"><a href="../hoc/opencv-2-khong-gian-mau-va-tach-mau.html"><span class="tn">2</span><span class="tt">Không gian màu BGR, HSV, Gray và tách màu</span></a></li><li data-lesson="opencv-3-roi-resize-xoay-lat"><a href="../hoc/opencv-3-roi-resize-xoay-lat.html"><span class="tn">3</span><span class="tt">ROI, resize, xoay, lật và ghép ảnh</span></a></li><li data-lesson="opencv-4-ve-ket-qua-len-anh"><a href="../hoc/opencv-4-ve-ket-qua-len-anh.html"><span class="tn">4</span><span class="tt">Vẽ kết quả lên ảnh: khung, chữ, overlay</span></a></li><li data-lesson="opencv-5-to-chuc-pipeline-xu-ly"><a href="../hoc/opencv-5-to-chuc-pipeline-xu-ly.html"><span class="tn">5</span><span class="tt">Tổ chức pipeline xử lý bằng hàm và cấu hình</span></a></li><li data-lesson="opencv-du-an-chang-2-cong-cu-chup-anh-kiem-tra" class="is-current"><a href="../hoc/opencv-du-an-chang-2-cong-cu-chup-anh-kiem-tra.html" aria-current="page"><span class="tn">6</span><span class="tt">Dự án chặng 2: công cụ chụp và lưu ảnh kiểm tra</span></a></li></ol>
+        <a class="more" href="../lo-trinh/vision-engineer.html">Xem toàn bộ lộ trình<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a>
+      </section>
+    </aside>
+  </div>
+  <section class="band">
+    <div class="container">
+      <div class="section-title"><h2>Có thể bạn quan tâm</h2></div>
+      <div class="card-grid"><article class="card">
+  <a class="thumb" href="../hoc/python-1-cai-dat-python-va-vs-code.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-1-cai-dat-python-va-vs-code.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-1-cai-dat-python-va-vs-code.html">Python cơ bản: cài Python, VS Code và chạy chương trình đầu tiên</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>7 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/python-2-bien-kieu-du-lieu-toan-tu.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-2-bien-kieu-du-lieu-toan-tu.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-2-bien-kieu-du-lieu-toan-tu.html">Python cơ bản: biến, kiểu dữ liệu và toán tử</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/python-3-re-nhanh-va-vong-lap.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-3-re-nhanh-va-vong-lap.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-3-re-nhanh-va-vong-lap.html">Python cơ bản: rẽ nhánh và vòng lặp</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article></div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <a class="logo" href="../"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+      <p>HọcFree.vn – nền tảng học miễn phí về AI, lập trình, Computer Vision, Machine Vision, tin tức AI và ngoại ngữ dành cho người Việt.</p>
+    </div>
+    <div><h3>Học &amp; thực hành</h3><ul><li><a href="../hoc/">Học AI &amp; Lập trình</a></li><li><a href="../projects/">Projects</a></li><li><a href="../lo-trinh/">Learning Paths</a></li></ul></div>
+    <div><h3>Khám phá</h3><ul><li><a href="../kien-thuc/">Kiến thức</a></li><li><a href="../tin-tuc-ai/">Tin tức AI</a></li><li><a href="../ngoai-ngu/">Ngoại ngữ</a></li><li><a href="../tai-nguyen/">Tài nguyên</a></li></ul></div>
+    <div><h3>Bài mới</h3><ul><li><a href="../hoc/python-1-cai-dat-python-va-vs-code.html">Python cơ bản: cài Python, VS Code và chạy chương trình đầu tiên</a></li><li><a href="../hoc/python-2-bien-kieu-du-lieu-toan-tu.html">Python cơ bản: biến, kiểu dữ liệu và toán tử</a></li><li><a href="../hoc/python-3-re-nhanh-va-vong-lap.html">Python cơ bản: rẽ nhánh và vòng lặp</a></li><li><a href="../hoc/python-4-list-tuple-dict-set.html">Python cơ bản: list, tuple, dict và set</a></li></ul></div>
+    <div>
+      <h3>HọcFree</h3>
+      <ul>
+        <li><a href="../gioi-thieu.html">Giới thiệu</a></li>
+        <li><a href="../search.html">Tìm kiếm</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">© 2026 HọcFree.vn · Kiến thức là để chia sẻ.</div>
+  </div>
+</footer>
+<button class="to-top" aria-label="Lên đầu trang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<script src="../assets/js/search-data.js?v=20261009" defer></script>
+<script src="../assets/js/main.js?v=20261009" defer></script>
+</body>
+</html>

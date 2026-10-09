@@ -1,0 +1,331 @@
+<p>Bài phân ngưỡng và contour đã dạy bạn <em>đếm</em> vật. Nhưng trạm kiểm tra thật cần nhiều hơn: vật này tròn hay méo, đặt thẳng hay lệch góc, có lỗ ở giữa không, có bị sứt mẻ không. Những câu hỏi đó trả lời bằng <strong>đặc trưng hình học</strong> của từng contour. Kỹ thuật này gọi là <strong>blob analysis</strong> và là công cụ chính của Machine Vision cổ điển: nhanh, dễ giải thích, không cần dữ liệu huấn luyện.</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Viết được hàm nhận mặt nạ nhị phân và trả về bảng đặc trưng của từng vật (diện tích, chu vi, tâm, độ tròn, độ đặc, góc xoay), rồi phân loại vật theo bảng đó.</div>
+
+<h2>1. Ảnh mẫu</h2>
+<p>Tạo một ảnh nhị phân có đủ các tình huống: tròn, vuông, chữ nhật xoay, tam giác, vòng đệm có lỗ và một vật bị cắt ở mép ảnh.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+img = np.zeros((360, 560), np.uint8)
+cv2.circle(img, (80, 90), 40, 255, -1)                                   # tròn
+cv2.rectangle(img, (170, 50), (249, 129), 255, -1)                       # vuông 80×80
+hop = cv2.boxPoints(((390, 90), (140, 50), 30)).astype(np.int32)         # chữ nhật 140×50 xoay 30°
+cv2.fillPoly(img, [hop], 255)
+cv2.fillPoly(img, [np.array([[60, 320], [140, 320], [100, 220]], np.int32)], 255)  # tam giác
+cv2.circle(img, (260, 270), 50, 255, -1)
+cv2.circle(img, (260, 270), 20, 0, -1)                                   # vòng đệm có lỗ
+cv2.circle(img, (540, 280), 45, 255, -1)                                 # vật bị cắt ở mép phải
+cv2.imwrite("vat_the.png", img)
+print("Đã tạo vat_the.png")</code></pre>
+
+<h2>2. Lấy contour đúng cách</h2>
+<pre><code class="language-python">import cv2
+
+img = cv2.imread("vat_the.png", cv2.IMREAD_GRAYSCALE)
+cs, h = cv2.findContours(img, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+h = h[0]                              # h có dạng (1, N, 4) → lấy (N, 4)
+ngoai = [i for i in range(len(cs)) if h[i][3] == -1]
+lo = [i for i in range(len(cs)) if h[i][3] != -1]
+print("tổng contour:", len(cs), "| vật:", len(ngoai), "| lỗ:", len(lo))</code></pre>
+<pre><code class="language-text">tổng contour: 7 | vật: 6 | lỗ: 1</code></pre>
+<table>
+  <tr><th>Chế độ</th><th>Trả về</th><th>Dùng khi</th></tr>
+  <tr><td><code>RETR_EXTERNAL</code></td><td>Chỉ viền ngoài</td><td>Chỉ cần đếm, đo bao ngoài</td></tr>
+  <tr><td><code>RETR_CCOMP</code></td><td>Viền ngoài + lỗ, 2 cấp</td><td>Cần biết vật có lỗ không (vòng đệm, đai ốc, lỗ khoan)</td></tr>
+  <tr><td><code>RETR_TREE</code></td><td>Cây lồng nhau đầy đủ</td><td>Vật lồng trong lỗ của vật khác</td></tr>
+</table>
+<p>Mỗi hàng <code>h[i]</code> là <code>[kế tiếp, trước, con đầu tiên, cha]</code>. Với <code>RETR_CCOMP</code>: <code>cha == -1</code> là viền ngoài của vật, <code>cha != -1</code> là lỗ nằm trong vật <code>cha</code>.</p>
+
+<h2>3. Các đặc trưng cơ bản</h2>
+<table>
+  <tr><th>Đặc trưng</th><th>Hàm / công thức</th><th>Ý nghĩa</th></tr>
+  <tr><td>Diện tích</td><td><code>cv2.contourArea(c)</code></td><td>Kích thước vật (pixel²)</td></tr>
+  <tr><td>Chu vi</td><td><code>cv2.arcLength(c, True)</code></td><td>Độ dài đường viền</td></tr>
+  <tr><td>Tâm</td><td><code>M = cv2.moments(c)</code>; <code>cx = M["m10"]/M["m00"]</code></td><td>Trọng tâm, dùng để gắp, định vị</td></tr>
+  <tr><td>Khung bao</td><td><code>cv2.boundingRect(c)</code></td><td><code>x, y, w, h</code> thẳng theo trục ảnh</td></tr>
+  <tr><td>Độ tròn</td><td>4π·A / P²</td><td>1 với hình tròn lý tưởng, nhỏ dần khi méo hoặc nhiều góc</td></tr>
+  <tr><td>Độ đặc (solidity)</td><td>A / diện tích bao lồi</td><td>Gần 1 nếu vật lồi; giảm mạnh khi vật bị sứt, khuyết</td></tr>
+  <tr><td>Khung xoay</td><td><code>cv2.minAreaRect(c)</code></td><td>Kích thước thật và góc xoay của vật</td></tr>
+</table>
+<pre><code class="language-python">import math
+
+import cv2
+
+img = cv2.imread("vat_the.png", cv2.IMREAD_GRAYSCALE)
+cs, h = cv2.findContours(img, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+h = h[0]
+print("   A      P      tâm         độ tròn  độ đặc")
+for i, c in enumerate(cs):
+    if h[i][3] != -1:
+        continue                                        # bỏ qua lỗ
+    A = cv2.contourArea(c)
+    P = cv2.arcLength(c, True)
+    M = cv2.moments(c)
+    cx, cy = M["m10"] / M["m00"], M["m01"] / M["m00"]
+    tron = 4 * math.pi * A / P ** 2
+    dac = A / cv2.contourArea(cv2.convexHull(c))
+    print(f"{A:6.0f} {P:6.1f}  ({cx:5.1f},{cy:5.1f})  {tron:.3f}    {dac:.3f}")</code></pre>
+<pre><code class="language-text">   A      P      tâm         độ tròn  độ đặc
+  4754  270.5  (530.8,280.0)  0.816    0.989
+  7704  329.7  (260.0,270.0)  0.891    0.989
+  4000  313.1  (100.0,286.7)  0.513    0.981
+  6241  316.0  (209.5, 89.5)  0.785    1.000
+  4912  263.8  ( 80.0, 90.0)  0.887    0.986
+  6996  408.7  (389.5, 89.5)  0.526    0.979</code></pre>
+<p>Ba điều <strong>phải biết</strong> trước khi dùng các con số này:</p>
+<ol>
+  <li><strong>Thứ tự contour không theo trái → phải.</strong> Vật đầu tiên trong danh sách là vật bị cắt ở mép phải. Nếu cần thứ tự ổn định (đánh số vị trí trên khay), hãy tự sắp xếp theo tâm (mục 6).</li>
+  <li><strong>Hình tròn số hóa có độ tròn khoảng 0,89, không phải 1.</strong> Đường viền trên lưới pixel là đường bậc thang nên <code>arcLength</code> dài hơn chu vi thật. Vì thế ngưỡng "là hình tròn" thực tế khoảng 0,85, không phải 0,99. Hình vuông cho đúng π/4 ≈ 0,785.</li>
+  <li><strong><code>contourArea</code> của viền ngoài không trừ lỗ.</strong> Vòng đệm báo 7704 nhưng diện tích vật liệu thật phải trừ lỗ (mục 4).</li>
+</ol>
+
+<h2>4. Vật có lỗ: diện tích thật và số lỗ</h2>
+<pre><code class="language-python">import cv2
+
+img = cv2.imread("vat_the.png", cv2.IMREAD_GRAYSCALE)
+cs, h = cv2.findContours(img, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+h = h[0]
+for i, c in enumerate(cs):
+    if h[i][3] != -1:
+        continue
+    cac_lo = [j for j in range(len(cs)) if h[j][3] == i]       # các contour có cha là i
+    if cac_lo:
+        a_ngoai = cv2.contourArea(c)
+        a_lo = sum(cv2.contourArea(cs[j]) for j in cac_lo)
+        print(f"vật {i}: {len(cac_lo)} lỗ, diện tích ngoài {a_ngoai:.0f}, lỗ {a_lo:.0f}, "
+              f"vật liệu {a_ngoai - a_lo:.0f}")</code></pre>
+<pre><code class="language-text">vật 1: 1 lỗ, diện tích ngoài 7704, lỗ 1314, vật liệu 6390</code></pre>
+<p>Ứng dụng: kiểm tra đai ốc thiếu lỗ ren, vòng đệm bị đột lệch, bo mạch thiếu lỗ khoan. Số lỗ và diện tích lỗ là hai tiêu chí OK/NG rất ổn định.</p>
+
+<h2>5. Góc xoay với minAreaRect: cách dùng an toàn</h2>
+<p><code>cv2.minAreaRect</code> trả về <code>((cx, cy), (w, h), góc)</code>: hình chữ nhật nhỏ nhất bao vật, kể cả khi vật xoay. Vấn đề: <strong>quy ước góc đã thay đổi giữa các phiên bản OpenCV</strong>, và <code>w</code>, <code>h</code> có thể bị hoán đổi. Với chữ nhật xoay 30° ở trên, OpenCV bạn đang dùng có thể trả về 30, −60 hoặc 60 tùy phiên bản. Đừng dùng thẳng giá trị góc. Hãy tính góc của <strong>cạnh dài</strong> từ 4 đỉnh, kết quả sẽ giống nhau trên mọi phiên bản:</p>
+<pre><code class="language-python">import math
+
+import cv2
+import numpy as np
+
+
+def khung_xoay(c):
+    """Trả về (dài, rộng, góc cạnh dài trong [0, 180)), không phụ thuộc phiên bản OpenCV."""
+    rect = cv2.minAreaRect(c)
+    p = cv2.boxPoints(rect)                      # 4 đỉnh theo thứ tự liền kề
+    c1, c2 = p[1] - p[0], p[2] - p[1]            # hai cạnh kề nhau
+    canh_dai = c1 if np.linalg.norm(c1) &gt;= np.linalg.norm(c2) else c2
+    goc = math.degrees(math.atan2(canh_dai[1], canh_dai[0])) % 180
+    dai, rong = max(rect[1]), min(rect[1])
+    return dai, rong, goc
+
+
+img = cv2.imread("vat_the.png", cv2.IMREAD_GRAYSCALE)
+cs, _ = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+for c in cs:
+    x, y, w, h = cv2.boundingRect(c)
+    dai, rong, goc = khung_xoay(c)
+    print(f"khung thẳng {w:3d}×{h:3d} | khung xoay {dai:5.1f}×{rong:5.1f} góc {goc:5.1f}°")</code></pre>
+<pre><code class="language-text">khung thẳng  65× 91 | khung xoay  90.0× 64.0 góc  90.0°
+khung thẳng 101×101 | khung xoay  99.0× 99.0 góc  45.0°
+khung thẳng  81×101 | khung xoay 100.0× 80.0 góc  90.0°
+khung thẳng  80× 80 | khung xoay  79.0× 79.0 góc   0.0°
+khung thẳng  81× 81 | khung xoay  79.2× 79.2 góc  45.0°
+khung thẳng 148×114 | khung xoay 141.7× 50.6 góc  29.8°</code></pre>
+<ul>
+  <li>Chữ nhật xoay: khung thẳng 148×114 vô nghĩa, khung xoay cho đúng kích thước 141,7×50,6 (vẽ 140×50; cạnh xiên trên lưới pixel làm dư khoảng 1–2 px) và góc <strong>29,8°</strong> (vẽ 30°).</li>
+  <li>Trục y của ảnh hướng <strong>xuống</strong>, nên góc dương nghĩa là xoay <strong>theo chiều kim đồng hồ</strong> khi nhìn trên màn hình.</li>
+  <li>Góc của hình tròn, hình vuông là <strong>vô nghĩa</strong> (0°, 45° hay 90° đều đúng như nhau). Chỉ tin góc khi tỉ lệ dài/rộng rõ ràng, ví dụ lớn hơn 1,2. Vật đối xứng cần cách khác để xác định hướng (template matching ở chặng 7).</li>
+</ul>
+
+<h2>6. Bảng đặc trưng và phân loại vật</h2>
+<p>Gom tất cả thành một hàm trả về danh sách dict, mỗi dict là một vật. Đây là cấu trúc dữ liệu bạn sẽ dùng lại ở dự án chặng 3 và chặng 7:</p>
+<pre><code class="language-python">import math
+
+import cv2
+import numpy as np
+
+
+def khung_xoay(c):
+    rect = cv2.minAreaRect(c)
+    p = cv2.boxPoints(rect)
+    c1, c2 = p[1] - p[0], p[2] - p[1]
+    canh_dai = c1 if np.linalg.norm(c1) &gt;= np.linalg.norm(c2) else c2
+    return max(rect[1]), min(rect[1]), math.degrees(math.atan2(canh_dai[1], canh_dai[0])) % 180
+
+
+def phan_tich_blob(mask, dien_tich_min=200, cao_hang=180):
+    """mask: vật trắng nền đen. Trả về danh sách đặc trưng, xếp theo hàng (cao cao_hang px) rồi trái → phải."""
+    cao, rong_anh = mask.shape[:2]
+    cs, h = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+    if h is None:
+        return []
+    h = h[0]
+    ket_qua = []
+    for i, c in enumerate(cs):
+        if h[i][3] != -1:
+            continue
+        A = cv2.contourArea(c)
+        if A &lt; dien_tich_min:
+            continue
+        P = cv2.arcLength(c, True)
+        x, y, w, hh = cv2.boundingRect(c)
+        M = cv2.moments(c)
+        dai, rong, goc = khung_xoay(c)
+        lo = [j for j in range(len(cs)) if h[j][3] == i]
+        ket_qua.append({
+            "tam": (round(M["m10"] / M["m00"], 1), round(M["m01"] / M["m00"], 1)),
+            "dien_tich": round(A - sum(cv2.contourArea(cs[j]) for j in lo)),
+            "do_tron": round(4 * math.pi * A / P ** 2, 3),
+            "do_dac": round(A / cv2.contourArea(cv2.convexHull(c)), 3),
+            "so_dinh": len(cv2.approxPolyDP(c, 0.02 * P, True)),
+            "dai": round(dai, 1), "rong": round(rong, 1), "goc": round(goc, 1),
+            "so_lo": len(lo),
+            "cham_mep": x == 0 or y == 0 or x + w == rong_anh or y + hh == cao,
+        })
+    ket_qua.sort(key=lambda v: (int(v["tam"][1] // cao_hang), v["tam"][0]))   # hàng trước, cột sau
+    return ket_qua
+
+
+def phan_loai(v):
+    if v["cham_mep"]:
+        return "bỏ qua (chạm mép)"
+    if v["so_lo"] &gt; 0:
+        return "vòng đệm"
+    if v["do_tron"] &gt; 0.85:
+        return "tròn"
+    if v["so_dinh"] == 3:
+        return "tam giác"
+    if v["so_dinh"] == 4:
+        return "vuông" if v["dai"] / v["rong"] &lt; 1.15 else "chữ nhật"
+    return "không xác định"
+
+
+mask = cv2.imread("vat_the.png", cv2.IMREAD_GRAYSCALE)
+for v in phan_tich_blob(mask):
+    print(f"{phan_loai(v):18s} tâm {v['tam']}  S={v['dien_tich']}  tròn={v['do_tron']}  "
+          f"{v['dai']}×{v['rong']} góc {v['goc']}")</code></pre>
+<pre><code class="language-text">tròn               tâm (80.0, 90.0)  S=4912  tròn=0.887  79.2×79.2 góc 45.0
+vuông              tâm (209.5, 89.5)  S=6241  tròn=0.785  79.0×79.0 góc 0.0
+chữ nhật           tâm (389.5, 89.5)  S=6996  tròn=0.526  141.7×50.6 góc 29.8
+tam giác           tâm (100.0, 286.7)  S=4000  tròn=0.513  100.0×80.0 góc 90.0
+vòng đệm           tâm (260.0, 270.0)  S=6390  tròn=0.891  99.0×99.0 góc 45.0
+bỏ qua (chạm mép)  tâm (530.8, 280.0)  S=4754  tròn=0.816  90.0×64.0 góc 90.0</code></pre>
+<p>Những quyết định thiết kế đáng học:</p>
+<ul>
+  <li><strong>Loại vật chạm mép</strong>: vật bị cắt cho số đo sai (diện tích thiếu, độ tròn sai). Trên băng tải, vật đó sẽ được kiểm tra đầy đủ ở khung hình sau.</li>
+  <li><strong>Thứ tự kiểm tra trong <code>phan_loai</code></strong>: kiểm tra lỗ trước độ tròn, vì vòng đệm cũng tròn. Kiểm tra độ tròn trước số đỉnh, vì <code>approxPolyDP</code> biến hình tròn thành đa giác 8 đỉnh.</li>
+  <li><strong>Sắp xếp theo hàng rồi theo cột</strong>: chia ảnh thành các dải ngang cao <code>cao_hang</code> pixel (theo bố trí khay, ở đây 2 hàng, mỗi hàng 180 px). Nếu chỉ sắp theo <code>y</code>, vòng đệm (tâm y = 270) sẽ đứng trước tam giác (y = 286,7) dù nằm bên phải, vì tâm tam giác thấp hơn. Lỗi này dễ làm sai số thứ tự vị trí khi báo NG.</li>
+  <li><strong><code>approxPolyDP(c, 0.02*P)</code></strong>: sai số cho phép là 2% chu vi. Tăng lên nếu cạnh vật bị răng cưa (ra quá nhiều đỉnh), giảm nếu góc bo tròn (ra quá ít đỉnh).</li>
+</ul>
+
+<h2>7. Cách nhanh hơn: connectedComponentsWithStats</h2>
+<p>Khi chỉ cần diện tích, khung bao và tâm (không cần độ tròn, góc), <code>connectedComponentsWithStats</code> nhanh hơn và trả về diện tích <strong>pixel thật</strong> (đã tự trừ lỗ):</p>
+<pre><code class="language-python">import cv2
+
+mask = cv2.imread("vat_the.png", cv2.IMREAD_GRAYSCALE)
+n, nhan, stats, tam = cv2.connectedComponentsWithStats(mask, connectivity=8)
+print("số vùng (kể cả nền):", n)
+for i in range(1, n):                            # nhãn 0 là nền
+    x, y, w, h, s = stats[i]
+    print(f"vùng {i}: x={x} y={y} w={w} h={h} diện tích={s} tâm=({tam[i][0]:.1f}, {tam[i][1]:.1f})")</code></pre>
+<pre><code class="language-text">số vùng (kể cả nền): 7
+vùng 1: x=316 y=33 w=148 h=114 diện tích=7162 tâm=(389.5, 89.5)
+vùng 2: x=40 y=50 w=81 h=81 diện tích=5025 tâm=(80.0, 90.0)
+vùng 3: x=170 y=50 w=80 h=80 diện tích=6400 tâm=(209.5, 89.5)
+vùng 4: x=60 y=220 w=81 h=101 diện tích=4141 tâm=(100.0, 286.6)
+vùng 5: x=210 y=220 w=101 h=101 diện tích=6588 tâm=(260.0, 270.0)
+vùng 6: x=495 y=235 w=65 h=91 diện tích=4877 tâm=(530.9, 280.0)</code></pre>
+<div class="warn"><strong>Hai cách đo diện tích cho số khác nhau</strong>Hình vuông 80×80: <code>connectedComponents</code> đếm đúng 6400 pixel, còn <code>contourArea</code> cho 6241 = 79×79 vì nó tính diện tích đa giác đi qua <em>tâm</em> các pixel viền. Chênh lệch khoảng nửa pixel mỗi phía. Trong một dự án, <strong>chọn một cách và dùng nhất quán</strong> cho cả lúc lấy mẫu chuẩn lẫn lúc kiểm tra, nếu không ngưỡng OK/NG sẽ lệch.</div>
+
+<h2>8. Từ đặc trưng đến quyết định OK/NG</h2>
+<p>Trong nhà máy, bảng đặc trưng được so với <strong>khoảng dung sai</strong> lấy từ mẫu chuẩn. Ví dụ quy tắc cho vòng đệm:</p>
+<pre><code class="language-python">DUNG_SAI_VONG_DEM = {
+    "dien_tich": (6200, 6800),    # pixel², từ đo 30 mẫu OK: trung bình ± 4 độ lệch chuẩn
+    "do_tron": (0.85, 1.0),       # méo → NG
+    "do_dac": (0.97, 1.0),        # sứt mép → độ đặc giảm
+    "so_lo": (1, 1),              # thiếu hoặc thừa lỗ → NG
+}
+
+
+def kiem_tra(v, dung_sai):
+    loi = [f"{k}={v[k]} ngoài [{lo}, {hi}]" for k, (lo, hi) in dung_sai.items()
+           if not lo &lt;= v[k] &lt;= hi]
+    return len(loi) == 0, loi
+
+
+vong_dem = {"dien_tich": 6390, "do_tron": 0.891, "do_dac": 0.989, "so_lo": 1}
+sut_me = {"dien_tich": 6010, "do_tron": 0.80, "do_dac": 0.93, "so_lo": 1}
+print(kiem_tra(vong_dem, DUNG_SAI_VONG_DEM))
+print(kiem_tra(sut_me, DUNG_SAI_VONG_DEM))</code></pre>
+<pre><code class="language-text">(True, [])
+(False, ['dien_tich=6010 ngoài [6200, 6800]', 'do_tron=0.8 ngoài [0.85, 1.0]', 'do_dac=0.93 ngoài [0.97, 1.0]'])</code></pre>
+<p>Hàm trả về <strong>lý do</strong> NG, không chỉ True/False. Kỹ sư vận hành cần biết vì sao hàng bị loại để chỉnh máy, và bạn cần biết để phân tích overkill (chặng 5).</p>
+
+<h2>9. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Tạo ảnh mới có hai hình tròn bán kính 40: một nguyên vẹn, một bị khoét "vết sứt" ở mép bằng hình tròn đen bán kính 15. So sánh độ tròn và độ đặc. Đặc trưng nào phát hiện sứt mẻ tốt hơn?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import math
+
+import cv2
+import numpy as np
+
+img = np.zeros((200, 300), np.uint8)
+cv2.circle(img, (80, 100), 40, 255, -1)          # nguyên vẹn
+cv2.circle(img, (210, 100), 40, 255, -1)
+cv2.circle(img, (248, 100), 15, 0, -1)           # vết sứt ở mép phải
+cs, _ = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+for c in sorted(cs, key=lambda c: cv2.boundingRect(c)[0]):
+    A, P = cv2.contourArea(c), cv2.arcLength(c, True)
+    dac = A / cv2.contourArea(cv2.convexHull(c))
+    print(f"x={cv2.boundingRect(c)[0]:3d}  độ tròn {4 * math.pi * A / P ** 2:.3f}  độ đặc {dac:.3f}")</code></pre>
+<pre><code class="language-text">x= 40  độ tròn 0.887  độ đặc 0.986
+x=170  độ tròn 0.721  độ đặc 0.919</code></pre>
+<p>Độ tròn giảm từ 0,887 xuống 0,721, độ đặc giảm từ 0,986 xuống 0,919. Cả hai đều giảm, nhưng <strong>độ đặc</strong> là chỉ số đặc hiệu cho sứt mẻ vì nó đo trực tiếp phần "khuyết" so với bao lồi, còn độ tròn giảm cả khi vật chỉ hơi bầu dục (không có lỗi khuyết). Quy tắc thực tế: dùng độ tròn để kiểm tra méo, dùng độ đặc để kiểm tra sứt.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Viết hàm <code>ve_bang(anh_mau, ds)</code> vẽ lên ảnh màu: khung xoay (<code>cv2.boxPoints</code> + <code>cv2.polylines</code>), số thứ tự và tên loại tại tâm mỗi vật. Dùng kết quả <code>phan_tich_blob</code> và <code>phan_loai</code> ở mục 6.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+
+def ve_bang(anh_mau, ds_contour, ds_ten):
+    ve = anh_mau.copy()
+    for i, (c, ten) in enumerate(zip(ds_contour, ds_ten), 1):
+        hop = cv2.boxPoints(cv2.minAreaRect(c)).astype(np.int32)
+        mau = (0, 0, 255) if "bỏ qua" in ten else (0, 200, 0)
+        cv2.polylines(ve, [hop], True, mau, 2)
+        M = cv2.moments(c)
+        cx, cy = int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"])
+        cv2.putText(ve, str(i), (cx - 6, cy + 6), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+    return ve
+
+
+mask = cv2.imread("vat_the.png", cv2.IMREAD_GRAYSCALE)
+cs, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+ket_qua = ve_bang(cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR), cs, ["vật"] * len(cs))
+cv2.imwrite("bang_vat.png", ket_qua)
+print("Đã lưu bang_vat.png")</code></pre>
+<p>In tên loại tiếng Việt lên ảnh: xem lưu ý về <code>putText</code> và font ở bài vẽ kết quả (chặng 2). Ở đây dùng số thứ tự và in bảng tên ra terminal là cách an toàn trên mọi phiên bản.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Một khay có 12 viên thuốc. Ảnh NG thiếu 1 viên, ảnh NG khác có 1 viên vỡ đôi. Chỉ dùng đặc trưng trong bài, bạn thiết kế quy tắc OK/NG thế nào để bắt được cả hai lỗi?</p>
+<details><summary>Xem đáp án</summary>
+<ul>
+  <li><strong>Thiếu viên</strong>: đếm vật hợp lệ (diện tích trong khoảng dung sai của một viên) khác 12 → NG.</li>
+  <li><strong>Viên vỡ đôi</strong>: hai mảnh có diện tích khoảng một nửa viên chuẩn, thấp hơn ngưỡng dưới → mỗi mảnh là một vật "ngoài dung sai" → NG. Nếu hai mảnh vẫn dính nhau, độ đặc giảm và độ tròn giảm → NG.</li>
+  <li>Quy tắc tổng: OK khi và chỉ khi có đúng 12 vật, <em>và</em> mọi vật nằm trong dung sai diện tích, độ tròn, độ đặc. Báo NG kèm số thứ tự vị trí trên khay, nhờ sắp xếp theo hàng/cột.</li>
+</ul>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Dùng <code>RETR_CCOMP</code> khi cần biết lỗ; <code>h[i][3]</code> là chỉ số cha.</li>
+  <li>Độ tròn của hình tròn số hóa khoảng 0,89; ngưỡng thực tế khoảng 0,85. Độ đặc phát hiện sứt mẻ.</li>
+  <li>Đừng tin trực tiếp góc của <code>minAreaRect</code>: tính góc cạnh dài từ <code>boxPoints</code>.</li>
+  <li>Loại vật chạm mép ảnh; tự sắp xếp vật theo hàng/cột.</li>
+  <li><code>contourArea</code> và <code>connectedComponentsWithStats</code> cho diện tích khác nhau, chọn một và dùng nhất quán.</li>
+  <li>Quyết định OK/NG = so đặc trưng với khoảng dung sai, luôn trả về lý do.</li>
+</ul>
+<p>Bài tiếp theo xử lý trường hợp khó mà contour thường thất bại: các vật <strong>dính nhau</strong>, tách bằng watershed.</p>
