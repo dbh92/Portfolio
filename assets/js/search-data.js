@@ -2230,22 +2230,6 @@ window.HF_TOPICS = [
   "f": 1
  },
  {
-  "t": "AI Engineer",
-  "u": "lo-trinh/index.html#ai-engineer",
-  "s": "Learning Path",
-  "g": "Machine Learning, Deep Learning, LLM",
-  "n": -1,
-  "f": 0
- },
- {
-  "t": "Computer Vision Engineer",
-  "u": "lo-trinh/index.html#computer-vision-engineer",
-  "s": "Learning Path",
-  "g": "OpenCV, Deep Learning, Detection",
-  "n": -1,
-  "f": 0
- },
- {
   "t": "Python Developer",
   "u": "lo-trinh/index.html#python-developer",
   "s": "Learning Path",
