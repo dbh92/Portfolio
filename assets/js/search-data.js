@@ -1,6 +1,154 @@
 /* Tự động sinh bởi tools/build.py – không sửa tay */
 window.HF_POSTS = [
  {
+  "t": "Kiểm thử hàm xử lý ảnh với pytest: bắt lỗi trước khi lên máy",
+  "u": "hoc/pytest-kiem-thu-ham-xu-ly-anh.html",
+  "e": "Dùng fixture, parametrize, pytest.raises và pytest.approx để khóa chặt các hàm cắt ROI, đếm pixel, đánh giá OK/NG, bắt lỗi ngưỡng trước khi lên máy trạm.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "10/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/pytest-kiem-thu-ham-xu-ly-anh.webp",
+  "tags": [
+   "Python",
+   "Lập trình",
+   "Machine Vision"
+  ]
+ },
+ {
+  "t": "C#: lưu và nạp recipe trạm vision bằng System.Text.Json",
+  "u": "hoc/csharp-system-text-json-luu-recipe.html",
+  "e": "Lưu thông số từng mã sản phẩm ra JSON với System.Text.Json: required, enum dạng chữ, từ chối trường gõ sai, bẫy số thực ở biên dung sai và ghi file an toàn.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "10/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/csharp-system-text-json-luu-recipe.webp",
+  "tags": [
+   "C#",
+   ".NET",
+   "Machine Vision"
+  ]
+ },
+ {
+  "t": "Cross-validation, Pipeline, GridSearchCV: đánh giá mô hình trung thực",
+  "u": "hoc/cross-validation-pipeline-gridsearchcv.html",
+  "e": "Vì sao một lần chia train/val không đủ, cách dùng StratifiedKFold, Pipeline chống rò rỉ dữ liệu và GridSearchCV chọn tham số với scikit-learn, có code chạy được.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "10/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/cross-validation-pipeline-gridsearchcv.webp",
+  "tags": [
+   "Machine Learning",
+   "Python"
+  ]
+ },
+ {
+  "t": "Hàm mất mát cho phân loại: cross-entropy, class weight, focal loss",
+  "u": "hoc/ham-mat-mat-cross-entropy-focal-loss.html",
+  "e": "Hiểu softmax và cross-entropy bằng con số cụ thể, vì sao dữ liệu ít ảnh NG làm mô hình lười, và cách xử lý bằng trọng số lớp hoặc focal loss trong PyTorch.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "10/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/ham-mat-mat-cross-entropy-focal-loss.webp",
+  "tags": [
+   "Deep Learning",
+   "PyTorch",
+   "AI Vision"
+  ]
+ },
+ {
+  "t": "PyTorch: lưu checkpoint và huấn luyện tiếp sau khi bị gián đoạn",
+  "u": "hoc/pytorch-luu-nap-checkpoint-huan-luyen-tiep.html",
+  "e": "Checkpoint cần model, optimizer, scheduler và epoch. Thí nghiệm chứng minh huấn luyện tiếp cho kết quả y hệt, cùng lỗi weights_only của torch.load từ bản 2.6.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "10/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/pytorch-luu-nap-checkpoint-huan-luyen-tiep.webp",
+  "tags": [
+   "PyTorch",
+   "Deep Learning",
+   "Python"
+  ]
+ },
+ {
+  "t": "Diffusion model hoạt động thế nào? Tự cài đặt DDPM bằng NumPy",
+  "u": "hoc/diffusion-model-hoat-dong-the-nao-numpy.html",
+  "e": "Lịch nhiễu, công thức nhảy thẳng tới bước t, mạng học đoán nhiễu và vòng lặp sinh ảnh 1000 bước của DDPM, minh họa bằng NumPy với các con số chạy được.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "10/10/2026",
+  "m": 9,
+  "img": "assets/images/posts/diffusion-model-hoat-dong-the-nao-numpy.webp",
+  "tags": [
+   "Generative AI",
+   "Deep Learning"
+  ]
+ },
+ {
+  "t": "Buộc LLM trả JSON đúng schema: kiểm tra bằng Pydantic và thử lại",
+  "u": "hoc/llm-structured-output-json-pydantic.html",
+  "e": "Định nghĩa schema bằng Pydantic, bắt câu trả lời sai định dạng của LLM, gửi lỗi lại để mô hình tự sửa và giới hạn số lần thử. Code chạy được không cần khóa API.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "10/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/llm-structured-output-json-pydantic.webp",
+  "tags": [
+   "LLM",
+   "AI Agents",
+   "Python"
+  ]
+ },
+ {
+  "t": "So sánh với ảnh mẫu (golden template) bằng OpenCV: tìm thiếu, thừa",
+  "u": "hoc/so-sanh-anh-mau-golden-template-opencv.html",
+  "e": "Phát hiện linh kiện thiếu và vật thừa bằng cách so với ảnh mẫu: absdiff, căn chỉnh bằng phaseCorrelate và dải dung sai từ dilate, erode để không báo nhầm ở cạnh.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "10/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/so-sanh-anh-mau-golden-template-opencv.webp",
+  "tags": [
+   "OpenCV",
+   "Machine Vision",
+   "Python"
+  ]
+ },
+ {
+  "t": "Biến đổi Fourier: lọc vân sọc tuần hoàn để lộ vết lỗi bề mặt",
+  "u": "hoc/bien-doi-fourier-loc-van-soc-tuan-hoan.html",
+  "e": "Dùng FFT tìm đỉnh tần số của hoa văn lặp lại trên vải, lưới, kim loại, xóa bằng notch filter rồi phát hiện vết bẩn mờ. Code NumPy và OpenCV có kết quả kiểm chứng.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "10/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/bien-doi-fourier-loc-van-soc-tuan-hoan.webp",
+  "tags": [
+   "Image Processing",
+   "OpenCV",
+   "Python"
+  ]
+ },
+ {
+  "t": "Optical flow với OpenCV: đo vận tốc băng tải, phát hiện chuyển động",
+  "u": "hoc/optical-flow-do-van-toc-bang-tai.html",
+  "e": "Lucas-Kanade và Farneback trong OpenCV: đo dịch chuyển từng khung hình, quy đổi ra vận tốc băng tải theo m/s và tìm vùng đang chuyển động, có code kiểm chứng.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "10/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/optical-flow-do-van-toc-bang-tai.webp",
+  "tags": [
+   "Computer Vision",
+   "OpenCV",
+   "Python"
+  ]
+ },
+ {
   "t": "Python cơ bản: cài Python, VS Code và chạy chương trình đầu tiên",
   "u": "hoc/python-1-cai-dat-python-va-vs-code.html",
   "e": "Cài Python 3.13 đúng cách trên Windows, macOS, Linux, cài VS Code, chạy file .py đầu tiên và học cách đọc thông báo lỗi.",
@@ -2214,70 +2362,70 @@ window.HF_TOPICS = [
   "u": "hoc/python.html",
   "s": "Học AI & Lập trình",
   "g": "Programming",
-  "n": 34
+  "n": 41
  },
  {
   "t": "C#",
   "u": "hoc/csharp.html",
   "s": "Học AI & Lập trình",
   "g": "Programming",
-  "n": 5
+  "n": 6
  },
  {
   "t": "Machine Learning",
   "u": "hoc/machine-learning.html",
   "s": "Học AI & Lập trình",
   "g": "AI & Machine Learning",
-  "n": 7
+  "n": 8
  },
  {
   "t": "Deep Learning",
   "u": "hoc/deep-learning.html",
   "s": "Học AI & Lập trình",
   "g": "AI & Machine Learning",
-  "n": 12
+  "n": 15
  },
  {
   "t": "PyTorch",
   "u": "hoc/pytorch.html",
   "s": "Học AI & Lập trình",
   "g": "AI & Machine Learning",
-  "n": 8
+  "n": 10
  },
  {
   "t": "Generative AI",
   "u": "hoc/generative-ai.html",
   "s": "Học AI & Lập trình",
   "g": "AI & Machine Learning",
-  "n": 6
+  "n": 7
  },
  {
   "t": "LLM / AI Agents",
   "u": "hoc/llm-ai-agents.html",
   "s": "Học AI & Lập trình",
   "g": "AI & Machine Learning",
-  "n": 10
+  "n": 11
  },
  {
   "t": "OpenCV",
   "u": "hoc/opencv.html",
   "s": "Học AI & Lập trình",
   "g": "Computer Vision",
-  "n": 23
+  "n": 26
  },
  {
   "t": "Image Processing",
   "u": "hoc/image-processing.html",
   "s": "Học AI & Lập trình",
   "g": "Computer Vision",
-  "n": 11
+  "n": 12
  },
  {
   "t": "Computer Vision",
   "u": "hoc/computer-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Computer Vision",
-  "n": 15
+  "n": 16
  },
  {
   "t": "OCR",
@@ -2305,14 +2453,14 @@ window.HF_TOPICS = [
   "u": "hoc/machine-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 35
+  "n": 38
  },
  {
   "t": "AI Vision",
   "u": "hoc/ai-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 8
+  "n": 9
  },
  {
   "t": "Industrial Vision",
@@ -2382,42 +2530,42 @@ window.HF_TOPICS = [
   "u": "kien-thuc/programming.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 12
+  "n": 13
  },
  {
   "t": "AI / Machine Learning",
   "u": "kien-thuc/ai-machine-learning.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 7
+  "n": 8
  },
  {
   "t": "Deep Learning",
   "u": "kien-thuc/deep-learning.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 12
+  "n": 15
  },
  {
   "t": "Computer Vision",
   "u": "kien-thuc/computer-vision.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 15
+  "n": 16
  },
  {
   "t": "Machine Vision",
   "u": "kien-thuc/machine-vision.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 35
+  "n": 38
  },
  {
   "t": "AI Vision",
   "u": "kien-thuc/ai-vision.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 8
+  "n": 9
  },
  {
   "t": "Industrial Automation",

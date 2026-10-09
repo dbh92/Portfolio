@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="vi" data-root="../">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PyTorch: lưu checkpoint và huấn luyện tiếp sau khi bị gián đoạn</title>
+<meta name="description" content="Checkpoint cần model, optimizer, scheduler và epoch. Thí nghiệm chứng minh huấn luyện tiếp cho kết quả y hệt, cùng lỗi weights_only của torch.load từ bản 2.6.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://hocfree.vn/hoc/pytorch-luu-nap-checkpoint-huan-luyen-tiep.html">
+<meta property="og:site_name" content="HọcFree">
+<meta property="og:type" content="article">
+<meta property="og:title" content="PyTorch: lưu checkpoint và huấn luyện tiếp sau khi bị gián đoạn">
+<meta property="og:description" content="Checkpoint cần model, optimizer, scheduler và epoch. Thí nghiệm chứng minh huấn luyện tiếp cho kết quả y hệt, cùng lỗi weights_only của torch.load từ bản 2.6.">
+<meta property="og:url" content="https://hocfree.vn/hoc/pytorch-luu-nap-checkpoint-huan-luyen-tiep.html">
+<meta property="og:image" content="https://hocfree.vn/assets/images/posts/pytorch-luu-nap-checkpoint-huan-luyen-tiep.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="PyTorch: lưu checkpoint và huấn luyện tiếp sau khi bị gián đoạn">
+<meta property="og:locale" content="vi_VN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="PyTorch: lưu checkpoint và huấn luyện tiếp sau khi bị gián đoạn">
+<meta name="twitter:description" content="Checkpoint cần model, optimizer, scheduler và epoch. Thí nghiệm chứng minh huấn luyện tiếp cho kết quả y hệt, cùng lỗi weights_only của torch.load từ bản 2.6.">
+<meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/pytorch-luu-nap-checkpoint-huan-luyen-tiep.jpg">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/fonts.css?v=20261009">
+<link rel="stylesheet" href="../assets/css/style.css?v=20261009">
+<script>try{var t=localStorage.getItem('hf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
+<meta property="article:published_time" content="2026-10-10">
+<meta property="article:section" content="Học AI &amp; Lập trình">
+<meta property="article:tag" content="PyTorch">
+<meta property="article:tag" content="Deep Learning">
+<meta property="article:tag" content="Python">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "PyTorch: lưu checkpoint và huấn luyện tiếp sau khi bị gián đoạn", "description": "Checkpoint cần model, optimizer, scheduler và epoch. Thí nghiệm chứng minh huấn luyện tiếp cho kết quả y hệt, cùng lỗi weights_only của torch.load từ bản 2.6.", "image": ["https://hocfree.vn/assets/images/posts/pytorch-luu-nap-checkpoint-huan-luyen-tiep.jpg"], "datePublished": "2026-10-10", "dateModified": "2026-10-10", "inLanguage": "vi", "articleSection": "Học AI & Lập trình", "keywords": "PyTorch, Deep Learning, Python", "wordCount": 1252, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/hoc/pytorch-luu-nap-checkpoint-huan-luyen-tiep.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Học AI & Lập trình", "item": "https://hocfree.vn/hoc/"}, {"@type": "ListItem", "position": 3, "name": "PyTorch: lưu checkpoint và huấn luyện tiếp sau khi bị gián đoạn"}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div class="progress" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="container wide header-top">
+    <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="nav-scrim" hidden></div>
+    <a class="logo" href="../" aria-label="HọcFree – Trang chủ"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+    <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
+    <div class="header-actions">
+      <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="login-link" href="../dang-nhap.html">Đăng nhập</a>
+      <a class="btn start-btn" href="../lo-trinh/">Bắt đầu học</a>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="container wide">
+      <nav class="site-nav" id="site-nav" aria-label="Menu chính">
+        <div class="drawer-head">
+          <a class="logo" href="../" tabindex="-1"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+          <button class="icon-btn nav-close" aria-label="Đóng menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <button type="button" class="drawer-search search-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Tìm bài học, chủ đề…</span></button>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="../">Trang chủ</a></li><li class="nav-item has-panel is-mega"><button type="button" class="nav-link nav-trigger is-active" aria-expanded="false" aria-controls="nav-panel-hoc" aria-current="true">Học AI &amp; Lập trình<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel mega" id="nav-panel-hoc">
+  <div class="container wide mega-inner">
+    <div class="mega-groups"><div class="mega-group"><a class="mega-group-title" href="../hoc/#programming">Programming</a><ul><li><a href="../hoc/python.html">Python</a></li><li><a href="../hoc/csharp.html">C#</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#ai-machine-learning">AI &amp; Machine Learning</a><ul><li><a href="../hoc/machine-learning.html">Machine Learning</a></li><li><a href="../hoc/deep-learning.html">Deep Learning</a></li><li><a href="../hoc/pytorch.html">PyTorch</a></li><li><a href="../hoc/generative-ai.html">Generative AI</a></li><li><a href="../hoc/llm-ai-agents.html">LLM / AI Agents</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#computer-vision">Computer Vision</a><ul><li><a href="../hoc/opencv.html">OpenCV</a></li><li><a href="../hoc/image-processing.html">Image Processing</a></li><li><a href="../hoc/computer-vision.html">Computer Vision</a></li><li><a href="../hoc/ocr.html">OCR</a></li><li><a href="../hoc/object-detection.html">Object Detection</a></li><li><a href="../hoc/segmentation.html">Segmentation</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#vision-engineering">Vision Engineering</a><ul><li><a href="../hoc/machine-vision.html">Machine Vision</a></li><li><a href="../hoc/ai-vision.html">AI Vision</a></li><li><a href="../hoc/industrial-vision.html">Industrial Vision</a></li><li><a href="../hoc/camera-lens.html">Camera &amp; Lens</a></li><li><a href="../hoc/lighting.html">Lighting</a></li><li><a href="../hoc/calibration.html">Calibration</a></li><li><a href="../hoc/plc-robot-mes.html">PLC / Robot / MES</a></li><li><a href="../hoc/vision-deployment.html">Vision Deployment</a></li></ul></div></div>
+    <a class="feature-card" href="../lo-trinh/vision-engineer.html">
+  <span class="feature-eyebrow">⭐ Learning Path nổi bật</span>
+  <span class="feature-title">Trở thành Vision Engineer</span>
+  <span class="feature-sub">Machine Vision + AI Vision + Industrial Automation</span>
+  <span class="feature-desc">Lộ trình thực chiến từ Python, OpenCV và Machine Vision đến Deep Learning, AI Vision, Camera, PLC, Robot và triển khai hệ thống Vision trong nhà máy.</span>
+  <span class="feature-chain" aria-label="Các chặng chính"><span>Python</span><i aria-hidden="true">→</i><span>OpenCV</span><i aria-hidden="true">→</i><span>Machine Vision</span><i aria-hidden="true">→</i><span>AI Vision</span><i aria-hidden="true">→</i><span class="chain-goal">🎯 Vision Engineer</span></span>
+  <span class="feature-meta">14 chặng · 5 giai đoạn · ~12 tháng</span>
+  <span class="feature-cta">Xem lộ trình →</span>
+</a>
+  </div>
+  <div class="mega-foot"><div class="container wide mega-foot-inner"><ol class="journey compact" aria-label="Học, thực hành, trở thành kỹ sư"><li><a href="../hoc/" aria-current="step"><span class="journey-n">1</span><span class="journey-t"><b>Học</b><small>Học AI &amp; Lập trình</small></span></a></li><li><a href="../projects/"><span class="journey-n">2</span><span class="journey-t"><b>Thực hành</b><small>Projects</small></span></a></li><li><a href="../lo-trinh/"><span class="journey-n">3</span><span class="journey-t"><b>Trở thành kỹ sư</b><small>Learning Paths</small></span></a></li></ol><a class="panel-all" href="../hoc/">Xem tất cả Học AI &amp; Lập trình →</a></div></div>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-projects">Projects<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-projects">
+  <p class="panel-kicker"><span>Bước 2 · Thực hành</span>Áp dụng vào dự án thật</p>
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../projects/ai-projects.html"><span class="drop-label">AI Projects</span><span class="drop-desc">Ứng dụng ML và LLM, từ ý tưởng đến bản demo</span></a></li><li><a class="drop-link" href="../projects/computer-vision-projects.html"><span class="drop-label">Computer Vision Projects</span><span class="drop-desc">Phát hiện, nhận dạng và theo dõi đối tượng</span></a></li><li><a class="drop-link" href="../projects/industrial-vision-projects.html"><span class="drop-label">Industrial Vision Projects</span><span class="drop-desc">Đo kích thước, kiểm tra lỗi, đọc mã trên dây chuyền</span></a></li></ul></div></div>
+  <a class="panel-all" href="../projects/">Xem tất cả Projects →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-lo-trinh">Learning Paths<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-lo-trinh">
+  <p class="panel-kicker"><span>Bước 3 · Trở thành kỹ sư</span>Định hướng nghề nghiệp</p>
+  <ul class="drop-list"><li><a class="drop-link is-flagship" href="../lo-trinh/vision-engineer.html"><span class="drop-label">⭐ Trở thành Vision Engineer</span><span class="drop-desc">Machine Vision + AI Vision + Industrial Automation · 14 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/#python-developer"><span class="drop-label">Python Developer<span class="badge-soon">Sắp ra mắt</span></span><span class="drop-desc">Python, công cụ, tự động hóa</span></a></li></ul>
+  <a class="panel-all" href="../lo-trinh/">Xem tất cả lộ trình →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-kien-thuc">Kiến thức<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-kien-thuc">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Lĩnh vực</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/programming.html"><span class="drop-label">Programming</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-machine-learning.html"><span class="drop-label">AI / Machine Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/deep-learning.html"><span class="drop-label">Deep Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/machine-vision.html"><span class="drop-label">Machine Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-vision.html"><span class="drop-label">AI Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/industrial-automation.html"><span class="drop-label">Industrial Automation</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Công cụ &amp; mẹo</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/tools-frameworks.html"><span class="drop-label">Tools &amp; Frameworks</span></a></li><li><a class="drop-link" href="../kien-thuc/tips-tricks.html"><span class="drop-label">Tips &amp; Tricks</span></a></li></ul></div></div>
+  <a class="panel-all" href="../kien-thuc/">Xem tất cả Kiến thức →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tin-tuc-ai">Tin tức AI<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tin-tuc-ai">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tin-tuc-ai/ai-news.html"><span class="drop-label">AI News</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-models.html"><span class="drop-label">AI Models</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/technology.html"><span class="drop-label">Technology</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/robotics.html"><span class="drop-label">Robotics</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-industry.html"><span class="drop-label">AI Industry</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tin-tuc-ai/">Xem tất cả Tin tức AI →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-ngoai-ngu">Ngoại ngữ<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-ngoai-ngu">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/english.html"><span class="drop-label">English</span><span class="drop-desc">Lộ trình 700 TOEIC, phương pháp học, giáo trình HF-700TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chinese.html"><span class="drop-label">Chinese</span><span class="drop-desc">Lộ trình HSK3, phương pháp học, giáo trình HF-HSK3</span></a></li></ul></div></div>
+  <a class="panel-all" href="../ngoai-ngu/">Xem tất cả Ngoại ngữ →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tai-nguyen">Tài nguyên<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tai-nguyen">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tai-nguyen/source-code.html"><span class="drop-label">Source Code</span><span class="drop-desc">Mã nguồn mẫu đi kèm bài học</span></a></li><li><a class="drop-link" href="../tai-nguyen/dataset.html"><span class="drop-label">Dataset</span><span class="drop-desc">Bộ dữ liệu ảnh để luyện tập</span></a></li><li><a class="drop-link" href="../tai-nguyen/cheat-sheets.html"><span class="drop-label">Cheat Sheets</span><span class="drop-desc">Tóm tắt nhanh trong một trang</span></a></li><li><a class="drop-link" href="../tai-nguyen/documentation.html"><span class="drop-label">Documentation</span><span class="drop-desc">Tài liệu tra cứu thư viện, API</span></a></li><li><a class="drop-link" href="../tai-nguyen/ebook.html"><span class="drop-label">Ebook / Tài liệu</span><span class="drop-desc">Sách và tài liệu tham khảo</span></a></li><li><a class="drop-link" href="../tai-nguyen/ai-tools.html"><span class="drop-label">AI Tools</span><span class="drop-desc">Công cụ AI hữu ích cho việc học</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tai-nguyen/">Xem tất cả Tài nguyên →</a>
+</div></li></ul>
+        <div class="drawer-foot">
+          <a class="btn ghost" href="../dang-nhap.html">Đăng nhập</a>
+          <a class="btn" href="../lo-trinh/">Bắt đầu học</a>
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+<div class="search-dialog" hidden>
+  <div class="search-scrim"></div>
+  <div class="search-box" role="dialog" aria-modal="true" aria-label="Tìm kiếm">
+    <form class="search-form" action="../search.html" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" placeholder="Tìm bài học, chủ đề, bài viết…" autocomplete="off" aria-label="Từ khóa tìm kiếm" aria-controls="search-suggest">
+      <button type="button" class="icon-btn search-close" aria-label="Đóng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </form>
+    <div class="search-suggest" id="search-suggest" aria-live="polite">
+      <div class="search-empty">
+        <p class="search-group-title">Chủ đề phổ biến</p>
+        <div class="chips"><a class="chip" href="../hoc/python.html">Python</a><a class="chip" href="../hoc/opencv.html">OpenCV</a><a class="chip" href="../hoc/machine-vision.html">Machine Vision</a><a class="chip" href="../hoc/deep-learning.html">Deep Learning</a><a class="chip" href="../hoc/ai-vision.html">AI Vision</a><a class="chip" href="../hoc/object-detection.html">Object Detection</a><a class="chip" href="../hoc/pytorch.html">PyTorch</a><a class="chip" href="../ngoai-ngu/english.html">English</a></div>
+        <p class="search-group-title">Lộ trình nổi bật</p>
+        <a class="search-item" href="../lo-trinh/vision-engineer.html"><span class="search-ico" aria-hidden="true">⭐</span><span>Trở thành Vision Engineer<small>Learning Path · Machine Vision + AI Vision + Industrial Automation</small></span></a>
+      </div>
+    </div>
+    <div class="search-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> chọn</span><span><kbd>Enter</kbd> mở</span><span><kbd>Esc</kbd> đóng</span></div>
+  </div>
+</div>
+<main id="main">
+  <div class="container layout article-layout">
+    <article class="article">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../hoc/">Học AI &amp; Lập trình</a></nav>
+      <header class="article-head">
+        <a class="pill cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+        <h1>PyTorch: lưu checkpoint và huấn luyện tiếp sau khi bị gián đoạn</h1>
+        <p class="lead">Checkpoint cần model, optimizer, scheduler và epoch. Thí nghiệm chứng minh huấn luyện tiếp cho kết quả y hệt, cùng lỗi weights_only của torch.load từ bản 2.6.</p>
+        <div class="article-meta">
+          <span class="avatar" aria-hidden="true">HF</span>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-10">10/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>7 phút đọc</span></div>
+        </div>
+      </header>
+      <figure class="article-cover">
+        <img src="../assets/images/posts/pytorch-luu-nap-checkpoint-huan-luyen-tiep.webp" alt="PyTorch: lưu checkpoint và huấn luyện tiếp sau khi bị gián đoạn" width="1200" height="675" fetchpriority="high" decoding="async">
+      </figure>
+      
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol><li><a href="#checkpoint-can-chua-nhung-gi">Checkpoint cần chứa những gì?</a></li><li><a href="#chuan-bi-mot-bai-toan-nho-co-the-lap-lai">Chuẩn bị: một bài toán nhỏ, có thể lặp lại</a></li><li><a href="#ham-luu-va-nap">Hàm lưu và nạp</a></li><li><a href="#kiem-chung-gian-doan-roi-chay-tiep-co-giong-chay-lien">Kiểm chứng: gián đoạn rồi chạy tiếp có giống chạy liền?</a></li><li><a href="#torch-load-va-weights-only">torch.load và weights_only</a></li><li><a href="#quy-trinh-luu-trong-thuc-te">Quy trình lưu trong thực tế</a></li></ol></details>
+      <div class="prose">
+<p>Huấn luyện một mô hình ảnh công nghiệp có thể mất vài giờ đến vài ngày. Mất điện, máy tự khởi động lại để cập nhật, hết phiên Colab... và bạn phải chạy lại từ đầu, nếu không lưu <strong>checkpoint</strong> đúng cách. Bài này hướng dẫn lưu và nạp checkpoint trong PyTorch sao cho huấn luyện tiếp cho ra <strong>đúng</strong> kết quả như chưa từng bị gián đoạn, cùng những lỗi phổ biến khi dùng <code>torch.load</code> từ PyTorch 2.6.</p>
+<p>Nếu chưa quen <code>state_dict</code> và vòng lặp huấn luyện, hãy đọc <a href="pytorch-co-ban-tensor-autograd.html">PyTorch cơ bản: tensor, autograd và vòng lặp huấn luyện</a>. Code trong bài chạy trên CPU với PyTorch 2.x.</p>
+
+<h2 id="checkpoint-can-chua-nhung-gi">Checkpoint cần chứa những gì?</h2>
+<table>
+  <tr><th>Thành phần</th><th>Vì sao cần</th></tr>
+  <tr><td><code>model.state_dict()</code></td><td>Trọng số mô hình</td></tr>
+  <tr><td><code>optimizer.state_dict()</code></td><td>Trạng thái bộ tối ưu: vận tốc momentum (SGD), trung bình động của gradient (Adam). Thiếu nó, bước cập nhật đầu tiên sau khi nạp sẽ khác hẳn</td></tr>
+  <tr><td><code>scheduler.state_dict()</code></td><td>Learning rate đang ở mức nào trong lịch giảm</td></tr>
+  <tr><td><code>epoch</code>, điểm tốt nhất</td><td>Biết chạy tiếp từ đâu, khi nào lưu <code>best.pt</code></td></tr>
+</table>
+<p>Một checkpoint chỉ dùng để <strong>suy luận</strong> thì chỉ cần trọng số. Còn checkpoint để <strong>huấn luyện tiếp</strong> phải có đủ cả bốn.</p>
+
+<h2 id="chuan-bi-mot-bai-toan-nho-co-the-lap-lai">Chuẩn bị: một bài toán nhỏ, có thể lặp lại</h2>
+<p>Để kiểm chứng "huấn luyện tiếp cho kết quả y hệt", ta dùng dữ liệu cố định, khởi tạo trọng số cố định và thứ tự batch cố định:</p>
+<pre><code class="language-python">import torch
+import torch.nn as nn
+
+torch.manual_seed(0)
+X = torch.randn(256, 8)
+y = (X[:, 0] + X[:, 1] &gt; 0).long()            # bài toán OK/NG giả lập
+
+
+def tao_mo_hinh():
+    torch.manual_seed(1)                       # khởi tạo trọng số giống nhau mỗi lần
+    mh = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2))
+    toi_uu = torch.optim.SGD(mh.parameters(), lr=0.1, momentum=0.9)
+    lich = torch.optim.lr_scheduler.StepLR(toi_uu, step_size=3, gamma=0.5)
+    return mh, toi_uu, lich
+
+
+def mot_epoch(mh, toi_uu, lich):
+    mh.train()
+    for i in range(0, len(X), 64):             # 4 batch, thứ tự cố định
+        toi_uu.zero_grad()
+        loss = nn.functional.cross_entropy(mh(X[i:i + 64]), y[i:i + 64])
+        loss.backward()
+        toi_uu.step()
+    lich.step()
+    return loss.item()</code></pre>
+<p><code>StepLR(step_size=3, gamma=0.5)</code> giảm learning rate một nửa sau mỗi 3 epoch: 0,1 → 0,05 → 0,025.</p>
+
+<h2 id="ham-luu-va-nap">Hàm lưu và nạp</h2>
+<pre><code class="language-python">def luu_checkpoint(duong_dan, mh, toi_uu, lich, epoch, loss_tot_nhat):
+    torch.save({
+        "epoch": epoch,
+        "model": mh.state_dict(),
+        "optimizer": toi_uu.state_dict(),
+        "scheduler": lich.state_dict(),
+        "loss_tot_nhat": loss_tot_nhat,
+    }, duong_dan)
+
+
+def nap_checkpoint(duong_dan, mh, toi_uu, lich):
+    ck = torch.load(duong_dan, map_location="cpu")    # weights_only=True là mặc định từ PyTorch 2.6
+    mh.load_state_dict(ck["model"])
+    toi_uu.load_state_dict(ck["optimizer"])
+    lich.load_state_dict(ck["scheduler"])
+    return ck["epoch"] + 1, ck["loss_tot_nhat"]       # epoch bắt đầu chạy tiếp</code></pre>
+<p><code>map_location="cpu"</code> cho phép nạp checkpoint lưu trên máy có GPU vào máy chỉ có CPU (ví dụ máy tính công nghiệp tại trạm). Nếu huấn luyện tiếp trên GPU, hãy <code>mh.to("cuda")</code> <strong>trước</strong> khi tạo optimizer, rồi mới nạp state.</p>
+
+<h2 id="kiem-chung-gian-doan-roi-chay-tiep-co-giong-chay-lien">Kiểm chứng: gián đoạn rồi chạy tiếp có giống chạy liền?</h2>
+<pre><code class="language-python"># Chạy A: huấn luyện liền 6 epoch
+mh, toi_uu, lich = tao_mo_hinh()
+for epoch in range(6):
+    loss = mot_epoch(mh, toi_uu, lich)
+print(f"A (liền mạch)   : loss cuối = {loss:.6f}, lr = {lich.get_last_lr()[0]}")
+
+# Chạy B: 3 epoch, lưu checkpoint, "mất điện"
+mh, toi_uu, lich = tao_mo_hinh()
+for epoch in range(3):
+    loss = mot_epoch(mh, toi_uu, lich)
+luu_checkpoint("last.pt", mh, toi_uu, lich, epoch, loss)
+del mh, toi_uu, lich
+
+# ... khởi động lại máy, tạo đối tượng mới và nạp checkpoint
+mh, toi_uu, lich = tao_mo_hinh()
+bat_dau, _ = nap_checkpoint("last.pt", mh, toi_uu, lich)
+for epoch in range(bat_dau, 6):
+    loss = mot_epoch(mh, toi_uu, lich)
+print(f"B (có gián đoạn): loss cuối = {loss:.6f}, lr = {lich.get_last_lr()[0]}")</code></pre>
+<pre><code class="language-text">A (liền mạch)   : loss cuối = 0.192472, lr = 0.025
+B (có gián đoạn): loss cuối = 0.192472, lr = 0.025</code></pre>
+<p>Hai kết quả trùng nhau đến chữ số thứ sáu. Checkpoint đã lưu đầy đủ trạng thái.</p>
+
+<h3 id="dieu-gi-xay-ra-neu-chi-luu-trong-so">Điều gì xảy ra nếu chỉ lưu trọng số?</h3>
+<pre><code class="language-python"># Chạy C: SAI, chỉ lưu trọng số mô hình, quên optimizer và scheduler
+mh, toi_uu, lich = tao_mo_hinh()
+for epoch in range(3):
+    mot_epoch(mh, toi_uu, lich)
+torch.save(mh.state_dict(), "chi_trong_so.pt")
+
+mh, toi_uu, lich = tao_mo_hinh()
+mh.load_state_dict(torch.load("chi_trong_so.pt"))
+for epoch in range(3, 6):
+    loss = mot_epoch(mh, toi_uu, lich)
+print(f"C (thiếu optimizer): loss cuối = {loss:.6f}, lr = {lich.get_last_lr()[0]}")</code></pre>
+<pre><code class="language-text">C (thiếu optimizer): loss cuối = 0.177919, lr = 0.05</code></pre>
+<p>Kết quả đã khác: learning rate quay về lịch ban đầu (0,1 rồi giảm còn 0,05 thay vì 0,025) và vận tốc momentum bị mất. Ở ví dụ nhỏ này loss tình cờ thấp hơn, nhưng đó không phải điều đáng mừng: quá trình huấn luyện đã khác với cấu hình bạn thiết kế, không lặp lại được, và với mô hình lớn dùng Adam, learning rate bị "reset" lên cao có thể phá hỏng trọng số đã học tốt.</p>
+
+<h2 id="torch-load-va-weights-only">torch.load và weights_only</h2>
+<p>Từ PyTorch 2.6, <code>torch.load</code> mặc định <code>weights_only=True</code>: chỉ cho phép nạp tensor, số, chuỗi, list, dict và một số kiểu an toàn. Lý do: file <code>.pt</code> dùng định dạng pickle, và một file pickle độc hại có thể chạy mã tùy ý khi nạp. Checkpoint như trên (dict gồm state_dict, số nguyên, số thực) nạp bình thường. Nhưng một lỗi rất hay gặp là vô tình lưu kiểu NumPy:</p>
+<pre><code class="language-python">import numpy as np
+
+torch.save({"model": mh.state_dict(), "nguong": np.float64(0.42)}, "co_numpy.pt")
+try:
+    torch.load("co_numpy.pt")
+except Exception as ex:
+    print(type(ex).__name__, "-", str(ex).split(".")[0])
+
+torch.save({"model": mh.state_dict(), "nguong": float(np.float64(0.42))}, "sach.pt")
+print("nạp được:", torch.load("sach.pt")["nguong"])</code></pre>
+<pre><code class="language-text">UnpicklingError - Weights only load failed
+nạp được: 0.42</code></pre>
+<p>Các giá trị như ngưỡng, F1, độ chính xác tính bằng NumPy hoặc scikit-learn thường là <code>np.float64</code>. Hãy chuyển sang <code>float()</code> trước khi lưu. Với checkpoint cũ <strong>do chính bạn tạo</strong>, có thể dùng <code>torch.load(..., weights_only=False)</code>; tuyệt đối không làm vậy với file tải từ nguồn lạ. Nếu cần giữ <code>weights_only=True</code> mà vẫn có kiểu riêng, PyTorch cho phép khai báo kiểu an toàn bằng <code>torch.serialization.add_safe_globals</code>.</p>
+<div class="warn"><strong>Tránh lưu cả đối tượng mô hình</strong><code>torch.save(model, "m.pt")</code> lưu cả lớp Python bằng pickle. File đó phụ thuộc vào đúng cấu trúc thư mục và tên lớp lúc lưu; đổi tên file code là không nạp được, và không nạp được với <code>weights_only=True</code>. Luôn lưu <code>state_dict()</code>.</div>
+
+<h2 id="quy-trinh-luu-trong-thuc-te">Quy trình lưu trong thực tế</h2>
+<ol>
+  <li><strong><code>last.pt</code></strong>: ghi đè sau mỗi epoch, để chạy tiếp khi bị gián đoạn.</li>
+  <li><strong><code>best.pt</code></strong>: chỉ lưu khi chỉ số validation (ví dụ F1 lớp NG) tốt hơn mức tốt nhất trước đó.</li>
+  <li><strong>Ghi an toàn</strong>: lưu ra <code>last.pt.tmp</code> rồi <code>os.replace</code> sang <code>last.pt</code>, tránh file hỏng nếu mất điện giữa lúc ghi.</li>
+  <li><strong>Lưu kèm cấu hình</strong>: kích thước ảnh đầu vào, tên các lớp, phiên bản dữ liệu, dưới dạng dict thuần (chuỗi, số). Sau 3 tháng, bạn sẽ cảm ơn chính mình.</li>
+  <li><strong>Dùng DataLoader có xáo trộn</strong>: để huấn luyện tiếp lặp lại hoàn toàn, lưu thêm trạng thái bộ sinh số ngẫu nhiên (<code>torch.get_rng_state()</code>). Trong thực tế, lặp lại xấp xỉ thường là đủ; quan trọng nhất là đúng optimizer và learning rate.</li>
+</ol>
+<pre><code class="language-python">import os
+
+
+def luu_an_toan(du_lieu, duong_dan):
+    tam = duong_dan + ".tmp"
+    torch.save(du_lieu, tam)
+    os.replace(tam, duong_dan)       # thay thế nguyên tử trên cùng ổ đĩa</code></pre>
+<p>Khi mô hình đã xong, bước tiếp theo để triển khai là xuất sang ONNX và tăng tốc, xem <a href="toi-uu-toc-do-suy-luan-onnx-tensorrt-openvino.html">tăng tốc suy luận: ONNX Runtime, OpenVINO, TensorRT</a>. Thư viện như Ultralytics đã tự lưu <code>last.pt</code> và <code>best.pt</code> và có tùy chọn <code>resume</code>; hiểu cơ chế bên dưới giúp bạn xử lý khi có sự cố.</p>
+
+<div class="ex">
+<h3 id="bai-tap">Bài tập</h3>
+<p>Đổi <code>SGD</code> thành <code>torch.optim.AdamW(mh.parameters(), lr=1e-3)</code> và chạy lại thí nghiệm A, B, C. In thêm <code>toi_uu.state_dict()["state"][0].keys()</code> để xem Adam lưu những gì cho mỗi tham số (gợi ý: <code>step</code>, <code>exp_avg</code>, <code>exp_avg_sq</code>).</p>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.pytorch.org/docs/stable/notes/serialization.html" rel="noopener" target="_blank">PyTorch: Serialization semantics (weights_only)</a>, <a href="https://docs.pytorch.org/tutorials/beginner/saving_loading_models.html" rel="noopener" target="_blank">PyTorch Tutorials: Saving and loading models</a>.</p>
+
+      </div>
+      
+      <footer class="article-foot">
+        <div class="tags"><a class="tag" href="../search.html?q=PyTorch">#PyTorch</a><a class="tag" href="../search.html?q=Deep Learning">#Deep Learning</a><a class="tag" href="../search.html?q=Python">#Python</a></div>
+        <div class="share">
+      <span>Chia sẻ:</span>
+      <a class="share-btn fb" href="https://www.facebook.com/sharer/sharer.php?u=https://hocfree.vn/hoc/pytorch-luu-nap-checkpoint-huan-luyen-tiep.html" target="_blank" rel="noopener" aria-label="Chia sẻ Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8z"/></svg></a>
+      <a class="share-btn x" href="https://twitter.com/intent/tweet?url=https://hocfree.vn/hoc/pytorch-luu-nap-checkpoint-huan-luyen-tiep.html" target="_blank" rel="noopener" aria-label="Chia sẻ X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+      <button class="share-btn copy-link" data-url="https://hocfree.vn/hoc/pytorch-luu-nap-checkpoint-huan-luyen-tiep.html" aria-label="Sao chép liên kết"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+    </div>
+      </footer>
+      <div class="author-box">
+        <span class="avatar lg" aria-hidden="true">HF</span>
+        <div>
+          <strong>Ban biên tập HọcFree</strong>
+          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và ngoại ngữ, hoàn toàn miễn phí.</p>
+        </div>
+      </div>
+      <nav class="pager" aria-label="Bài trước/sau"><a class="prev" href="../hoc/diffusion-model-hoat-dong-the-nao-numpy.html"><span>← Bài trước</span>Diffusion model hoạt động thế nào? Tự cài đặt DDPM bằng NumPy</a><a class="next" href="../hoc/ham-mat-mat-cross-entropy-focal-loss.html"><span>Bài tiếp →</span>Hàm mất mát cho phân loại: cross-entropy, class weight, focal loss</a></nav>
+    </article>
+    <aside class="sidebar">
+  <section class="widget"><h2 class="widget-title">Đọc nhiều nhất</h2><ol class="popular"><li><a href="../hoc/yolo26-object-detection-nhap-mon.html"><span class="num">1</span><span class="t">Object Detection với YOLO26: huấn luyện mô hình đầu tiên</span></a></li><li><a href="../kien-thuc/chon-camera-ong-kinh-machine-vision.html"><span class="num">2</span><span class="t">Cách chọn camera và ống kính cho hệ thống Machine Vision</span></a></li><li><a href="../projects/phat-hien-loi-be-mat-anomaly-detection.html"><span class="num">3</span><span class="t">Dự án: phát hiện lỗi bề mặt bằng Anomaly Detection (PatchCore)</span></a></li><li><a href="../hoc/opencv-co-ban-anh-video-camera.html"><span class="num">4</span><span class="t">OpenCV cơ bản: đọc, hiển thị, ghi ảnh, video và camera</span></a></li><li><a href="../kien-thuc/7-kieu-chieu-sang-machine-vision.html"><span class="num">5</span><span class="t">7 kiểu chiếu sáng trong Machine Vision và khi nào dùng</span></a></li></ol></section>
+  <section class="widget">
+    <h2 class="widget-title">Chuyên mục</h2>
+    <ul class="cat-list"><li><a href="../hoc/"><span>Học AI &amp; Lập trình</span><span class="count">133 bài</span></a></li><li><a href="../projects/"><span>Projects</span><span class="count">15 bài</span></a></li><li><a href="../kien-thuc/"><span>Kiến thức</span><span class="count">108 bài</span></a></li><li><a href="../tin-tuc-ai/"><span>Tin tức AI</span><span class="count">16 bài</span></a></li><li><a href="../ngoai-ngu/"><span>Ngoại ngữ</span><span class="count">6 bài</span></a></li><li><a href="../tai-nguyen/"><span>Tài nguyên</span><span class="count">32 bài</span></a></li></ul>
+  </section>
+  <section class="widget widget-about">
+    <h2 class="widget-title">Về HọcFree</h2>
+    <p>Nơi học <strong>miễn phí</strong> AI, lập trình, Computer Vision và ngoại ngữ dành cho người Việt. Không quảng cáo, không thu phí.</p>
+    <a class="btn" href="../gioi-thieu.html">Tìm hiểu thêm</a>
+  </section>
+  <section class="widget"><h2 class="widget-title">Thẻ</h2><div class="tags"><a class="tag" href="../search.html?q=.NET">.NET</a><a class="tag" href="../search.html?q=AI Agents">AI Agents</a><a class="tag" href="../search.html?q=AI Industry">AI Industry</a><a class="tag" href="../search.html?q=AI Models">AI Models</a><a class="tag" href="../search.html?q=AI News">AI News</a><a class="tag" href="../search.html?q=AI Project">AI Project</a><a class="tag" href="../search.html?q=AI Tools">AI Tools</a><a class="tag" href="../search.html?q=AI Vision">AI Vision</a><a class="tag" href="../search.html?q=AI/ML">AI/ML</a><a class="tag" href="../search.html?q=C#">C#</a><a class="tag" href="../search.html?q=Calibration">Calibration</a><a class="tag" href="../search.html?q=Camera">Camera</a><a class="tag" href="../search.html?q=Cheat Sheet">Cheat Sheet</a><a class="tag" href="../search.html?q=Chiếu sáng">Chiếu sáng</a><a class="tag" href="../search.html?q=Computer Vision">Computer Vision</a><a class="tag" href="../search.html?q=CV News">CV News</a><a class="tag" href="../search.html?q=CV Project">CV Project</a><a class="tag" href="../search.html?q=Công cụ">Công cụ</a><a class="tag" href="../search.html?q=Dataset">Dataset</a><a class="tag" href="../search.html?q=Deep Learning">Deep Learning</a><a class="tag" href="../search.html?q=Deployment">Deployment</a><a class="tag" href="../search.html?q=Documentation">Documentation</a><a class="tag" href="../search.html?q=Ebook">Ebook</a><a class="tag" href="../search.html?q=Generative AI">Generative AI</a><a class="tag" href="../search.html?q=Git">Git</a><a class="tag" href="../search.html?q=HSK">HSK</a><a class="tag" href="../search.html?q=Image Processing">Image Processing</a><a class="tag" href="../search.html?q=Industrial Automation">Industrial Automation</a><a class="tag" href="../search.html?q=Industrial Project">Industrial Project</a><a class="tag" href="../search.html?q=Industrial Vision">Industrial Vision</a><a class="tag" href="../search.html?q=Kinh nghiệm">Kinh nghiệm</a><a class="tag" href="../search.html?q=Lens">Lens</a><a class="tag" href="../search.html?q=Lighting">Lighting</a><a class="tag" href="../search.html?q=LLM">LLM</a><a class="tag" href="../search.html?q=Lập trình">Lập trình</a><a class="tag" href="../search.html?q=Machine Learning">Machine Learning</a><a class="tag" href="../search.html?q=Machine Vision">Machine Vision</a><a class="tag" href="../search.html?q=MES">MES</a><a class="tag" href="../search.html?q=NumPy">NumPy</a><a class="tag" href="../search.html?q=Object Detection">Object Detection</a><a class="tag" href="../search.html?q=OCR">OCR</a><a class="tag" href="../search.html?q=OpenCV">OpenCV</a><a class="tag" href="../search.html?q=PLC">PLC</a><a class="tag" href="../search.html?q=Python">Python</a><a class="tag" href="../search.html?q=PyTorch">PyTorch</a><a class="tag" href="../search.html?q=Robot">Robot</a><a class="tag" href="../search.html?q=Robotics">Robotics</a><a class="tag" href="../search.html?q=Segmentation">Segmentation</a><a class="tag" href="../search.html?q=Source Code">Source Code</a><a class="tag" href="../search.html?q=Technology">Technology</a><a class="tag" href="../search.html?q=Tips">Tips</a><a class="tag" href="../search.html?q=Tiếng Anh">Tiếng Anh</a><a class="tag" href="../search.html?q=Tiếng Trung">Tiếng Trung</a><a class="tag" href="../search.html?q=TOEIC">TOEIC</a><a class="tag" href="../search.html?q=Tự học">Tự học</a><a class="tag" href="../search.html?q=VS Code">VS Code</a><a class="tag" href="../search.html?q=YOLO">YOLO</a><a class="tag" href="../search.html?q=Đo lường">Đo lường</a></div></section>
+</aside>
+  </div>
+  <section class="band">
+    <div class="container">
+      <div class="section-title"><h2>Có thể bạn quan tâm</h2></div>
+      <div class="card-grid"><article class="card">
+  <a class="thumb" href="../hoc/pytest-kiem-thu-ham-xu-ly-anh.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/pytest-kiem-thu-ham-xu-ly-anh.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/pytest-kiem-thu-ham-xu-ly-anh.html">Kiểm thử hàm xử lý ảnh với pytest: bắt lỗi trước khi lên máy</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-10">10/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/csharp-system-text-json-luu-recipe.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/csharp-system-text-json-luu-recipe.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/csharp-system-text-json-luu-recipe.html">C#: lưu và nạp recipe trạm vision bằng System.Text.Json</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-10">10/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/cross-validation-pipeline-gridsearchcv.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/cross-validation-pipeline-gridsearchcv.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/cross-validation-pipeline-gridsearchcv.html">Cross-validation, Pipeline, GridSearchCV: đánh giá mô hình trung thực</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-10">10/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article></div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <a class="logo" href="../"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+      <p>HọcFree.vn – nền tảng học miễn phí về AI, lập trình, Computer Vision, Machine Vision, tin tức AI và ngoại ngữ dành cho người Việt.</p>
+    </div>
+    <div><h3>Học &amp; thực hành</h3><ul><li><a href="../hoc/">Học AI &amp; Lập trình</a></li><li><a href="../projects/">Projects</a></li><li><a href="../lo-trinh/">Learning Paths</a></li></ul></div>
+    <div><h3>Khám phá</h3><ul><li><a href="../kien-thuc/">Kiến thức</a></li><li><a href="../tin-tuc-ai/">Tin tức AI</a></li><li><a href="../ngoai-ngu/">Ngoại ngữ</a></li><li><a href="../tai-nguyen/">Tài nguyên</a></li></ul></div>
+    <div><h3>Bài mới</h3><ul><li><a href="../hoc/pytest-kiem-thu-ham-xu-ly-anh.html">Kiểm thử hàm xử lý ảnh với pytest: bắt lỗi trước khi lên máy</a></li><li><a href="../hoc/csharp-system-text-json-luu-recipe.html">C#: lưu và nạp recipe trạm vision bằng System.Text.Json</a></li><li><a href="../hoc/cross-validation-pipeline-gridsearchcv.html">Cross-validation, Pipeline, GridSearchCV: đánh giá mô hình trung thực</a></li><li><a href="../hoc/ham-mat-mat-cross-entropy-focal-loss.html">Hàm mất mát cho phân loại: cross-entropy, class weight, focal loss</a></li></ul></div>
+    <div>
+      <h3>HọcFree</h3>
+      <ul>
+        <li><a href="../gioi-thieu.html">Giới thiệu</a></li>
+        <li><a href="../search.html">Tìm kiếm</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">© 2026 HọcFree.vn · Kiến thức là để chia sẻ.</div>
+  </div>
+</footer>
+<button class="to-top" aria-label="Lên đầu trang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<script src="../assets/js/search-data.js?v=20261009" defer></script>
+<script src="../assets/js/main.js?v=20261009" defer></script>
+</body>
+</html>
