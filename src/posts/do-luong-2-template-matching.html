@@ -45,7 +45,7 @@ anh = np.clip(nen + rng.normal(0, 4, nen.shape), 0, 255).astype(np.uint8)
 cv2.imwrite("bo_mach.png", anh)
 cv2.imwrite("mau_chip.png", chip)
 print("Đã lưu bo_mach.png", anh.shape, "và mau_chip.png", chip.shape)</code></pre>
-<pre><code class="language-text">TODO</code></pre>
+<pre><code class="language-text">Đã lưu bo_mach.png (480, 640) và mau_chip.png (56, 80)</code></pre>
 
 <h2>2. matchTemplate và minMaxLoc</h2>
 <p><code>cv2.matchTemplate(anh, mau, phuong_phap)</code> đặt template lên mọi vị trí có thể và tính một điểm số. Kết quả là ảnh điểm số kích thước <strong>(H − h + 1) × (W − w + 1)</strong>; giá trị tại (x, y) ứng với template đặt có <strong>góc trên-trái</strong> tại (x, y), không phải tâm. <code>cv2.minMaxLoc</code> trả về giá trị nhỏ nhất, lớn nhất và vị trí của chúng.</p>
@@ -64,7 +64,8 @@ print(f"tốt nhất tại góc trên-trái ({x}, {y}), tâm ({x + w / 2:.1f}, {
 ve = cv2.cvtColor(anh, cv2.COLOR_GRAY2BGR)
 cv2.rectangle(ve, (x, y), (x + w, y + h), (0, 255, 0), 2)
 cv2.imwrite("ket_qua_1.png", ve)</code></pre>
-<pre><code class="language-text">TODO</code></pre>
+<pre><code class="language-text">ảnh (480, 640) | mẫu (56, 80) | bản đồ điểm (425, 561)
+tốt nhất tại góc trên-trái (150, 250), tâm (190.0, 278.0), điểm 0.9962</code></pre>
 <p>Kết quả trúng một trong 5 chip (vị trí (150, 250) có trong danh sách). Với 5 chip giống nhau, chip nào có điểm cao nhất chỉ phụ thuộc nhiễu và nền xung quanh, nên <code>minMaxLoc</code> chỉ hợp khi trong ảnh có <strong>đúng một</strong> vật cần tìm. Mục 4 xử lý trường hợp nhiều vật.</p>
 
 <h2>3. Chọn phương pháp so khớp</h2>
@@ -102,12 +103,24 @@ for ten in ["TM_SQDIFF", "TM_SQDIFF_NORMED", "TM_CCORR", "TM_CCORR_NORMED", "TM_
         dung = any(abs(bx - x) &lt;= 3 and abs(by - y) &lt;= 3 for x, y in VI_TRI)
         nen_tot = kq[nen].min() if nho_la_tot else kq[nen].max()
         print(f"{ten:17s} {nhan:5s} {'có' if dung else 'SAI':6s} {kq[40, 40]:13.4g} {nen_tot:14.4g}")</code></pre>
-<pre><code class="language-text">TODO</code></pre>
+<pre><code class="language-text">phương pháp       ảnh   đúng?  điểm tại chip tốt nhất ở nền
+TM_SQDIFF         gốc   có         3.406e+05       1.03e+07
+TM_SQDIFF         tối   có         6.901e+06      9.879e+06
+TM_SQDIFF_NORMED  gốc   có          0.006147         0.1923
+TM_SQDIFF_NORMED  tối   có            0.2017         0.2328
+TM_CCORR          gốc   SAI        5.531e+07      1.011e+08
+TM_CCORR          tối   SAI        3.401e+07      5.689e+07
+TM_CCORR_NORMED   gốc   có            0.9982         0.9041
+TM_CCORR_NORMED   tối   có            0.9941         0.9073
+TM_CCOEFF         gốc   có         1.186e+07      4.464e+06
+TM_CCOEFF         tối   có         5.929e+06      2.232e+06
+TM_CCOEFF_NORMED  gốc   có            0.9916         0.4265
+TM_CCOEFF_NORMED  tối   có            0.9915         0.4267</code></pre>
 <p>Đọc bảng như một kỹ sư:</p>
 <ul>
   <li><code>TM_CCORR</code> <strong>sai cả hai lần</strong>: tích T·I lớn nhất ở nhãn trắng, không phải ở chip. Đừng dùng nó để định vị.</li>
-  <li><code>TM_SQDIFF</code> và <code>TM_CCOEFF</code> vẫn tìm đúng, nhưng giá trị điểm thay đổi theo độ sáng nhiều lần, nên không thể đặt một ngưỡng cố định "có chip / không có chip".</li>
-  <li><code>TM_SQDIFF_NORMED</code> vẫn đúng nhưng khoảng cách giữa điểm tại chip và điểm tốt nhất ở nền thu hẹp mạnh khi ảnh tối: biên an toàn mất dần.</li>
+  <li><code>TM_SQDIFF</code> và <code>TM_CCOEFF</code> vẫn tìm đúng, nhưng giá trị điểm đổi theo độ sáng (SQDIFF tại chip tăng khoảng 20 lần, CCOEFF giảm một nửa), nên không thể đặt một ngưỡng cố định "có chip / không có chip".</li>
+  <li><code>TM_SQDIFF_NORMED</code> vẫn đúng nhưng khi ảnh tối, điểm tại chip (0,20) gần sát điểm tốt nhất ở nền (0,23): biên an toàn gần như mất hết, tối thêm chút nữa là bắt nhầm.</li>
   <li><code>TM_CCORR_NORMED</code> bất biến với gain, nhưng nền cũng đạt điểm rất cao (khoảng 0,9) vì mọi vùng ảnh đều dương: độ phân biệt kém.</li>
   <li><code>TM_CCOEFF_NORMED</code>: điểm tại chip không đổi giữa hai ảnh, nền chỉ khoảng 0,4. Đây là lựa chọn mặc định cho định vị công nghiệp.</li>
 </ul>
@@ -146,7 +159,12 @@ ket_qua, so_ung_vien = tim_tat_ca(anh, mau)
 print("số vị trí vượt ngưỡng 0.8:", so_ung_vien, "→ sau NMS:", len(ket_qua))
 for s, (x, y, w, h) in sorted(ket_qua, key=lambda k: (k[1][1] // 100, k[1][0])):   # theo hàng rồi cột
     print(f"  chip tại ({x:3d}, {y:3d})  điểm {s:.3f}")</code></pre>
-<pre><code class="language-text">TODO</code></pre>
+<pre><code class="language-text">số vị trí vượt ngưỡng 0.8: 45 → sau NMS: 5
+  chip tại ( 40,  40)  điểm 0.992
+  chip tại (300,  60)  điểm 0.987
+  chip tại (150, 250)  điểm 0.996
+  chip tại (420, 200)  điểm 0.984
+  chip tại ( 60, 380)  điểm 0.989</code></pre>
 <p>NMS ở trên có độ phức tạp O(N·K) (N ứng viên, K vật giữ lại), đủ nhanh vì N chỉ vài trăm. Nếu ngưỡng thấp làm N lên hàng chục nghìn, hãy lọc trước bằng cực đại cục bộ: chỉ giữ pixel bằng giá trị của <code>cv2.dilate(kq, kernel)</code> tại đó. OpenCV cũng có sẵn <code>cv2.dnn.NMSBoxes(boxes, scores, nguong_diem, nguong_iou)</code> làm đúng việc này (thường dùng với mô hình phát hiện vật ở giai đoạn Deep Learning).</p>
 <div class="tip"><strong>Chọn ngưỡng điểm như thế nào?</strong>Chạy trên vài chục ảnh OK thật, ghi lại điểm thấp nhất của vật đúng (ví dụ 0,93) và điểm cao nhất ở chỗ không có vật (ví dụ 0,45). Đặt ngưỡng ở khoảng giữa, nghiêng về phía vật đúng, ví dụ 0,75. Nếu hai khoảng này sát nhau, đừng chỉnh ngưỡng mà hãy sửa template hoặc chiếu sáng.</div>
 
@@ -180,7 +198,9 @@ for tx, ty in ((0.4, 0.7), (-0.3, 0.2), (0.5, -0.5)):
     x, y = x + 130, y + 230
     sx, sy = dinh_subpixel(kq, x, y)
     print(f"thật ({150 + tx:.2f}, {250 + ty:.2f}) | nguyên ({x}, {y}) | subpixel ({sx:.2f}, {sy:.2f})")</code></pre>
-<pre><code class="language-text">TODO</code></pre>
+<pre><code class="language-text">thật (150.40, 250.70) | nguyên (150, 251) | subpixel (150.33, 250.78)
+thật (149.70, 250.20) | nguyên (150, 250) | subpixel (149.78, 250.14)
+thật (150.50, 249.50) | nguyên (150, 250) | subpixel (150.49, 249.51)</code></pre>
 <p>Sai số giảm từ cỡ 0,5 px xuống cỡ 0,1 px. Đủ tốt để đặt ROI và caliper; nhưng đừng dùng vị trí template matching làm kết quả đo kích thước. Phép đo chính xác luôn làm bằng caliper và fitting trên cạnh thật như bài trước, template chỉ cho biết "đặt thước ở đâu".</p>
 
 <h2>6. Tăng tốc bằng kim tự tháp ảnh (coarse-to-fine)</h2>
@@ -225,7 +245,8 @@ for ten, ham in (("đầy đủ", tim_day_du), ("kim tự tháp", tim_kim_tu_tha
         x, y, s = ham(anh, mau)
     ms = (time.perf_counter() - t0) / 10 * 1000
     print(f"{ten:12s}: ({x}, {y}) điểm {s:.4f}, {ms:.2f} ms/lần")</code></pre>
-<pre><code class="language-text">TODO</code></pre>
+<pre><code class="language-text">đầy đủ      : (1013, 677) điểm 0.9877, 68.18 ms/lần
+kim tự tháp : (1013, 677) điểm 0.9877, 5.22 ms/lần</code></pre>
 <p>Thời gian phụ thuộc máy (con số trên chỉ để tham khảo, máy bạn sẽ khác), nhưng việc kim tự tháp nhanh hơn nhiều lần thì ổn định. Vị trí và điểm cuối cùng giống hệt cách đầy đủ vì bước tinh chỉnh chạy trên ảnh gốc. Hai lưu ý:</p>
 <ul>
   <li>Template ở cấp thô phải còn đủ chi tiết. Template 80×56 xuống 20×14 vẫn nhận ra chip; template 30×20 xuống 8×5 thì gần như mất hết, khi đó chỉ nên dùng 1 cấp.</li>
@@ -257,7 +278,15 @@ for goc, tl in ((0, 1), (5, 1), (10, 1), (20, 1), (45, 1), (0, 0.9), (0, 1.1), (
     _, s, _, (x, y) = cv2.minMaxLoc(kq)
     cx, cy = x + 40, y + 28
     print(f" xoay {goc:2d}°, ×{tl:.1f}    {s:6.3f}        ({cx:3d}, {cy:3d})       {np.hypot(cx - 160, cy - 120):5.1f} px")</code></pre>
-<pre><code class="language-text">TODO</code></pre>
+<pre><code class="language-text">biến đổi        điểm cao nhất   tâm tìm được    lệch tâm
+ xoay  0°, ×1.0     0.997        (160, 120)         0.0 px
+ xoay  5°, ×1.0     0.790        (160, 120)         0.0 px
+ xoay 10°, ×1.0     0.653        (156, 121)         4.1 px
+ xoay 20°, ×1.0     0.502        (160, 120)         0.0 px
+ xoay 45°, ×1.0     0.338        (160, 119)         1.0 px
+ xoay  0°, ×0.9     0.699        (160, 120)         0.0 px
+ xoay  0°, ×1.1     0.721        (160, 120)         0.0 px
+ xoay  0°, ×0.8     0.491        (155, 124)         6.4 px</code></pre>
 <p>Điểm số tụt rất nhanh: xoay 5° còn 0,79, xoay 10° còn 0,65, xoay 20° còn 0,50, gần bằng điểm cao nhất của vùng nền trên bo mạch ở mục 3 (0,43). Đổi tỉ lệ ±10% cũng chỉ còn khoảng 0,7. Vị trí ở đây vẫn gần đúng vì ảnh thử chỉ có một chip trên nền phẳng; trên bo mạch thật, với ngưỡng 0,8 chương trình sẽ báo "không tìm thấy" ngay từ khi chip xoay 5°, còn nếu hạ ngưỡng xuống 0,5 thì sẽ bắt nhầm nền. Với chip này, quy tắc thực tế: template matching thường chỉ tin cậy khi vật xoay trong khoảng vài độ và tỉ lệ thay đổi dưới khoảng 5%. Con số chính xác phụ thuộc kích thước và chi tiết của template: template càng lớn, chi tiết càng mảnh thì càng nhạy với xoay (điểm ở xa tâm dịch nhiều hơn khi xoay).</p>
 <p>Ba cách xử lý khi vật có thể xoay:</p>
 <table>
@@ -295,7 +324,8 @@ for ten, m in (("không mask", None), ("có mask", mask)):
     kq = np.nan_to_num(kq, nan=-1.0, posinf=-1.0, neginf=-1.0)   # mask có thể sinh NaN ở vùng phẳng
     _, s, _, (x, y) = cv2.minMaxLoc(kq)
     print(f"{ten:11s}: tìm thấy tại ({x}, {y}), điểm {s:.3f}   (thật: (120, 70))")</code></pre>
-<pre><code class="language-text">TODO</code></pre>
+<pre><code class="language-text">không mask : tìm thấy tại (120, 70), điểm 0.889   (thật: (120, 70))
+có mask    : tìm thấy tại (120, 70), điểm 0.999   (thật: (120, 70))</code></pre>
 <ul>
   <li>Mask giữ điểm số cao vì chỉ so phần thuộc vật. Không có mask, phần sọc ở góc template làm điểm giảm, và với nền phức tạp hơn có thể làm định vị sai.</li>
   <li>Tài liệu OpenCV cũ ghi mask chỉ hỗ trợ <code>TM_SQDIFF</code> và <code>TM_CCORR_NORMED</code>; các bản 4.x về sau hỗ trợ mask cho mọi phương pháp. Nếu phải dùng bản cũ, hãy kiểm tra lại trên phiên bản của bạn.</li>
@@ -349,7 +379,9 @@ san_xuat = chup(17, -9, thieu_chan=3)
 for theo_doi in (False, True):
     kq, thieu = kiem_tra(san_xuat, theo_doi)
     print(f"{'có' if theo_doi else 'không'} dời ROI: {kq}, ROI báo thiếu chân: {thieu}")</code></pre>
-<pre><code class="language-text">TODO</code></pre>
+<pre><code class="language-text">vị trí template trên ảnh chuẩn: (90, 70)
+không dời ROI: NG, ROI báo thiếu chân: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+có dời ROI: NG, ROI báo thiếu chân: [9]</code></pre>
 <p>Không dời ROI, gần như mọi ROI rơi ra ngoài chân và chương trình báo NG sai hàng loạt (overkill), dù lỗi thật chỉ là một chân (số 9 = chân thứ 4 hàng dưới). Có dời ROI, chỉ đúng chân thiếu bị báo. Đây là cấu trúc của hầu hết chương trình kiểm tra: <strong>định vị → dời công cụ → kiểm tra/đo → quyết định</strong>. Dự án cuối chặng (đọc số seri) cũng định vị vùng chữ theo cách này.</p>
 <div class="tip"><strong>Định vị phải tự kiểm tra chính nó</strong>Nếu điểm định vị thấp hơn ngưỡng, đừng tiếp tục kiểm tra với vị trí sai: báo NG "không định vị được" (hoặc mã lỗi riêng cho PLC) và lưu ảnh. Khi vật có thể xoay, cần thêm góc vào phép dời (ma trận xoay + tịnh tiến); bài sau sẽ lấy được góc đó.</div>
 
@@ -393,7 +425,7 @@ def tim_lap(anh, mau, nguong=0.8, toi_da=20):
 anh = cv2.imread("bo_mach.png", cv2.IMREAD_GRAYSCALE)
 mau = cv2.imread("mau_chip.png", cv2.IMREAD_GRAYSCALE)
 print(sorted(tim_lap(anh, mau)))</code></pre>
-<pre><code class="language-text">TODO</code></pre>
+<pre><code class="language-text">[(40, 40, 0.992), (60, 380, 0.989), (150, 250, 0.996), (300, 60, 0.987), (420, 200, 0.984)]</code></pre>
 <p>Cùng 5 vị trí như NMS. Cách này đơn giản, tự nhiên trả về theo thứ tự điểm giảm dần và có giới hạn số vật; nhược điểm là xóa một vùng cố định nên hai vật nằm sát nhau hơn nửa template có thể bị mất một.</p>
 </details>
 </div>

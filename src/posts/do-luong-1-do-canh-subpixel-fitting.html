@@ -35,9 +35,17 @@ def tao_profile(x_canh, n=40, toi=40, sang=200, sigma=0.8):
 p = tao_profile(20.3)
 for i in range(16, 25):
     print(f"pixel {i}: {p[i]:6.1f}")</code></pre>
-<pre><code class="language-text">TODO</code></pre>
-<p>Cạnh thật ở 20,3 nhưng không có pixel nào "nhảy" từ 40 lên 200: các pixel 18–22 có mức trung gian. Nếu chỉ phân ngưỡng ở 120, ta chỉ biết cạnh nằm giữa pixel 19 và 20 (sai số tới 0,5 px). Thông tin vị trí chính xác nằm trong <em>hình dạng</em> của vùng chuyển tiếp.</p>
-<div class="warn"><strong>Subpixel không phải phép màu</strong>Nó chỉ hoạt động khi vùng chuyển tiếp có từ 2–4 pixel và không bị bão hòa. Ảnh lấy nét quá gắt (cạnh nhảy trong 1 pixel) hoặc mờ quá (cạnh trải 10 pixel, nhiễu chiếm ưu thế) đều làm kém độ chính xác. Đèn nền (backlight) cho cạnh tương phản cao và sắc nét là lựa chọn số một cho bài đo, như bạn đã học ở bài 7 kiểu chiếu sáng.</div>
+<pre><code class="language-text">pixel 16:   40.0
+pixel 17:   40.0
+pixel 18:   40.7
+pixel 19:   50.4
+pixel 20:   95.1
+pixel 21:  166.7
+pixel 22:  197.1
+pixel 23:  199.9
+pixel 24:  200.0</code></pre>
+<p>Cạnh thật ở 20,3 nhưng không có pixel nào "nhảy" từ 40 lên 200: các pixel 18–22 có mức trung gian. Nếu chỉ phân ngưỡng ở 120, ta chỉ biết cạnh nằm giữa pixel 20 và 21 (sai số tới 0,5 px). Thông tin vị trí chính xác nằm trong <em>hình dạng</em> của vùng chuyển tiếp.</p>
+<div class="warn"><strong>Subpixel không phải phép màu</strong>Nó cần ba điều kiện: tương phản cạnh đủ lớn so với nhiễu, không bão hòa (vùng sáng chạm 255 làm profile bị cắt phẳng), và ảnh được lấy nét tốt. Ảnh mờ làm cạnh trải rộng nhiều pixel, gradient thấp, nhiễu chiếm ưu thế (bài tập 1 cho bạn thấy con số). Đèn nền (backlight) cho cạnh tương phản cao và sắc nét là lựa chọn số một cho bài đo, như bạn đã học ở bài 7 kiểu chiếu sáng.</div>
 
 <h2>3. Tìm cạnh subpixel trên profile 1D</h2>
 <p>Cạnh là nơi mức xám thay đổi nhanh nhất, tức đỉnh của <strong>gradient</strong> (đạo hàm). Các bước:</p>
@@ -88,8 +96,21 @@ for x in np.arange(20.0, 21.0, 0.1):
     print(f"{x:5.2f}   {k:3d}    {a:6.3f}   {b:6.3f}")
 for ten, e in sai.items():
     print(f"sai số lớn nhất {ten:8s}: {np.max(np.abs(e)):.3f} px")</code></pre>
-<pre><code class="language-text">TODO</code></pre>
-<p>Trên ảnh không nhiễu, parabol cho sai số cỡ vài phần trăm pixel, tốt hơn 10 lần so với pixel nguyên. Sai số còn lại là <strong>sai số hệ thống</strong> của phép nội suy, phụ thuộc vị trí cạnh trong pixel (khi cạnh nằm đúng tâm hoặc đúng biên pixel thì sai số bằng 0). Bây giờ thêm nhiễu cảm biến, điều luôn có trong ảnh thật:</p>
+<pre><code class="language-text">thật   nguyên   50%     parabol
+20.00    20    20.000   20.000
+20.10    20    20.157   20.125
+20.20    20    20.226   20.187
+20.30    20    20.348   20.312
+20.40    20    20.402   20.375
+20.50    20    20.500   20.500
+20.60    21    20.598   20.625
+20.70    21    20.652   20.687
+20.80    21    20.774   20.812
+20.90    21    20.843   20.875
+sai số lớn nhất nguyên  : 0.500 px
+sai số lớn nhất 50%     : 0.057 px
+sai số lớn nhất parabol : 0.025 px</code></pre>
+<p>Trên ảnh không nhiễu, parabol cho sai số lớn nhất 0,025 px, tốt hơn 20 lần so với vị trí nguyên (0,5 px). Cách cắt mức 50% cũng tốt (0,057 px) nhưng phụ thuộc vào việc biết đúng mức tối và mức sáng, vốn thay đổi theo đèn và bề mặt vật. Sai số còn lại là <strong>sai số hệ thống</strong> của phép nội suy, phụ thuộc vị trí cạnh trong pixel (khi cạnh nằm đúng tâm hoặc đúng biên pixel thì sai số bằng 0). Bây giờ thêm nhiễu cảm biến, điều luôn có trong ảnh thật:</p>
 <pre><code class="language-python">import cv2
 import numpy as np
 
@@ -117,7 +138,9 @@ sach = tao_profile(20.3)
 for nhieu in (1, 3, 8):
     kq = [canh_parabol(sach + rng.normal(0, nhieu, sach.size)) for _ in range(1000)]
     print(f"nhiễu σ={nhieu} mức xám: trung bình {np.mean(kq):.3f}, độ lệch chuẩn {np.std(kq):.3f} px")</code></pre>
-<pre><code class="language-text">TODO</code></pre>
+<pre><code class="language-text">nhiễu σ=1 mức xám: trung bình 20.314, độ lệch chuẩn 0.021 px
+nhiễu σ=3 mức xám: trung bình 20.318, độ lệch chuẩn 0.064 px
+nhiễu σ=8 mức xám: trung bình 20.345, độ lệch chuẩn 0.171 px</code></pre>
 <p>Tương phản cạnh ở đây là 160 mức xám. Độ lệch chuẩn của vị trí cạnh tăng gần tỉ lệ thuận với nhiễu và tỉ lệ nghịch với tương phản. Hai hệ quả thực tế: (1) tăng tương phản bằng chiếu sáng có lợi hơn mọi thuật toán; (2) một điểm cạnh đơn lẻ vẫn dao động, nên ta không đo bằng 1 điểm mà <strong>fit</strong> qua hàng chục điểm (mục 5).</p>
 
 <h2>4. Ảnh mẫu 2D với đáp án biết trước</h2>
@@ -159,7 +182,8 @@ bv = ve_mau(bavia=True)
 cv2.imwrite("mau_bavia.png", np.clip(bv + rng.normal(0, 2, bv.shape), 0, 255).round().astype(np.uint8))
 print("Đã lưu mau.png, mau_bavia.png, mau_sach.npy")
 print(f"Đáp án: rộng thanh {RONG} px, góc cạnh {90 + 3.0:.1f}°, đường kính đĩa {2 * BAN_KINH} px")</code></pre>
-<pre><code class="language-text">TODO</code></pre>
+<pre><code class="language-text">Đã lưu mau.png, mau_bavia.png, mau_sach.npy
+Đáp án: rộng thanh 80.4 px, góc cạnh 93.0°, đường kính đĩa 120.5 px</code></pre>
 
 <h2>5. Caliper: quét profile vuông góc với cạnh</h2>
 <p>Trong ảnh 2D, ta không tìm cạnh trên cả ảnh mà đặt các <strong>đường quét</strong> ngắn cắt ngang cạnh cần đo, gần như vuông góc với nó. Mỗi đường quét cho 1 điểm cạnh subpixel. Công cụ này trong phần mềm thương mại gọi là <strong>caliper</strong> (thước cặp) hoặc edge tool. Ta lấy mẫu mức xám dọc đường quét bằng <code>cv2.remap</code>: hàm này đọc ảnh tại tọa độ thực bất kỳ (nội suy), nên đường quét có thể nghiêng tùy ý.</p>
@@ -203,7 +227,9 @@ print("3 điểm đầu cạnh trái:", np.round(trai[:3], 3).tolist())
 g = math.radians(3.0)
 d = (trai[:, 0] - 120) * math.cos(g) + (trai[:, 1] - 150) * math.sin(g)
 print(f"sai số từng điểm cạnh trái: lớn nhất {np.max(np.abs(d + 40.2)):.3f} px")</code></pre>
-<pre><code class="language-text">TODO</code></pre>
+<pre><code class="language-text">số điểm cạnh: 27 27
+3 điểm đầu cạnh trái: [[86.6050033569336, 20.0], [86.03800201416016, 30.0], [85.56099700927734, 40.0]]
+sai số từng điểm cạnh trái: lớn nhất 0.072 px</code></pre>
 <p>Ở đây đường quét nằm ngang còn cạnh nghiêng 3°, vẫn ổn vì điểm tìm được vẫn nằm trên cạnh. Khi cạnh nghiêng nhiều (trên khoảng 20–30°), hãy xoay hướng quét theo pháp tuyến của cạnh, nếu không vùng chuyển tiếp dọc đường quét bị kéo dài và kém chính xác. Trong chương trình thật, vị trí và hướng của các đường quét được đặt theo kết quả định vị vật (template matching, bài sau), không cố định như ví dụ.</p>
 <div class="tip"><strong>Caliper công nghiệp làm thêm gì?</strong>Phần mềm thương mại thường lấy trung bình mức xám trên một dải rộng vài pixel song song với cạnh (projection) trước khi tìm cạnh, nhờ đó nhiễu giảm theo căn bậc hai số đường lấy trung bình. Chúng cũng cho chọn "cạnh đầu tiên", "cạnh mạnh nhất" hoặc "cặp cạnh có khoảng cách gần X" để tránh bắt nhầm.</div>
 
@@ -263,7 +289,10 @@ rong = abs(np.dot(cP - cT, n))
 lech_song_song = math.degrees(math.acos(min(1.0, abs(np.dot(vT, vP)))))
 print(f"độ rộng {rong:.3f} px (thật 80.4), hai cạnh lệch song song {lech_song_song:.3f}°")
 print(f"quy đổi với 0.05 mm/px: {rong * 0.05:.4f} mm")</code></pre>
-<pre><code class="language-text">TODO</code></pre>
+<pre><code class="language-text">cạnh trái: fitLine góc 93.000°, qua (79.743, 150.000) | SVD góc 93.000°, qua (79.743, 150.000)
+cạnh phải: fitLine góc 92.995°, qua (160.258, 150.000) | SVD góc 92.995°, qua (160.258, 150.000)
+độ rộng 80.405 px (thật 80.4), hai cạnh lệch song song 0.005°
+quy đổi với 0.05 mm/px: 4.0202 mm</code></pre>
 <p>Hai cách cho cùng kết quả, góc 93,0° đúng như đáp án (thanh nghiêng 3° so với phương thẳng đứng). Độ rộng sai khác so với giá trị thật chỉ vài phần nghìn pixel. Đây là sức mạnh của fitting: sai số ngẫu nhiên của từng điểm (cỡ vài phần trăm pixel ở mục 3) giảm đi khoảng √N lần khi fit N điểm.</p>
 <div class="warn"><strong>Định nghĩa "khoảng cách" phải rõ</strong>Hai cạnh thật không bao giờ song song tuyệt đối. Bản vẽ ghi "chiều rộng" thì bạn phải thống nhất với QC: khoảng cách trung bình, nhỏ nhất hay lớn nhất dọc chiều dài? Đo tại vị trí nào? Code trên đo khoảng cách giữa hai trọng tâm theo pháp tuyến chung, tương đương khoảng cách trung bình. Nếu cần nhỏ nhất/lớn nhất, hãy tính khoảng cách từ từng điểm cạnh phải đến đường trái rồi lấy min/max.</div>
 
@@ -330,12 +359,17 @@ print(f"minEnclosingCircle       ({ex:.3f}, {ey:.3f})  {2 * er:.3f}")
 print(f"fitEllipse (TB 2 trục)   ({fx:.3f}, {fy:.3f})  {(fa + fb) / 2:.3f}")
 print(f"từ diện tích contour     -                   {d_dien_tich:.3f}")
 print(f"caliper + Kasa ({len(P)} điểm) ({kx:.3f}, {ky:.3f})  {2 * kr:.3f}")</code></pre>
-<pre><code class="language-text">TODO</code></pre>
+<pre><code class="language-text">phương pháp              tâm                 đường kính
+thật                     (290.370, 148.620)  120.500
+minEnclosingCircle       (290.372, 148.631)  120.538
+fitEllipse (TB 2 trục)   (290.368, 148.635)  119.577
+từ diện tích contour     -                   119.579
+caliper + Kasa (72 điểm) (290.382, 148.624)  120.506</code></pre>
 <p>Đọc bảng:</p>
 <ul>
-  <li><code>minEnclosingCircle</code> là đường tròn <em>bao ngoài</em> contour, luôn lớn hơn vật và rất nhạy với một pixel nhiễu nhô ra. Chỉ dùng để ước lượng thô.</li>
-  <li>Contour đi qua tâm các pixel biên của ảnh nhị phân, nên các phép đo dựa trên contour (<code>fitEllipse</code>, diện tích) bị lệch hệ thống khoảng 1 px đường kính và phụ thuộc ngưỡng.</li>
-  <li>Caliper + Kasa cho sai số đường kính cỡ vài phần trăm pixel. Phần sai lệch hệ thống nhỏ còn lại (đường kính hơi nhỏ hơn thật) đến từ cách nội suy parabol trên cạnh cong và mờ; trong thực tế nó được hấp thụ khi hiệu chuẩn hệ đo bằng mẫu chuẩn có kích thước biết trước.</li>
+  <li><code>minEnclosingCircle</code> ở đây cho 120,538, gần đúng một cách <em>tình cờ</em>. Nó là đường tròn nhỏ nhất bao mọi điểm contour, nên chỉ do vài điểm ngoài cùng quyết định: một pixel nhiễu hay ba via nhô ra là đường kính nhảy theo (ở mục 9 nó có độ lặp lại kém nhất). Chỉ dùng để ước lượng thô.</li>
+  <li>Contour đi qua tâm các pixel biên của ảnh nhị phân, nên <code>fitEllipse</code> và đường kính quy từ diện tích đều nhỏ hơn thật khoảng 0,9 px, và độ lệch này thay đổi theo ngưỡng nhị phân (mục 9 sẽ chứng minh).</li>
+  <li>Caliper + Kasa: sai số đường kính 0,006 px, tâm lệch khoảng 0,01 px. Trong thực tế vẫn còn sai lệch hệ thống nhỏ do quang học và cách nội suy; phần đó được bù khi hiệu chuẩn hệ đo bằng mẫu chuẩn có kích thước biết trước.</li>
 </ul>
 <div class="tip"><strong>Khi chỉ có một cung tròn</strong>Kasa chính xác khi điểm phủ gần hết đường tròn. Nếu chỉ thấy một cung ngắn (ví dụ góc bo 60°), Kasa bị kéo nhỏ bán kính khi có nhiễu. Khi đó dùng kết quả Kasa làm điểm xuất phát rồi tối ưu sai số hình học (khoảng cách từ điểm tới đường tròn) bằng phương pháp lặp, ví dụ <code>scipy.optimize.least_squares</code>.</div>
 
@@ -428,8 +462,13 @@ print(f"đĩa, Kasa bền vững: tâm ({tam[0]:.3f}, {tam[1]:.3f}), đường k
 vx, vy, x0, y0 = cv2.fitLine(phai.astype(np.float32), cv2.DIST_HUBER, 0, 0.01, 0.01).ravel()
 n = mT[2]
 print(f"thanh, fitLine DIST_HUBER: rộng {abs((x0 - mT[0][0]) * n[0] + (y0 - mT[0][1]) * n[1]):.3f} px")</code></pre>
-<pre><code class="language-text">TODO</code></pre>
-<p>Ba via làm đường fit thường lệch về phía gờ, kết quả đo bị "phình" và góc cạnh lệch. Fit bền vững loại đúng các điểm nằm trên gờ và đưa kết quả về gần giá trị thật. <code>cv2.fitLine</code> có sẵn các hàm khoảng cách bền vững (<code>DIST_HUBER</code>, <code>DIST_FAIR</code>, <code>DIST_WELSCH</code>) giảm trọng số điểm xa; nhưng chúng chỉ <em>giảm</em> ảnh hưởng chứ không loại hẳn, và không trả về danh sách điểm bị loại.</p>
+<pre><code class="language-text">thanh, fit thường   : rộng 80.477 px (thật 80.4), góc cạnh phải 92.952°
+thanh, fit bền vững : rộng 80.393 px (thật 80.4), góc cạnh phải 92.994°
+điểm bị loại trên cạnh phải, y = [195, 200, 205]
+đĩa, Kasa thường  : tâm (290.434, 148.554), đường kính 120.584
+đĩa, Kasa bền vững: tâm (290.374, 148.615), đường kính 120.501, loại 3 điểm
+thanh, fitLine DIST_HUBER: rộng 80.382 px</code></pre>
+<p>Chỉ 3 trên 53 điểm nằm trên gờ, nhưng fit thường đã làm độ rộng phình thêm 0,077 px (80,477) và góc cạnh lệch 0,05°; đường kính đĩa tăng 0,084 px và tâm lệch theo hướng gờ. Fit bền vững loại đúng 3 điểm trên gờ (y = 195, 200, 205) và đưa kết quả về 80,393 và 120,501. <code>cv2.fitLine</code> có sẵn các hàm khoảng cách bền vững (<code>DIST_HUBER</code>, <code>DIST_FAIR</code>, <code>DIST_WELSCH</code>) giảm trọng số điểm xa; nhưng chúng chỉ <em>giảm</em> ảnh hưởng chứ không loại hẳn, và không trả về danh sách điểm bị loại.</p>
 <div class="tip"><strong>Điểm bị loại cũng là thông tin</strong>Đừng vứt danh sách điểm bị loại. Nếu khách hàng cũng kiểm tra ba via, thì "có ≥ 2 điểm liên tiếp lệch &gt; 0,1 mm khỏi đường fit" chính là tiêu chí NG cho lỗi ba via, đo được vị trí và chiều cao gờ. Ngược lại, khi số điểm bị loại quá nhiều (ví dụ &gt; 30%), đừng tin kết quả đo: có thể caliper đặt sai chỗ hoặc ảnh có vấn đề, hãy báo lỗi đo thay vì báo OK/NG. Khi tỉ lệ điểm nhiễu rất lớn, dùng RANSAC (chọn ngẫu nhiên tập điểm nhỏ, fit, đếm điểm đồng thuận) như bạn sẽ gặp với <code>findHomography</code> ở bài feature matching.</div>
 
 <h2>9. Độ lặp lại: đo 30 lần, xem độ lệch chuẩn</h2>
@@ -515,8 +554,24 @@ for do_sang in (1.0, 0.85, 0.7):
     print(f"độ sáng {do_sang:4.0%}: rộng contour {kq['rộng, contour minAreaRect']:.2f}, "
           f"caliper {kq['rộng, caliper + fit']:.2f} | Ø fitEllipse {kq['Ø, contour fitEllipse']:.2f}, "
           f"Kasa {kq['Ø, caliper + Kasa']:.2f}")</code></pre>
-<pre><code class="language-text">TODO</code></pre>
-<p>Cột 6σ (quy ra mm với 0,05 mm/px) là khoảng dao động gần như toàn bộ các lần đo. Trong nghiệm thu, người ta so nó với khoảng dung sai: với dung sai ±0,03 mm (khoảng 0,06 mm), hệ đo nên có 6σ nhỏ hơn khoảng 10% của 0,06 mm, tối đa 30% thì còn chấp nhận được có điều kiện. Đây là tinh thần của phân tích Gauge R&amp;R mà phòng QC sẽ yêu cầu khi nghiệm thu trạm đo. Ở ví dụ này, chỉ phương án caliper + fit đạt yêu cầu.</p>
+<pre><code class="language-text">phép đo                         trung bình   σ (px)  6σ (mm)
+rộng, contour minAreaRect           80.490   0.0207   0.0062
+rộng, caliper + fit                 80.398   0.0122   0.0037
+Ø, contour minEnclosingCircle      120.552   0.0355   0.0106
+Ø, contour fitEllipse              119.575   0.0113   0.0034
+Ø, caliper + Kasa                  120.494   0.0094   0.0028
+giá trị thật: rộng 80.4, Ø 120.5; quy đổi 0.05 mm/px
+
+Đèn yếu dần, contour dùng ngưỡng cố định 125:
+độ sáng 100%: rộng contour 80.52, caliper 80.41 | Ø fitEllipse 119.57, Kasa 120.48
+độ sáng  85%: rộng contour 81.06, caliper 80.36 | Ø fitEllipse 120.11, Kasa 120.55
+độ sáng  70%: rộng contour 82.35, caliper 80.41 | Ø fitEllipse 121.21, Kasa 120.46</code></pre>
+<p>Cột 6σ (quy ra mm với 0,05 mm/px) là khoảng dao động gần như toàn bộ các lần đo. Trong nghiệm thu, người ta so nó với khoảng dung sai: với dung sai ±0,03 mm (khoảng 0,06 mm), hệ đo nên có 6σ nhỏ hơn khoảng 10% của 0,06 mm, tối đa 30% thì còn chấp nhận được có điều kiện. Đây là tinh thần của phân tích Gauge R&amp;R mà phòng QC sẽ yêu cầu khi nghiệm thu trạm đo. Đọc kết quả:</p>
+<ul>
+  <li>10% của 0,06 mm là 0,006 mm. Caliper + fit (0,0037) và caliper + Kasa (0,0028) đạt; <code>minAreaRect</code> trên contour (0,0062) chỉ vừa chạm ngưỡng; <code>minEnclosingCircle</code> (0,0106) không đạt.</li>
+  <li><code>fitEllipse</code> có độ lặp lại tốt vì nó cũng fit qua hàng trăm điểm contour. Nhưng nó lệch −0,93 px so với thật, và phần cuối của kết quả cho thấy vấn đề lớn hơn: khi đèn yếu đi 30% mà ngưỡng nhị phân giữ nguyên, đường kính theo contour trôi từ 119,57 lên 121,21 px (0,08 mm), độ rộng từ 80,52 lên 82,35 px. Caliper + fit gần như không đổi vì vị trí đỉnh gradient không phụ thuộc độ sáng tổng thể.</li>
+  <li>Bài học: fitting cho độ lặp lại, còn tìm cạnh trên mức xám (subpixel) cho kết quả không phụ thuộc ngưỡng và độ sáng. Trạm đo cần cả hai. Đèn LED giảm sáng dần theo tuổi thọ là chuyện có thật trong nhà máy.</li>
+</ul>
 
 <h2>10. Lỗi thường gặp</h2>
 <table>
@@ -561,8 +616,10 @@ for sigma in (0.3, 0.8, 3.0):
     sach = tao_profile(20.3, sigma=sigma)
     lech = np.std([canh_parabol(sach + rng.normal(0, 3, sach.size)) for _ in range(500)])
     print(f"sigma {sigma}: sai số hệ thống lớn nhất {loi:.3f} px, σ khi có nhiễu {lech:.3f} px")</code></pre>
-<pre><code class="language-text">TODO</code></pre>
-<p>Ảnh quá nét: vùng chuyển tiếp chỉ khoảng 1 pixel, parabol 3 điểm khớp kém, sai số hệ thống lớn hơn. Ảnh quá mờ: không nhiễu thì vẫn chính xác, nhưng gradient thấp và trải rộng nên nhạy nhiễu hơn hẳn (σ lớn hơn). Vùng tốt là cạnh trải khoảng 2–4 pixel. Đây là lý do không nên chỉnh nét "càng gắt càng tốt" cho bài đo, và cũng không được để mất nét.</p>
+<pre><code class="language-text">sigma 0.3: sai số hệ thống lớn nhất 0.025 px, σ khi có nhiễu 0.029 px
+sigma 0.8: sai số hệ thống lớn nhất 0.025 px, σ khi có nhiễu 0.063 px
+sigma 3.0: sai số hệ thống lớn nhất 0.025 px, σ khi có nhiễu 0.784 px</code></pre>
+<p>Khi không có nhiễu, ba mức nét cho sai số hệ thống như nhau (0,025 px): nhờ cảm biến lấy trung bình trên diện tích pixel, cạnh rất nét vẫn có pixel trung gian. Khác biệt nằm ở nhiễu: ảnh nét (sigma 0,3) có gradient cao, σ chỉ 0,029 px; ảnh mờ (sigma 3) có gradient thấp và đỉnh bẹt, nhiễu làm vị trí cực đại nhảy vài pixel và parabol 3 điểm không cứu được, σ lên tới 0,78 px. Kết luận thực tế: lấy nét tốt là bắt buộc cho bài đo, và phải khóa vòng lấy nét (như bài độ sâu trường ảnh ở chặng 6). Nếu buộc phải đo trên ảnh hơi mờ, hãy làm trơn profile (lọc Gaussian 1D) trước khi lấy gradient, hoặc nội suy trên cửa sổ rộng hơn 3 điểm.</p>
 </details>
 </div>
 <div class="ex">
@@ -602,7 +659,7 @@ trai = np.array([tim_canh(anh, (80, y), (1, 0), cuc=-1) for y in range(20, 281, 
 phai = np.array([tim_canh(anh, (160, y), (1, 0), cuc=+1) for y in range(20, 281, 10)])
 dmin, dmax = khoang_cach_min_max(trai, phai)
 print(f"nhỏ nhất {dmin:.3f} px, lớn nhất {dmax:.3f} px")</code></pre>
-<pre><code class="language-text">TODO</code></pre>
+<pre><code class="language-text">nhỏ nhất 80.345 px, lớn nhất 80.465 px</code></pre>
 <p>Chênh lệch đến từ nhiễu của từng điểm cạnh riêng lẻ (không được fit làm trơn). Vì vậy min/max theo điểm luôn "xấu" hơn giá trị thật, và nhạy với nhiễu. Nếu khách hàng yêu cầu đo chiều rộng nhỏ nhất, nên lấy trung bình trượt vài điểm liền kề trước khi lấy min, và ghi rõ cách tính trong tài liệu nghiệm thu.</p>
 </details>
 </div>
