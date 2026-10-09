@@ -1,0 +1,401 @@
+<p>Các bài trước của chặng 12 ("Object Detection với YOLO26", "Phân đoạn vết lỗi với YOLO26-seg", "U-Net cho phân đoạn ảnh") đều cần <strong>ảnh lỗi đã gán nhãn</strong>, thường vài trăm ảnh mỗi loại. Ở nhiều dây chuyền, điều đó không có: lỗi hiếm, mỗi tuần vài chiếc, mỗi chiếc một kiểu, và lỗi mới xuất hiện sau mỗi lần đổi khuôn. <strong>Anomaly detection</strong> (phát hiện bất thường) đảo ngược bài toán: chỉ học từ <strong>ảnh OK</strong>, rồi đánh dấu mọi thứ "không giống OK". Bài này giải thích hai thuật toán nền tảng nhất, <strong>PaDiM</strong> và <strong>PatchCore</strong>, bằng cách tự cài đặt phiên bản thu nhỏ của cả hai trên ảnh tổng hợp, so sánh chúng trên các tình huống mà nhà máy thật gặp (lỗi bề mặt, chi tiết đặt lệch, thiếu chi tiết, đèn sáng hơn), và chỉ ra khi nào <em>không</em> nên dùng anomaly detection. Bài sau, "Dự án chặng 12: phát hiện lỗi bề mặt bằng PatchCore", dùng thư viện anomalib với mạng pretrained thật.</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Giải thích được vì sao học từ ảnh OK là khả thi; cài được PaDiM (Gaussian theo từng vị trí, khoảng cách Mahalanobis) và PatchCore (memory bank, coreset, láng giềng gần nhất) trên đặc trưng CNN; tạo bản đồ bất thường định vị vết lỗi và điểm số cấp ảnh; đo AUROC; hiểu ảnh hưởng của tỉ lệ coreset; đặt ngưỡng chỉ từ ảnh OK; biết các tình huống anomaly detection thất bại.</div>
+
+<h2>1. Ý tưởng: học "bình thường" thay vì học "lỗi"</h2>
+<p>Mô hình có giám sát học ranh giới giữa OK và từng loại NG; nó chỉ biết những loại lỗi đã thấy. Mô hình anomaly detection chỉ mô tả <strong>vùng của dữ liệu OK</strong> trong một không gian đặc trưng; bất cứ thứ gì nằm xa vùng đó đều bị coi là bất thường, kể cả loại lỗi chưa từng xuất hiện.</p>
+<table>
+  <tr><th></th><th>Có giám sát (phân loại, phát hiện, phân đoạn)</th><th>Anomaly detection</th></tr>
+  <tr><td>Dữ liệu huấn luyện</td><td>Ảnh OK và ảnh NG đã gán nhãn từng loại</td><td>Chỉ ảnh OK (vài chục đến vài trăm)</td></tr>
+  <tr><td>Lỗi chưa từng thấy</td><td>Thường bỏ sót</td><td>Bắt được nếu khác OK đủ rõ</td></tr>
+  <tr><td>Đầu ra</td><td>Loại lỗi, vị trí, mặt nạ</td><td>Điểm bất thường + bản đồ bất thường; không biết "loại" lỗi</td></tr>
+  <tr><td>Biến động vô hại (bụi, đèn, vị trí)</td><td>Học được là OK nếu có trong dữ liệu</td><td>Dễ bị coi là bất thường (overkill)</td></tr>
+</table>
+<p>Cả PaDiM và PatchCore đều theo ba bước giống nhau:</p>
+<ol>
+  <li><strong>Trích đặc trưng theo mảnh (patch)</strong>: cho ảnh qua một CNN đã huấn luyện sẵn trên ImageNet, lấy feature map ở các lớp giữa. Mỗi điểm trên feature map là một vector mô tả một mảnh ảnh nhỏ (bạn đã gặp khái niệm feature map và receptive field ở bài "Mạng nơ-ron và CNN hoạt động thế nào"). <strong>Không huấn luyện lại CNN.</strong></li>
+  <li><strong>Mô hình hóa "bình thường"</strong> từ các vector của ảnh OK: PaDiM dùng phân phối Gaussian ở từng vị trí; PatchCore lưu lại chính các vector (memory bank).</li>
+  <li><strong>Chấm điểm</strong> từng mảnh của ảnh mới theo khoảng cách tới "bình thường" → bản đồ bất thường; điểm cả ảnh = điểm mảnh lớn nhất.</li>
+</ol>
+
+<h2>2. Dữ liệu mẫu: tấm nhôm chải xước có lỗ khoan</h2>
+<p>Ảnh 96×96, vân chải ngang ngẫu nhiên, một lỗ khoan ở giữa (vị trí dao động ±2 px như sai số đồ gá). Tập huấn luyện 40 ảnh OK; tập kiểm định 100 ảnh OK (chỉ để đặt ngưỡng); tập kiểm tra 100 OK và 30 NG (xước sáng, đốm tối), kèm mặt nạ lỗi để kiểm tra định vị. Thêm ba tập "tình huống" dùng ở mục 9: lỗ khoan lệch 8 px, thiếu lỗ khoan, đèn sáng hơn 15%.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+S = 96
+rng = np.random.default_rng(0)
+
+
+def tam_nhom(rng, lo=(48, 48), co_lo=True, sang=1.0):
+    van = cv2.GaussianBlur(rng.normal(0, 8, (S, 1)), (1, 3), 0)      # vân chải: mỗi hàng một độ sáng
+    img = 135 + van + rng.normal(0, 4, (S, S)) + rng.normal(0, 3)   # nhiễu + độ sáng từng tấm
+    if co_lo:
+        c = (int(lo[0] + rng.integers(-2, 3)), int(lo[1] + rng.integers(-2, 3)))
+        cv2.circle(img, c, 7, 45, -1)                                # lỗ khoan, lệch ±2 px
+    return np.clip(img * sang, 0, 255).astype(np.uint8)
+
+
+def them_loi(img, loai, rng):
+    img, m = img.copy(), np.zeros((S, S), np.uint8)
+    if loai == "xuoc":
+        x1, y1 = int(rng.integers(8, 30) + rng.choice([0, 55])), int(rng.integers(8, 60))
+        x2, y2 = x1 + int(rng.integers(-8, 9)), y1 + int(rng.integers(14, 24))
+        cv2.line(img, (x1, y1), (x2, y2), 225, 1)
+        cv2.line(m, (x1, y1), (x2, y2), 1, 3)
+    else:                                                            # đốm tối
+        c = (int(rng.integers(12, 84)), int(rng.choice([18, 78])))
+        cv2.circle(img, c, int(rng.integers(3, 5)), 70, -1)
+        cv2.circle(m, c, 6, 1, -1)
+    return img, m
+
+
+train = np.stack([tam_nhom(rng) for _ in range(40)])
+val_ok = np.stack([tam_nhom(rng) for _ in range(100)])
+test_ok = np.stack([tam_nhom(rng) for _ in range(100)])
+ng = [them_loi(tam_nhom(rng), loai, rng) for loai in ["xuoc"] * 15 + ["dom"] * 15]
+test_ng, mat_na = np.stack([a for a, _ in ng]), np.stack([m for _, m in ng])
+lo_lech = np.stack([tam_nhom(rng, lo=(56, 48)) for _ in range(15)])
+thieu_lo = np.stack([tam_nhom(rng, co_lo=False) for _ in range(15)])
+sang_hon = np.stack([tam_nhom(rng, sang=1.15) for _ in range(15)])
+np.savez("du_lieu_ad.npz", train=train, val_ok=val_ok, test_ok=test_ok, test_ng=test_ng, mat_na=mat_na,
+         lo_lech=lo_lech, thieu_lo=thieu_lo, sang_hon=sang_hon)
+cv2.imwrite("mau_ad.png", cv2.hconcat([train[0], test_ng[0], test_ng[20], lo_lech[0], thieu_lo[0], sang_hon[0]]))
+print("train", train.shape, "| val OK", len(val_ok), "| test OK", len(test_ok), "| test NG", len(test_ng))
+print("đã lưu mau_ad.png: OK | xước | đốm | lỗ lệch | thiếu lỗ | sáng hơn")</code></pre>
+<pre><code class="language-text">train (40, 96, 96) | val OK 100 | test OK 100 | test NG 30
+đã lưu mau_ad.png: OK | xước | đốm | lỗ lệch | thiếu lỗ | sáng hơn</code></pre>
+
+<h2>3. Trích đặc trưng theo mảnh</h2>
+<p>Trong sản phẩm thật, PaDiM và PatchCore dùng mạng <strong>pretrained trên ImageNet</strong>, phổ biến nhất là WideResNet-50 hoặc ResNet-18. PatchCore lấy đặc trưng ở hai tầng giữa (<code>layer2</code>, <code>layer3</code>): đủ chi tiết để thấy vết nhỏ, đủ khái quát để không nhạy với nhiễu pixel. Tầng sâu hơn (<code>layer4</code>) thiên về "đây là con mèo hay cái cốc" của ImageNet nên ít hữu ích cho bề mặt công nghiệp. Trên máy của bạn, đoạn sau tải trọng số và lấy hai tầng đó:</p>
+<pre><code class="language-python"># (minh họa) cần tải trọng số pretrained từ Internet (khoảng vài trăm MB)
+import torch
+from torchvision.models import Wide_ResNet50_2_Weights, wide_resnet50_2
+from torchvision.models.feature_extraction import create_feature_extractor
+
+mang = wide_resnet50_2(weights=Wide_ResNet50_2_Weights.IMAGENET1K_V1).eval()
+trich = create_feature_extractor(mang, return_nodes={"layer2": "l2", "layer3": "l3"})
+with torch.no_grad():
+    f = trich(torch.randn(1, 3, 224, 224))
+print(f["l2"].shape, f["l3"].shape)        # (1, 512, 28, 28) và (1, 1024, 14, 14)</code></pre>
+<p>Môi trường chạy ví dụ của bài này không tải được trọng số, nên ta thay bằng một <strong>CNN nhỏ khởi tạo ngẫu nhiên, cố định</strong> (không huấn luyện) với hai "tầng" có stride 4 và 8. Đặc trưng ngẫu nhiên vẫn mô tả được kết cấu cục bộ của ảnh tổng hợp đơn giản, đủ để minh họa thuật toán; với ảnh thật, đặc trưng pretrained tốt hơn rất nhiều. Phần còn lại của thuật toán giữ nguyên: ghép hai tầng (phóng tầng sâu lên cùng kích thước), rồi lấy trung bình vùng 3×3 quanh mỗi điểm (PatchCore gọi là gom láng giềng cục bộ) để mỗi vector "nhìn" rộng hơn một chút.</p>
+<pre><code class="language-python">import numpy as np
+import torch
+import torch.nn.functional as F
+from torch import nn
+
+torch.manual_seed(0)
+torch.set_num_threads(4)
+tang1 = nn.Sequential(nn.Conv2d(1, 32, 3, padding=1), nn.ReLU(), nn.AvgPool2d(2),
+                      nn.Conv2d(32, 64, 3, padding=1), nn.ReLU(), nn.AvgPool2d(2)).eval()   # stride 4
+tang2 = nn.Sequential(nn.Conv2d(64, 64, 3, padding=1), nn.ReLU(), nn.AvgPool2d(2)).eval()   # stride 8
+
+
+@torch.no_grad()
+def dac_trung(imgs):
+    """imgs: (N, 96, 96) uint8 → (N, 128, 24, 24): một vector 128 chiều cho mỗi mảnh 4×4 px."""
+    x = (torch.from_numpy(np.asarray(imgs)).float()[:, None] / 255 - 0.5) / 0.25
+    f1 = tang1(x)
+    f2 = F.interpolate(tang2(f1), size=f1.shape[-2:], mode="bilinear", align_corners=False)
+    f = torch.cat([f1, f2], 1)
+    return F.avg_pool2d(f, 3, stride=1, padding=1) / THANG     # gom láng giềng 3×3, chuẩn hóa thang đo
+
+
+d = np.load("du_lieu_ad.npz")
+THANG = 1.0                                                    # tạm thời, để đo thang đo thật
+THANG = float(dac_trung(d["train"]).std())                     # một hệ số chung, tính trên ảnh train
+f_train = dac_trung(d["train"])
+N, C, H, W = f_train.shape
+print(f"đặc trưng train: {tuple(f_train.shape)} → {N * H * W:,} vector mảnh, mỗi vector {C} chiều")</code></pre>
+<pre><code class="language-text">đặc trưng train: (40, 128, 24, 24) → 23,040 vector mảnh, mỗi vector 128 chiều</code></pre>
+<p>Mỗi ảnh 96×96 trở thành lưới 24×24 = 576 vector. Ảnh train chỉ có 40 tấm, nhưng ta có 23.040 vector mô tả "mảnh bình thường" trông như thế nào. Đây là lý do anomaly detection cấp mảnh cần ít ảnh OK: mỗi ảnh đóng góp hàng trăm mẫu.</p>
+
+<h2>4. PaDiM: một phân phối Gaussian cho mỗi vị trí</h2>
+<p><strong>PaDiM</strong> (Patch Distribution Modeling) giả định rằng ở mỗi vị trí <code>(i, j)</code> trên lưới, vector đặc trưng của các ảnh OK tuân theo một <strong>phân phối Gaussian nhiều chiều</strong> với trung bình <code>μᵢⱼ</code> và ma trận hiệp phương sai <code>Σᵢⱼ</code>. Với ảnh mới, điểm bất thường của mảnh <code>(i, j)</code> là <strong>khoảng cách Mahalanobis</strong>:</p>
+<pre><code class="language-text">M(x) = sqrt( (x − μᵢⱼ)ᵀ · Σᵢⱼ⁻¹ · (x − μᵢⱼ) )</code></pre>
+<p>Khác khoảng cách Euclid, Mahalanobis "co giãn" theo độ biến động tự nhiên của từng hướng: chiều nào ở ảnh OK vốn dao động nhiều thì lệch ở chiều đó ít bị phạt; chiều nào ổn định thì lệch nhỏ cũng bị phạt nặng. Hai chi tiết thực tế của PaDiM:</p>
+<ul>
+  <li><strong>Giảm chiều ngẫu nhiên</strong>: với WideResNet-50, vector ghép có hàng nghìn chiều, ma trận Σ quá lớn và cần rất nhiều ảnh để ước lượng. PaDiM chọn ngẫu nhiên một tập con chiều (ví dụ vài trăm) và thấy kết quả gần như không giảm.</li>
+  <li><strong>Điều chuẩn</strong> <code>Σ + εI</code> (bài báo dùng ε = 0,01) để Σ luôn nghịch đảo được khi số ảnh ít.</li>
+</ul>
+<pre><code class="language-python">import torch
+
+g = torch.Generator().manual_seed(0)
+chon = torch.randperm(C, generator=g)[:32]                         # giữ 32 trong 128 chiều, chọn ngẫu nhiên
+X = f_train[:, chon].permute(2, 3, 0, 1).reshape(H * W, N, -1)    # (576 vị trí, 40 ảnh, 32 chiều)
+mu = X.mean(1)                                                     # (576, 32)
+Xc = X - mu[:, None]
+cov = Xc.transpose(1, 2) @ Xc / (N - 1) + 0.01 * torch.eye(len(chon))   # (576, 32, 32)
+cov_inv = torch.linalg.inv(cov)
+
+
+def ban_do_padim(imgs):
+    f = dac_trung(imgs)[:, chon].permute(2, 3, 0, 1).reshape(H * W, len(imgs), -1)
+    dx = f - mu[:, None]
+    m2 = torch.einsum("pnd,pde,pne->pn", dx, cov_inv, dx)          # Mahalanobis² cho mọi vị trí, mọi ảnh
+    return m2.clamp_min(0).sqrt().T.reshape(-1, 1, H, W)
+
+
+print(f"PaDiM lưu: μ {tuple(mu.shape)} + Σ⁻¹ {tuple(cov_inv.shape)} = "
+      f"{(mu.numel() + cov_inv.numel()) * 4 / 1e6:.2f} MB")
+print("bản đồ cho 2 ảnh:", tuple(ban_do_padim(d["test_ng"][:2]).shape))</code></pre>
+<pre><code class="language-text">PaDiM lưu: μ (576, 32) + Σ⁻¹ (576, 32, 32) = 2.43 MB
+bản đồ cho 2 ảnh: (2, 1, 24, 24)</code></pre>
+<p>Bộ nhớ của PaDiM tăng theo <strong>số vị trí × số chiều²</strong>, không phụ thuộc số ảnh train. Với WideResNet-50 ở độ phân giải 224 px, lưới 56×56 và vài trăm chiều, Σ có thể chiếm hàng GB; đó là lý do giảm chiều là bắt buộc.</p>
+
+<h2>5. PatchCore: memory bank và láng giềng gần nhất</h2>
+<p><strong>PatchCore</strong> không giả định phân phối nào. Nó lưu <strong>tất cả</strong> vector mảnh của ảnh OK vào một <strong>memory bank</strong>, không phân biệt vị trí. Điểm bất thường của một mảnh mới là <strong>khoảng cách tới vector gần nhất</strong> trong bank: nếu ở đâu đó trong ảnh OK đã từng có một mảnh trông giống vậy, mảnh đó bình thường.</p>
+<p>Bank đầy đủ có hàng trăm nghìn đến hàng triệu vector, tìm láng giềng gần nhất sẽ chậm. PatchCore giảm kích thước bằng <strong>coreset</strong>: chọn một tập con nhỏ (ví dụ 1–10%) sao cho mọi vector bị bỏ đi đều có một vector được giữ ở gần. Thuật toán tham lam k-center: bắt đầu từ một điểm, mỗi bước thêm điểm <em>xa nhất</em> so với các điểm đã chọn. Để nhanh, khoảng cách khi chọn được tính trên phép chiếu ngẫu nhiên xuống ít chiều hơn.</p>
+<pre><code class="language-python">import time
+
+import torch
+
+bank_day_du = f_train.permute(0, 2, 3, 1).reshape(-1, C)         # (23040, 128)
+
+
+def coreset(bank, ti_le, seed=0):
+    """Chọn tham lam k-center: mỗi bước lấy vector xa tập đã chọn nhất."""
+    n = max(1, int(len(bank) * ti_le))
+    luong = torch.get_num_threads()
+    torch.set_num_threads(1)              # vòng lặp gồm nhiều phép tính nhỏ: 1 luồng nhanh hơn nhiều luồng
+    g = torch.Generator().manual_seed(seed)
+    z = bank @ (torch.randn(bank.shape[1], 32, generator=g) / 32 ** 0.5)   # chiếu ngẫu nhiên 128 → 32 chiều
+    zz = (z * z).sum(1)                                            # ‖z‖², để tính khoảng cách bằng một phép nhân
+    chon = [int(torch.randint(len(bank), (1,), generator=g))]
+    dmin = zz - 2 * (z @ z[chon[0]]) + zz[chon[0]]                 # khoảng cách² tới tập đã chọn
+    for _ in range(n - 1):
+        i = int(dmin.argmax())                                     # vector xa tập đã chọn nhất
+        chon.append(i)
+        dmin = torch.minimum(dmin, zz - 2 * (z @ z[i]) + zz[i])
+    torch.set_num_threads(luong)
+    return bank[chon]
+
+
+def ban_do_patchcore(imgs, bank):
+    q = dac_trung(imgs).permute(0, 2, 3, 1).reshape(-1, C)
+    d_min = torch.cdist(q, bank).min(1).values                     # khoảng cách tới láng giềng gần nhất
+    return d_min.reshape(len(imgs), 1, H, W)
+
+
+t0 = time.perf_counter()
+bank = coreset(bank_day_du, 0.10)
+print(f"memory bank: {len(bank_day_du):,} → coreset 10%: {len(bank):,} vector "
+      f"({bank.numel() * 4 / 1e6:.2f} MB), chọn mất {time.perf_counter() - t0:.1f} s")</code></pre>
+<pre><code class="language-text">memory bank: 23,040 → coreset 10%: 2,304 vector (1.18 MB), chọn mất 1.3 s</code></pre>
+<p>(Thời gian phụ thuộc máy.) Bài báo PatchCore còn hai chi tiết nhỏ ta bỏ qua cho gọn: điểm của cả ảnh được điều chỉnh thêm theo mật độ láng giềng quanh mảnh có điểm cao nhất, và bản đồ được làm mượt bằng lọc Gaussian (ta làm ở mục sau).</p>
+
+<h2>6. Bản đồ bất thường, điểm cấp ảnh và AUROC</h2>
+<p>Bản đồ 24×24 được phóng về 96×96 và làm mượt; điểm cấp ảnh là giá trị lớn nhất của bản đồ. Đánh giá cấp ảnh bằng <strong>AUROC</strong> (đã gặp ở bài "Chọn ngưỡng và đánh giá theo escape, overkill, cycle time"); đánh giá định vị bằng cách kiểm tra điểm nóng nhất có rơi vào vùng lỗi thật không.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+import torch.nn.functional as F
+from sklearn.metrics import roc_auc_score
+
+
+def phong_to(ban_do):
+    m = F.interpolate(ban_do, size=(S, S), mode="bilinear", align_corners=False)[:, 0].numpy()
+    return np.stack([cv2.GaussianBlur(a, (0, 0), 2) for a in m])
+
+
+def cham_diem(imgs, phuong_phap):
+    bd = phong_to(ban_do_padim(imgs) if phuong_phap == "PaDiM" else ban_do_patchcore(imgs, bank))
+    return bd, bd.reshape(len(imgs), -1).max(1)                     # bản đồ, điểm cấp ảnh = max
+
+
+y = np.r_[np.zeros(len(d["test_ok"])), np.ones(len(d["test_ng"]))]
+anh_ve = []
+for pp in ("PaDiM", "PatchCore"):
+    _, s_ok = cham_diem(d["test_ok"], pp)
+    bd_ng, s_ng = cham_diem(d["test_ng"], pp)
+    trung = sum(m[np.unravel_index(b.argmax(), b.shape)] &gt; 0 for b, m in zip(bd_ng, d["mat_na"]))
+    print(f"{pp:9s}: AUROC cấp ảnh {roc_auc_score(y, np.r_[s_ok, s_ng]):.3f} | "
+          f"điểm nóng nhất nằm trong vùng lỗi: {trung}/{len(bd_ng)} ảnh NG")
+    hang = []
+    for k in (0, 20):                                               # một ảnh xước, một ảnh đốm
+        nhiet = cv2.applyColorMap(cv2.normalize(bd_ng[k], None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8),
+                                  cv2.COLORMAP_JET)
+        goc = cv2.cvtColor(d["test_ng"][k], cv2.COLOR_GRAY2BGR)
+        hang += [goc, cv2.addWeighted(goc, 0.5, nhiet, 0.5, 0)]
+    anh_ve.append(cv2.hconcat(hang))
+cv2.imwrite("ban_do_bat_thuong.png", cv2.vconcat(anh_ve))
+print("đã lưu ban_do_bat_thuong.png (hàng trên PaDiM, hàng dưới PatchCore)")</code></pre>
+<pre><code class="language-text">PaDiM    : AUROC cấp ảnh 1.000 | điểm nóng nhất nằm trong vùng lỗi: 30/30 ảnh NG
+PatchCore: AUROC cấp ảnh 0.996 | điểm nóng nhất nằm trong vùng lỗi: 30/30 ảnh NG
+đã lưu ban_do_bat_thuong.png (hàng trên PaDiM, hàng dưới PatchCore)</code></pre>
+<p>Cả hai phương pháp phân biệt OK/NG tốt trên dữ liệu này và định vị đúng vết lỗi ở gần như mọi ảnh, dù không ai chỉ cho chúng vết xước trông như thế nào. Mở <code>ban_do_bat_thuong.png</code>: vùng đỏ trùng vết xước và đốm. Đây là giá trị lớn nhất của anomaly detection trong nhà máy: <strong>bản đồ nhiệt cho người vận hành thấy ngay vì sao sản phẩm bị loại</strong>. Kết quả trên ảnh tổng hợp đơn giản này không nói lên độ chính xác trên ảnh thật; trên bộ chuẩn MVTec AD với đặc trưng pretrained, PatchCore thường cho kết quả cao hơn PaDiM.</p>
+
+<h2>7. Tỉ lệ coreset: bộ nhớ, tốc độ và độ chính xác</h2>
+<pre><code class="language-python">import time
+
+import numpy as np
+from sklearn.metrics import roc_auc_score
+
+print(" tỉ lệ | số vector | bộ nhớ MB | chọn coreset (s) | ms/ảnh | AUROC")
+for ti_le in (1.0, 0.1, 0.01, 0.001):
+    t0 = time.perf_counter()
+    mb = bank_day_du if ti_le == 1.0 else coreset(bank_day_du, ti_le)
+    t_chon = time.perf_counter() - t0
+    t0 = time.perf_counter()
+    s_ok = phong_to(ban_do_patchcore(d["test_ok"][:50], mb)).reshape(50, -1).max(1)   # 50 OK cho nhanh
+    s_ng = phong_to(ban_do_patchcore(d["test_ng"], mb)).reshape(len(d["test_ng"]), -1).max(1)
+    ms = (time.perf_counter() - t0) / (len(s_ok) + len(s_ng)) * 1000
+    auc = roc_auc_score(np.r_[np.zeros(len(s_ok)), np.ones(len(s_ng))], np.r_[s_ok, s_ng])
+    print(f"{ti_le:6.1%} | {len(mb):9,} | {mb.numel() * 4 / 1e6:9.2f} | {t_chon:16.1f} | {ms:6.1f} | {auc:.3f}")</code></pre>
+<pre><code class="language-text"> tỉ lệ | số vector | bộ nhớ MB | chọn coreset (s) | ms/ảnh | AUROC
+100.0% |    23,040 |     11.80 |              0.0 |  117.9 | 0.997
+ 10.0% |     2,304 |      1.18 |              1.1 |   32.5 | 0.997
+  1.0% |       230 |      0.12 |              0.1 |   21.2 | 0.999
+  0.1% |        23 |      0.01 |              0.0 |   18.5 | 0.707</code></pre>
+<p>(Cột thời gian phụ thuộc máy; xu hướng thì không.) Từ 100% xuống 10%, thời gian mỗi ảnh giảm mạnh vì tìm láng giềng gần nhất chiếm phần lớn thời gian; nhỏ hơn nữa thì thời gian bị chi phối bởi bước trích đặc trưng nên gần như không giảm thêm. AUROC giữ nguyên đến 1% rồi sụp ở 0,1% (23 vector không đủ đại diện cho mọi kiểu mảnh bình thường): coreset giữ lại những vector "đại diện" và bỏ các vector trùng lặp. Trên dữ liệu thật, hãy thử vài tỉ lệ và chọn tỉ lệ nhỏ nhất mà escape/overkill trên tập kiểm định chưa xấu đi, rồi kiểm tra cycle time trên phần cứng đích. Lưu ý chi phí <em>chọn</em> coreset chỉ trả một lần khi huấn luyện; cái trạm quan tâm là cột ms/ảnh.</p>
+
+<h2>8. Đặt ngưỡng chỉ từ ảnh OK</h2>
+<p>Khi chưa có (đủ) ảnh NG, ngưỡng phải lấy từ phân bố điểm của <strong>ảnh OK không dùng để huấn luyện</strong> (tập kiểm định). Ba cách phổ biến: điểm lớn nhất của tập OK kiểm định; một percentile cao (99%, 99,5%); hoặc trung bình + k·độ lệch chuẩn. Sau đó <strong>xác minh</strong> bằng những ảnh NG ít ỏi đang có.</p>
+<pre><code class="language-python">import numpy as np
+
+for pp in ("PaDiM", "PatchCore"):
+    _, s_val = cham_diem(d["val_ok"], pp)
+    _, s_ok = cham_diem(d["test_ok"], pp)
+    _, s_ng = cham_diem(d["test_ng"], pp)
+    nguong = {"max val OK": s_val.max(),
+              "percentile 99": np.percentile(s_val, 99),
+              "TB + 3·σ": s_val.mean() + 3 * s_val.std()}
+    print(f"{pp}: điểm val OK trung vị {np.median(s_val):.2f}, max {s_val.max():.2f}")
+    for ten, T in nguong.items():
+        print(f"   {ten:14s} T = {T:6.2f} | overkill test {np.mean(s_ok &gt;= T):5.1%} | "
+              f"lọt {int(np.sum(s_ng &lt; T))}/{len(s_ng)} NG")</code></pre>
+<pre><code class="language-text">PaDiM: điểm val OK trung vị 3.61, max 11.28
+   max val OK     T =  11.28 | overkill test  0.0% | lọt 0/30 NG
+   percentile 99  T =   8.72 | overkill test  0.0% | lọt 0/30 NG
+   TB + 3·σ       T =   8.33 | overkill test  2.0% | lọt 0/30 NG
+PatchCore: điểm val OK trung vị 1.14, max 3.49
+   max val OK     T =   3.49 | overkill test  0.0% | lọt 6/30 NG
+   percentile 99  T =   3.16 | overkill test  3.0% | lọt 2/30 NG
+   TB + 3·σ       T =   2.98 | overkill test  5.0% | lọt 1/30 NG</code></pre>
+<p>Trên dữ liệu này PaDiM bắt đủ 30 ảnh NG ở cả ba ngưỡng. PatchCore với ngưỡng "max val OK" lọt 6/30; hạ xuống TB + 3σ chỉ còn lọt 1 nhưng overkill trên test tăng lên 5%. Ba điều rút ra:</p>
+<ul>
+  <li>Ngưỡng từ ảnh OK <strong>không đảm bảo bắt hết lỗi</strong>: nó chỉ đảm bảo tỉ lệ loại nhầm xấp xỉ mong muốn. Lỗi nào có điểm thấp hơn ngưỡng sẽ lọt, nên phải xác minh bằng ảnh NG thật trước khi tin, và tiếp tục thu ảnh NG trong lúc chạy.</li>
+  <li>Ngưỡng "max của tập OK" phụ thuộc mạnh vào số ảnh: với 100 ảnh, overkill kỳ vọng khoảng 1%; với 20 ảnh, khoảng 5%. Cần <strong>hàng trăm</strong> ảnh OK kiểm định, trải đều các lô, các ca, để ngưỡng ổn định.</li>
+  <li>Các thư viện như anomalib có cơ chế tự tính ngưỡng và chuẩn hóa điểm về khoảng 0–1. Hãy đọc tài liệu đúng phiên bản để biết ngưỡng được tính <em>trên dữ liệu nào</em>: nếu nó tối ưu một chỉ số (ví dụ F1) trên tập kiểm định có ảnh NG, đó không còn là "ngưỡng chỉ từ ảnh OK", và tập kiểm định đó không được dùng lại để báo cáo kết quả.</li>
+</ul>
+
+<h2>9. Khi nào anomaly detection thất bại</h2>
+<p>Chạy cả hai mô hình (với ngưỡng "max val OK") trên ba tình huống: lỗ khoan lệch 8 px, thiếu lỗ khoan, đèn sáng hơn 15%. Không tình huống nào có vết xước hay đốm.</p>
+<pre><code class="language-python">import numpy as np
+
+print("tình huống        |  PaDiM báo NG | PatchCore báo NG")
+nguong = {pp: cham_diem(d["val_ok"], pp)[1].max() for pp in ("PaDiM", "PatchCore")}
+for ten, khoa in (("lỗ khoan lệch 8 px", "lo_lech"), ("thiếu lỗ khoan", "thieu_lo"), ("đèn sáng hơn 15%", "sang_hon")):
+    ket_qua = [np.mean(cham_diem(d[khoa], pp)[1] &gt;= nguong[pp]) for pp in ("PaDiM", "PatchCore")]
+    print(f"{ten:18s}| {ket_qua[0]:13.0%} | {ket_qua[1]:16.0%}")</code></pre>
+<pre><code class="language-text">tình huống        |  PaDiM báo NG | PatchCore báo NG
+lỗ khoan lệch 8 px|          100% |               0%
+thiếu lỗ khoan    |          100% |               0%
+đèn sáng hơn 15%  |          100% |              87%</code></pre>
+<p>Đây là bảng quan trọng nhất của bài:</p>
+<ul>
+  <li><strong>PaDiM so sánh theo vị trí.</strong> Lỗ lệch 8 px bị báo NG: tốt nếu "khoan sai vị trí" là lỗi, tệ nếu chỉ là chi tiết đặt lệch trên đồ gá (overkill hàng loạt). PaDiM đòi hỏi ảnh được <strong>căn chỉnh nhất quán</strong>: định vị bằng template matching hoặc shape matching (chặng 7) rồi cắt ROI trước khi đưa vào.</li>
+  <li><strong>PatchCore không biết vị trí.</strong> Nó chịu được lệch vị trí, nhưng vì cùng lý do đó, nó <strong>bỏ lọt gần như toàn bộ chi tiết thiếu lỗ khoan</strong>: mọi mảnh của ảnh thiếu lỗ đều giống một mảnh vân nhôm bình thường nào đó trong bank. Đây là nhóm <strong>lỗi logic</strong> (logical anomaly): thiếu linh kiện, thừa linh kiện, sai thứ tự, sai vị trí, sai số lượng. Từng mảnh đều bình thường; chỉ <em>cách sắp xếp</em> là sai. Dùng rule-based (đếm, đo vị trí) hoặc mô hình có giám sát cho nhóm này.</li>
+  <li><strong>Đèn sáng hơn làm cả hai báo NG hàng loạt</strong> (PaDiM 100%, PatchCore 87%). Với anomaly detection, "khác lúc huấn luyện" là bất thường, kể cả khi sự khác biệt vô hại. Đèn lão hóa, đổi lô vật liệu có màu hơi khác, bụi trên kính bảo vệ camera đều gây overkill hàng loạt. Cần chiếu sáng ổn định, kiểm tra ảnh chuẩn đầu ca, và theo dõi phân bố điểm của ảnh OK theo thời gian.</li>
+</ul>
+<table>
+  <tr><th>Nên dùng anomaly detection khi</th><th>Không nên (hoặc phải kết hợp) khi</th></tr>
+  <tr><td>Lỗi hiếm, đa dạng, khó thu đủ ảnh để gán nhãn</td><td>Cần biết loại lỗi và kích thước theo mm để áp tiêu chí (dùng phân đoạn có giám sát)</td></tr>
+  <tr><td>Bề mặt đồng nhất hoặc kết cấu lặp lại: kim loại, vải, gỗ ép, nhựa đúc</td><td>Lỗi logic: thiếu, thừa, sai vị trí, sai thứ tự linh kiện</td></tr>
+  <tr><td>Ảnh chụp ổn định: đồ gá cố định hoặc đã căn chỉnh ROI, ánh sáng ổn định</td><td>Vị trí, hướng sản phẩm thay đổi nhiều; ánh sáng môi trường lọt vào</td></tr>
+  <tr><td>Cần triển khai sớm khi mới có ảnh OK, làm "lưới an toàn" bắt lỗi lạ</td><td>Biến động OK tự nhiên rất lớn (vân gỗ tự nhiên, sản phẩm thủ công) khiến OK cũng trông "bất thường"</td></tr>
+  <tr><td>Lỗi đủ lớn so với độ phân giải đặc trưng (vài pixel trên lưới feature map)</td><td>Lỗi chỉ thay đổi rất nhẹ cường độ (vết mờ, chênh màu nhỏ) mà OK cũng dao động cỡ đó</td></tr>
+</table>
+<div class="tip"><strong>Thư viện anomalib</strong>Trong thực tế bạn không tự cài PaDiM hay PatchCore. Thư viện mã nguồn mở anomalib (do nhóm OpenVINO phát triển) có sẵn PaDiM, PatchCore, EfficientAD và nhiều thuật toán khác với backbone pretrained, công cụ đánh giá (AUROC cấp ảnh và cấp pixel), hiển thị bản đồ nhiệt và xuất mô hình sang ONNX hoặc OpenVINO để chạy trên CPU công nghiệp. API của anomalib đã thay đổi đáng kể giữa các phiên bản lớn, nên luôn làm theo tài liệu và ví dụ đúng phiên bản bạn cài. Dự án kế tiếp hướng dẫn dùng anomalib từ đầu đến cuối.</div>
+
+<h2>10. Sai lầm thường gặp</h2>
+<ul>
+  <li><strong>Lẫn ảnh NG vào tập train "OK"</strong>. Một vết xước trong memory bank trở thành "bình thường" và các vết xước tương tự sẽ lọt. Kiểm tra kỹ ảnh OK trước khi huấn luyện; với PatchCore, chỉ một vài ảnh bẩn cũng đủ gây hại.</li>
+  <li><strong>Ảnh train quá đồng nhất</strong>: chụp 200 ảnh trong 10 phút cùng một lô. Lô sau màu hơi khác là overkill hàng loạt. Ảnh OK phải trải đều lô, ca, ngày, đúng như biến động bạn chấp nhận là OK.</li>
+  <li><strong>Không căn chỉnh ảnh khi dùng PaDiM</strong>, hoặc dùng PatchCore cho bài toán thiếu linh kiện.</li>
+  <li><strong>Đặt ngưỡng từ 20 ảnh OK</strong> rồi bất ngờ vì overkill cao trên dây chuyền.</li>
+  <li><strong>Thu nhỏ ảnh lớn về 224 px</strong> làm lỗi nhỏ biến mất trước khi vào mạng. Với lỗi nhỏ trên chi tiết lớn, cắt ảnh thành ô (tile) hoặc cắt ROI.</li>
+  <li><strong>Báo cáo AUROC</strong> cho nhà máy. Hãy chọn ngưỡng và báo escape, overkill kèm số mẫu, như bài "Chọn ngưỡng và đánh giá theo escape, overkill, cycle time".</li>
+</ul>
+
+<h2>11. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> PaDiM giữ ngẫu nhiên 32 trong 128 chiều. Thử giữ 8, 32 và 96 chiều: AUROC và bộ nhớ thay đổi thế nào? Vì sao số chiều quá lớn so với số ảnh train (40) là vấn đề?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import numpy as np
+import torch
+from sklearn.metrics import roc_auc_score
+
+f_test = torch.cat([dac_trung(d["test_ok"][:50]), dac_trung(d["test_ng"])])     # 50 OK + 30 NG cho nhanh
+y = np.r_[np.zeros(50), np.ones(len(d["test_ng"]))]
+for k in (8, 32, 96):
+    ch = torch.randperm(C, generator=torch.Generator().manual_seed(0))[:k]
+    X = f_train[:, ch].permute(2, 3, 0, 1).reshape(H * W, N, -1)
+    mu_k = X.mean(1)
+    cov_k = (X - mu_k[:, None]).transpose(1, 2) @ (X - mu_k[:, None]) / (N - 1) + 0.01 * torch.eye(k)
+    inv_k = torch.linalg.inv(cov_k)
+    f = f_test[:, ch].permute(2, 3, 0, 1).reshape(H * W, len(f_test), -1) - mu_k[:, None]
+    m = torch.einsum("pnd,pde,pne->pn", f, inv_k, f).clamp_min(0).sqrt().T.reshape(-1, 1, H, W)
+    s = phong_to(m).reshape(len(f_test), -1).max(1)
+    print(f"{k:3d} chiều: AUROC {roc_auc_score(y, s):.3f}, Σ⁻¹ chiếm {inv_k.numel() * 4 / 1e6:6.2f} MB")</code></pre>
+<pre><code class="language-text">  8 chiều: AUROC 0.951, Σ⁻¹ chiếm   0.15 MB
+ 32 chiều: AUROC 1.000, Σ⁻¹ chiếm   2.36 MB
+ 96 chiều: AUROC 1.000, Σ⁻¹ chiếm  21.23 MB</code></pre>
+<p>Bộ nhớ tăng theo bình phương số chiều. Khi số chiều tiến gần hoặc vượt số ảnh train (40), ma trận hiệp phương sai ước lượng từ 60 mẫu không còn tin cậy (thậm chí suy biến nếu không có εI): các hướng chưa từng thấy biến động trong dữ liệu OK bị phạt cực nặng, làm điểm của ảnh OK dao động. Quy tắc thực tế: số ảnh train nên lớn hơn nhiều so với số chiều giữ lại, hoặc giảm số chiều.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Đèn sáng hơn 15% làm cả hai mô hình báo NG. Thêm bước tiền xử lý chuẩn hóa độ sáng (chia mỗi ảnh cho độ sáng trung bình của nó rồi nhân với độ sáng trung bình của tập train), xây lại PatchCore và kiểm tra lại tập "sáng hơn" và tập NG. Cách này có rủi ro gì?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import numpy as np
+import torch
+
+TB_TRAIN = d["train"].mean()
+
+
+def chuan_hoa_sang(imgs):
+    imgs = np.asarray(imgs, np.float32)
+    tb = imgs.reshape(len(imgs), -1).mean(1)[:, None, None]
+    return np.clip(imgs / tb * TB_TRAIN, 0, 255).astype(np.uint8)
+
+
+bank_cs = coreset(dac_trung(chuan_hoa_sang(d["train"])).permute(0, 2, 3, 1).reshape(-1, C), 0.10)
+
+
+def diem_cs(imgs):
+    return phong_to(ban_do_patchcore(chuan_hoa_sang(imgs), bank_cs)).reshape(len(imgs), -1).max(1)
+
+
+T = diem_cs(d["val_ok"]).max()
+T0 = cham_diem(d["val_ok"], "PatchCore")[1].max()                # mô hình cũ, không chuẩn hóa
+print(f"không chuẩn hóa: sáng hơn bị báo NG {np.mean(cham_diem(d['sang_hon'], 'PatchCore')[1] &gt;= T0):.0%}, "
+      f"lọt {int(np.sum(cham_diem(d['test_ng'], 'PatchCore')[1] &lt; T0))}/{len(d['test_ng'])} NG")
+print(f"sáng hơn 15% bị báo NG: {np.mean(diem_cs(d['sang_hon']) &gt;= T):.0%}")
+print(f"test OK bị báo NG     : {np.mean(diem_cs(d['test_ok']) &gt;= T):.0%}")
+print(f"test NG bị lọt        : {int(np.sum(diem_cs(d['test_ng']) &lt; T))}/{len(d['test_ng'])}")</code></pre>
+<pre><code class="language-text">không chuẩn hóa: sáng hơn bị báo NG 87%, lọt 6/30 NG
+sáng hơn 15% bị báo NG: 13%
+test OK bị báo NG     : 3%
+test NG bị lọt        : 0/30</code></pre>
+<p>Chuẩn hóa độ sáng giảm tỉ lệ báo nhầm khi đèn sáng hơn từ 87% xuống 13% và trên dữ liệu này còn bắt tốt hơn (lọt 0/30 thay vì 6/30, vì độ sáng từng tấm khác nhau không còn làm nhiễu điểm số). Overkill trên test OK tăng nhẹ, cần kiểm tra lại trên tập lớn hơn. Rủi ro: nếu lỗi chính là <em>thay đổi độ sáng toàn bộ</em> (bạc màu, thiếu lớp phủ, sai vật liệu), bước chuẩn hóa sẽ xóa luôn lỗi. Khi đó giữ một phép đo độ sáng tuyệt đối bằng rule-based song song. Và chuẩn hóa phần mềm không thay được việc sửa nguồn gốc: đèn ổn định, có kiểm tra ảnh chuẩn đầu ca.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Chọn phương pháp (PaDiM, PatchCore, mô hình có giám sát, rule-based, hoặc kết hợp) cho từng trạm và giải thích: (a) cuộn vải dệt chạy liên tục dưới camera line-scan, lỗi sợi đứt, vết dầu, lỗ thủng; mỗi tháng vài chục mét lỗi; (b) bo mạch đã hàn, cần phát hiện thiếu linh kiện, linh kiện lắp ngược, cầu hàn; (c) nắp chai nhựa đúc ép trên đồ gá cố định, lỗi bavia, thiếu nhựa, vết đen; dây chuyền mới, chưa có ảnh lỗi nào.</p>
+<details><summary>Xem đáp án</summary>
+<ul>
+  <li><strong>(a) Vải: PatchCore.</strong> Kết cấu lặp lại, vị trí trong ảnh không có ý nghĩa (vải chạy liên tục, không căn chỉnh được theo vị trí), lỗi đa dạng và hiếm: đúng thế mạnh của phương pháp không phụ thuộc vị trí. PaDiM không phù hợp vì không có "vị trí chuẩn". Cần ổn định độ căng vải và ánh sáng.</li>
+  <li><strong>(b) Bo mạch: rule-based + có giám sát, không dùng PatchCore làm chính.</strong> Thiếu linh kiện, lắp ngược là lỗi logic: mảnh "bo trống" vẫn giống mảnh bo trống ở chỗ khác. Đối chiếu với vị trí linh kiện từ dữ liệu thiết kế (rule-based, template matching) và phát hiện có giám sát cho cầu hàn. PaDiM trên ảnh đã căn chỉnh có thể làm lớp bổ sung bắt lỗi lạ.</li>
+  <li><strong>(c) Nắp chai trên đồ gá cố định, chưa có ảnh lỗi: anomaly detection ngay từ đầu.</strong> Ảnh đã căn chỉnh nhờ đồ gá nên PaDiM hoặc PatchCore đều dùng được; PaDiM bắt thêm được "thiếu nhựa ở đúng vị trí gân". Thu ảnh NG trong lúc chạy, khi đủ thì bổ sung mô hình phân đoạn có giám sát để đo kích thước bavia theo tiêu chí.</li>
+</ul>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Anomaly detection học từ ảnh OK: trích đặc trưng mảnh bằng CNN pretrained (không huấn luyện lại), mô hình hóa "bình thường", chấm điểm từng mảnh → bản đồ bất thường; điểm ảnh = max bản đồ.</li>
+  <li>PaDiM: Gaussian nhiều chiều ở mỗi vị trí, khoảng cách Mahalanobis, giảm chiều ngẫu nhiên và điều chuẩn εI; nhạy vị trí nên cần ảnh căn chỉnh, bắt được lỗi thiếu/sai vị trí.</li>
+  <li>PatchCore: memory bank mọi vector mảnh OK, coreset tham lam để thu gọn, điểm = khoảng cách láng giềng gần nhất; không phụ thuộc vị trí, mạnh với bề mặt và kết cấu, yếu với lỗi logic.</li>
+  <li>Tỉ lệ coreset đánh đổi tốc độ, bộ nhớ với độ chính xác; chọn tỉ lệ nhỏ nhất chưa làm xấu escape/overkill, rồi đo cycle time.</li>
+  <li>Ngưỡng lấy từ hàng trăm ảnh OK kiểm định (max, percentile, TB + kσ), sau đó xác minh bằng ảnh NG thật.</li>
+  <li>Không dùng (một mình) cho lỗi logic, ảnh không ổn định vị trí hoặc ánh sáng, hay khi cần đo kích thước lỗi theo tiêu chí; trong thực tế dùng thư viện anomalib, đọc tài liệu đúng phiên bản.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Dự án chặng 12: phát hiện lỗi bề mặt bằng PatchCore</strong>, huấn luyện chỉ với ảnh OK bằng anomalib, chọn ngưỡng và hiển thị bản đồ nhiệt vùng lỗi.</p>
