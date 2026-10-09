@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="vi" data-root="../">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Optical flow với OpenCV: đo vận tốc băng tải, phát hiện chuyển động</title>
+<meta name="description" content="Lucas-Kanade và Farneback trong OpenCV: đo dịch chuyển từng khung hình, quy đổi ra vận tốc băng tải theo m/s và tìm vùng đang chuyển động, có code kiểm chứng.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://hocfree.vn/hoc/optical-flow-do-van-toc-bang-tai.html">
+<meta property="og:site_name" content="HọcFree">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Optical flow với OpenCV: đo vận tốc băng tải, phát hiện chuyển động">
+<meta property="og:description" content="Lucas-Kanade và Farneback trong OpenCV: đo dịch chuyển từng khung hình, quy đổi ra vận tốc băng tải theo m/s và tìm vùng đang chuyển động, có code kiểm chứng.">
+<meta property="og:url" content="https://hocfree.vn/hoc/optical-flow-do-van-toc-bang-tai.html">
+<meta property="og:image" content="https://hocfree.vn/assets/images/posts/optical-flow-do-van-toc-bang-tai.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="Optical flow với OpenCV: đo vận tốc băng tải, phát hiện chuyển động">
+<meta property="og:locale" content="vi_VN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Optical flow với OpenCV: đo vận tốc băng tải, phát hiện chuyển động">
+<meta name="twitter:description" content="Lucas-Kanade và Farneback trong OpenCV: đo dịch chuyển từng khung hình, quy đổi ra vận tốc băng tải theo m/s và tìm vùng đang chuyển động, có code kiểm chứng.">
+<meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/optical-flow-do-van-toc-bang-tai.jpg">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/fonts.css?v=20261009">
+<link rel="stylesheet" href="../assets/css/style.css?v=20261009">
+<script>try{var t=localStorage.getItem('hf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
+<meta property="article:published_time" content="2026-10-10">
+<meta property="article:section" content="Học AI &amp; Lập trình">
+<meta property="article:tag" content="Computer Vision">
+<meta property="article:tag" content="OpenCV">
+<meta property="article:tag" content="Python">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "Optical flow với OpenCV: đo vận tốc băng tải, phát hiện chuyển động", "description": "Lucas-Kanade và Farneback trong OpenCV: đo dịch chuyển từng khung hình, quy đổi ra vận tốc băng tải theo m/s và tìm vùng đang chuyển động, có code kiểm chứng.", "image": ["https://hocfree.vn/assets/images/posts/optical-flow-do-van-toc-bang-tai.jpg"], "datePublished": "2026-10-10", "dateModified": "2026-10-10", "inLanguage": "vi", "articleSection": "Học AI & Lập trình", "keywords": "Computer Vision, OpenCV, Python", "wordCount": 1381, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/hoc/optical-flow-do-van-toc-bang-tai.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Học AI & Lập trình", "item": "https://hocfree.vn/hoc/"}, {"@type": "ListItem", "position": 3, "name": "Optical flow với OpenCV: đo vận tốc băng tải, phát hiện chuyển động"}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div class="progress" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="container wide header-top">
+    <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="nav-scrim" hidden></div>
+    <a class="logo" href="../" aria-label="HọcFree – Trang chủ"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+    <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
+    <div class="header-actions">
+      <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="login-link" href="../dang-nhap.html">Đăng nhập</a>
+      <a class="btn start-btn" href="../lo-trinh/">Bắt đầu học</a>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="container wide">
+      <nav class="site-nav" id="site-nav" aria-label="Menu chính">
+        <div class="drawer-head">
+          <a class="logo" href="../" tabindex="-1"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+          <button class="icon-btn nav-close" aria-label="Đóng menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <button type="button" class="drawer-search search-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Tìm bài học, chủ đề…</span></button>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="../">Trang chủ</a></li><li class="nav-item has-panel is-mega"><button type="button" class="nav-link nav-trigger is-active" aria-expanded="false" aria-controls="nav-panel-hoc" aria-current="true">Học AI &amp; Lập trình<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel mega" id="nav-panel-hoc">
+  <div class="container wide mega-inner">
+    <div class="mega-groups"><div class="mega-group"><a class="mega-group-title" href="../hoc/#programming">Programming</a><ul><li><a href="../hoc/python.html">Python</a></li><li><a href="../hoc/csharp.html">C#</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#ai-machine-learning">AI &amp; Machine Learning</a><ul><li><a href="../hoc/machine-learning.html">Machine Learning</a></li><li><a href="../hoc/deep-learning.html">Deep Learning</a></li><li><a href="../hoc/pytorch.html">PyTorch</a></li><li><a href="../hoc/generative-ai.html">Generative AI</a></li><li><a href="../hoc/llm-ai-agents.html">LLM / AI Agents</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#computer-vision">Computer Vision</a><ul><li><a href="../hoc/opencv.html">OpenCV</a></li><li><a href="../hoc/image-processing.html">Image Processing</a></li><li><a href="../hoc/computer-vision.html">Computer Vision</a></li><li><a href="../hoc/ocr.html">OCR</a></li><li><a href="../hoc/object-detection.html">Object Detection</a></li><li><a href="../hoc/segmentation.html">Segmentation</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#vision-engineering">Vision Engineering</a><ul><li><a href="../hoc/machine-vision.html">Machine Vision</a></li><li><a href="../hoc/ai-vision.html">AI Vision</a></li><li><a href="../hoc/industrial-vision.html">Industrial Vision</a></li><li><a href="../hoc/camera-lens.html">Camera &amp; Lens</a></li><li><a href="../hoc/lighting.html">Lighting</a></li><li><a href="../hoc/calibration.html">Calibration</a></li><li><a href="../hoc/plc-robot-mes.html">PLC / Robot / MES</a></li><li><a href="../hoc/vision-deployment.html">Vision Deployment</a></li></ul></div></div>
+    <a class="feature-card" href="../lo-trinh/vision-engineer.html">
+  <span class="feature-eyebrow">⭐ Learning Path nổi bật</span>
+  <span class="feature-title">Trở thành Vision Engineer</span>
+  <span class="feature-sub">Machine Vision + AI Vision + Industrial Automation</span>
+  <span class="feature-desc">Lộ trình thực chiến từ Python, OpenCV và Machine Vision đến Deep Learning, AI Vision, Camera, PLC, Robot và triển khai hệ thống Vision trong nhà máy.</span>
+  <span class="feature-chain" aria-label="Các chặng chính"><span>Python</span><i aria-hidden="true">→</i><span>OpenCV</span><i aria-hidden="true">→</i><span>Machine Vision</span><i aria-hidden="true">→</i><span>AI Vision</span><i aria-hidden="true">→</i><span class="chain-goal">🎯 Vision Engineer</span></span>
+  <span class="feature-meta">14 chặng · 5 giai đoạn · ~12 tháng</span>
+  <span class="feature-cta">Xem lộ trình →</span>
+</a>
+  </div>
+  <div class="mega-foot"><div class="container wide mega-foot-inner"><ol class="journey compact" aria-label="Học, thực hành, trở thành kỹ sư"><li><a href="../hoc/" aria-current="step"><span class="journey-n">1</span><span class="journey-t"><b>Học</b><small>Học AI &amp; Lập trình</small></span></a></li><li><a href="../projects/"><span class="journey-n">2</span><span class="journey-t"><b>Thực hành</b><small>Projects</small></span></a></li><li><a href="../lo-trinh/"><span class="journey-n">3</span><span class="journey-t"><b>Trở thành kỹ sư</b><small>Learning Paths</small></span></a></li></ol><a class="panel-all" href="../hoc/">Xem tất cả Học AI &amp; Lập trình →</a></div></div>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-projects">Projects<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-projects">
+  <p class="panel-kicker"><span>Bước 2 · Thực hành</span>Áp dụng vào dự án thật</p>
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../projects/ai-projects.html"><span class="drop-label">AI Projects</span><span class="drop-desc">Ứng dụng ML và LLM, từ ý tưởng đến bản demo</span></a></li><li><a class="drop-link" href="../projects/computer-vision-projects.html"><span class="drop-label">Computer Vision Projects</span><span class="drop-desc">Phát hiện, nhận dạng và theo dõi đối tượng</span></a></li><li><a class="drop-link" href="../projects/industrial-vision-projects.html"><span class="drop-label">Industrial Vision Projects</span><span class="drop-desc">Đo kích thước, kiểm tra lỗi, đọc mã trên dây chuyền</span></a></li></ul></div></div>
+  <a class="panel-all" href="../projects/">Xem tất cả Projects →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-lo-trinh">Learning Paths<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-lo-trinh">
+  <p class="panel-kicker"><span>Bước 3 · Trở thành kỹ sư</span>Định hướng nghề nghiệp</p>
+  <ul class="drop-list"><li><a class="drop-link is-flagship" href="../lo-trinh/vision-engineer.html"><span class="drop-label">⭐ Trở thành Vision Engineer</span><span class="drop-desc">Machine Vision + AI Vision + Industrial Automation · 14 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/#python-developer"><span class="drop-label">Python Developer<span class="badge-soon">Sắp ra mắt</span></span><span class="drop-desc">Python, công cụ, tự động hóa</span></a></li></ul>
+  <a class="panel-all" href="../lo-trinh/">Xem tất cả lộ trình →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-kien-thuc">Kiến thức<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-kien-thuc">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Lĩnh vực</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/programming.html"><span class="drop-label">Programming</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-machine-learning.html"><span class="drop-label">AI / Machine Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/deep-learning.html"><span class="drop-label">Deep Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/machine-vision.html"><span class="drop-label">Machine Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-vision.html"><span class="drop-label">AI Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/industrial-automation.html"><span class="drop-label">Industrial Automation</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Công cụ &amp; mẹo</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/tools-frameworks.html"><span class="drop-label">Tools &amp; Frameworks</span></a></li><li><a class="drop-link" href="../kien-thuc/tips-tricks.html"><span class="drop-label">Tips &amp; Tricks</span></a></li></ul></div></div>
+  <a class="panel-all" href="../kien-thuc/">Xem tất cả Kiến thức →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tin-tuc-ai">Tin tức AI<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tin-tuc-ai">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tin-tuc-ai/ai-news.html"><span class="drop-label">AI News</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-models.html"><span class="drop-label">AI Models</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/technology.html"><span class="drop-label">Technology</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/robotics.html"><span class="drop-label">Robotics</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-industry.html"><span class="drop-label">AI Industry</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tin-tuc-ai/">Xem tất cả Tin tức AI →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-ngoai-ngu">Ngoại ngữ<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-ngoai-ngu">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/english.html"><span class="drop-label">English</span><span class="drop-desc">Lộ trình 700 TOEIC, phương pháp học, giáo trình HF-700TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chinese.html"><span class="drop-label">Chinese</span><span class="drop-desc">Lộ trình HSK3, phương pháp học, giáo trình HF-HSK3</span></a></li></ul></div></div>
+  <a class="panel-all" href="../ngoai-ngu/">Xem tất cả Ngoại ngữ →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tai-nguyen">Tài nguyên<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tai-nguyen">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tai-nguyen/source-code.html"><span class="drop-label">Source Code</span><span class="drop-desc">Mã nguồn mẫu đi kèm bài học</span></a></li><li><a class="drop-link" href="../tai-nguyen/dataset.html"><span class="drop-label">Dataset</span><span class="drop-desc">Bộ dữ liệu ảnh để luyện tập</span></a></li><li><a class="drop-link" href="../tai-nguyen/cheat-sheets.html"><span class="drop-label">Cheat Sheets</span><span class="drop-desc">Tóm tắt nhanh trong một trang</span></a></li><li><a class="drop-link" href="../tai-nguyen/documentation.html"><span class="drop-label">Documentation</span><span class="drop-desc">Tài liệu tra cứu thư viện, API</span></a></li><li><a class="drop-link" href="../tai-nguyen/ebook.html"><span class="drop-label">Ebook / Tài liệu</span><span class="drop-desc">Sách và tài liệu tham khảo</span></a></li><li><a class="drop-link" href="../tai-nguyen/ai-tools.html"><span class="drop-label">AI Tools</span><span class="drop-desc">Công cụ AI hữu ích cho việc học</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tai-nguyen/">Xem tất cả Tài nguyên →</a>
+</div></li></ul>
+        <div class="drawer-foot">
+          <a class="btn ghost" href="../dang-nhap.html">Đăng nhập</a>
+          <a class="btn" href="../lo-trinh/">Bắt đầu học</a>
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+<div class="search-dialog" hidden>
+  <div class="search-scrim"></div>
+  <div class="search-box" role="dialog" aria-modal="true" aria-label="Tìm kiếm">
+    <form class="search-form" action="../search.html" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" placeholder="Tìm bài học, chủ đề, bài viết…" autocomplete="off" aria-label="Từ khóa tìm kiếm" aria-controls="search-suggest">
+      <button type="button" class="icon-btn search-close" aria-label="Đóng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </form>
+    <div class="search-suggest" id="search-suggest" aria-live="polite">
+      <div class="search-empty">
+        <p class="search-group-title">Chủ đề phổ biến</p>
+        <div class="chips"><a class="chip" href="../hoc/python.html">Python</a><a class="chip" href="../hoc/opencv.html">OpenCV</a><a class="chip" href="../hoc/machine-vision.html">Machine Vision</a><a class="chip" href="../hoc/deep-learning.html">Deep Learning</a><a class="chip" href="../hoc/ai-vision.html">AI Vision</a><a class="chip" href="../hoc/object-detection.html">Object Detection</a><a class="chip" href="../hoc/pytorch.html">PyTorch</a><a class="chip" href="../ngoai-ngu/english.html">English</a></div>
+        <p class="search-group-title">Lộ trình nổi bật</p>
+        <a class="search-item" href="../lo-trinh/vision-engineer.html"><span class="search-ico" aria-hidden="true">⭐</span><span>Trở thành Vision Engineer<small>Learning Path · Machine Vision + AI Vision + Industrial Automation</small></span></a>
+      </div>
+    </div>
+    <div class="search-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> chọn</span><span><kbd>Enter</kbd> mở</span><span><kbd>Esc</kbd> đóng</span></div>
+  </div>
+</div>
+<main id="main">
+  <div class="container layout article-layout">
+    <article class="article">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../hoc/">Học AI &amp; Lập trình</a></nav>
+      <header class="article-head">
+        <a class="pill cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+        <h1>Optical flow với OpenCV: đo vận tốc băng tải, phát hiện chuyển động</h1>
+        <p class="lead">Lucas-Kanade và Farneback trong OpenCV: đo dịch chuyển từng khung hình, quy đổi ra vận tốc băng tải theo m/s và tìm vùng đang chuyển động, có code kiểm chứng.</p>
+        <div class="article-meta">
+          <span class="avatar" aria-hidden="true">HF</span>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-10">10/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+        </div>
+      </header>
+      <figure class="article-cover">
+        <img src="../assets/images/posts/optical-flow-do-van-toc-bang-tai.webp" alt="Optical flow với OpenCV: đo vận tốc băng tải, phát hiện chuyển động" width="1200" height="675" fetchpriority="high" decoding="async">
+      </figure>
+      
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol class="toc-plain"><li><a href="#gia-dinh-nen-tang-cua-optical-flow">Giả định nền tảng của optical flow</a></li><li><a href="#1-tao-hai-khung-hinh">1. Tạo hai khung hình</a></li><li><a href="#2-lucas-kanade-theo-doi-cac-diem-dac-trung">2. Lucas-Kanade: theo dõi các điểm đặc trưng</a></li><li><a href="#3-farneback-dong-quang-hoc-day">3. Farneback: dòng quang học dày</a></li><li><a href="#4-quy-doi-ra-van-toc-that">4. Quy đổi ra vận tốc thật</a></li><li><a href="#5-phat-hien-vung-dang-chuyen-dong">5. Phát hiện vùng đang chuyển động</a></li><li><a href="#optical-flow-trong-nha-may-khi-nao-nen-dung">Optical flow trong nhà máy: khi nào nên dùng?</a></li></ol></details>
+      <div class="prose">
+<p>Làm sao biết băng tải đang chạy nhanh hay chậm mà không gắn encoder? Làm sao phát hiện một vật đang trượt trên máng, hay một cánh tay robot chuyển động bất thường? Câu trả lời là <strong>optical flow</strong> (dòng quang học): ước lượng mỗi điểm trong ảnh đã di chuyển bao nhiêu pixel giữa hai khung hình liên tiếp. Bài này giới thiệu hai thuật toán có sẵn trong OpenCV, <strong>Lucas-Kanade</strong> (thưa, theo dõi một số điểm) và <strong>Farneback</strong> (dày, tính cho mọi pixel), và áp dụng vào bài toán đo vận tốc băng tải.</p>
+<p>Code chạy với OpenCV-Python và NumPy, dùng ảnh tạo bằng code với độ dịch chuyển biết trước để bạn kiểm chứng kết quả.</p>
+
+<h2 id="gia-dinh-nen-tang-cua-optical-flow">Giả định nền tảng của optical flow</h2>
+<ol>
+  <li><strong>Độ sáng không đổi</strong>: một điểm trên vật giữ nguyên độ sáng khi di chuyển giữa hai khung.</li>
+  <li><strong>Chuyển động nhỏ</strong>: mỗi điểm chỉ dời vài pixel giữa hai khung (kim tự tháp ảnh giúp nới lỏng điều này).</li>
+  <li><strong>Lân cận chuyển động giống nhau</strong>: các pixel gần nhau di chuyển gần như cùng một vectơ.</li>
+</ol>
+<p>Hệ quả quan trọng: vùng <strong>không có vân</strong> (một mảng màu đồng nhất) thì không đo được chuyển động, vì không có gì để "bám". Bề mặt băng tải cao su, vải, gỗ thường có đủ vân nhỏ để optical flow hoạt động tốt.</p>
+
+<h2 id="1-tao-hai-khung-hinh">1. Tạo hai khung hình</h2>
+<p>Ta tạo một dải bề mặt có vân ngẫu nhiên rồi cắt hai khung hình lệch nhau đúng 4 px, giống băng tải chạy sang phải giữa hai lần chụp:</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+rng = np.random.default_rng(0)
+# Bề mặt băng tải có vân ngẫu nhiên (lớn hơn khung hình để có thể "trượt")
+be_mat = cv2.GaussianBlur(rng.integers(0, 256, (240, 600), dtype=np.uint8), (0, 0), 2)
+be_mat = cv2.normalize(be_mat, None, 0, 255, cv2.NORM_MINMAX)
+
+khung_1 = be_mat[:, 100:420].copy()          # khung hình 240x320
+khung_2 = be_mat[:, 96:416].copy()           # băng tải chạy sang phải 4 px giữa 2 khung
+print(khung_1.shape, khung_2.shape)</code></pre>
+<pre><code class="language-text">(240, 320) (240, 320)</code></pre>
+
+<h2 id="2-lucas-kanade-theo-doi-cac-diem-dac-trung">2. Lucas-Kanade: theo dõi các điểm đặc trưng</h2>
+<p>Bước 1: chọn những điểm "dễ theo dõi" (góc, chỗ có vân hai chiều) bằng <code>goodFeaturesToTrack</code>. Bước 2: <code>calcOpticalFlowPyrLK</code> tìm vị trí mới của từng điểm ở khung sau.</p>
+<pre><code class="language-python">diem = cv2.goodFeaturesToTrack(khung_1, maxCorners=200, qualityLevel=0.01, minDistance=8)
+diem_moi, trang_thai, _ = cv2.calcOpticalFlowPyrLK(khung_1, khung_2, diem, None,
+                                                   winSize=(21, 21), maxLevel=3)
+tot = trang_thai.ravel() == 1
+dich = (diem_moi[tot] - diem[tot]).reshape(-1, 2)
+print(f"Lucas-Kanade: {tot.sum()}/{len(diem)} điểm theo dõi được")
+print(f"  dịch chuyển trung vị: dx = {np.median(dich[:, 0]):.2f}, dy = {np.median(dich[:, 1]):.2f} px")</code></pre>
+<pre><code class="language-text">Lucas-Kanade: 200/200 điểm theo dõi được
+  dịch chuyển trung vị: dx = 4.00, dy = -0.00 px</code></pre>
+<p>Đúng 4 px theo phương ngang (giá trị −0,00 chỉ là số âm rất nhỏ, làm tròn về 0). Các tham số chính:</p>
+<table>
+  <tr><th>Tham số</th><th>Ý nghĩa</th></tr>
+  <tr><td><code>winSize</code></td><td>Cửa sổ quanh mỗi điểm dùng để so khớp. Lớn hơn thì ổn định hơn với nhiễu nhưng kém chính xác ở chỗ chuyển động không đồng nhất</td></tr>
+  <tr><td><code>maxLevel</code></td><td>Số tầng kim tự tháp. Mỗi tầng giảm nửa kích thước ảnh, nên với 3 tầng bắt được chuyển động lớn hơn nhiều so với cửa sổ</td></tr>
+  <tr><td><code>trang_thai</code> (status)</td><td>1 nếu tìm thấy điểm ở khung sau. Luôn lọc các điểm có status 0</td></tr>
+</table>
+<div class="tip"><strong>Dùng trung vị, không dùng trung bình</strong>Trên dây chuyền thật, sẽ có điểm bị theo dõi sai (phản xạ, vật đi qua che khuất). Trung vị gần như không bị ảnh hưởng bởi vài điểm sai, trung bình thì có.</div>
+
+<h2 id="3-farneback-dong-quang-hoc-day">3. Farneback: dòng quang học dày</h2>
+<p>Farneback tính vectơ chuyển động cho <strong>mọi pixel</strong>. Kết quả là mảng (cao, rộng, 2): kênh 0 là dx, kênh 1 là dy.</p>
+<pre><code class="language-python">dong = cv2.calcOpticalFlowFarneback(khung_1, khung_2, None, pyr_scale=0.5, levels=3,
+                                    winsize=15, iterations=3, poly_n=5, poly_sigma=1.2, flags=0)
+print("Farneback: kích thước trường dòng =", dong.shape)
+vung_giua = dong[20:-20, 20:-20]                      # bỏ mép, nơi thiếu thông tin
+print(f"  dịch chuyển trung vị: dx = {np.median(vung_giua[..., 0]):.2f}, dy = {np.median(vung_giua[..., 1]):.2f} px")</code></pre>
+<pre><code class="language-text">Farneback: kích thước trường dòng = (240, 320, 2)
+  dịch chuyển trung vị: dx = 4.00, dy = -0.00 px</code></pre>
+<p>Ý nghĩa các tham số theo tài liệu OpenCV: <code>pyr_scale=0.5</code> là kim tự tháp cổ điển (mỗi tầng nhỏ đi một nửa), <code>levels</code> là số tầng kể cả ảnh gốc, <code>winsize</code> là cửa sổ lấy trung bình (lớn thì chống nhiễu tốt và bắt chuyển động nhanh tốt hơn nhưng trường dòng mờ hơn), <code>poly_n</code> và <code>poly_sigma</code> điều khiển việc xấp xỉ đa thức quanh mỗi pixel. Mép ảnh bị bỏ khi tính trung vị vì ở đó có phần nội dung mới đi vào khung hình, không có tương ứng ở khung trước.</p>
+
+<h2 id="4-quy-doi-ra-van-toc-that">4. Quy đổi ra vận tốc thật</h2>
+<p>Có dịch chuyển theo pixel, chỉ cần thêm hai thông số: tỉ lệ mm/pixel (từ <a href="calib-1-quy-doi-pixel-sang-mm.html">quy đổi pixel sang mm</a>) và tốc độ khung hình.</p>
+<pre><code class="language-python">MM_MOI_PX = 0.25        # từ hiệu chuẩn: 1 px = 0,25 mm trên mặt băng tải
+FPS = 60                # tốc độ khung hình camera
+
+dx_px = float(np.median(dich[:, 0]))
+van_toc = dx_px * MM_MOI_PX * FPS / 1000          # m/s
+print(f"Vận tốc băng tải ≈ {van_toc:.3f} m/s ({van_toc * 60:.1f} m/phút)")</code></pre>
+<pre><code class="language-text">Vận tốc băng tải ≈ 0.060 m/s (3.6 m/phút)</code></pre>
+<p>4 px × 0,25 mm × 60 khung/giây = 60 mm/s. Trong ứng dụng thật, hãy lấy thời điểm chụp (timestamp) từ camera thay vì giả định FPS cố định, vì camera công nghiệp có thể rớt khung hoặc chạy theo trigger không đều (xem <a href="industrial-vision-1-trigger-encoder-cycle-time.html">trigger, encoder và cycle time</a>).</p>
+
+<h2 id="5-phat-hien-vung-dang-chuyen-dong">5. Phát hiện vùng đang chuyển động</h2>
+<p>Trường dòng dày cũng cho biết <strong>vùng nào</strong> đang chuyển động. Ví dụ: băng tải đứng yên, một hộp trượt xuống 5 px:</p>
+<pre><code class="language-python"># Khung 3: băng tải đứng yên, nhưng có một hộp di chuyển xuống dưới 5 px
+khung_3 = khung_1.copy()
+hop = khung_1[60:120, 140:200].copy()
+cv2.rectangle(khung_1, (140, 60), (199, 119), 255, 2)          # viền hộp ở khung 1
+khung_3[65:125, 140:200] = hop
+cv2.rectangle(khung_3, (140, 65), (199, 124), 255, 2)          # hộp ở khung 3, thấp hơn 5 px
+
+dong = cv2.calcOpticalFlowFarneback(khung_1, khung_3, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+do_lon = np.linalg.norm(dong, axis=2)
+mat_na = (do_lon &gt; 2).astype(np.uint8)
+x, y, w, h = cv2.boundingRect(mat_na)
+print(f"Vùng chuyển động: x={x}, y={y}, w={w}, h={h}")
+print(f"  dịch chuyển trung vị trong vùng: dy = {np.median(dong[..., 1][mat_na == 1]):.1f} px")</code></pre>
+<pre><code class="language-text">Vùng chuyển động: x=133, y=49, w=74, h=82
+  dịch chuyển trung vị trong vùng: dy = 5.0 px</code></pre>
+<p>Thuật toán tìm đúng hộp và đo đúng dịch chuyển 5 px. Khung bao (74×82) rộng hơn hộp thật (60×65) vì Farneback lấy trung bình trong cửa sổ, nên chuyển động "lan" ra vài pixel quanh biên vật. Nếu cần đường biên chính xác, hãy dùng optical flow để định vị sơ bộ rồi phân đoạn vật bằng phương pháp khác.</p>
+
+<h2 id="optical-flow-trong-nha-may-khi-nao-nen-dung">Optical flow trong nhà máy: khi nào nên dùng?</h2>
+<table>
+  <tr><th>Bài toán</th><th>Gợi ý</th></tr>
+  <tr><td>Đo vận tốc băng tải, phát hiện trượt, kẹt</td><td>Lucas-Kanade trên một ROI mặt băng tải, lấy trung vị. Nhanh, chạy tốt trên CPU</td></tr>
+  <tr><td>Phát hiện vật rơi, chuyển động bất thường trong vùng an toàn</td><td>Farneback trên ảnh thu nhỏ, ngưỡng độ lớn vectơ</td></tr>
+  <tr><td>Ổn định ảnh khi camera rung</td><td>Lucas-Kanade + <code>cv2.estimateAffinePartial2D</code> để tìm chuyển động của cả khung hình</td></tr>
+  <tr><td>Đếm, theo dõi từng sản phẩm</td><td>Thường đơn giản hơn với phát hiện + theo dõi, như dự án <a href="../projects/dem-san-pham-bang-tai-opencv.html">đếm sản phẩm trên băng tải</a></td></tr>
+  <tr><td>Cần độ chính xác vị trí tuyệt đối cao</td><td>Encoder vẫn là chuẩn mực; optical flow phù hợp để giám sát hoặc khi không lắp được encoder</td></tr>
+</table>
+<div class="warn"><strong>Những thứ phá vỡ optical flow</strong>Ánh sáng nhấp nháy (đèn không đồng bộ với camera), bề mặt bóng phản xạ, motion blur do thời gian phơi sáng quá dài, và bề mặt không có vân. Hãy giải quyết từ phần cứng trước: đèn ổn định, thời gian phơi sáng ngắn (xem <a href="../kien-thuc/den-strobe-dong-bo-trigger-camera.html">đèn strobe và đồng bộ trigger</a>).</div>
+
+<div class="ex">
+<h3 id="bai-tap">Bài tập</h3>
+<p>Thêm nhiễu Gauss (độ lệch chuẩn 10) vào <code>khung_2</code> và một độ lệch dọc 1 px (dùng <code>be_mat[1:, 96:416]</code> và cắt <code>khung_1</code> tương ứng cho cùng kích thước). Lucas-Kanade với <code>winSize=(21, 21)</code> và <code>(7, 7)</code> cho kết quả trung vị khác nhau thế nào? Thử thêm độ dịch 30 px với <code>maxLevel=0</code> và <code>maxLevel=3</code>.</p>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.opencv.org/4.x/d4/dee/tutorial_optical_flow.html" rel="noopener" target="_blank">OpenCV Tutorials: Optical Flow</a>, <a href="https://docs.opencv.org/4.x/dc/d6b/group__video__track.html" rel="noopener" target="_blank">OpenCV: calcOpticalFlowPyrLK, calcOpticalFlowFarneback</a>.</p>
+
+      </div>
+      
+      <footer class="article-foot">
+        <div class="tags"><a class="tag" href="../search.html?q=Computer Vision">#Computer Vision</a><a class="tag" href="../search.html?q=OpenCV">#OpenCV</a><a class="tag" href="../search.html?q=Python">#Python</a></div>
+        <div class="share">
+      <span>Chia sẻ:</span>
+      <a class="share-btn fb" href="https://www.facebook.com/sharer/sharer.php?u=https://hocfree.vn/hoc/optical-flow-do-van-toc-bang-tai.html" target="_blank" rel="noopener" aria-label="Chia sẻ Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8z"/></svg></a>
+      <a class="share-btn x" href="https://twitter.com/intent/tweet?url=https://hocfree.vn/hoc/optical-flow-do-van-toc-bang-tai.html" target="_blank" rel="noopener" aria-label="Chia sẻ X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+      <button class="share-btn copy-link" data-url="https://hocfree.vn/hoc/optical-flow-do-van-toc-bang-tai.html" aria-label="Sao chép liên kết"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+    </div>
+      </footer>
+      <div class="author-box">
+        <span class="avatar lg" aria-hidden="true">HF</span>
+        <div>
+          <strong>Ban biên tập HọcFree</strong>
+          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và ngoại ngữ, hoàn toàn miễn phí.</p>
+        </div>
+      </div>
+      <nav class="pager" aria-label="Bài trước/sau"><a class="prev" href="../hoc/python-1-cai-dat-python-va-vs-code.html"><span>← Bài trước</span>Python cơ bản: cài Python, VS Code và chạy chương trình đầu tiên</a><a class="next" href="../hoc/bien-doi-fourier-loc-van-soc-tuan-hoan.html"><span>Bài tiếp →</span>Biến đổi Fourier: lọc vân sọc tuần hoàn để lộ vết lỗi bề mặt</a></nav>
+    </article>
+    <aside class="sidebar">
+  <section class="widget"><h2 class="widget-title">Đọc nhiều nhất</h2><ol class="popular"><li><a href="../hoc/yolo26-object-detection-nhap-mon.html"><span class="num">1</span><span class="t">Object Detection với YOLO26: huấn luyện mô hình đầu tiên</span></a></li><li><a href="../kien-thuc/chon-camera-ong-kinh-machine-vision.html"><span class="num">2</span><span class="t">Chọn camera và ống kính Machine Vision: độ phân giải, FOV, tiêu cự</span></a></li><li><a href="../projects/phat-hien-loi-be-mat-anomaly-detection.html"><span class="num">3</span><span class="t">Dự án: phát hiện lỗi bề mặt bằng Anomaly Detection (PatchCore)</span></a></li><li><a href="../hoc/opencv-co-ban-anh-video-camera.html"><span class="num">4</span><span class="t">OpenCV cơ bản: đọc, hiển thị, ghi ảnh, video và camera</span></a></li><li><a href="../kien-thuc/7-kieu-chieu-sang-machine-vision.html"><span class="num">5</span><span class="t">7 kiểu chiếu sáng trong Machine Vision và khi nào dùng</span></a></li></ol></section>
+  <section class="widget">
+    <h2 class="widget-title">Chuyên mục</h2>
+    <ul class="cat-list"><li><a href="../hoc/"><span>Học AI &amp; Lập trình</span><span class="count">144 bài</span></a></li><li><a href="../projects/"><span>Projects</span><span class="count">15 bài</span></a></li><li><a href="../kien-thuc/"><span>Kiến thức</span><span class="count">116 bài</span></a></li><li><a href="../tin-tuc-ai/"><span>Tin tức AI</span><span class="count">16 bài</span></a></li><li><a href="../ngoai-ngu/"><span>Ngoại ngữ</span><span class="count">6 bài</span></a></li><li><a href="../tai-nguyen/"><span>Tài nguyên</span><span class="count">33 bài</span></a></li></ul>
+  </section>
+  <section class="widget widget-about">
+    <h2 class="widget-title">Về HọcFree</h2>
+    <p>Nơi học <strong>miễn phí</strong> AI, lập trình, Computer Vision và ngoại ngữ dành cho người Việt. Không quảng cáo, không thu phí.</p>
+    <a class="btn" href="../gioi-thieu.html">Tìm hiểu thêm</a>
+  </section>
+  <section class="widget"><h2 class="widget-title">Thẻ</h2><div class="tags"><a class="tag" href="../search.html?q=.NET">.NET</a><a class="tag" href="../search.html?q=AI Agents">AI Agents</a><a class="tag" href="../search.html?q=AI Industry">AI Industry</a><a class="tag" href="../search.html?q=AI Models">AI Models</a><a class="tag" href="../search.html?q=AI News">AI News</a><a class="tag" href="../search.html?q=AI Project">AI Project</a><a class="tag" href="../search.html?q=AI Tools">AI Tools</a><a class="tag" href="../search.html?q=AI Vision">AI Vision</a><a class="tag" href="../search.html?q=AI/ML">AI/ML</a><a class="tag" href="../search.html?q=C#">C#</a><a class="tag" href="../search.html?q=Calibration">Calibration</a><a class="tag" href="../search.html?q=Camera">Camera</a><a class="tag" href="../search.html?q=Cheat Sheet">Cheat Sheet</a><a class="tag" href="../search.html?q=Chiếu sáng">Chiếu sáng</a><a class="tag" href="../search.html?q=Computer Vision">Computer Vision</a><a class="tag" href="../search.html?q=CV News">CV News</a><a class="tag" href="../search.html?q=CV Project">CV Project</a><a class="tag" href="../search.html?q=Công cụ">Công cụ</a><a class="tag" href="../search.html?q=Dataset">Dataset</a><a class="tag" href="../search.html?q=Deep Learning">Deep Learning</a><a class="tag" href="../search.html?q=Deployment">Deployment</a><a class="tag" href="../search.html?q=Documentation">Documentation</a><a class="tag" href="../search.html?q=Ebook">Ebook</a><a class="tag" href="../search.html?q=Generative AI">Generative AI</a><a class="tag" href="../search.html?q=Git">Git</a><a class="tag" href="../search.html?q=HSK">HSK</a><a class="tag" href="../search.html?q=Image Processing">Image Processing</a><a class="tag" href="../search.html?q=Industrial Automation">Industrial Automation</a><a class="tag" href="../search.html?q=Industrial Project">Industrial Project</a><a class="tag" href="../search.html?q=Industrial Vision">Industrial Vision</a><a class="tag" href="../search.html?q=Kinh nghiệm">Kinh nghiệm</a><a class="tag" href="../search.html?q=Lens">Lens</a><a class="tag" href="../search.html?q=Lighting">Lighting</a><a class="tag" href="../search.html?q=LLM">LLM</a><a class="tag" href="../search.html?q=Lập trình">Lập trình</a><a class="tag" href="../search.html?q=Machine Learning">Machine Learning</a><a class="tag" href="../search.html?q=Machine Vision">Machine Vision</a><a class="tag" href="../search.html?q=MES">MES</a><a class="tag" href="../search.html?q=NumPy">NumPy</a><a class="tag" href="../search.html?q=Object Detection">Object Detection</a><a class="tag" href="../search.html?q=OCR">OCR</a><a class="tag" href="../search.html?q=OpenCV">OpenCV</a><a class="tag" href="../search.html?q=PLC">PLC</a><a class="tag" href="../search.html?q=Python">Python</a><a class="tag" href="../search.html?q=PyTorch">PyTorch</a><a class="tag" href="../search.html?q=Robot">Robot</a><a class="tag" href="../search.html?q=Robotics">Robotics</a><a class="tag" href="../search.html?q=Segmentation">Segmentation</a><a class="tag" href="../search.html?q=Source Code">Source Code</a><a class="tag" href="../search.html?q=Technology">Technology</a><a class="tag" href="../search.html?q=Tips">Tips</a><a class="tag" href="../search.html?q=Tiếng Anh">Tiếng Anh</a><a class="tag" href="../search.html?q=Tiếng Trung">Tiếng Trung</a><a class="tag" href="../search.html?q=TOEIC">TOEIC</a><a class="tag" href="../search.html?q=Tự học">Tự học</a><a class="tag" href="../search.html?q=VS Code">VS Code</a><a class="tag" href="../search.html?q=YOLO">YOLO</a><a class="tag" href="../search.html?q=Đo lường">Đo lường</a></div></section>
+</aside>
+  </div>
+  <section class="band">
+    <div class="container">
+      <div class="section-title"><h2>Có thể bạn quan tâm</h2></div>
+      <div class="card-grid"><article class="card">
+  <a class="thumb" href="../hoc/pytest-kiem-thu-ham-xu-ly-anh.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/pytest-kiem-thu-ham-xu-ly-anh.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/pytest-kiem-thu-ham-xu-ly-anh.html">Kiểm thử hàm xử lý ảnh với pytest: bắt lỗi trước khi lên máy</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-10">10/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/csharp-system-text-json-luu-recipe.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/csharp-system-text-json-luu-recipe.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/csharp-system-text-json-luu-recipe.html">C#: lưu và nạp recipe trạm vision bằng System.Text.Json</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-10">10/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/cross-validation-pipeline-gridsearchcv.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/cross-validation-pipeline-gridsearchcv.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/cross-validation-pipeline-gridsearchcv.html">Cross-validation, Pipeline, GridSearchCV: đánh giá mô hình trung thực</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-10">10/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article></div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <a class="logo" href="../"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+      <p>HọcFree.vn – nền tảng học miễn phí về AI, lập trình, Computer Vision, Machine Vision, tin tức AI và ngoại ngữ dành cho người Việt.</p>
+    </div>
+    <div><h3>Học &amp; thực hành</h3><ul><li><a href="../hoc/">Học AI &amp; Lập trình</a></li><li><a href="../projects/">Projects</a></li><li><a href="../lo-trinh/">Learning Paths</a></li></ul></div>
+    <div><h3>Khám phá</h3><ul><li><a href="../kien-thuc/">Kiến thức</a></li><li><a href="../tin-tuc-ai/">Tin tức AI</a></li><li><a href="../ngoai-ngu/">Ngoại ngữ</a></li><li><a href="../tai-nguyen/">Tài nguyên</a></li></ul></div>
+    <div><h3>Bài mới</h3><ul><li><a href="../hoc/pytest-kiem-thu-ham-xu-ly-anh.html">Kiểm thử hàm xử lý ảnh với pytest: bắt lỗi trước khi lên máy</a></li><li><a href="../hoc/csharp-system-text-json-luu-recipe.html">C#: lưu và nạp recipe trạm vision bằng System.Text.Json</a></li><li><a href="../hoc/cross-validation-pipeline-gridsearchcv.html">Cross-validation, Pipeline, GridSearchCV: đánh giá mô hình trung thực</a></li><li><a href="../hoc/ham-mat-mat-cross-entropy-focal-loss.html">Hàm mất mát cho phân loại: cross-entropy, class weight, focal loss</a></li></ul></div>
+    <div>
+      <h3>HọcFree</h3>
+      <ul>
+        <li><a href="../gioi-thieu.html">Giới thiệu</a></li>
+        <li><a href="../search.html">Tìm kiếm</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">© 2026 HọcFree.vn · Kiến thức là để chia sẻ.</div>
+  </div>
+</footer>
+<button class="to-top" aria-label="Lên đầu trang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<script src="../assets/js/search-data.js?v=20261009" defer></script>
+<script src="../assets/js/main.js?v=20261009" defer></script>
+</body>
+</html>

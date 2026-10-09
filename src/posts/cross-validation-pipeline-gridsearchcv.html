@@ -1,0 +1,118 @@
+<p>Bạn huấn luyện một mô hình phân loại OK/NG, chia dữ liệu một lần, được accuracy 82,5%. Đồng nghiệp chạy lại với cách chia khác, được 79,2%. Con số nào đúng? Và khi thử 10 bộ tham số rồi chọn bộ tốt nhất trên cùng tập validation, con số đó có còn đáng tin? Bài này giải quyết ba câu hỏi đó bằng ba công cụ của scikit-learn: <strong>cross-validation</strong>, <strong>Pipeline</strong> và <strong>GridSearchCV</strong>.</p>
+<p>Bài tiếp nối <a href="../kien-thuc/overfitting-chia-train-val-test.html">overfitting và cách chia train/val/test</a> và <a href="scikit-learn-phan-loai-ok-ng.html">phân loại OK/NG bằng scikit-learn</a>. Code chạy với scikit-learn 1.9.</p>
+
+<h2>Dữ liệu giả lập</h2>
+<p>Để ai cũng chạy được, ta tạo dữ liệu giống bài toán thật: 600 sản phẩm, mỗi sản phẩm 8 đặc trưng hình học (diện tích, chu vi, độ tròn...), khoảng 20% là NG.</p>
+<pre><code class="language-python">import numpy as np
+from sklearn.datasets import make_classification
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import GridSearchCV, StratifiedKFold, cross_val_score, train_test_split
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+# Dữ liệu giả lập: 600 sản phẩm, 8 đặc trưng hình học, 20% là NG
+X, y = make_classification(n_samples=600, n_features=8, n_informative=4,
+                           weights=[0.8, 0.2], random_state=0)
+print(X.shape, "tỉ lệ NG:", y.mean().round(3))
+
+# Giữ riêng tập test, chỉ dùng ở bước cuối
+X_tv, X_test, y_tv, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=0)
+
+# Một lần chia: kết quả phụ thuộc may rủi
+for seed in range(3):
+    X_tr, X_val, y_tr, y_val = train_test_split(X_tv, y_tv, test_size=0.25, stratify=y_tv, random_state=seed)
+    mh = make_pipeline(StandardScaler(), LogisticRegression())
+    mh.fit(X_tr, y_tr)
+    print(f"seed {seed}: accuracy = {mh.score(X_val, y_val):.3f}")</code></pre>
+<pre><code class="language-text">(600, 8) tỉ lệ NG: 0.202
+seed 0: accuracy = 0.825
+seed 1: accuracy = 0.792
+seed 2: accuracy = 0.817</code></pre>
+<p>Cùng một mô hình, chỉ đổi cách chia, kết quả dao động hơn 3 điểm phần trăm. Với tập dữ liệu nhỏ (rất thường gặp trong nhà máy), một lần chia không đủ để kết luận.</p>
+<div class="warn"><strong>Accuracy 80% có thể là con số vô nghĩa</strong>Dữ liệu có 80% OK. Một "mô hình" luôn trả lời OK cũng đạt accuracy 80%! Với bài toán mất cân bằng, hãy dùng F1, precision, recall (xem <a href="../kien-thuc/precision-recall-f1-ma-tran-nham-lan.html">precision, recall, F1</a>). Từ đây ta dùng <code>scoring="f1"</code>, tính cho lớp NG (nhãn 1).</div>
+
+<h2>1. Cross-validation: chia nhiều lần, lấy trung bình</h2>
+<p><strong>K-fold cross-validation</strong> chia dữ liệu thành K phần. Lần lượt mỗi phần làm validation, K−1 phần còn lại để huấn luyện. Kết quả là K điểm số; trung bình cho biết mô hình tốt cỡ nào, độ lệch chuẩn cho biết kết quả ổn định ra sao.</p>
+<p><code>StratifiedKFold</code> giữ tỉ lệ OK/NG giống nhau ở mọi fold, rất quan trọng khi lớp NG hiếm.</p>
+<pre><code class="language-python">cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+mh = make_pipeline(StandardScaler(), LogisticRegression())
+diem = cross_val_score(mh, X_tv, y_tv, cv=cv, scoring="f1")
+print("F1 từng fold:", diem.round(3))
+print(f"F1 = {diem.mean():.3f} ± {diem.std():.3f}")</code></pre>
+<pre><code class="language-text">F1 từng fold: [0.48  0.296 0.417 0.25  0.462]
+F1 = 0.381 ± 0.092</code></pre>
+<p>Bức tranh thật hiện ra: mô hình có accuracy "82%" nhưng chỉ bắt được NG rất kém (F1 khoảng 0,38), và dao động mạnh giữa các fold. Đây là thông tin mà một lần chia không cho bạn thấy.</p>
+
+<h2>2. Pipeline: gói tiền xử lý và mô hình làm một</h2>
+<p>Bạn đã thấy <code>make_pipeline(StandardScaler(), LogisticRegression())</code>. Tại sao không chuẩn hóa toàn bộ <code>X</code> một lần ở đầu cho gọn? Vì như thế, thông tin từ fold validation (trung bình, độ lệch chuẩn) đã "rò" vào lúc huấn luyện. Pipeline đảm bảo mỗi bước <code>fit</code> <strong>chỉ</strong> trên phần huấn luyện của từng fold.</p>
+<p>Với StandardScaler, rò rỉ thường nhỏ. Nhưng với bước <strong>chọn đặc trưng</strong>, hậu quả rất lớn. Thí nghiệm sau dùng dữ liệu hoàn toàn ngẫu nhiên, không có quy luật nào để học, nên accuracy đúng phải quanh 50%:</p>
+<pre><code class="language-python">from sklearn.feature_selection import SelectKBest, f_classif
+
+rng = np.random.default_rng(0)
+X_nhieu = rng.normal(size=(100, 5000))      # 5000 đặc trưng ngẫu nhiên
+y_nhieu = rng.integers(0, 2, size=100)       # nhãn ngẫu nhiên: không có gì để học
+
+# SAI: chọn đặc trưng trên toàn bộ dữ liệu rồi mới cross-validation
+X_chon = SelectKBest(f_classif, k=20).fit_transform(X_nhieu, y_nhieu)
+sai = cross_val_score(LogisticRegression(), X_chon, y_nhieu, cv=5)
+print(f"Sai (rò rỉ): accuracy = {sai.mean():.2f}")
+
+# ĐÚNG: đưa bước chọn đặc trưng vào pipeline
+dung = cross_val_score(make_pipeline(SelectKBest(f_classif, k=20), LogisticRegression()),
+                       X_nhieu, y_nhieu, cv=5)
+print(f"Đúng (pipeline): accuracy = {dung.mean():.2f}")</code></pre>
+<pre><code class="language-text">Sai (rò rỉ): accuracy = 0.85
+Đúng (pipeline): accuracy = 0.48</code></pre>
+<p>Cách sai báo 85% trên dữ liệu ngẫu nhiên! Bước chọn đặc trưng đã "nhìn thấy" nhãn của cả tập validation, nên chọn ra đúng 20 cột tình cờ khớp với nhãn. Mô hình như vậy mang ra dây chuyền sẽ thất bại hoàn toàn. Quy tắc: <strong>mọi bước học từ dữ liệu</strong> (chuẩn hóa, chọn đặc trưng, PCA, điền giá trị thiếu) đều phải nằm trong pipeline.</p>
+
+<h2>3. GridSearchCV: thử tham số một cách trung thực</h2>
+<p><code>GridSearchCV</code> thử mọi tổ hợp tham số, mỗi tổ hợp được đánh giá bằng cross-validation, rồi huấn luyện lại mô hình tốt nhất trên toàn bộ dữ liệu train. Tên tham số trong pipeline có dạng <code>tênbước__thamsố</code> (hai dấu gạch dưới); tên bước do <code>make_pipeline</code> tự đặt bằng tên lớp viết thường.</p>
+<pre><code class="language-python">pipe = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000))
+luoi = {
+    "logisticregression__C": [0.01, 0.1, 1, 10],
+    "logisticregression__class_weight": [None, "balanced"],
+}
+tim = GridSearchCV(pipe, luoi, cv=cv, scoring="f1")
+tim.fit(X_tv, y_tv)
+print("Tốt nhất:", tim.best_params_)
+print(f"F1 (CV) = {tim.best_score_:.3f}")
+
+rf = GridSearchCV(RandomForestClassifier(random_state=0),
+                  {"n_estimators": [100, 300], "max_depth": [None, 5]},
+                  cv=cv, scoring="f1")
+rf.fit(X_tv, y_tv)
+print("Random forest tốt nhất:", rf.best_params_, f"F1 (CV) = {rf.best_score_:.3f}")</code></pre>
+<pre><code class="language-text">Tốt nhất: {'logisticregression__C': 0.1, 'logisticregression__class_weight': 'balanced'}
+F1 (CV) = 0.435
+Random forest tốt nhất: {'max_depth': None, 'n_estimators': 100} F1 (CV) = 0.837</code></pre>
+<p>Hai bài học rút ra:</p>
+<ul>
+  <li><code>class_weight="balanced"</code> giúp mô hình tuyến tính quan tâm hơn tới lớp NG hiếm, F1 tăng từ 0,38 lên 0,435.</li>
+  <li>Nhưng mô hình tuyến tính vẫn không đủ sức: ranh giới OK/NG trong dữ liệu này phi tuyến. Random forest đạt F1 khoảng 0,84. Cross-validation cho phép so sánh hai họ mô hình một cách công bằng.</li>
+</ul>
+<p>Random forest không cần <code>StandardScaler</code> vì cây quyết định không bị ảnh hưởng bởi thang đo của đặc trưng.</p>
+
+<h2>4. Đánh giá cuối cùng trên tập test</h2>
+<p>Điểm <code>best_score_</code> hơi lạc quan, vì ta đã chọn tổ hợp tốt nhất trong nhiều lần thử. Tập test được giữ riêng từ đầu chính là "kỳ thi cuối" chưa ai nhìn thấy:</p>
+<pre><code class="language-python">tot_nhat = rf if rf.best_score_ &gt; tim.best_score_ else tim
+print(f"F1 trên tập test: {tot_nhat.score(X_test, y_test):.3f}")</code></pre>
+<pre><code class="language-text">F1 trên tập test: 0.844</code></pre>
+<p><code>GridSearchCV</code> sau khi <code>fit</code> đã tự huấn luyện lại mô hình tốt nhất trên toàn bộ <code>X_tv</code> (mặc định <code>refit=True</code>), và <code>score</code> dùng đúng thước đo <code>scoring="f1"</code>. F1 trên test (0,844) khớp với ước lượng cross-validation (0,837), dấu hiệu quy trình đánh giá trung thực. Chỉ đánh giá trên test <strong>một lần</strong>; nếu quay lại chỉnh tham số theo kết quả test, tập test cũng bị "dùng mòn".</p>
+
+<h2>Lưu ý khi áp dụng với dữ liệu nhà máy</h2>
+<table>
+  <tr><th>Tình huống</th><th>Cách chia phù hợp</th></tr>
+  <tr><td>Nhiều ảnh của cùng một sản phẩm, cùng một lô</td><td><code>GroupKFold</code> hoặc <code>StratifiedGroupKFold</code> với nhóm = mã sản phẩm/lô, để ảnh của cùng sản phẩm không vừa ở train vừa ở validation</td></tr>
+  <tr><td>Dữ liệu theo thời gian (cảm biến, xu hướng)</td><td><code>TimeSeriesSplit</code>: luôn huấn luyện trên quá khứ, kiểm tra trên tương lai</td></tr>
+  <tr><td>NG rất hiếm (vài chục mẫu)</td><td><code>StratifiedKFold</code>, có thể lặp lại nhiều lần với <code>RepeatedStratifiedKFold</code> để ước lượng ổn định hơn</td></tr>
+  <tr><td>Lưới tham số quá lớn</td><td><code>RandomizedSearchCV</code>: thử ngẫu nhiên N tổ hợp thay vì tất cả</td></tr>
+</table>
+<div class="tip"><strong>Báo cáo cả độ dao động</strong>Khi trình bày kết quả cho trưởng nhóm, ghi "F1 = 0,84 ± 0,03 (5-fold)" thay vì chỉ một con số. Độ dao động lớn là tín hiệu cần thêm dữ liệu trước khi đưa mô hình vào sản xuất.</div>
+
+<div class="ex">
+<h3>Bài tập</h3>
+<p>Thêm <code>GradientBoostingClassifier</code> vào so sánh với lưới <code>{"learning_rate": [0.05, 0.1], "n_estimators": [100, 200]}</code>. Sau đó thay <code>scoring="f1"</code> bằng <code>scoring="recall"</code>: mô hình nào được chọn? Vì sao trong kiểm tra chất lượng, recall của lớp NG (không để lọt hàng lỗi) thường được ưu tiên?</p>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://scikit-learn.org/stable/modules/cross_validation.html" rel="noopener" target="_blank">scikit-learn: Cross-validation</a>, <a href="https://scikit-learn.org/stable/modules/grid_search.html" rel="noopener" target="_blank">scikit-learn: Tuning hyper-parameters</a>, <a href="https://scikit-learn.org/stable/common_pitfalls.html" rel="noopener" target="_blank">scikit-learn: Common pitfalls (data leakage)</a>.</p>

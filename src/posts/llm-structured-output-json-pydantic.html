@@ -1,0 +1,133 @@
+<p>Bạn muốn LLM đọc ghi chú tự do của công nhân vận hành ("Trạm 3 đèn chớp tắt, ảnh tối, máy loại nhầm, dừng chuyền khoảng 25 phút") rồi tạo phiếu sự cố để ghi vào cơ sở dữ liệu. Phần mềm cần <strong>dữ liệu có cấu trúc</strong>: mã máy đúng định dạng, loại sự cố nằm trong danh mục, số phút là số nguyên không âm. Nhưng LLM là mô hình sinh văn bản: thỉnh thoảng nó thêm lời dẫn, bọc JSON trong khối markdown, viết "có" thay vì <code>true</code>, hoặc bịa ra một loại sự cố không có trong danh mục.</p>
+<p>Bài này hướng dẫn cách làm chắc chắn: <strong>định nghĩa schema bằng Pydantic</strong>, đưa schema cho mô hình, <strong>kiểm tra mọi câu trả lời</strong>, và nếu sai thì gửi lỗi lại để mô hình tự sửa. Đây là kỹ thuật nền tảng cho mọi <a href="../kien-thuc/ai-agent-la-gi.html">AI agent</a> gọi công cụ. Code chạy với Pydantic 2.x, không cần khóa API: phần gọi LLM được giả lập để bạn chạy thử ngay.</p>
+
+<h2>1. Định nghĩa schema bằng Pydantic</h2>
+<pre><code class="language-python">import json
+from enum import Enum
+from typing import Literal
+
+from pydantic import BaseModel, Field, ValidationError
+
+
+class MucDo(str, Enum):
+    thap = "thap"
+    trung_binh = "trung_binh"
+    cao = "cao"
+
+
+class PhieuSuCo(BaseModel):
+    """Phiếu sự cố trích xuất từ ghi chú của công nhân vận hành."""
+    may: str = Field(description="Mã máy, ví dụ 'CAM-03'", pattern=r"^[A-Z]+-\d{2}$")
+    loai: Literal["camera", "den", "plc", "phan_mem", "co_khi", "khac"]
+    muc_do: MucDo
+    dung_may: bool = Field(description="Dây chuyền có phải dừng không")
+    thoi_gian_dung_phut: int = Field(ge=0, le=24 * 60)
+    tom_tat: str = Field(max_length=200)
+
+
+print(json.dumps(PhieuSuCo.model_json_schema()["properties"]["thoi_gian_dung_phut"], ensure_ascii=False))</code></pre>
+<pre><code class="language-text">{"maximum": 1440, "minimum": 0, "title": "Thoi Gian Dung Phut", "type": "integer"}</code></pre>
+<p>Mỗi ràng buộc trong lớp Python trở thành một quy tắc trong JSON Schema, định dạng chuẩn mà hầu hết API LLM hiểu:</p>
+<table>
+  <tr><th>Khai báo Python</th><th>Ý nghĩa</th></tr>
+  <tr><td><code>Literal[...]</code>, <code>Enum</code></td><td>Chỉ được chọn trong danh mục cố định, chặn mô hình "bịa" loại mới</td></tr>
+  <tr><td><code>pattern=r"^[A-Z]+-\d{2}$"</code></td><td>Mã máy phải đúng dạng như <code>CAM-03</code></td></tr>
+  <tr><td><code>ge=0, le=1440</code></td><td>Số phút trong khoảng 0 đến 24 giờ</td></tr>
+  <tr><td><code>max_length=200</code></td><td>Giới hạn độ dài tóm tắt</td></tr>
+  <tr><td><code>description=...</code></td><td>Được đưa vào schema, giúp mô hình hiểu ý nghĩa trường</td></tr>
+</table>
+
+<h2>2. Kiểm tra câu trả lời hợp lệ</h2>
+<pre><code class="language-python">tra_loi_tot = """{"may": "CAM-03", "loai": "den", "muc_do": "cao", "dung_may": true,
+"thoi_gian_dung_phut": 25, "tom_tat": "Đèn vòng trạm 3 nhấp nháy, ảnh tối, loại nhầm nhiều."}"""
+
+phieu = PhieuSuCo.model_validate_json(tra_loi_tot)
+print(phieu.may, phieu.muc_do.value, phieu.thoi_gian_dung_phut)</code></pre>
+<pre><code class="language-text">CAM-03 cao 25</code></pre>
+<p><code>model_validate_json</code> vừa phân tích JSON vừa kiểm tra mọi ràng buộc. Kết quả là đối tượng Python có kiểu rõ ràng: <code>phieu.thoi_gian_dung_phut</code> chắc chắn là <code>int</code>, không phải chuỗi <code>"25"</code>.</p>
+
+<h2>3. Bắt câu trả lời sai</h2>
+<p>Đây là kiểu câu trả lời rất hay gặp: có lời dẫn, có khối markdown, và nhiều giá trị sai định dạng.</p>
+<pre><code class="language-python">tra_loi_loi = ('Đây là phiếu sự cố:\n```json\n'
+               '{"may": "cam 3", "loai": "đèn", "muc_do": "cao", "dung_may": "có", '
+               '"thoi_gian_dung_phut": -5, "tom_tat": "Đèn hỏng"}\n```')
+
+
+def tach_json(van_ban):
+    """Lấy đoạn từ dấu { đầu tiên tới dấu } cuối cùng (LLM hay thêm lời dẫn, khối ```)."""
+    dau, cuoi = van_ban.find("{"), van_ban.rfind("}")
+    if dau == -1 or cuoi == -1:
+        raise ValueError("Không tìm thấy JSON")
+    return van_ban[dau:cuoi + 1]
+
+
+try:
+    PhieuSuCo.model_validate_json(tach_json(tra_loi_loi))
+except ValidationError as ex:
+    print(f"{ex.error_count()} lỗi")
+    for loi in ex.errors():
+        print(" -", ".".join(map(str, loi["loc"])), ":", loi["msg"])</code></pre>
+<pre><code class="language-text">4 lỗi
+ - may : String should match pattern '^[A-Z]+-\d{2}$'
+ - loai : Input should be 'camera', 'den', 'plc', 'phan_mem', 'co_khi' or 'khac'
+ - dung_may : Input should be a valid boolean, unable to interpret input
+ - thoi_gian_dung_phut : Input should be greater than or equal to 0</code></pre>
+<p>Pydantic liệt kê <strong>tất cả</strong> lỗi cùng lúc, chỉ rõ trường nào và sai thế nào. Danh sách lỗi này vừa để ghi log, vừa là nội dung hoàn hảo để gửi lại cho LLM tự sửa.</p>
+<div class="warn"><strong>Đừng "tự sửa hộ" bằng đoán mò</strong>Viết code đổi "cam 3" thành "CAM-03", "có" thành <code>true</code> có vẻ tiện, nhưng mỗi quy tắc đoán là một chỗ có thể sai âm thầm. Với dữ liệu đi vào hệ thống sản xuất (MES, phiếu bảo trì), hãy từ chối rõ ràng và yêu cầu làm lại, hoặc chuyển cho người kiểm tra.</div>
+
+<h2>4. Vòng lặp: kiểm tra, báo lỗi, thử lại</h2>
+<pre><code class="language-python">def goi_llm(messages):
+    """Giả lập: lần 1 trả lời sai, lần 2 (sau khi được báo lỗi) trả lời đúng.
+    Trong dự án thật, thay bằng lời gọi API của nhà cung cấp LLM bạn dùng."""
+    return tra_loi_loi if len(messages) == 2 else tra_loi_tot
+
+
+def trich_xuat(ghi_chu, so_lan_thu=3):
+    messages = [
+        {"role": "system", "content": "Chỉ trả lời bằng JSON đúng schema sau:\n"
+                                      + json.dumps(PhieuSuCo.model_json_schema(), ensure_ascii=False)},
+        {"role": "user", "content": ghi_chu},
+    ]
+    for lan in range(1, so_lan_thu + 1):
+        tra_loi = goi_llm(messages)
+        try:
+            return PhieuSuCo.model_validate_json(tach_json(tra_loi))
+        except (ValidationError, ValueError) as ex:
+            print(f"Lần {lan}: không hợp lệ, gửi lỗi lại cho mô hình")
+            messages += [
+                {"role": "assistant", "content": tra_loi},
+                {"role": "user", "content": f"JSON chưa hợp lệ:\n{ex}\nHãy sửa và chỉ trả JSON."},
+            ]
+    raise RuntimeError("LLM không trả được JSON hợp lệ, chuyển cho người xử lý")
+
+
+phieu = trich_xuat("Trạm 3 đèn chớp tắt, ảnh tối, máy loại nhầm, dừng chuyền khoảng 25 phút.")
+print("Lần 2: hợp lệ -&gt;", phieu.model_dump(mode="json"))</code></pre>
+<pre><code class="language-text">Lần 1: không hợp lệ, gửi lỗi lại cho mô hình
+Lần 2: hợp lệ -&gt; {'may': 'CAM-03', 'loai': 'den', 'muc_do': 'cao', 'dung_may': True, 'thoi_gian_dung_phut': 25, 'tom_tat': 'Đèn vòng trạm 3 nhấp nháy, ảnh tối, loại nhầm nhiều.'}</code></pre>
+<p>Những điểm quan trọng trong vòng lặp:</p>
+<ul>
+  <li><strong>Schema nằm trong system prompt</strong>, nên mô hình biết chính xác cần trả về gì.</li>
+  <li><strong>Gửi lại cả câu trả lời sai và thông báo lỗi</strong>: mô hình thấy mình đã viết gì và sai ở đâu, thường sửa được ngay ở lần 2.</li>
+  <li><strong>Giới hạn số lần thử</strong> (ở đây 3): không để chương trình lặp vô hạn và tốn chi phí API. Hết lượt thì chuyển cho người.</li>
+  <li><strong>Đầu ra cuối cùng luôn hợp lệ</strong>: phần còn lại của phần mềm không bao giờ phải xử lý JSON hỏng.</li>
+</ul>
+
+<h2>5. Structured output phía nhà cung cấp</h2>
+<p>Nhiều API LLM hiện nay có chế độ <strong>structured output</strong> (hoặc "JSON mode", "response schema"): bạn truyền JSON Schema vào tham số của API, và máy chủ ràng buộc quá trình sinh để câu trả lời khớp schema. Tên tham số và mức hỗ trợ (ví dụ có hỗ trợ <code>pattern</code> hay không) khác nhau giữa các nhà cung cấp, nên hãy đọc tài liệu của dịch vụ bạn dùng.</p>
+<p>Ngay cả khi dùng chế độ này, <strong>vẫn giữ bước kiểm tra Pydantic</strong>:</p>
+<ol>
+  <li>Một số ràng buộc (khoảng giá trị, regex, độ dài) có thể không được nhà cung cấp áp dụng đầy đủ.</li>
+  <li>JSON đúng schema chưa chắc đúng <strong>ý nghĩa</strong>: mô hình vẫn có thể ghi 25 phút trong khi ghi chú nói 2 tiếng. Thêm kiểm tra nghiệp vụ, ví dụ <code>dung_may</code> là <code>false</code> thì <code>thoi_gian_dung_phut</code> phải bằng 0 (Pydantic hỗ trợ bằng <code>@model_validator</code>).</li>
+  <li>Bạn có thể đổi nhà cung cấp mà không phải sửa phần còn lại của phần mềm.</li>
+</ol>
+
+<h2>Áp dụng vào dự án</h2>
+<p>Mẫu "schema + kiểm tra + thử lại" dùng được cho rất nhiều việc của kỹ sư nhà máy: trích thông số từ datasheet camera, chuyển báo cáo ca thành bảng số liệu (như dự án <a href="../projects/tro-ly-viet-bao-cao-ca-san-xuat-llm.html">trợ lý soạn báo cáo ca sản xuất</a>), hay chuẩn hóa tham số khi agent gọi công cụ (như dự án <a href="../projects/agent-tra-cuu-tai-lieu-tao-phieu-sua-chua.html">agent tạo phiếu sửa chữa</a>). Kết hợp với <a href="../kien-thuc/prompt-engineering-cho-ky-su.html">prompt engineering</a>: đưa thêm 1–2 ví dụ đầu vào/đầu ra mẫu vào prompt sẽ giảm đáng kể số lần phải thử lại.</p>
+
+<div class="ex">
+<h3>Bài tập</h3>
+<p>Thêm vào <code>PhieuSuCo</code> một <code>@model_validator(mode="after")</code> báo lỗi khi <code>dung_may</code> là <code>False</code> nhưng <code>thoi_gian_dung_phut</code> lớn hơn 0. Viết một câu trả lời giả lập vi phạm quy tắc này và kiểm tra rằng vòng lặp <code>trich_xuat</code> bắt được nó.</p>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.pydantic.dev/latest/concepts/json_schema/" rel="noopener" target="_blank">Pydantic: JSON Schema</a>, <a href="https://docs.pydantic.dev/latest/concepts/json/" rel="noopener" target="_blank">Pydantic: JSON parsing (model_validate_json)</a>, <a href="https://docs.pydantic.dev/latest/errors/validation_errors/" rel="noopener" target="_blank">Pydantic: Validation errors</a>.</p>

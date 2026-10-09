@@ -1,0 +1,175 @@
+<p>Bạn vừa sửa một ngưỡng trong hàm đánh giá OK/NG, chạy thử vài ảnh thấy ổn, đẩy lên máy trạm. Hai ngày sau, ca đêm báo máy loại nhầm hàng loạt sản phẩm đúng ở mức ranh giới. Lỗi này hoàn toàn có thể bắt được trong vài giây nếu có <strong>kiểm thử tự động</strong>. Bài này hướng dẫn dùng <strong>pytest</strong>, công cụ kiểm thử phổ biến nhất của Python, để bảo vệ các hàm xử lý ảnh của bạn.</p>
+
+<h2>Vì sao kỹ sư Vision cần viết test?</h2>
+<ul>
+  <li><strong>Code thay đổi liên tục</strong>: đổi ngưỡng, thêm điều kiện, tối ưu tốc độ. Mỗi lần sửa đều có thể làm hỏng thứ đang chạy đúng.</li>
+  <li><strong>Lỗi ở ranh giới rất khó thấy bằng mắt</strong>: <code>&lt;</code> hay <code>&lt;=</code>, ROI sát biên ảnh, ảnh màu thay vì ảnh xám.</li>
+  <li><strong>Test là tài liệu sống</strong>: đọc test là biết hàm được dùng thế nào và kỳ vọng ra sao.</li>
+</ul>
+<p>Mục tiêu không phải viết thật nhiều test, mà là khóa chặt những hành vi quan trọng: kích thước đầu ra, cách xử lý dữ liệu sai, và các giá trị ngưỡng.</p>
+
+<h2>Cài đặt</h2>
+<pre><code class="language-bash">pip install pytest numpy</code></pre>
+<p>Quy ước của pytest rất đơn giản: file tên bắt đầu bằng <code>test_</code>, hàm test tên bắt đầu bằng <code>test_</code>, bên trong dùng câu lệnh <code>assert</code> bình thường của Python. Không cần kế thừa lớp nào.</p>
+
+<h2>Code cần kiểm thử</h2>
+<p>Tạo file <code>xu_ly.py</code> chứa ba hàm nhỏ thường gặp trong một trạm kiểm tra: cắt ROI, tính tỉ lệ pixel tối (vết bẩn, vết cháy) và đánh giá OK/NG.</p>
+<pre><code class="language-python">import numpy as np
+
+
+def cat_roi(anh, roi):
+    """Cắt ROI (x, y, w, h); báo lỗi nếu ROI nằm ngoài ảnh."""
+    x, y, w, h = roi
+    cao, rong = anh.shape[:2]
+    x1, y1 = max(0, x), max(0, y)
+    x2, y2 = min(rong, x + w), min(cao, y + h)
+    if x1 &gt;= x2 or y1 &gt;= y2:
+        raise ValueError(f"ROI {roi} nằm ngoài ảnh {rong}x{cao}")
+    return anh[y1:y2, x1:x2]
+
+
+def ti_le_pixel_toi(anh_xam, nguong=50):
+    """Tỉ lệ (0..1) số pixel tối hơn ngưỡng."""
+    if anh_xam.ndim != 2:
+        raise ValueError("Cần ảnh xám 2 chiều")
+    return float(np.count_nonzero(anh_xam &lt; nguong)) / anh_xam.size
+
+
+def danh_gia(ti_le_toi, gioi_han=0.02):
+    """OK nếu vết tối chiếm không quá giới hạn."""
+    return "OK" if ti_le_toi &lt;= gioi_han else "NG"</code></pre>
+<p>Hàm <code>cat_roi</code> giống bài <a href="opencv-3-roi-resize-xoay-lat.html">cắt ROI, resize, xoay, lật</a>. Ở đây ta không cần OpenCV: ảnh chỉ là mảng NumPy (xem <a href="numpy-anh-la-mang-so.html">ảnh là mảng số</a>), nên có thể tự tạo ảnh thử trong test mà không cần file ảnh thật.</p>
+
+<h2>Viết test đầu tiên</h2>
+<p>Tạo file <code>test_xu_ly.py</code> cùng thư mục:</p>
+<pre><code class="language-python">import numpy as np
+import pytest
+
+from xu_ly import cat_roi, danh_gia, ti_le_pixel_toi
+
+
+@pytest.fixture
+def anh_trang():
+    """Ảnh xám 100x200 toàn màu sáng (200)."""
+    return np.full((100, 200), 200, np.uint8)
+
+
+def test_cat_roi_dung_kich_thuoc(anh_trang):
+    vung = cat_roi(anh_trang, (10, 20, 50, 30))
+    assert vung.shape == (30, 50)          # (cao, rộng)
+
+
+def test_cat_roi_bi_cat_o_bien(anh_trang):
+    vung = cat_roi(anh_trang, (180, 90, 50, 50))
+    assert vung.shape == (10, 20)
+
+
+def test_cat_roi_ngoai_anh_bao_loi(anh_trang):
+    with pytest.raises(ValueError, match="nằm ngoài ảnh"):
+        cat_roi(anh_trang, (500, 500, 10, 10))
+
+
+def test_anh_sach_khong_co_pixel_toi(anh_trang):
+    assert ti_le_pixel_toi(anh_trang) == 0.0
+
+
+def test_vet_toi_100_pixel(anh_trang):
+    anh_trang[0:10, 0:10] = 0              # vết tối 10x10 = 100 pixel
+    assert ti_le_pixel_toi(anh_trang) == pytest.approx(100 / 20000)
+
+
+def test_anh_mau_bi_tu_choi():
+    anh_mau = np.zeros((10, 10, 3), np.uint8)
+    with pytest.raises(ValueError):
+        ti_le_pixel_toi(anh_mau)
+
+
+@pytest.mark.parametrize(
+    "ti_le, ket_qua",
+    [(0.0, "OK"), (0.02, "OK"), (0.0201, "NG"), (0.5, "NG")],
+)
+def test_danh_gia_theo_nguong(ti_le, ket_qua):
+    assert danh_gia(ti_le) == ket_qua</code></pre>
+<p>Ba công cụ quan trọng nhất của pytest đều có mặt ở đây:</p>
+<table>
+  <tr><th>Công cụ</th><th>Tác dụng</th><th>Trong ví dụ</th></tr>
+  <tr><td><code>@pytest.fixture</code></td><td>Tạo dữ liệu dùng chung; mỗi test nhận một bản <strong>mới</strong></td><td><code>anh_trang</code></td></tr>
+  <tr><td><code>pytest.raises</code></td><td>Khẳng định hàm phải báo lỗi (có thể kiểm tra cả nội dung thông báo)</td><td>ROI ngoài ảnh, ảnh màu</td></tr>
+  <tr><td><code>@pytest.mark.parametrize</code></td><td>Chạy một test với nhiều bộ dữ liệu</td><td>4 mức tỉ lệ quanh ngưỡng</td></tr>
+  <tr><td><code>pytest.approx</code></td><td>So sánh số thực có sai số làm tròn</td><td>Tỉ lệ 0,005</td></tr>
+</table>
+<div class="tip"><strong>Fixture tạo bản mới cho từng test</strong>Test <code>test_vet_toi_100_pixel</code> vẽ vết đen lên <code>anh_trang</code>. Vì fixture được gọi lại cho mỗi test, các test khác vẫn nhận ảnh sạch. Nếu bạn dùng một biến toàn cục thay cho fixture, thứ tự chạy test sẽ ảnh hưởng kết quả, một loại lỗi rất khó tìm.</div>
+
+<h2>Chạy test</h2>
+<pre><code class="language-bash">pytest -v</code></pre>
+<pre><code class="language-text">test_xu_ly.py::test_cat_roi_dung_kich_thuoc PASSED                       [ 10%]
+test_xu_ly.py::test_cat_roi_bi_cat_o_bien PASSED                         [ 20%]
+test_xu_ly.py::test_cat_roi_ngoai_anh_bao_loi PASSED                     [ 30%]
+test_xu_ly.py::test_anh_sach_khong_co_pixel_toi PASSED                   [ 40%]
+test_xu_ly.py::test_vet_toi_100_pixel PASSED                             [ 50%]
+test_xu_ly.py::test_anh_mau_bi_tu_choi PASSED                            [ 60%]
+test_xu_ly.py::test_danh_gia_theo_nguong[0.0-OK] PASSED                  [ 70%]
+test_xu_ly.py::test_danh_gia_theo_nguong[0.02-OK] PASSED                 [ 80%]
+test_xu_ly.py::test_danh_gia_theo_nguong[0.0201-NG] PASSED               [ 90%]
+test_xu_ly.py::test_danh_gia_theo_nguong[0.5-NG] PASSED                  [100%]
+============================== 10 passed in 0.05s ==============================</code></pre>
+<p>7 hàm test nhưng có 10 kết quả, vì test dùng <code>parametrize</code> được tách thành 4 lần chạy, mỗi lần có tên riêng như <code>[0.02-OK]</code>. Thời gian chạy trên máy bạn sẽ khác một chút.</p>
+
+<h2>Khi test bắt được lỗi</h2>
+<p>Giả sử một đồng nghiệp "tối ưu" hàm đánh giá và vô tình đổi <code>&lt;=</code> thành <code>&lt;</code>:</p>
+<pre><code class="language-python">def danh_gia(ti_le_toi, gioi_han=0.02):
+    return "OK" if ti_le_toi &lt; gioi_han else "NG"     # lỗi: đổi &lt;= thành &lt;</code></pre>
+<p>Chạy <code>pytest -q</code>, kết quả (rút gọn phần cuối):</p>
+<pre><code class="language-text">    def test_danh_gia_theo_nguong(ti_le, ket_qua):
+&gt;       assert danh_gia(ti_le) == ket_qua
+E       AssertionError: assert 'NG' == 'OK'
+E
+E         - OK
+E         + NG
+
+test_xu_ly.py:48: AssertionError
+=========================== short test summary info ============================
+FAILED test_xu_ly.py::test_danh_gia_theo_nguong[0.02-OK] - AssertionError: as...
+1 failed, 9 passed in 0.07s</code></pre>
+<p>pytest chỉ rõ: đúng ở mức <strong>0,02</strong>, hàm trả về NG trong khi quy định là OK. Đây chính là lỗi "loại nhầm hàng ở ranh giới" ở đầu bài, bị chặn trước khi lên máy trạm.</p>
+
+<h2>Các lệnh hay dùng</h2>
+<table>
+  <tr><th>Lệnh</th><th>Ý nghĩa</th></tr>
+  <tr><td><code>pytest -q</code></td><td>Kết quả gọn</td></tr>
+  <tr><td><code>pytest -v</code></td><td>Liệt kê từng test</td></tr>
+  <tr><td><code>pytest -k roi</code></td><td>Chỉ chạy test có chữ "roi" trong tên</td></tr>
+  <tr><td><code>pytest -x</code></td><td>Dừng ngay ở test lỗi đầu tiên</td></tr>
+  <tr><td><code>pytest --lf</code></td><td>Chỉ chạy lại các test lỗi ở lần trước</td></tr>
+</table>
+
+<h2>Nên test gì trong code xử lý ảnh?</h2>
+<ol>
+  <li><strong>Hình dạng và kiểu dữ liệu đầu ra</strong>: <code>shape</code>, <code>dtype</code>. Rất nhiều lỗi đến từ nhầm (cao, rộng) với (rộng, cao).</li>
+  <li><strong>Ảnh tổng hợp có đáp án biết trước</strong>: vẽ một hình tròn đặc bán kính 20 rồi kiểm tra số pixel trắng xấp xỉ π·20² ≈ 1257. Lưu ý <code>cv2.contourArea</code> đo theo đường viền nên cho số nhỏ hơn (khoảng 1200), vì vậy hãy ghi rõ test đo theo cách nào. Không cần ảnh thật.</li>
+  <li><strong>Đầu vào sai</strong>: ảnh rỗng, ảnh màu khi cần ảnh xám, ROI ngoài biên. Hàm nên báo lỗi rõ ràng thay vì trả kết quả vô nghĩa.</li>
+  <li><strong>Giá trị ngưỡng</strong>: đúng tại ngưỡng, ngay trên và ngay dưới ngưỡng.</li>
+  <li><strong>Ảnh hồi quy (regression)</strong>: giữ vài ảnh thật từng gây lỗi trong thư mục <code>tests/data/</code> kèm kết quả mong đợi. Mỗi lần sửa thuật toán, chạy lại để chắc không "sửa chỗ này hỏng chỗ kia".</li>
+</ol>
+<div class="warn"><strong>Đừng so sánh số thực bằng ==</strong>Kết quả như độ tròn, góc, kích thước mm gần như luôn có sai số làm tròn. Dùng <code>pytest.approx(gia_tri, abs=0.01)</code> hoặc <code>rel=1e-3</code> tùy độ chính xác bạn cần.</div>
+
+<h2>Tổ chức thư mục gợi ý</h2>
+<pre><code class="language-text">du_an/
+├── tram_kiem_tra/
+│   ├── __init__.py
+│   └── xu_ly.py
+├── tests/
+│   ├── data/            # ảnh hồi quy nhỏ
+│   └── test_xu_ly.py
+└── pyproject.toml</code></pre>
+<p>Kết hợp với <a href="../kien-thuc/git-cho-du-an-ai-vision.html">Git</a>: tập thói quen chạy <code>pytest</code> trước mỗi lần commit. Khi dự án lớn hơn, bạn có thể cho máy chủ CI (ví dụ GitHub Actions) tự chạy test mỗi lần đẩy code.</p>
+
+<div class="ex">
+<h3>Bài tập</h3>
+<p>Viết hàm <code>dem_vat(anh_nhi_phan)</code> đếm số vùng trắng (dùng <code>cv2.connectedComponents</code>, nhớ trừ nền). Viết test: ảnh đen trả về 0; ảnh có 3 hình vuông tách rời trả về 3; hai hình vuông chạm nhau trả về 1.</p>
+<details><summary>Gợi ý</summary>
+<p>Tạo ảnh bằng <code>np.zeros((100, 100), np.uint8)</code> rồi gán <code>anh[10:20, 10:20] = 255</code>. <code>cv2.connectedComponents</code> trả về <code>(so_nhan, nhan)</code>, trong đó nhãn 0 là nền nên số vật là <code>so_nhan - 1</code>.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.pytest.org/en/stable/how-to/assert.html" rel="noopener" target="_blank">pytest: assert và pytest.raises</a>, <a href="https://docs.pytest.org/en/stable/how-to/parametrize.html" rel="noopener" target="_blank">pytest: parametrize</a>, <a href="https://docs.pytest.org/en/stable/how-to/fixtures.html" rel="noopener" target="_blank">pytest: fixtures</a>.</p>
