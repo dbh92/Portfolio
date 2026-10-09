@@ -1,61 +1,326 @@
-<p>Rất nhiều người bỏ cuộc khi học AI không phải vì thuật toán khó, mà vì <strong>môi trường cài đặt rối tung</strong>: xung đột phiên bản, PyTorch không nhận GPU, code chạy máy này không chạy máy kia. Bài này hướng dẫn thiết lập môi trường Python gọn gàng, có thể tái lập, cho học AI và Computer Vision.</p>
+<p>Rất nhiều người bỏ cuộc khi học AI không phải vì thuật toán khó, mà vì <strong>môi trường cài đặt rối tung</strong>: xung đột phiên bản, PyTorch không nhận GPU, code chạy máy này không chạy máy kia. Ở bài "Đọc ghi file, pathlib và xử lý lỗi" bạn mới chỉ dùng thư viện chuẩn có sẵn trong Python. Từ bài này trở đi ta cần thư viện bên ngoài: NumPy, OpenCV, rồi PyTorch. Bài này dạy cách cài chúng gọn gàng, mỗi dự án một môi trường riêng, có file ghi lại phiên bản để mang sang máy tính ở nhà máy vẫn chạy y hệt. Bài tiếp theo, "Xử lý thư mục ảnh, CSV và log", sẽ dùng ngay môi trường này.</p>
 
-<h2>Nguyên tắc vàng: mỗi dự án một môi trường ảo</h2>
-<p>Không bao giờ <code>pip install</code> thẳng vào Python của hệ thống. Mỗi dự án có một môi trường ảo riêng với phiên bản thư viện riêng.</p>
-
-<h3>Cách 1: venv có sẵn trong Python</h3>
-<pre><code>python -m venv .venv
-# Windows
-.venv\Scripts\activate
-# Linux / macOS
-source .venv/bin/activate
-
-pip install --upgrade pip
-pip install numpy opencv-python matplotlib jupyter
-pip freeze &gt; requirements.txt          # lưu danh sách phiên bản</code></pre>
-
-<h3>Cách 2: uv, nhanh hơn nhiều</h3>
-<p><a href="https://docs.astral.sh/uv/" rel="noopener" target="_blank">uv</a> là công cụ quản lý gói và môi trường cho Python, cài thư viện nhanh hơn pip đáng kể và quản lý luôn cả phiên bản Python.</p>
-<pre><code>uv init vision-demo
-cd vision-demo
-uv add numpy opencv-python ultralytics    # tự tạo .venv và ghi vào pyproject.toml
-uv run python main.py                     # chạy trong môi trường của dự án</code></pre>
-<p>File <code>pyproject.toml</code> và <code>uv.lock</code> giúp người khác (hoặc máy công nghiệp) tạo lại đúng môi trường chỉ bằng <code>uv sync</code>.</p>
-
-<h2>Cài PyTorch có GPU đúng cách</h2>
-<ol>
-  <li>Cài driver NVIDIA mới. Kiểm tra bằng lệnh <code>nvidia-smi</code>.</li>
-  <li>Vào trang <a href="https://pytorch.org/get-started/locally/" rel="noopener" target="_blank">pytorch.org/get-started</a>, chọn hệ điều hành, pip và phiên bản CUDA, <strong>copy đúng lệnh cài</strong> trang đó đưa ra (thường có tham số <code>--index-url</code> trỏ tới bản build CUDA).</li>
-  <li>Kiểm tra:</li>
-</ol>
-<pre><code>import torch
-print(torch.__version__)
-print(torch.cuda.is_available())          # phải là True
-print(torch.cuda.get_device_name(0))</code></pre>
-<p>Lỗi phổ biến nhất: cài <code>ultralytics</code> hoặc thư viện khác <em>trước</em>, pip kéo về bản PyTorch chỉ chạy CPU. Hãy cài PyTorch bản GPU trước, rồi mới cài các thư viện còn lại. Bạn <strong>không</strong> cần cài CUDA Toolkit riêng để chạy PyTorch; bản build của PyTorch đã kèm thư viện CUDA cần thiết, chỉ cần driver đủ mới.</p>
-
-<h2>Trình soạn thảo: VS Code</h2>
+<h2>1. Vì sao mỗi dự án cần một môi trường ảo?</h2>
+<p>Khi bạn gõ <code>pip install opencv-python</code> mà không chuẩn bị gì, thư viện được cài vào bản Python chung của máy. Sau vài tháng, máy bạn sẽ có tình huống quen thuộc:</p>
 <ul>
-  <li>Cài extension <strong>Python</strong> và <strong>Jupyter</strong> của Microsoft.</li>
-  <li><code>Ctrl+Shift+P</code> → <em>Python: Select Interpreter</em> → chọn <code>.venv</code> của dự án.</li>
-  <li>Dùng file <code>.ipynb</code> để thử nghiệm, xem ảnh trung gian; chuyển code ổn định sang file <code>.py</code>.</li>
-  <li>Bật định dạng tự động (ví dụ Ruff hoặc Black) để code luôn gọn.</li>
+  <li>Dự án A (trạm kiểm tra cũ) chạy ổn với NumPy 1.26 và một thư viện của hãng camera chỉ hỗ trợ NumPy 1.x.</li>
+  <li>Dự án B (huấn luyện YOLO) cần NumPy 2.x và PyTorch mới.</li>
+  <li>Cài cho B xong thì A báo lỗi. Gỡ để chữa A thì B hỏng.</li>
+</ul>
+<p><strong>Môi trường ảo</strong> (virtual environment) là một thư mục chứa bản sao nhẹ của trình thông dịch Python và <em>bộ thư viện riêng</em> của một dự án. Mỗi dự án một môi trường, các phiên bản không đụng nhau. Hỏng thì xóa thư mục, tạo lại trong vài phút.</p>
+<table>
+  <tr><th>Không dùng môi trường ảo</th><th>Dùng môi trường ảo</th></tr>
+  <tr><td>Mọi dự án dùng chung một bộ thư viện</td><td>Mỗi dự án một bộ thư viện riêng</td></tr>
+  <tr><td>Nâng cấp một gói có thể làm hỏng dự án khác</td><td>Nâng cấp chỉ ảnh hưởng dự án đang làm</td></tr>
+  <tr><td>Không biết dự án thật sự cần những gì</td><td>Danh sách gói rõ ràng, xuất ra <code>requirements.txt</code></td></tr>
+  <tr><td>Cài sang máy nhà máy: "máy em chạy được mà"</td><td>Tạo lại đúng môi trường bằng một lệnh</td></tr>
+</table>
+<div class="tip"><strong>Quy tắc vàng</strong>Không bao giờ <code>pip install</code> vào Python chung của hệ thống. Mỗi thư mục dự án có một môi trường ảo riêng, thường đặt tên <code>.venv</code> nằm ngay trong thư mục dự án.</div>
+
+<h2>2. Tạo và kích hoạt môi trường ảo bằng venv</h2>
+<p><code>venv</code> có sẵn trong Python, không cần cài thêm. Mở terminal trong thư mục dự án (trong VS Code: <strong>Terminal → New Terminal</strong>):</p>
+<pre><code class="language-bash"># Tạo môi trường ảo tên .venv trong thư mục hiện tại
+python -m venv .venv          # Windows có thể dùng: py -m venv .venv
+                              # macOS / Linux: python3 -m venv .venv</code></pre>
+<p>Kích hoạt (activate) để terminal dùng Python và pip của môi trường đó. Lệnh khác nhau theo loại terminal:</p>
+<table>
+  <tr><th>Terminal</th><th>Lệnh kích hoạt</th></tr>
+  <tr><td>Windows PowerShell (mặc định trong VS Code)</td><td><code>.venv\Scripts\Activate.ps1</code></td></tr>
+  <tr><td>Windows Command Prompt (cmd)</td><td><code>.venv\Scripts\activate.bat</code></td></tr>
+  <tr><td>macOS / Linux (bash, zsh)</td><td><code>source .venv/bin/activate</code></td></tr>
+</table>
+<p>Kích hoạt thành công thì đầu dòng lệnh có thêm <code>(.venv)</code>. Kiểm tra Python đang dùng có đúng là của môi trường không:</p>
+<pre><code class="language-bash">python -c "import sys; print(sys.executable)"</code></pre>
+<pre><code class="language-text">D:\du-an\tram-kiem-tra\.venv\Scripts\python.exe</code></pre>
+<p>(Đường dẫn trên là ví dụ trên Windows; trên Linux sẽ là <code>.../.venv/bin/python</code>.) Muốn thoát môi trường, gõ <code>deactivate</code>.</p>
+<div class="warn"><strong>Lỗi PowerShell: "running scripts is disabled on this system"</strong>Windows mặc định chặn chạy script <code>.ps1</code>. Chạy một lần lệnh sau (chỉ áp dụng cho tài khoản của bạn) rồi kích hoạt lại:<br><code>Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser</code></div>
+<p>Muốn chọn đúng phiên bản Python khi máy có nhiều bản, trên Windows dùng trình khởi động <code>py</code>: <code>py -V:3.13 -m venv .venv</code> (với trình khởi động cũ có thể viết <code>py -3.13 -m venv .venv</code>). Lệnh <code>py list</code> (hoặc <code>py -0</code> ở trình khởi động cũ) liệt kê các bản đã cài.</p>
+<p>Ba điều cần nhớ về thư mục <code>.venv</code>:</p>
+<ul>
+  <li><strong>Không copy</strong> <code>.venv</code> sang máy khác hay sang thư mục khác: bên trong có đường dẫn tuyệt đối, chuyển chỗ là hỏng. Cái cần mang theo là <em>danh sách gói</em> (mục 4).</li>
+  <li><strong>Không đưa</strong> <code>.venv</code> lên Git (thêm vào <code>.gitignore</code>).</li>
+  <li>Hỏng thì xóa cả thư mục <code>.venv</code> rồi tạo lại, không có gì phải tiếc.</li>
 </ul>
 
-<h2>Cấu trúc thư mục gợi ý</h2>
-<pre><code>vision-demo/
-  data/            # ảnh, dataset (không commit file lớn lên Git)
-  notebooks/       # thử nghiệm
-  src/             # mã nguồn chính
-  models/          # trọng số đã huấn luyện
-  pyproject.toml   # hoặc requirements.txt
-  .gitignore       # bỏ qua .venv/, data/, models/*.pt</code></pre>
+<h2>3. Cài thư viện bằng pip</h2>
+<p>Sau khi kích hoạt môi trường, cài các thư viện của chặng 1 và 2:</p>
+<pre><code class="language-bash">python -m pip install --upgrade pip
+python -m pip install numpy opencv-python</code></pre>
+<p>Viết <code>python -m pip</code> thay vì chỉ <code>pip</code> là thói quen tốt: nó bảo đảm pip cài vào <strong>đúng bản Python</strong> mà lệnh <code>python</code> đang trỏ tới. Rất nhiều lỗi "đã cài rồi mà vẫn báo không có module" đến từ việc <code>pip</code> và <code>python</code> thuộc hai bản Python khác nhau.</p>
+<table>
+  <tr><th>Lệnh</th><th>Tác dụng</th></tr>
+  <tr><td><code>python -m pip install numpy==2.3.4</code></td><td>Cài đúng một phiên bản</td></tr>
+  <tr><td><code>python -m pip install "numpy&gt;=2.0,&lt;3"</code></td><td>Cài bản bất kỳ trong khoảng (nhớ đặt trong dấu nháy)</td></tr>
+  <tr><td><code>python -m pip install -U opencv-python</code></td><td>Nâng cấp lên bản mới nhất</td></tr>
+  <tr><td><code>python -m pip uninstall opencv-python</code></td><td>Gỡ gói</td></tr>
+  <tr><td><code>python -m pip list</code></td><td>Liệt kê gói đã cài và phiên bản</td></tr>
+  <tr><td><code>python -m pip show opencv-python</code></td><td>Thông tin một gói: phiên bản, nơi cài, phụ thuộc</td></tr>
+</table>
 
-<h2>Checklist khi mang code sang máy khác</h2>
+<h3>Chọn đúng gói OpenCV</h3>
+<p>OpenCV trên PyPI có 4 gói. Chúng đều cung cấp cùng một module <code>cv2</code>, nên <strong>chỉ được cài một gói</strong>; cài hai gói cùng lúc thì file của gói này đè lên gói kia và dễ sinh lỗi khó hiểu.</p>
+<table>
+  <tr><th>Gói</th><th>Có cửa sổ (<code>imshow</code>)</th><th>Có module mở rộng (contrib)</th><th>Dùng khi</th></tr>
+  <tr><td><code>opencv-python</code></td><td>Có</td><td>Không</td><td>Máy tính học tập, PC trạm có màn hình. <strong>Chọn gói này nếu không chắc.</strong></td></tr>
+  <tr><td><code>opencv-contrib-python</code></td><td>Có</td><td>Có</td><td>Cần thuật toán trong nhóm contrib</td></tr>
+  <tr><td><code>opencv-python-headless</code></td><td>Không</td><td>Không</td><td>Máy chủ không màn hình, Docker</td></tr>
+  <tr><td><code>opencv-contrib-python-headless</code></td><td>Không</td><td>Có</td><td>Máy chủ cần contrib</td></tr>
+</table>
+<p>Nếu lỡ cài lẫn: gỡ <em>tất cả</em> các gói OpenCV rồi cài lại đúng một gói.</p>
+
+<h2>4. Lưu danh sách thư viện: requirements.txt</h2>
+<p>Môi trường chạy tốt rồi thì "chụp ảnh" lại danh sách gói và phiên bản:</p>
+<pre><code class="language-bash">python -m pip freeze &gt; requirements.txt</code></pre>
+<p>Nội dung file có dạng (phiên bản trên máy bạn sẽ khác):</p>
+<pre><code class="language-text">numpy==2.3.4
+opencv-python==4.12.0.88</code></pre>
+<p>Trên máy khác (hoặc chính máy bạn sau khi xóa <code>.venv</code>), tạo lại đúng môi trường:</p>
+<pre><code class="language-bash">python -m venv .venv
+# kích hoạt như mục 2, rồi:
+python -m pip install -r requirements.txt</code></pre>
+<p><code>pip freeze</code> ghi <strong>mọi</strong> gói trong môi trường, kể cả gói phụ thuộc được kéo theo. Khi dự án lớn dần, nhiều nhóm giữ hai file: <code>requirements.in</code> viết tay chỉ các gói chính (<code>numpy</code>, <code>opencv-python</code>, <code>torch</code>), và <code>requirements.txt</code> là kết quả freeze có đủ phiên bản để tái lập. Với người mới, một file freeze là đủ.</p>
+
+<h3>Cài lên máy nhà máy không có Internet</h3>
+<p>PC trạm kiểm tra thường bị cách ly khỏi Internet. Tải sẵn các file cài đặt (wheel) trên máy có mạng, chép bằng USB rồi cài offline:</p>
+<pre><code class="language-bash"># Trên máy có mạng (cùng hệ điều hành và cùng phiên bản Python với máy trạm)
+python -m pip download -r requirements.txt -d wheels
+
+# Trên máy trạm, sau khi tạo và kích hoạt .venv
+python -m pip install --no-index --find-links wheels -r requirements.txt</code></pre>
+<p>Wheel phụ thuộc hệ điều hành và phiên bản Python (ví dụ file có chữ <code>cp313-win_amd64</code> chỉ dành cho Python 3.13 trên Windows 64 bit). Tải trên máy Linux mang sang Windows sẽ không cài được.</p>
+
+<h2>5. uv: công cụ thay thế nhanh hơn (tùy chọn)</h2>
+<p><a href="https://docs.astral.sh/uv/" rel="noopener" target="_blank">uv</a> là công cụ quản lý gói và môi trường cho Python, cài thư viện nhanh hơn pip đáng kể và quản lý luôn cả phiên bản Python. Bạn có thể học bằng venv + pip trước; khi đã quen, uv giúp tiết kiệm nhiều thời gian chờ.</p>
+<pre><code class="language-bash"># Cách 1: dùng uv như pip, vẫn với requirements.txt
+uv venv                                  # tạo .venv
+uv pip install -r requirements.txt       # cài nhanh hơn pip
+
+# Cách 2: quản lý dự án đầy đủ với pyproject.toml
+uv init vision-demo
+cd vision-demo
+uv add numpy opencv-python               # tự tạo .venv, ghi vào pyproject.toml và uv.lock
+uv run python main.py                    # chạy trong môi trường của dự án
+uv sync                                  # trên máy khác: tạo lại đúng môi trường từ uv.lock</code></pre>
+<p>File <code>pyproject.toml</code> ghi các gói chính, <code>uv.lock</code> ghi chính xác mọi phiên bản: vai trò giống cặp <code>requirements.in</code>/<code>requirements.txt</code> ở trên.</p>
+
+<h2>6. VS Code dùng đúng môi trường</h2>
+<ul>
+  <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> → <strong>Python: Select Interpreter</strong> → chọn bản có <code>.venv</code> của dự án. Thanh trạng thái góc dưới phải hiện tên môi trường.</li>
+  <li>Sau khi chọn, terminal mới mở trong VS Code sẽ tự kích hoạt <code>.venv</code>, nút Run cũng dùng Python của <code>.venv</code>.</li>
+  <li>Muốn dùng notebook <code>.ipynb</code> (rất tiện để xem ảnh trung gian): cài tiện ích <strong>Jupyter</strong> của Microsoft; khi chạy ô đầu tiên, VS Code sẽ đề nghị cài gói <code>ipykernel</code> vào môi trường, đồng ý là xong. Code ổn định thì chuyển sang file <code>.py</code>.</li>
+</ul>
+<div class="warn"><strong>Lỗi kinh điển: chạy trong terminal được, bấm Run lại lỗi</strong><code>ModuleNotFoundError: No module named 'cv2'</code> khi bấm Run nhưng gõ <code>python file.py</code> trong terminal lại chạy được: VS Code đang chọn interpreter khác với terminal. Chọn lại interpreter <code>.venv</code> như trên.</div>
+
+<h2>7. PyTorch và GPU</h2>
+<p>Chặng AI (từ chặng 10) dùng PyTorch. Bạn <strong>không bắt buộc</strong> có GPU để học: các bài trong lộ trình dùng mô hình nhỏ chạy được trên CPU. Nhưng nếu máy có GPU NVIDIA, huấn luyện nhanh hơn nhiều lần, và bạn cần biết cài cho đúng.</p>
+<ol>
+  <li><strong>Driver NVIDIA</strong>: cài bản mới. Kiểm tra bằng lệnh <code>nvidia-smi</code>: bảng hiện ra cho biết tên GPU, phiên bản driver, và dòng "CUDA Version" là phiên bản CUDA <em>tối đa</em> mà driver hỗ trợ.</li>
+  <li><strong>Lấy lệnh cài trên trang chủ</strong>: vào <a href="https://pytorch.org/get-started/locally/" rel="noopener" target="_blank">pytorch.org/get-started</a>, chọn hệ điều hành, Pip, Python và một phiên bản CUDA không cao hơn con số "CUDA Version" ở trên, rồi <strong>copy đúng lệnh trang đó đưa ra</strong>. Trên Windows, lệnh thường có thêm <code>--index-url https://download.pytorch.org/whl/cuXXX</code>: thiếu tham số này, pip sẽ cài bản chỉ chạy CPU.</li>
+  <li><strong>Cài PyTorch trước</strong>, rồi mới cài các thư viện dùng PyTorch (ví dụ <code>ultralytics</code>). Làm ngược lại, pip có thể tự kéo về một bản PyTorch không đúng loại bạn muốn.</li>
+</ol>
+<p>Bạn <strong>không</strong> cần cài CUDA Toolkit riêng để chạy PyTorch: bản build GPU của PyTorch đã kèm thư viện CUDA cần thiết (vì vậy gói cài nặng tới vài GB), chỉ cần driver đủ mới. Mac chip Apple dùng GPU qua backend <code>mps</code>, không có CUDA.</p>
+<p>Kiểm tra PyTorch nhận GPU và chạy thử một phép nhân ma trận trên thiết bị tốt nhất có sẵn:</p>
+<pre><code class="language-python">import torch
+
+print("PyTorch:", torch.__version__)
+print("CUDA khả dụng:", torch.cuda.is_available())
+if torch.cuda.is_available():
+    print("GPU:", torch.cuda.get_device_name(0))
+    print("CUDA của bản build:", torch.version.cuda)
+
+if torch.cuda.is_available():
+    thiet_bi = "cuda"
+elif torch.backends.mps.is_available():
+    thiet_bi = "mps"          # Mac chip Apple
+else:
+    thiet_bi = "cpu"
+
+x = torch.rand(1000, 1000, device=thiet_bi)
+y = x @ x                     # nhân ma trận 1000x1000
+print("Chạy trên:", thiet_bi, tuple(y.shape))</code></pre>
+<p>Kết quả trên máy chạy thử của bài viết (máy chủ không có GPU; phiên bản của bạn sẽ khác):</p>
+<pre><code class="language-text">PyTorch: 2.14.1+cu130
+CUDA khả dụng: False
+Chạy trên: cpu (1000, 1000)</code></pre>
+<p>Trên máy có GPU cài đúng, dòng thứ hai là <code>True</code>, có thêm dòng tên card (ví dụ "NVIDIA GeForce RTX ...") và dòng cuối là <code>cuda</code>. Hậu tố <code>+cu130</code> cho biết đây là bản build có CUDA; nếu thấy <code>+cpu</code> thì bạn đã cài nhầm bản chỉ chạy CPU.</p>
+<table>
+  <tr><th>Triệu chứng</th><th>Nguyên nhân thường gặp</th><th>Cách xử lý</th></tr>
+  <tr><td><code>torch.__version__</code> có <code>+cpu</code></td><td>Cài thiếu <code>--index-url</code> (Windows) hoặc thư viện khác kéo bản CPU về</td><td><code>pip uninstall torch torchvision</code>, cài lại bằng lệnh trên pytorch.org</td></tr>
+  <tr><td>Bản <code>+cuXXX</code> nhưng <code>is_available()</code> là <code>False</code></td><td>Driver cũ hơn CUDA của bản build, hoặc máy không có GPU NVIDIA</td><td>Cập nhật driver, kiểm tra lại <code>nvidia-smi</code></td></tr>
+  <tr><td><code>nvidia-smi</code> không chạy</td><td>Chưa cài driver NVIDIA</td><td>Cài driver từ trang NVIDIA hoặc của hãng laptop</td></tr>
+</table>
+
+<h2>8. Script kiểm tra môi trường</h2>
+<p>Đây là script đầu tiên bạn nên chép vào mọi dự án, và chạy đầu tiên mỗi khi cài lên một máy mới. Nó in phiên bản Python, NumPy, OpenCV, cho biết có đang ở trong môi trường ảo không, có cài lẫn nhiều gói OpenCV không, và có GPU hay không. Script không bắt buộc phải có PyTorch: thiếu PyTorch thì nó hỏi <code>nvidia-smi</code>.</p>
+<pre><code class="language-python">"""kiem_tra_moi_truong.py: in thông tin môi trường trước khi chạy dự án vision."""
+import platform
+import shutil
+import subprocess
+import sys
+from importlib import metadata
+
+GOI_OPENCV = ["opencv-python", "opencv-contrib-python",
+              "opencv-python-headless", "opencv-contrib-python-headless"]
+
+
+def phien_ban_goi(ten):
+    """Phiên bản của một gói pip, hoặc None nếu chưa cài."""
+    try:
+        return metadata.version(ten)
+    except metadata.PackageNotFoundError:
+        return None
+
+
+def kiem_tra_gpu():
+    try:
+        import torch
+    except ImportError:
+        torch = None
+    if torch is not None:
+        if torch.cuda.is_available():
+            return f"có ({torch.cuda.get_device_name(0)}, PyTorch {torch.__version__})"
+        return f"không (PyTorch {torch.__version__} chạy CPU)"
+    # Không có PyTorch: hỏi trực tiếp driver NVIDIA
+    if shutil.which("nvidia-smi") is None:
+        return "không thấy nvidia-smi (chưa có GPU NVIDIA hoặc chưa cài driver)"
+    kq = subprocess.run(["nvidia-smi", "--query-gpu=name,driver_version", "--format=csv,noheader"],
+                        capture_output=True, text=True, timeout=10)
+    return "có (" + kq.stdout.strip() + "), nhưng chưa cài PyTorch"
+
+
+print("Python       :", platform.python_version(), "|", sys.platform)
+print("Môi trường ảo:", "có" if sys.prefix != sys.base_prefix else "KHÔNG (đang dùng Python chung!)")
+
+try:
+    import numpy as np
+    print("NumPy        :", np.__version__)
+except ImportError:
+    print("NumPy        : chưa cài")
+
+try:
+    import cv2
+    print("OpenCV       :", cv2.__version__)
+except ImportError:
+    print("OpenCV       : chưa cài")
+
+goi_cv = [g for g in GOI_OPENCV if phien_ban_goi(g)]
+print("Gói OpenCV   :", ", ".join(goi_cv) if goi_cv else "không có")
+if len(goi_cv) &gt; 1:
+    print("CẢNH BÁO: cài lẫn nhiều gói OpenCV, hãy gỡ hết rồi cài lại một gói")
+
+print("GPU          :", kiem_tra_gpu())</code></pre>
+<p>Kết quả trên máy chạy thử của bài viết (máy chủ Linux, không GPU, OpenCV bản headless). Phiên bản trên máy bạn sẽ khác:</p>
+<pre><code class="language-text">Python       : 3.13.16 | linux
+Môi trường ảo: có
+NumPy        : 2.5.3
+OpenCV       : 5.0.0
+Gói OpenCV   : opencv-python-headless
+GPU          : không (PyTorch 2.14.1+cu130 chạy CPU)</code></pre>
+<p>Một số điểm đáng học trong script:</p>
+<ul>
+  <li><code>sys.prefix != sys.base_prefix</code> là cách chuẩn để biết đang chạy trong môi trường ảo.</li>
+  <li><code>importlib.metadata.version()</code> đọc phiên bản theo <strong>tên gói pip</strong> (<code>opencv-python</code>), còn <code>cv2.__version__</code> là phiên bản theo <strong>tên module</strong> (<code>cv2</code>). Hai tên này khác nhau, đây là lý do <code>pip install cv2</code> không chạy.</li>
+  <li><code>import torch</code> đặt trong <code>try/except ImportError</code> (bài trước) nên script chạy được cả trên máy chưa có PyTorch.</li>
+</ul>
+
+<h2>9. Cấu trúc thư mục dự án gợi ý</h2>
+<pre><code class="language-text">vision-demo/
+  .venv/             # môi trường ảo (không commit, không copy sang máy khác)
+  data/              # ảnh, dataset (không commit file lớn lên Git)
+  notebooks/         # thử nghiệm
+  src/               # mã nguồn chính
+  models/            # trọng số đã huấn luyện
+  requirements.txt   # hoặc pyproject.toml + uv.lock
+  kiem_tra_moi_truong.py
+  README.md          # ghi phiên bản Python, driver GPU, cách cài
+  .gitignore         # .venv/, data/, models/*.pt, __pycache__/</code></pre>
+<p>Checklist trước khi mang code sang máy khác hoặc giao cho nhà máy:</p>
 <ul>
   <li>Có file khai báo phiên bản (<code>requirements.txt</code> hoặc <code>uv.lock</code>).</li>
-  <li>Ghi rõ phiên bản Python, driver GPU trong README.</li>
-  <li>Không dùng đường dẫn tuyệt đối kiểu <code>C:\Users\ten-ban\...</code> trong code.</li>
-  <li>Thử cài lại từ đầu trên một máy sạch (hoặc máy ảo) trước khi giao cho khách hàng.</li>
+  <li>README ghi rõ phiên bản Python, hệ điều hành, driver GPU đã thử.</li>
+  <li>Không dùng đường dẫn tuyệt đối kiểu <code>C:\Users\ten-ban\...</code> trong code; dùng <code>pathlib</code> và đường dẫn tương đối hoặc file cấu hình.</li>
+  <li>Thử cài lại từ đầu trên một máy sạch (hoặc máy ảo) bằng đúng hướng dẫn trong README, chạy <code>kiem_tra_moi_truong.py</code>, rồi mới giao.</li>
 </ul>
-<p>Môi trường đã sẵn sàng? Bắt đầu với bài <a href="../hoc/numpy-anh-la-mang-so.html">NumPy cho xử lý ảnh</a>.</p>
+
+<h2>10. Lỗi thường gặp</h2>
+<table>
+  <tr><th>Thông báo / hiện tượng</th><th>Nguyên nhân</th><th>Cách sửa</th></tr>
+  <tr><td><code>ModuleNotFoundError: No module named 'cv2'</code></td><td>Chưa kích hoạt <code>.venv</code>, hoặc VS Code chọn interpreter khác</td><td>Kích hoạt môi trường; chọn lại interpreter; dùng <code>python -m pip</code></td></tr>
+  <tr><td><code>pip install cv2</code> báo không tìm thấy gói</td><td>Tên module khác tên gói</td><td><code>python -m pip install opencv-python</code></td></tr>
+  <tr><td><code>A module that was compiled using NumPy 1.x cannot be run in NumPy 2.x ...</code></td><td>Một thư viện cũ được build cho NumPy 1.x</td><td>Nâng cấp thư viện đó, hoặc tạm ghim <code>"numpy&lt;2"</code> trong môi trường của dự án này</td></tr>
+  <tr><td><code>imshow</code> báo "The function is not implemented"</td><td>Đang dùng gói <code>-headless</code> (hoặc cài lẫn hai gói)</td><td>Gỡ hết gói OpenCV, cài lại <code>opencv-python</code></td></tr>
+  <tr><td>Copy <code>.venv</code> sang máy khác thì lỗi</td><td><code>.venv</code> chứa đường dẫn tuyệt đối</td><td>Tạo môi trường mới, cài từ <code>requirements.txt</code></td></tr>
+</table>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Mỗi dự án một môi trường ảo: <code>python -m venv .venv</code>, kích hoạt, thấy <code>(.venv)</code> ở đầu dòng lệnh.</li>
+  <li>Cài bằng <code>python -m pip install ...</code>; OpenCV chỉ cài <strong>một</strong> trong 4 gói (mặc định <code>opencv-python</code>).</li>
+  <li>Lưu phiên bản bằng <code>pip freeze &gt; requirements.txt</code>, tái lập bằng <code>pip install -r requirements.txt</code>; máy không có mạng dùng <code>pip download</code> + <code>--no-index --find-links</code>.</li>
+  <li>PyTorch GPU: driver mới, lệnh cài từ pytorch.org, cài PyTorch trước các thư viện khác, kiểm tra <code>torch.cuda.is_available()</code>.</li>
+  <li>Luôn có script kiểm tra môi trường và chạy nó đầu tiên trên máy mới.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Môi trường vision-env</h3>
+<p>Tạo môi trường ảo tên <code>vision-env</code>, cài <code>numpy</code> và <code>opencv-python</code>, xuất <code>requirements.txt</code>. Sau đó xóa môi trường và tạo lại từ file đó để chắc chắn quy trình tái lập hoạt động.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-bash">python -m venv vision-env
+# Windows PowerShell:  vision-env\Scripts\Activate.ps1
+# macOS / Linux:       source vision-env/bin/activate
+python -m pip install --upgrade pip
+python -m pip install numpy opencv-python
+python -m pip freeze &gt; requirements.txt
+deactivate
+
+# Thử tái lập: xóa môi trường rồi tạo lại
+# Windows:  rmdir /s /q vision-env   (cmd)  hoặc  Remove-Item -Recurse -Force vision-env  (PowerShell)
+# Linux:    rm -rf vision-env
+python -m venv vision-env
+# kích hoạt lại, rồi:
+python -m pip install -r requirements.txt
+python -c "import cv2, numpy; print(cv2.__version__, numpy.__version__)"</code></pre>
+<p><code>requirements.txt</code> phải có ít nhất hai dòng <code>numpy==...</code> và <code>opencv-python==...</code>. Lệnh cuối in ra hai phiên bản giống hệt trong file là thành công. Lưu ý tên thư mục môi trường không nhất thiết là <code>.venv</code>, nhưng nhớ thêm <code>vision-env/</code> vào <code>.gitignore</code>.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Script in phiên bản và GPU</h3>
+<p>Viết script ngắn (không cần đầy đủ như mục 8) in phiên bản Python, NumPy, OpenCV và cho biết có GPU hay không. Yêu cầu: không bị lỗi trên máy chưa cài PyTorch.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import platform
+
+import cv2
+import numpy as np
+
+print("Python:", platform.python_version())
+print("NumPy :", np.__version__)
+print("OpenCV:", cv2.__version__)
+
+try:
+    import torch
+    co_gpu = torch.cuda.is_available()
+    ten = torch.cuda.get_device_name(0) if co_gpu else "-"
+    print("GPU   :", "có" if co_gpu else "không", ten)
+except ImportError:
+    print("GPU   : chưa cài PyTorch nên chưa kiểm tra được")</code></pre>
+<p>Kết quả trên máy chạy thử (máy bạn sẽ khác):</p>
+<pre><code class="language-text">Python: 3.13.16
+NumPy : 2.5.3
+OpenCV: 5.0.0
+GPU   : không -</code></pre>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 3. Chẩn đoán lỗi</h3>
+<p>Một đồng nghiệp báo: "Em đã <code>pip install opencv-python</code> rồi, gõ <code>python test.py</code> trong terminal chạy được, nhưng bấm nút Run trong VS Code thì báo <code>ModuleNotFoundError: No module named 'cv2'</code>." Nêu nguyên nhân và hai lệnh/thao tác để kiểm tra và sửa.</p>
+<details><summary>Xem đáp án</summary>
+<p>Nguyên nhân: terminal và nút Run dùng hai bản Python khác nhau. Terminal đã kích hoạt môi trường có OpenCV, còn VS Code đang chọn interpreter khác (thường là Python chung của máy).</p>
+<ol>
+  <li>Trong terminal, chạy <code>python -c "import sys; print(sys.executable)"</code> để biết đường dẫn Python có OpenCV.</li>
+  <li>Trong VS Code: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> → <strong>Python: Select Interpreter</strong> → chọn đúng đường dẫn đó (bản trong <code>.venv</code>). Bấm Run lại.</li>
+</ol>
+<p>Để phòng lỗi lần sau: luôn cài bằng <code>python -m pip</code> trong terminal đã thấy <code>(.venv)</code>.</p>
+</details>
+</div>
+<p>Bài tiếp theo: <strong>Xử lý thư mục ảnh, CSV và log</strong>, bạn sẽ dùng môi trường vừa tạo để duyệt hàng nghìn ảnh, chia tập train/val và ghi log như một trạm kiểm tra thật.</p>

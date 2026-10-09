@@ -1,66 +1,304 @@
-<p>Trước khi học OpenCV hay Deep Learning, có một sự thật cần nắm thật chắc: <strong>với máy tính, một bức ảnh chỉ là một mảng số</strong>. Hiểu điều này, mọi thao tác xử lý ảnh (cắt, tăng sáng, tạo mặt nạ, đếm điểm ảnh) chỉ còn là phép toán trên mảng NumPy.</p>
+<p>Trước khi học OpenCV hay Deep Learning, có một sự thật cần nắm thật chắc: <strong>với máy tính, một bức ảnh chỉ là một mảng số</strong>. Bài "NumPy cơ bản: mảng, slicing, vector hóa" đã dạy bạn tạo mảng, cắt mảng, view/copy, mặt nạ boolean và <code>axis</code> trên các dãy số đo. Bài này áp dụng đúng những công cụ đó lên <strong>ảnh</strong>: ảnh xám và ảnh màu nằm trong bộ nhớ ra sao, vì sao OpenCV dùng thứ tự BGR, cắt vùng kiểm tra (ROI), tạo mặt nạ, và cái bẫy tràn số <code>uint8</code> mà gần như ai cũng dính ít nhất một lần. Sau bài này là "Dự án chặng 1: báo cáo chất lượng thư mục ảnh", nơi bạn dùng mọi thứ để tự động đánh giá cả nghìn ảnh.</p>
+<p>Các ví dụ dùng NumPy và OpenCV (đã cài ở bài "Môi trường ảo, pip và thư viện cho AI Vision"). Ở đây OpenCV chỉ dùng để đọc/ghi file và vài hàm nhỏ; chặng 2 sẽ học OpenCV bài bản.</p>
 
-<h2>Ảnh xám và ảnh màu trong NumPy</h2>
-<p>Khi đọc ảnh bằng OpenCV, kết quả là một <code>numpy.ndarray</code>:</p>
-<pre><code>import cv2
+<h2>1. Ảnh xám: mảng 2 chiều</h2>
+<p>Ảnh xám (grayscale) là mảng 2 chiều <code>(cao, rộng)</code>. Mỗi phần tử là độ sáng của một pixel, kiểu <code>uint8</code> (số nguyên không dấu 8 bit): 0 là đen, 255 là trắng. Tự tạo một ảnh "thang xám" 100 hàng × 256 cột, sáng dần từ trái sang phải:</p>
+<pre><code class="language-python">import cv2
 import numpy as np
 
-img = cv2.imread("linh-kien.jpg")          # ảnh màu
-gray = cv2.imread("linh-kien.jpg", cv2.IMREAD_GRAYSCALE)
+xam = np.tile(np.arange(256, dtype=np.uint8), (100, 1))   # lặp hàng 0..255 thành 100 hàng
+print(xam.shape, xam.dtype, xam.size)
+print("Trái, giữa, phải:", xam[50, 0], xam[50, 128], xam[50, 255])
+cv2.imwrite("thang_xam.png", xam)
 
-print(type(img))        # &lt;class 'numpy.ndarray'&gt;
-print(img.shape)        # (480, 640, 3)  -&gt; cao, rộng, số kênh
-print(gray.shape)       # (480, 640)
-print(img.dtype)        # uint8 -&gt; mỗi giá trị từ 0 đến 255</code></pre>
+doc_lai = cv2.imread("thang_xam.png", cv2.IMREAD_GRAYSCALE)
+print("Đọc lại giống hệt:", np.array_equal(doc_lai, xam))</code></pre>
+<pre><code class="language-text">(100, 256) uint8 25600
+Trái, giữa, phải: 0 128 255
+Đọc lại giống hệt: True</code></pre>
+<p>Một ảnh xám 2448×2048 (camera 5 MP phổ biến trong Machine Vision) chiếm đúng 2448 × 2048 = 5.013.504 byte, khoảng 5 MB trong bộ nhớ: mỗi pixel 1 byte. Ảnh màu cùng độ phân giải chiếm gấp 3.</p>
+
+<h3>Hệ tọa độ: hàng trước, cột sau</h3>
+<p>Gốc tọa độ ảnh ở <strong>góc trái trên</strong>, trục y hướng <strong>xuống</strong>. NumPy truy cập theo <code>anh[hàng, cột]</code> tức <code>anh[y, x]</code>, nhưng các hàm vẽ của OpenCV lại nhận điểm dạng <code>(x, y)</code>. Hai quy ước này nằm cạnh nhau trong cùng một chương trình, nên phải luôn tỉnh táo:</p>
+<pre><code class="language-python">anh = np.zeros((100, 200), np.uint8)          # cao 100, rộng 200
+cv2.circle(anh, (150, 30), 5, 255, -1)        # OpenCV: tâm (x=150, y=30)
+print(anh.shape)                              # (cao, rộng)
+print("anh[30, 150] =", anh[30, 150])         # NumPy: [y, x] → đúng điểm trắng
+try:
+    print(anh[150, 30])                       # viết nhầm thành [x, y]
+except IndexError as loi:
+    print("anh[150, 30] lỗi:", loi)</code></pre>
+<pre><code class="language-text">(100, 200)
+anh[30, 150] = 255
+anh[150, 30] lỗi: index 150 is out of bounds for axis 0 with size 100</code></pre>
+
+<h2>2. Ảnh màu và thứ tự BGR</h2>
+<p>Ảnh màu là mảng 3 chiều <code>(cao, rộng, 3)</code>: mỗi pixel có 3 số. OpenCV lưu 3 số đó theo thứ tự <strong>Blue, Green, Red</strong> (BGR), ngược với RGB mà Pillow, matplotlib và hầu hết mô hình AI dùng.</p>
+<pre><code class="language-python">mau = np.zeros((120, 160, 3), np.uint8)
+mau[:, :, 2] = 255                    # kênh số 2 là R → cả ảnh màu đỏ
+mau[40:80, 60:100] = (255, 0, 0)      # ô giữa: B=255 → xanh dương
+cv2.imwrite("do_xanh.png", mau)
+
+anh = cv2.imread("do_xanh.png")       # mặc định đọc thành ảnh màu BGR
+print(anh.shape, anh.dtype)
+print("Pixel góc (BGR):", anh[0, 0], " pixel giữa (BGR):", anh[60, 80])
+
+b, g, r = cv2.split(anh)              # tách 3 kênh, mỗi kênh là ảnh xám
+print("Trung bình B, G, R:", anh.mean(axis=(0, 1)).round(1))
+
+xam = cv2.imread("do_xanh.png", cv2.IMREAD_GRAYSCALE)
+print("Đọc dạng xám:", xam.shape, xam[0, 0], xam[60, 80])</code></pre>
+<pre><code class="language-text">(120, 160, 3) uint8
+Pixel góc (BGR): [  0   0 255]  pixel giữa (BGR): [255   0   0]
+Trung bình B, G, R: [ 21.2   0.  233.8]
+Đọc dạng xám: (120, 160) 76 29</code></pre>
+<p>Đọc dạng xám, đỏ thuần thành 76 còn xanh dương thuần thành 29: OpenCV đổi màu sang xám theo trọng số <code>0,299·R + 0,587·G + 0,114·B</code> (bài "Không gian màu BGR, HSV, Gray và tách màu" sẽ giải thích kỹ).</p>
+
+<h3>BGR gặp RGB: đọc cùng file bằng Pillow</h3>
+<pre><code class="language-python">from PIL import Image
+
+rgb_pillow = np.asarray(Image.open("do_xanh.png"))
+print("Pillow (RGB) pixel góc:", rgb_pillow[0, 0])
+
+rgb = cv2.cvtColor(anh, cv2.COLOR_BGR2RGB)          # cách chuẩn để đổi BGR → RGB
+print("Giống Pillow:", np.array_equal(rgb, rgb_pillow))
+
+dao_kenh = anh[:, :, ::-1]                          # đảo kênh bằng slicing: nhanh, là view
+print("Giống Pillow:", np.array_equal(dao_kenh, rgb_pillow),
+      "| liền bộ nhớ:", dao_kenh.flags["C_CONTIGUOUS"])
+try:
+    cv2.rectangle(dao_kenh, (0, 0), (10, 10), (0, 255, 0), -1)
+except cv2.error as loi:
+    print("cv2.rectangle trên view đảo kênh báo lỗi:", type(loi).__name__)
+dao_kenh = np.ascontiguousarray(dao_kenh)           # sao chép thành mảng liền bộ nhớ
+cv2.rectangle(dao_kenh, (0, 0), (10, 10), (0, 255, 0), -1)
+print("Sau ascontiguousarray: vẽ được")</code></pre>
+<pre><code class="language-text">Pillow (RGB) pixel góc: [255   0   0]
+Giống Pillow: True
+Giống Pillow: True | liền bộ nhớ: False
+cv2.rectangle trên view đảo kênh báo lỗi: error
+Sau ascontiguousarray: vẽ được</code></pre>
+<p><code>anh[:, :, ::-1]</code> là view với bước nhảy âm, không liền bộ nhớ. Nhiều hàm OpenCV từ chối ghi vào mảng như vậy (lỗi "Layout of the output array ... is incompatible with cv::Mat"). Dùng <code>cv2.cvtColor</code> hoặc bọc thêm <code>np.ascontiguousarray</code> là hết.</p>
+<div class="warn"><strong>Hai hậu quả kinh điển của BGR</strong>(1) Hiển thị ảnh OpenCV bằng matplotlib: màu đỏ và xanh dương bị đảo cho nhau. (2) Đưa ảnh OpenCV vào mô hình AI huấn luyện bằng ảnh RGB mà quên đổi kênh: mô hình vẫn chạy, không báo lỗi gì, nhưng độ chính xác giảm khó hiểu. Quy ước an toàn: <strong>trong code OpenCV mọi thứ là BGR</strong>, chỉ đổi sang RGB tại đúng chỗ giao tiếp với thư viện khác.</div>
+
+<h2>3. Ảnh 16 bit từ camera công nghiệp</h2>
+<p>Camera công nghiệp thường cho ảnh 10 hoặc 12 bit (giá trị 0–1023 hoặc 0–4095), lưu trong mảng <code>uint16</code>. Đọc sai cờ là mất dữ liệu mà không hay biết:</p>
+<pre><code class="language-python">anh12 = np.tile(np.linspace(0, 4095, 8).astype(np.uint16), (4, 1))   # ảnh 12 bit giả lập
+cv2.imwrite("anh_12bit.png", anh12)               # PNG lưu được 16 bit
+
+giu_nguyen = cv2.imread("anh_12bit.png", cv2.IMREAD_UNCHANGED)
+mac_dinh = cv2.imread("anh_12bit.png")            # mặc định: ép về 8 bit, 3 kênh
+print("UNCHANGED:", giu_nguyen.dtype, giu_nguyen.shape, giu_nguyen[0])
+print("Mặc định :", mac_dinh.dtype, mac_dinh.shape, mac_dinh[0, :, 0])
+
+hien_thi = (giu_nguyen &gt;&gt; 4).astype(np.uint8)     # 12 bit → 8 bit để xem: chia 16
+print("Để hiển thị:", hien_thi[0])</code></pre>
+<pre><code class="language-text">UNCHANGED: uint16 (4, 8) [   0  585 1170 1755 2340 2925 3510 4095]
+Mặc định : uint8 (4, 8, 3) [ 0  2  4  6  9 11 13 15]
+Để hiển thị: [  0  36  73 109 146 182 219 255]</code></pre>
+<p>Với ảnh 16 bit, đọc mặc định sẽ chia giá trị cho 256 (dịch phải 8 bit), nên ảnh 12 bit gần như chỉ còn 16 mức xám. Muốn đo đạc chính xác trên ảnh 12 bit: đọc bằng <code>IMREAD_UNCHANGED</code>, tính toán trên <code>uint16</code> hoặc <code>float32</code>, chỉ chuyển về 8 bit khi cần hiển thị. JPEG không lưu được 16 bit, hãy dùng PNG hoặc TIFF.</p>
+
+<h2>4. Cắt vùng quan tâm (ROI)</h2>
+<p>Trong Machine Vision, ta hầu như chỉ xử lý một vùng nhỏ của ảnh, gọi là <strong>ROI</strong> (Region of Interest): vùng có con ốc, vùng in hạn sử dụng, vị trí linh kiện trên khay. Cắt ROI là slicing <code>anh[y1:y2, x1:x2]</code>, và thường cấu hình dưới dạng <code>(x, y, w, h)</code>.</p>
+<p>Ví dụ: kiểm tra khay 4 ô, ô nào có linh kiện (sáng) thì OK, ô trống (tối) thì NG. Độ sáng trung bình của ROI là một "cảm biến" đơn giản mà rất hiệu quả, dùng cho các bài toán có/không: có linh kiện chưa, nắp chai đã đậy chưa, đèn báo có sáng không.</p>
+<pre><code class="language-python">rng = np.random.default_rng(0)
+khay = rng.integers(20, 50, size=(200, 400), dtype=np.uint8)        # nền khay tối, có nhiễu
+for x in (20, 120, 320):                                            # ô thứ 3 (x=220) bị trống
+    khay[60:140, x + 10:x + 70] = rng.integers(170, 220, size=(80, 60), dtype=np.uint8)
+cv2.imwrite("khay.png", khay)
+
+ROI = [(20, 50, 80, 100), (120, 50, 80, 100), (220, 50, 80, 100), (320, 50, 80, 100)]  # (x, y, w, h)
+NGUONG = 90
+for i, (x, y, w, h) in enumerate(ROI, start=1):
+    vung = khay[y:y + h, x:x + w]                    # hàng y..y+h, cột x..x+w
+    sang = vung.mean()
+    print(f"Ô {i}: ROI {vung.shape}, sáng TB {sang:6.1f} → {'OK' if sang &gt; NGUONG else 'NG (trống)'}")</code></pre>
+<pre><code class="language-text">Ô 1: ROI (100, 80), sáng TB  130.6 → OK
+Ô 2: ROI (100, 80), sáng TB  130.6 → OK
+Ô 3: ROI (100, 80), sáng TB   34.5 → NG (trống)
+Ô 4: ROI (100, 80), sáng TB  130.4 → OK</code></pre>
+<p>Ngưỡng 90 nằm giữa nền (khoảng 35) và mức trung bình của ô có linh kiện (khoảng 130, vì linh kiện chỉ chiếm 60% diện tích ROI). Ngưỡng tốt nằm xa cả hai phía; trên dây chuyền thật bạn sẽ lấy hai giá trị này từ vài chục ảnh OK và NG.</p>
+<div class="tip"><strong>ROI là view</strong>Như bài NumPy cơ bản, <code>vung</code> dùng chung bộ nhớ với ảnh gốc: gán <code>vung[:] = 0</code> là bôi đen luôn vùng đó trên ảnh gốc. Tính toán (mean, so sánh) thì không sao; định sửa thì <code>.copy()</code> trước. Ngược lại, chính tính chất này cho phép "vẽ" lên ảnh bằng slicing, như bài tập 1.</div>
+
+<h2>5. Mặt nạ (mask)</h2>
+<p>Phép so sánh trên ảnh trả về mảng <code>True/False</code> cùng kích thước: đó là một <strong>mặt nạ</strong>, đánh dấu pixel nào thỏa điều kiện. Ví dụ: bề mặt sáng có vài vết bẩn tối, tính tỉ lệ diện tích bẩn.</p>
+<pre><code class="language-python">be_mat = np.full((100, 100), 200, np.uint8)        # bề mặt sáng
+be_mat[20:26, 30:40] = 40                           # vết bẩn 1: 6 x 10 = 60 pixel
+be_mat[70:75, 60:64] = 55                           # vết bẩn 2: 5 x 4 = 20 pixel
+
+toi = be_mat &lt; 100                                  # mặt nạ bool
+print(toi.dtype, toi.shape)
+print("Số pixel tối:", toi.sum(), "| tỉ lệ:", f"{toi.mean():.2%}")
+print("Độ sáng TB vùng tối:", be_mat[toi].mean(), "| vùng sạch:", be_mat[~toi].mean())
+
+mask_cv = toi.astype(np.uint8) * 255                # dạng OpenCV: 0 và 255
+print(mask_cv.dtype, np.unique(mask_cv), cv2.countNonZero(mask_cv))
+
+danh_dau = cv2.cvtColor(be_mat, cv2.COLOR_GRAY2BGR)
+danh_dau[toi] = (0, 0, 255)                         # tô đỏ mọi pixel bẩn
+cv2.imwrite("vet_ban.png", danh_dau)</code></pre>
+<pre><code class="language-text">bool (100, 100)
+Số pixel tối: 80 | tỉ lệ: 0.80%
+Độ sáng TB vùng tối: 43.75 | vùng sạch: 200.0
+uint8 [  0 255] 80</code></pre>
 <ul>
-  <li><strong>Ảnh xám</strong>: mảng 2 chiều <code>(cao, rộng)</code>, 0 là đen, 255 là trắng.</li>
-  <li><strong>Ảnh màu</strong>: mảng 3 chiều <code>(cao, rộng, 3)</code>. OpenCV lưu theo thứ tự <strong>BGR</strong>, không phải RGB, đây là lỗi người mới gặp nhiều nhất khi hiển thị ảnh bằng matplotlib.</li>
-  <li>Chỉ số luôn là <code>img[hàng, cột]</code>, tức <code>img[y, x]</code>, ngược với thói quen viết (x, y).</li>
+  <li><code>toi.sum()</code> đếm số <code>True</code>; <code>toi.mean()</code> là tỉ lệ diện tích (True = 1, False = 0).</li>
+  <li><code>be_mat[toi]</code> lấy ra các pixel thỏa mặt nạ (thành mảng 1 chiều); <code>~toi</code> là phần còn lại.</li>
+  <li>Hàm OpenCV nhận mặt nạ dạng <strong><code>uint8</code> với giá trị 0/255</strong>, không nhận <code>bool</code>. Đổi bằng <code>.astype(np.uint8) * 255</code>; chiều ngược lại là <code>mask_cv &gt; 0</code>.</li>
+  <li>Gán theo mặt nạ trên ảnh màu (<code>danh_dau[toi] = (0, 0, 255)</code>) tô cả 3 kênh của mọi pixel được chọn: cách nhanh nhất để đánh dấu lỗi lên ảnh kết quả.</li>
 </ul>
 
-<h2>Đọc và sửa từng điểm ảnh</h2>
-<pre><code>b, g, r = img[100, 200]          # điểm ảnh ở hàng 100, cột 200
-img[100, 200] = (0, 0, 255)      # tô đỏ (B=0, G=0, R=255)
+<h3>Mặt nạ hình tròn: chỉ kiểm tra bên trong nắp chai</h3>
+<p>Sản phẩm tròn (nắp chai, vòng đệm) thì ROI chữ nhật dính cả nền ở bốn góc. Tạo mặt nạ tròn bằng khoảng cách tới tâm, tính được bằng broadcasting:</p>
+<pre><code class="language-python">cao, rong = 120, 120
+cx, cy, ban_kinh = 60, 60, 50
+yy, xx = np.ogrid[:cao, :rong]                       # yy: cột (120,1), xx: hàng (1,120)
+trong_tron = (xx - cx) ** 2 + (yy - cy) ** 2 &lt;= ban_kinh ** 2
+print(trong_tron.shape, trong_tron.sum(), "pixel; πr² =", round(np.pi * ban_kinh ** 2))
 
-rgb = img[:, :, ::-1]            # đổi BGR -&gt; RGB bằng cách đảo trục kênh</code></pre>
-<p>Không bao giờ dùng vòng lặp <code>for</code> duyệt từng điểm ảnh để xử lý: ảnh 5 megapixel có 5 triệu điểm, vòng lặp Python sẽ chậm hàng trăm lần so với phép toán vector hóa của NumPy.</p>
+nap = np.full((cao, rong), 30, np.uint8)             # nền tối
+nap[trong_tron] = 180                                # nắp sáng
+nap[55:60, 40:52] = 60                               # một vết lõm tối trên nắp
+loi = trong_tron &amp; (nap &lt; 100)                       # tối VÀ nằm trong nắp
+print("Pixel lỗi trong nắp:", loi.sum(), "| nếu không có mặt nạ tròn:", (nap &lt; 100).sum())</code></pre>
+<pre><code class="language-text">(120, 120) 7845 pixel; πr² = 7854
+Pixel lỗi trong nắp: 60 | nếu không có mặt nạ tròn: 6615</code></pre>
+<p>Không dùng mặt nạ tròn, bốn góc nền tối bị đếm là "lỗi" và mọi nắp đều thành NG. Kết hợp mặt nạ bằng <code>&amp;</code>, <code>|</code>, <code>~</code> với mỗi điều kiện trong ngoặc, đúng như bài NumPy cơ bản.</p>
 
-<h2>Cắt vùng quan tâm (ROI) bằng slicing</h2>
-<p>Trong Machine Vision, ta hầu như chỉ xử lý một vùng nhỏ của ảnh, gọi là ROI (Region of Interest):</p>
-<pre><code>roi = img[150:350, 200:500]      # y từ 150 đến 350, x từ 200 đến 500
-roi_copy = roi.copy()            # slicing trả về "view", sửa roi là sửa luôn img</code></pre>
-<p>Lưu ý <code>roi</code> là <em>view</em> chia sẻ bộ nhớ với ảnh gốc. Muốn xử lý độc lập thì phải <code>.copy()</code>.</p>
+<h2>6. Bẫy tràn số uint8</h2>
+<p><code>uint8</code> chỉ chứa 0–255. Phép cộng, trừ, nhân giữa hai mảng <code>uint8</code> cho kết quả <code>uint8</code>, giá trị vượt khoảng sẽ <strong>quay vòng</strong> (tính theo modulo 256), không báo lỗi gì:</p>
+<pre><code class="language-python">a = np.array([[200, 250, 30]], dtype=np.uint8)   # "ảnh" 1 hàng x 3 pixel
+b = np.array([[100, 10, 60]], dtype=np.uint8)
+print("a + b      :", a + b)            # 300 → 44 !
+print("b - a      :", b - a)            # -100 → 156 !
+print("(a + b) // 2:", (a + b) // 2)    # trung bình hai ảnh: sai
 
-<h2>Cái bẫy tràn số uint8</h2>
-<p>Đây là lỗi kinh điển khi tăng độ sáng:</p>
-<pre><code>a = np.array([200], dtype=np.uint8)
-print(a + 100)                   # [44]  -&gt; 300 bị "quay vòng" thành 44!
+print("Đúng, int16:", (a.astype(np.int16) + b))
+print("TB đúng    :", ((a.astype(np.uint16) + b) // 2).astype(np.uint8))
+print("cv2.add    :", cv2.add(a, b))         # OpenCV: bão hòa ở 255
+print("cv2.absdiff:", cv2.absdiff(a, b))     # |a - b|, không bao giờ âm</code></pre>
+<pre><code class="language-text">a + b      : [[44  4 90]]
+b - a      : [[156  16  30]]
+(a + b) // 2: [[22  2 45]]
+Đúng, int16: [[300 260  90]]
+TB đúng    : [[150 130  45]]
+cv2.add    : [[255 255  90]]
+cv2.absdiff: [[100 240  30]]</code></pre>
+<p>Ở dòng TB đúng, chỉ cần một toán hạng là <code>uint16</code> thì NumPy tính cả phép cộng ở <code>uint16</code>. Ví dụ dùng mảng 2 chiều 1×3 (một "ảnh" nhỏ) vì các hàm OpenCV làm việc với ảnh; truyền mảng 1 chiều 3–4 phần tử, OpenCV có thể hiểu nhầm nó là một bộ giá trị màu.</p>
+<p>Ba tình huống dính bẫy hay gặp nhất:</p>
+<table>
+  <tr><th>Tình huống</th><th>Viết sai</th><th>Viết đúng</th></tr>
+  <tr><td>Tăng sáng</td><td><code>anh + 60</code></td><td><code>np.clip(anh.astype(np.int16) + 60, 0, 255).astype(np.uint8)</code> hoặc <code>cv2.add</code></td></tr>
+  <tr><td>So sánh ảnh với ảnh mẫu (tìm khác biệt)</td><td><code>anh - mau</code></td><td><code>cv2.absdiff(anh, mau)</code></td></tr>
+  <tr><td>Tăng tương phản, nhân hệ số</td><td><code>(anh * 1.5).astype(np.uint8)</code></td><td><code>np.clip(anh * 1.5, 0, 255).astype(np.uint8)</code> hoặc <code>cv2.convertScaleAbs(anh, alpha=1.5, beta=0)</code></td></tr>
+</table>
+<p>Dòng cuối là bẫy kiểu khác: <code>anh * 1.5</code> cho ra <code>float64</code> (không tràn), nhưng ép thẳng về <code>uint8</code> mà không <code>clip</code> thì giá trị ngoài 0–255 cho kết quả không xác định:</p>
+<pre><code class="language-python">f = np.array([300.0, -20.0, 128.6])
+print("Ép thẳng:", f.astype(np.uint8))                       # không xác định, tùy máy
+print("Clip rồi ép:", np.clip(f, 0, 255).astype(np.uint8))   # 128.6 → 128: cắt phần lẻ
+print("Làm tròn đúng:", np.clip(np.rint(f), 0, 255).astype(np.uint8))</code></pre>
+<pre><code class="language-text">Ép thẳng: [ 44 236 128]
+Clip rồi ép: [255   0 128]
+Làm tròn đúng: [255   0 129]</code></pre>
+<p>Kết quả dòng đầu là trên máy chạy thử; máy khác có thể ra số khác, đó chính là vấn đề. Cũng để ý <code>astype</code> <strong>cắt bỏ</strong> phần lẻ (128,6 thành 128), muốn làm tròn thì <code>np.rint</code> trước.</p>
+<div class="warn"><strong>cv2.add với một con số: khác nhau giữa OpenCV 4 và 5</strong>Với ảnh màu 3 kênh, <code>cv2.add(anh, 60)</code> trên OpenCV 4.x hiểu số 60 là bộ <code>(60, 0, 0, 0)</code>, nên <strong>chỉ kênh B</strong> được cộng và ảnh ngả xanh; OpenCV 5 cộng đều cả 3 kênh. Để code chạy đúng trên mọi phiên bản, truyền đủ bộ giá trị: <code>cv2.add(anh, (60, 60, 60, 0))</code>, hoặc dùng cách <code>np.clip</code> ở trên.</div>
 
-# Cách đúng 1: đổi sang kiểu lớn hơn rồi cắt về 0..255
-bright = np.clip(img.astype(np.int16) + 60, 0, 255).astype(np.uint8)
+<h2>7. Thống kê nhanh trên ảnh</h2>
+<p>Vài con số tính trong một dòng NumPy đủ để phát hiện ảnh có vấn đề trước khi chạy thuật toán chính:</p>
+<pre><code class="language-python">anh = cv2.imread("khay.png", cv2.IMREAD_GRAYSCALE)
+print("Sáng TB:", round(anh.mean(), 1), "| độ tương phản (std):", round(anh.std(), 1))
+print("Min/max:", anh.min(), anh.max())
+hist = np.bincount(anh.ravel(), minlength=256)        # histogram 256 mức xám
+print("Mức xám phổ biến nhất:", hist.argmax(), "với", hist.max(), "pixel")
+chay_sang = (anh == 255).mean()                       # tỉ lệ pixel bão hòa
+print(f"Pixel cháy sáng (=255): {chay_sang:.2%}")</code></pre>
+<pre><code class="language-text">Sáng TB: 63.3 | độ tương phản (std): 62.3
+Min/max: 20 219
+Mức xám phổ biến nhất: 39 với 2261 pixel
+Pixel cháy sáng (=255): 0.00%</code></pre>
+<table>
+  <tr><th>Chỉ số</th><th>Dấu hiệu bất thường</th><th>Nguyên nhân thường gặp ở trạm</th></tr>
+  <tr><td>Sáng TB rất thấp</td><td>Ảnh tối</td><td>Đèn chưa bật, trigger đèn lệch thời điểm chụp, exposure quá ngắn</td></tr>
+  <tr><td>Tỉ lệ pixel = 255 lớn (vài %)</td><td>Cháy sáng, mất chi tiết</td><td>Exposure/gain quá cao, phản xạ gương từ bề mặt kim loại</td></tr>
+  <tr><td>Std rất nhỏ</td><td>Ảnh "phẳng", thiếu tương phản</td><td>Mất nét nặng, ống kính bẩn, chụp khi chưa có sản phẩm</td></tr>
+</table>
 
-# Cách đúng 2: dùng hàm của OpenCV, tự động "bão hòa" ở 255
-bright = cv2.add(img, (60, 60, 60, 0))</code></pre>
-
-<h2>Mặt nạ (mask) và phép so sánh</h2>
-<p>Phép so sánh trên mảng trả về mảng <code>True/False</code>, đó chính là một mặt nạ:</p>
-<pre><code>mask = gray &gt; 128                # điểm sáng
-print(mask.sum())                # số điểm ảnh sáng
-ratio = mask.mean() * 100        # % diện tích sáng
-gray_dark = gray.copy()
-gray_dark[mask] = 0              # tô đen tất cả điểm sáng</code></pre>
-<p>Kỹ thuật này dùng rất nhiều trong kiểm tra sản phẩm: ví dụ đếm tỷ lệ điểm tối trên bề mặt sáng để phát hiện vết bẩn.</p>
-
-<h2>Các thống kê hữu ích</h2>
-<pre><code>print(gray.mean(), gray.std())   # độ sáng trung bình, độ tương phản
-print(gray.min(), gray.max())
-hist = np.bincount(gray.ravel(), minlength=256)   # histogram 256 mức xám</code></pre>
-<p>Độ sáng trung bình của ROI là một "cảm biến" đơn giản mà rất hiệu quả: kiểm tra có/không có linh kiện, nắp chai đã đậy chưa, đèn có sáng không.</p>
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Ảnh xám: <code>(cao, rộng)</code>; ảnh màu: <code>(cao, rộng, 3)</code> theo thứ tự <strong>BGR</strong>; thường là <code>uint8</code> 0–255, camera công nghiệp có thể là <code>uint16</code> (đọc bằng <code>IMREAD_UNCHANGED</code>).</li>
+  <li>NumPy: <code>anh[y, x]</code>; OpenCV vẽ: <code>(x, y)</code>. Gốc ở góc trái trên.</li>
+  <li>Đổi BGR→RGB bằng <code>cv2.cvtColor</code>; view <code>[:, :, ::-1]</code> không liền bộ nhớ, một số hàm OpenCV từ chối.</li>
+  <li>ROI <code>(x, y, w, h)</code> → <code>anh[y:y+h, x:x+w]</code>; độ sáng TB của ROI là cảm biến có/không đơn giản.</li>
+  <li>Mặt nạ bool: <code>sum()</code> đếm, <code>mean()</code> tỉ lệ; OpenCV cần mặt nạ <code>uint8</code> 0/255.</li>
+  <li><code>uint8</code> quay vòng khi tràn: đổi sang kiểu lớn hơn + <code>np.clip</code>, hoặc dùng <code>cv2.add</code>/<code>cv2.absdiff</code>.</li>
+</ul>
 
 <h2>Bài tập</h2>
-<ol>
-  <li>Đọc một ảnh, in ra <code>shape</code>, <code>dtype</code> và độ sáng trung bình của từng kênh B, G, R.</li>
-  <li>Cắt ROI ở giữa ảnh, tăng sáng 50 mức mà không bị tràn số, ghi ra file mới.</li>
-  <li>Tạo mặt nạ các điểm có độ xám nhỏ hơn 50 và tính tỷ lệ % diện tích của chúng.</li>
-</ol>
-<p>Nắm vững NumPy là nền móng cho chặng tiếp theo trong lộ trình Vision Engineer: <a href="../lo-trinh/vision-engineer.html#step-opencv">OpenCV</a>.</p>
+<div class="ex">
+<h3>Bài 1. Vẽ hình chữ nhật bằng slicing</h3>
+<p>Tạo ảnh xám 200×300 (cao 200, rộng 300) nền đen. Chỉ bằng slicing (không dùng <code>cv2.rectangle</code>), vẽ một hình chữ nhật trắng đặc có góc trái trên tại x = 50, y = 40, rộng 120, cao 80. Lưu ra <code>chu_nhat.png</code>, đọc lại và kiểm tra số pixel trắng.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+anh = np.zeros((200, 300), dtype=np.uint8)       # (cao, rộng)
+x, y, w, h = 50, 40, 120, 80
+anh[y:y + h, x:x + w] = 255                      # hàng trước (y), cột sau (x)
+cv2.imwrite("chu_nhat.png", anh)
+
+doc = cv2.imread("chu_nhat.png", cv2.IMREAD_GRAYSCALE)
+print(doc.shape, "pixel trắng:", np.count_nonzero(doc == 255), "= w*h =", w * h)
+print("Góc trái trên:", doc[40, 50], "| ngay ngoài:", doc[39, 50], doc[40, 49])</code></pre>
+<pre><code class="language-text">(200, 300) pixel trắng: 9600 = w*h = 9600
+Góc trái trên: 255 | ngay ngoài: 0 0</code></pre>
+<p>Muốn chỉ vẽ <strong>viền</strong> dày 3 pixel: tô cả khối trắng rồi tô đen phần bên trong <code>anh[y+3:y+h-3, x+3:x+w-3] = 0</code>. Với ảnh màu, gán bộ 3 số: <code>anh[y:y+h, x:x+w] = (0, 255, 0)</code> cho màu xanh lá.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Tăng sáng 60 mà không tràn số</h3>
+<p>Dùng ảnh <code>thang_xam.png</code> ở mục 1. Tăng độ sáng thêm 60 theo hai cách: cộng trực tiếp trên <code>uint8</code>, và cách đúng (đổi kiểu + <code>clip</code>). So sánh: đếm số pixel bị "quay vòng" ở cách sai, in giá trị của vài cột tiêu biểu, và kiểm tra cách đúng cho cùng kết quả với <code>cv2.add</code>.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+anh = cv2.imread("thang_xam.png", cv2.IMREAD_GRAYSCALE)     # 100 x 256, cột c có giá trị c
+
+sai = anh + 60                                               # uint8 + int: vẫn là uint8
+dung = np.clip(anh.astype(np.int16) + 60, 0, 255).astype(np.uint8)
+dung_cv = cv2.add(anh, 60)                                   # ảnh 1 kênh: an toàn mọi phiên bản
+
+cot = [0, 100, 195, 196, 200, 255]
+print("Gốc :", anh[0, cot])
+print("Sai :", sai[0, cot])
+print("Đúng:", dung[0, cot])
+print("Pixel bị quay vòng:", np.count_nonzero(sai &lt; anh), "trên", anh.size)
+print("Giống cv2.add:", np.array_equal(dung, dung_cv))
+cv2.imwrite("so_sanh_tang_sang.png", np.vstack([anh, sai, dung]))</code></pre>
+<pre><code class="language-text">Gốc : [  0 100 195 196 200 255]
+Sai : [ 60 160 255   0   4  59]
+Đúng: [ 60 160 255 255 255 255]
+Pixel bị quay vòng: 6000 trên 25600
+Giống cv2.add: True</code></pre>
+<p>Mọi pixel có giá trị từ 196 trở lên (196 + 60 = 256) bị quay vòng về gần 0: vùng sáng nhất của ảnh trở thành vùng tối nhất. Mở <code>so_sanh_tang_sang.png</code> sẽ thấy dải giữa (cách sai) có một bước nhảy đột ngột từ trắng sang đen. Trong bài toán thật, lỗi này làm sản phẩm sáng bóng bị coi là "lỗ đen" và báo NG oan (overkill).</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 3. Kiểm tra có/không bằng ROI và mặt nạ</h3>
+<p>Dùng ảnh <code>khay.png</code> ở mục 4. Thay vì độ sáng trung bình, với mỗi ô tính <strong>tỉ lệ pixel sáng</strong> (giá trị &gt; 128) trong ROI. Ô OK nếu tỉ lệ ≥ 40%. Vì sao cách này ổn định hơn độ sáng trung bình khi đèn yếu đi một chút?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+khay = cv2.imread("khay.png", cv2.IMREAD_GRAYSCALE)
+ROI = [(20, 50, 80, 100), (120, 50, 80, 100), (220, 50, 80, 100), (320, 50, 80, 100)]
+for i, (x, y, w, h) in enumerate(ROI, start=1):
+    ti_le = (khay[y:y + h, x:x + w] &gt; 128).mean()
+    print(f"Ô {i}: {ti_le:.0%} pixel sáng → {'OK' if ti_le &gt;= 0.4 else 'NG'}")</code></pre>
+<pre><code class="language-text">Ô 1: 60% pixel sáng → OK
+Ô 2: 60% pixel sáng → OK
+Ô 3: 0% pixel sáng → NG
+Ô 4: 60% pixel sáng → OK</code></pre>
+<p>Linh kiện chiếm khoảng 60% ROI (vùng 80×60 trong ROI 100×80), ô trống gần 0%. Khi đèn yếu đi 20%, pixel linh kiện giảm từ khoảng 195 xuống khoảng 156, vẫn trên ngưỡng 128, nên tỉ lệ gần như không đổi; còn độ sáng trung bình thì tụt theo đèn và tiến sát ngưỡng. Đếm pixel theo mặt nạ đo <strong>diện tích</strong>, ít nhạy với độ sáng tổng thể hơn trung bình.</p>
+</details>
+</div>
+<p>Bài tiếp theo: <strong>Dự án chặng 1: báo cáo chất lượng thư mục ảnh</strong>, bạn sẽ gộp duyệt thư mục, CSV, log và các phép thống kê ảnh vừa học thành một công cụ hoàn chỉnh.</p>

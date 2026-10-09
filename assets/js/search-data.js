@@ -503,6 +503,171 @@ window.HF_POSTS = [
   ]
  },
  {
+  "t": "Xuất mô hình PyTorch sang ONNX và kiểm tra kết quả khớp PyTorch",
+  "u": "hoc/deploy-1-xuat-onnx-va-kiem-tra-sai-so.html",
+  "e": "Xuất PyTorch và YOLO sang ONNX, chạy bằng ONNX Runtime, đo sai số trên nhiều ảnh, bắt lỗi tiền xử lý và lưu thẻ mô hình có mã băm.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 34,
+  "img": "assets/images/posts/deploy-1-xuat-onnx-va-kiem-tra-sai-so.webp",
+  "tags": [
+   "Deployment",
+   "PyTorch",
+   "Python"
+  ]
+ },
+ {
+  "t": "Đo latency, log JSON và phát hiện drift cho mô hình AI trong nhà máy",
+  "u": "hoc/deploy-4-do-latency-logging-giam-sat.html",
+  "e": "Đo thời gian từng bước với p95/p99, log JSON xoay vòng, giám sát drift bằng PSI, KS và p-chart, heartbeat cho trạm vision chạy liên tục.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 33,
+  "img": "assets/images/posts/deploy-4-do-latency-logging-giam-sat.webp",
+  "tags": [
+   "Deployment",
+   "Industrial Vision",
+   "Python"
+  ]
+ },
+ {
+  "t": "Dự án: đóng gói ứng dụng vision chạy 24/7, tự khởi động lại, cập nhật mô hình",
+  "u": "hoc/deploy-6-dong-goi-ung-dung-chay-24-7.html",
+  "e": "Cấu hình TOML có kiểm tra, supervisor tự khởi động lại khi lỗi hay treo, cập nhật mô hình nguyên tử có rollback, chạy như dịch vụ Windows/Linux.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 42,
+  "img": "assets/images/posts/deploy-6-dong-goi-ung-dung-chay-24-7.webp",
+  "tags": [
+   "Deployment",
+   "Industrial Vision",
+   "Python"
+  ]
+ },
+ {
+  "t": "Mạng nơ-ron và CNN hoạt động thế nào: neuron, tích chập, pooling",
+  "u": "hoc/deep-learning-3-mang-no-ron-va-cnn.html",
+  "e": "Hiểu neuron, hàm kích hoạt, tích chập, pooling, feature map, receptive field và tự tính số tham số lớp Conv bằng NumPy, kiểm tra lại với PyTorch.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 33,
+  "img": "assets/images/posts/deep-learning-3-mang-no-ron-va-cnn.webp",
+  "tags": [
+   "Deep Learning",
+   "PyTorch",
+   "Python"
+  ]
+ },
+ {
+  "t": "Dataset, DataLoader và augmentation cho ảnh công nghiệp với PyTorch",
+  "u": "hoc/deep-learning-5-dataset-dataloader-augmentation.html",
+  "e": "Viết Dataset đọc ảnh OK/NG bằng OpenCV, dùng DataLoader, cân bằng lớp bằng WeightedRandomSampler và chọn augmentation không làm sai nhãn ảnh công nghiệp.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 31,
+  "img": "assets/images/posts/deep-learning-5-dataset-dataloader-augmentation.webp",
+  "tags": [
+   "PyTorch",
+   "Deep Learning",
+   "Dataset"
+  ]
+ },
+ {
+  "t": "Chọn ngưỡng mô hình AI theo escape, overkill và đo cycle time đúng cách",
+  "u": "hoc/ai-vision-5-chon-nguong-va-danh-gia-theo-nha-may.html",
+  "e": "Vẽ đường PR và ROC, chọn ngưỡng theo ràng buộc lọt lỗi rồi tối thiểu loại nhầm, xây golden set có phiên bản để nghiệm thu và đo cycle time p99.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 35,
+  "img": "assets/images/posts/ai-vision-5-chon-nguong-va-danh-gia-theo-nha-may.webp",
+  "tags": [
+   "AI Vision",
+   "Industrial Vision",
+   "Deep Learning"
+  ]
+ },
+ {
+  "t": "Bài tập: thiết kế chiến lược AI cho bài toán lỗi bề mặt nhôm anod",
+  "u": "hoc/ai-vision-6-bai-tap-thiet-ke-chien-luoc-ai.html",
+  "e": "Chọn cách tiếp cận (phân đoạn, anomaly, rule-based), lập kế hoạch dữ liệu và gán nhãn, chia tập theo lô, đặt tiêu chí nghiệm thu escape, overkill, cycle time.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 26,
+  "img": "assets/images/posts/ai-vision-6-bai-tap-thiet-ke-chien-luoc-ai.webp",
+  "tags": [
+   "AI Vision",
+   "Industrial Vision",
+   "Dataset"
+  ]
+ },
+ {
+  "t": "Anomaly detection với PaDiM và PatchCore: học từ ảnh OK",
+  "u": "hoc/anomaly-6-anomaly-detection-padim-patchcore.html",
+  "e": "Tự cài PaDiM và PatchCore trên ảnh tổng hợp: bản đồ bất thường, AUROC, coreset, ngưỡng chỉ từ ảnh OK và những trường hợp anomaly detection thất bại.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 30,
+  "img": "assets/images/posts/anomaly-6-anomaly-detection-padim-patchcore.webp",
+  "tags": [
+   "AI Vision",
+   "Deep Learning",
+   "Industrial Vision"
+  ]
+ },
+ {
+  "t": "Capstone: trạm đo kích thước có hiệu chuẩn, %GRR, PLC và nghiệm thu",
+  "u": "hoc/capstone-1-tram-do-kich-thuoc.html",
+  "e": "Dự án portfolio: hiệu chuẩn mm/px, bù sai lệch biên, đo subpixel 4 kích thước, đánh giá %GRR và tuyến tính, trả kết quả PLC Modbus, biên bản tự sinh.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 60,
+  "img": "assets/images/posts/capstone-1-tram-do-kich-thuoc.webp",
+  "tags": [
+   "Đo lường",
+   "Calibration",
+   "PLC"
+  ]
+ },
+ {
+  "t": "Capstone: trạm đọc DataMatrix, OCR/OCV số seri và chống trùng theo lệnh sản xuất",
+  "u": "hoc/capstone-2-tram-doc-ma-va-ocr.html",
+  "e": "Dự án portfolio: đọc mã 2D và số seri trong một chu kỳ, OCV chất lượng in, xác minh lệnh sản xuất, Luhn, chống trùng SQLite, đo p99 theo tốc độ dây chuyền.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 46,
+  "img": "assets/images/posts/capstone-2-tram-doc-ma-va-ocr.webp",
+  "tags": [
+   "OCR",
+   "Industrial Vision",
+   "Python"
+  ]
+ },
+ {
+  "t": "Capstone: kiểm tra lỗi bề mặt bằng AI, ONNX real-time, PLC và giám sát drift",
+  "u": "hoc/capstone-3-kiem-tra-loi-be-mat-ai-plc.html",
+  "e": "Dự án portfolio: dữ liệu chia theo lô, huấn luyện CNN, chọn ngưỡng theo escape, xuất ONNX kiểm sai số, trạm ONNX Runtime trả PLC, lưu ảnh NG, giám sát drift.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 43,
+  "img": "assets/images/posts/capstone-3-kiem-tra-loi-be-mat-ai-plc.webp",
+  "tags": [
+   "AI Vision",
+   "PLC",
+   "Industrial Vision"
+  ]
+ },
+ {
   "t": "Lộ trình 700 TOEIC trong 5 tháng cho người đi làm",
   "u": "ngoai-ngu/lo-trinh-700-toeic.html",
   "e": "Cấu trúc đề 200 câu, phân bổ điểm mục tiêu, kế hoạch từng tháng, lịch học 60–90 phút mỗi ngày và mốc thi thử để theo dõi tiến độ.",
@@ -735,18 +900,17 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Thiết lập môi trường Python cho AI và Computer Vision",
+  "t": "Môi trường ảo, pip và requirements.txt cho dự án AI Vision",
   "u": "kien-thuc/moi-truong-python-cho-ai-vision.html",
-  "e": "venv, uv, cài PyTorch nhận GPU đúng cách, cấu hình VS Code và checklist để code chạy được trên mọi máy.",
+  "e": "Tạo venv cho từng dự án, cài đúng gói OpenCV, lưu requirements.txt, cài offline cho máy nhà máy, cài PyTorch nhận GPU và script kiểm tra môi trường.",
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "04/10/2026",
-  "m": 3,
+  "m": 19,
   "img": "assets/images/posts/moi-truong-python-cho-ai-vision.webp",
   "tags": [
-   "Công cụ",
    "Python",
-   "Lập trình",
+   "Công cụ",
    "PyTorch"
   ]
  },
@@ -1520,16 +1684,16 @@ window.HF_POSTS = [
  {
   "t": "OpenCV cơ bản: đọc, hiển thị, ghi ảnh, video và camera",
   "u": "hoc/opencv-co-ban-anh-video-camera.html",
-  "e": "Cài đặt OpenCV, đọc ảnh đúng cách (kể cả đường dẫn tiếng Việt), đổi không gian màu, vẽ kết quả và xử lý video, webcam theo thời gian thực.",
+  "e": "Cài OpenCV, imread/imshow/imwrite, đường dẫn tiếng Việt trên Windows, đọc ghi video, vòng lặp webcam đo FPS, waitKey và thuộc tính camera.",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "14/09/2026",
-  "m": 3,
+  "m": 23,
   "img": "assets/images/posts/opencv-co-ban-anh-video-camera.webp",
   "tags": [
    "OpenCV",
    "Python",
-   "Computer Vision"
+   "Camera"
   ]
  },
  {
@@ -1665,18 +1829,18 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "NumPy cho xử lý ảnh: hiểu rằng ảnh chỉ là một mảng số",
+  "t": "Ảnh là mảng số: NumPy cho xử lý ảnh (BGR, ROI, mặt nạ, uint8)",
   "u": "hoc/numpy-anh-la-mang-so.html",
-  "e": "Ảnh xám, ảnh màu, BGR, ROI, mặt nạ và cái bẫy tràn số uint8: nền tảng NumPy bắt buộc trước khi học OpenCV và Deep Learning.",
+  "e": "Ảnh xám, ảnh màu BGR, ảnh 16 bit, cắt ROI kiểm tra có/không, mặt nạ tròn và bẫy tràn số uint8: nền tảng trước khi học OpenCV.",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "10/09/2026",
-  "m": 4,
+  "m": 20,
   "img": "assets/images/posts/numpy-anh-la-mang-so.webp",
   "tags": [
    "Python",
    "NumPy",
-   "Image Processing"
+   "Machine Vision"
   ]
  },
  {
@@ -2168,15 +2332,15 @@ window.HF_POSTS = [
  {
   "t": "Python cho kỹ sư Vision: xử lý thư mục ảnh, CSV và log kết quả",
   "u": "hoc/python-xu-ly-thu-muc-anh-va-log.html",
-  "e": "Duyệt hàng nghìn ảnh bằng pathlib, chia train/val tái lập được, ghi kết quả ra CSV mở bằng Excel và ghi log đúng cách cho trạm chạy 24/7.",
+  "e": "Lab: duyệt hàng nghìn ảnh bằng pathlib, bắt lỗi gán nhãn, ghi CSV mở được bằng Excel, chia train/val tái lập được và ghi log xoay vòng cho trạm 24/7.",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "22/08/2026",
-  "m": 3,
+  "m": 22,
   "img": "assets/images/posts/python-xu-ly-thu-muc-anh-va-log.webp",
   "tags": [
    "Python",
-   "Lập trình"
+   "Machine Vision"
   ]
  },
  {
@@ -2214,7 +2378,7 @@ window.HF_TOPICS = [
   "u": "hoc/python.html",
   "s": "Học AI & Lập trình",
   "g": "Programming",
-  "n": 34
+  "n": 39
  },
  {
   "t": "C#",
@@ -2235,14 +2399,14 @@ window.HF_TOPICS = [
   "u": "hoc/deep-learning.html",
   "s": "Học AI & Lập trình",
   "g": "AI & Machine Learning",
-  "n": 12
+  "n": 16
  },
  {
   "t": "PyTorch",
   "u": "hoc/pytorch.html",
   "s": "Học AI & Lập trình",
   "g": "AI & Machine Learning",
-  "n": 8
+  "n": 11
  },
  {
   "t": "Generative AI",
@@ -2270,21 +2434,21 @@ window.HF_TOPICS = [
   "u": "hoc/image-processing.html",
   "s": "Học AI & Lập trình",
   "g": "Computer Vision",
-  "n": 11
+  "n": 10
  },
  {
   "t": "Computer Vision",
   "u": "hoc/computer-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Computer Vision",
-  "n": 15
+  "n": 14
  },
  {
   "t": "OCR",
   "u": "hoc/ocr.html",
   "s": "Học AI & Lập trình",
   "g": "Computer Vision",
-  "n": 6
+  "n": 7
  },
  {
   "t": "Object Detection",
@@ -2305,28 +2469,28 @@ window.HF_TOPICS = [
   "u": "hoc/machine-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 35
+  "n": 37
  },
  {
   "t": "AI Vision",
   "u": "hoc/ai-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 8
+  "n": 12
  },
  {
   "t": "Industrial Vision",
   "u": "hoc/industrial-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 14
+  "n": 21
  },
  {
   "t": "Camera & Lens",
   "u": "hoc/camera-lens.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 11
+  "n": 12
  },
  {
   "t": "Lighting",
@@ -2340,21 +2504,21 @@ window.HF_TOPICS = [
   "u": "hoc/calibration.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 6
+  "n": 7
  },
  {
   "t": "PLC / Robot / MES",
   "u": "hoc/plc-robot-mes.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 12
+  "n": 14
  },
  {
   "t": "Vision Deployment",
   "u": "hoc/vision-deployment.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 5
+  "n": 8
  },
  {
   "t": "AI Projects",
@@ -2382,7 +2546,7 @@ window.HF_TOPICS = [
   "u": "kien-thuc/programming.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 12
+  "n": 10
  },
  {
   "t": "AI / Machine Learning",
@@ -2396,35 +2560,35 @@ window.HF_TOPICS = [
   "u": "kien-thuc/deep-learning.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 12
+  "n": 16
  },
  {
   "t": "Computer Vision",
   "u": "kien-thuc/computer-vision.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 15
+  "n": 14
  },
  {
   "t": "Machine Vision",
   "u": "kien-thuc/machine-vision.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 35
+  "n": 37
  },
  {
   "t": "AI Vision",
   "u": "kien-thuc/ai-vision.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 8
+  "n": 12
  },
  {
   "t": "Industrial Automation",
   "u": "kien-thuc/industrial-automation.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 10
+  "n": 12
  },
  {
   "t": "Tools & Frameworks",
@@ -2508,7 +2672,7 @@ window.HF_TOPICS = [
   "u": "tai-nguyen/dataset.html",
   "s": "Tài nguyên",
   "g": "",
-  "n": 5
+  "n": 7
  },
  {
   "t": "Cheat Sheets",

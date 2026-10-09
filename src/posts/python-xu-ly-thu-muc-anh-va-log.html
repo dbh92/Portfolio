@@ -1,78 +1,478 @@
-<p>Phần lớn công việc hằng ngày của kỹ sư Vision không phải là thuật toán, mà là <strong>xử lý hàng nghìn file ảnh</strong>: duyệt thư mục, đổi tên, chia tập train/val, ghi kết quả ra CSV để báo cáo. Python làm những việc này rất gọn nếu bạn dùng đúng thư viện chuẩn.</p>
+<p>Phần lớn công việc hằng ngày của kỹ sư Vision không phải là thuật toán, mà là <strong>xử lý hàng nghìn file ảnh</strong>: dây chuyền chạy một ca đã sinh ra vài nghìn ảnh, khách hàng gửi một ổ cứng ảnh lỗi, bạn cần đếm, lọc, chia tập train/val, ghi kết quả ra file Excel đọc được và để lại log khi có sự cố. Bài lab này dùng môi trường đã tạo ở bài "Môi trường ảo, pip và thư viện cho AI Vision" và kiến thức <code>pathlib</code>, <code>try/except</code> từ bài "Đọc ghi file, pathlib và xử lý lỗi". Cuối bài bạn có một script quét thư mục ảnh hoàn chỉnh, đúng kiểu công cụ dùng thật ở nhà máy.</p>
+<div class="tip"><strong>Cách học bài lab</strong>Chạy lần lượt từng khối code trong cùng một thư mục làm việc (khối đầu tiên tạo dữ liệu, các khối sau dùng lại). Đọc kết quả in ra, rồi tự sửa thử vài chỗ để hiểu vì sao.</div>
 
-<h2>Duyệt thư mục với pathlib</h2>
-<pre><code>from pathlib import Path
+<h2>1. Tạo thư mục ảnh giả lập dây chuyền</h2>
+<p>Để mọi người chạy ra cùng kết quả, ta tự tạo một thư mục ảnh giống ảnh lưu từ trạm kiểm tra: 3 ngày, mỗi ngày 2 lô (LOT-A, LOT-B), mỗi lô có thư mục <code>OK</code> và <code>NG</code>. Tên file theo quy ước <code>&lt;trạm&gt;_&lt;ngày&gt;_&lt;số thứ tự&gt;_&lt;kết quả&gt;</code>. Thêm vào đó vài thứ "bẩn" bạn chắc chắn sẽ gặp ngoài đời: đuôi file viết hoa, file <code>Thumbs.db</code> của Windows, file ghi chú, file tạm, ảnh hỏng do mất điện lúc đang lưu, ảnh chụp tay đặt tên tùy tiện, và một ảnh NG bị kéo nhầm vào thư mục OK.</p>
+<pre><code class="language-python">from pathlib import Path
 
-root = Path("data/anh-kiem-tra")
-images = sorted(p for p in root.rglob("*") if p.suffix.lower() in {".png", ".jpg", ".bmp"})
-print(f"Tìm thấy {len(images)} ảnh")
+import cv2
+import numpy as np
 
-for p in images[:3]:
-    print(p.name, p.stem, p.parent.name, p.stat().st_size // 1024, "KB")</code></pre>
-<p><code>pathlib</code> xử lý đường dẫn đúng trên cả Windows và Linux, không cần nối chuỗi bằng tay. <code>rglob</code> duyệt cả thư mục con.</p>
+GOC = Path("anh_day_chuyen")
+rng = np.random.default_rng(7)
+DUOI = [".png"] * 7 + [".jpg", ".JPG", ".bmp"]       # đa số PNG, lẫn JPG/BMP, có cả đuôi viết hoa
 
-<h2>Chia tập train/val có thể tái lập</h2>
-<pre><code>import random, shutil
+stt = 0
+for ngay in ["20261005", "20261006", "20261007"]:
+    for lo in ["LOT-A", "LOT-B"]:
+        for nhan, so_luong in [("OK", 180), ("NG", 20)]:
+            thu_muc = GOC / ngay / lo / nhan
+            thu_muc.mkdir(parents=True, exist_ok=True)
+            for _ in range(so_luong):
+                stt += 1
+                anh = rng.integers(60, 200, size=(48, 64), dtype=np.uint8)   # ảnh nhỏ cho nhanh
+                duoi = DUOI[stt % len(DUOI)]
+                cv2.imwrite(str(thu_muc / f"ST1_{ngay}_{stt:05d}_{nhan}{duoi}"), anh)
 
-random.seed(42)                       # cố định để lần sau chia giống hệt
-random.shuffle(images)
-n_val = int(len(images) * 0.2)
-splits = {"val": images[:n_val], "train": images[n_val:]}
+# Những thứ "bẩn" thường gặp trong thư mục ảnh thật
+(GOC / "20261005" / "Thumbs.db").write_bytes(b"\x00" * 64)
+(GOC / "20261006" / "ghi_chu_ca_dem.txt").write_text("Đèn ring bị lệch lúc 2h", encoding="utf-8")
+(GOC / "20261006" / "LOT-A" / "OK" / "ST1_20261006_00999_NG.png").write_bytes(
+    cv2.imencode(".png", anh)[1].tobytes())                         # ảnh NG nằm nhầm thư mục OK
+thu_muc_cuoi = GOC / "20261007" / "LOT-B" / "OK"
+(thu_muc_cuoi / ".~tam.png").write_bytes(b"")                      # file tạm, rỗng
+(thu_muc_cuoi / "ST1_20261007_01201_OK.png").write_bytes(b"mat dien khi dang luu")   # ảnh hỏng
+(thu_muc_cuoi / "anh chup tay.jpg").write_bytes(cv2.imencode(".jpg", anh)[1].tobytes())
 
-for split, files in splits.items():
-    out = Path("dataset") / split
-    out.mkdir(parents=True, exist_ok=True)
-    for f in files:
-        shutil.copy2(f, out / f.name)</code></pre>
-<p>Lưu ý thực tế: nếu ảnh được chụp liên tiếp từ cùng một sản phẩm, chia ngẫu nhiên sẽ làm tập val "dễ" giả tạo. Hãy chia theo <strong>lô, ngày hoặc mã sản phẩm</strong>.</p>
+print("Đã tạo", stt, "ảnh dây chuyền và vài file lạ trong", GOC)</code></pre>
+<pre><code class="language-text">Đã tạo 1200 ảnh dây chuyền và vài file lạ trong anh_day_chuyen</code></pre>
+<p><code>cv2.imencode</code> mã hóa ảnh thành bytes trong bộ nhớ, ta ghi bytes đó ra file bằng <code>write_bytes</code>. Bài OpenCV đầu tiên của chặng 2 sẽ giải thích vì sao cách này hữu ích với đường dẫn tiếng Việt trên Windows.</p>
 
-<h2>Ghi kết quả kiểm tra ra CSV</h2>
-<pre><code>import csv
-from datetime import datetime
+<h2>2. Duyệt hàng nghìn ảnh bằng pathlib</h2>
+<p>Bài trước bạn đã biết <code>glob</code> và <code>rglob</code>. Với thư mục ảnh thật, cần thêm bốn chi tiết: lọc theo đuôi <strong>không phân biệt hoa thường</strong>, bỏ file ẩn/file tạm, chỉ lấy file (không lấy thư mục), và <strong>sắp xếp</strong> kết quả.</p>
+<pre><code class="language-python">from collections import Counter
+from pathlib import Path
 
-with open("ket-qua.csv", "w", newline="", encoding="utf-8-sig") as fh:
-    writer = csv.writer(fh)
-    writer.writerow(["thoi_gian", "file", "ket_qua", "dien_tich"])
-    for p in images:
-        area = 0          # thay bằng kết quả xử lý ảnh thật
-        writer.writerow([datetime.now().isoformat(timespec="seconds"), p.name, "OK", area])</code></pre>
-<p>Mã hóa <code>utf-8-sig</code> giúp Excel mở file có tiếng Việt không bị lỗi font.</p>
+GOC = Path("anh_day_chuyen")
+DUOI_ANH = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}
 
-<h2>Ghi log đúng cách thay vì print</h2>
-<pre><code>import logging
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(message)s",
-    handlers=[logging.FileHandler("vision.log", encoding="utf-8"), logging.StreamHandler()],
-)
-log = logging.getLogger("tram-1")
+def liet_ke_anh(goc: Path) -&gt; list[Path]:
+    """Mọi file ảnh trong goc và các thư mục con, đã sắp xếp."""
+    ket_qua = []
+    for p in goc.rglob("*"):
+        if not p.is_file():
+            continue
+        if p.name.startswith((".", "~")):          # file ẩn, file tạm
+            continue
+        if p.suffix.lower() in DUOI_ANH:           # .JPG cũng được tính
+            ket_qua.append(p)
+    return sorted(ket_qua)
 
-log.info("Bắt đầu ca, %d ảnh", len(images))
-log.warning("Ảnh %s quá tối, độ sáng TB = %.1f", "img_0012.png", 18.4)
-log.error("Mất kết nối camera")</code></pre>
-<p>Log có thời gian và mức độ là "hộp đen" của trạm kiểm tra: khi có sự cố lúc 3 giờ sáng, đây là thứ duy nhất giúp bạn biết chuyện gì đã xảy ra.</p>
 
-<h2>Xử lý lỗi để chương trình không dừng giữa chừng</h2>
-<pre><code>import cv2
+ds_anh = liet_ke_anh(GOC)
+print("Số ảnh:", len(ds_anh))
+print("Đầu tiên:", ds_anh[0].relative_to(GOC).as_posix())
+print("Cuối cùng:", ds_anh[-1].relative_to(GOC).as_posix())
 
-ok, failed = 0, []
-for p in images:
-    try:
-        img = cv2.imread(str(p))
-        if img is None:
-            raise ValueError("không đọc được ảnh")
-        # ... xử lý ...
-        ok += 1
-    except Exception as exc:
-        failed.append(p.name)
-        log.exception("Lỗi khi xử lý %s: %s", p.name, exc)
+theo_thu_muc = Counter(p.parent.name for p in ds_anh)            # OK / NG
+theo_ngay = Counter(p.relative_to(GOC).parts[0] for p in ds_anh)  # phần đầu đường dẫn
+print(theo_thu_muc)
+print(dict(sorted(theo_ngay.items())))</code></pre>
+<pre><code class="language-text">Số ảnh: 1203
+Đầu tiên: 20261005/LOT-A/NG/ST1_20261005_00181_NG.png
+Cuối cùng: 20261007/LOT-B/OK/anh chup tay.jpg
+Counter({'OK': 1083, 'NG': 120})
+dict({'20261005': 400, '20261006': 401, '20261007': 402})</code></pre>
+<p>Vài điểm đáng học:</p>
+<ul>
+  <li><code>p.relative_to(GOC)</code> bỏ phần gốc, <code>.parts</code> tách đường dẫn thành tuple <code>('20261005', 'LOT-A', 'NG', 'ST1_...png')</code>: cách gọn nhất để lấy ngày, lô, nhãn từ cấu trúc thư mục. <code>.as_posix()</code> luôn dùng dấu <code>/</code>, tiện để ghi vào CSV dùng chung giữa Windows và Linux.</li>
+  <li><code>Counter</code> (module <code>collections</code>) đếm số lần xuất hiện: đúng thứ bạn cần để thống kê ảnh theo nhãn, ngày, lô.</li>
+  <li><code>sorted()</code> không phải để đẹp: thứ tự <code>rglob</code> trả về phụ thuộc hệ điều hành và hệ thống file. Không sắp xếp thì cùng một thư mục, chạy trên hai máy có thể ra hai thứ tự khác nhau, và phép chia train/val ở mục 5 sẽ không tái lập được.</li>
+</ul>
+<div class="warn"><strong>Bẫy: rglob("*.jpg") trên Windows và Linux khác nhau</strong>Trên Linux, <code>rglob("*.jpg")</code> <strong>bỏ sót</strong> file <code>.JPG</code> vì phân biệt hoa thường. Trên Windows thì ngược lại, tìm cả <code>.jpg</code> lẫn <code>.JPG</code>; nếu bạn "chữa" bằng cách gọi thêm <code>rglob("*.JPG")</code> thì trên Windows mỗi ảnh bị đếm <strong>hai lần</strong>. Cách chạy đúng ở mọi nơi là duyệt <code>rglob("*")</code> rồi so <code>p.suffix.lower()</code> như trên.</div>
+<p>Với vài chục nghìn ảnh, <code>rglob</code> chạy trong vài giây là đủ nhanh. Khi thư mục lên tới hàng trăm nghìn hay hàng triệu file (ổ lưu ảnh của trạm sau nhiều tháng), <code>os.scandir</code>/<code>os.walk</code> nhanh hơn vì đọc sẵn thông tin file khi duyệt; và nên tổ chức thư mục theo ngày để mỗi lần chỉ quét một phần.</p>
 
-log.info("Xong: %d thành công, %d lỗi", ok, len(failed))</code></pre>
+<h2>3. Lấy thông tin từ tên file và kiểm tra dữ liệu</h2>
+<p>Quy ước đặt tên tốt giúp tên file tự mang thông tin. Viết một hàm tách tên, trả về <code>None</code> khi tên sai quy ước, rồi dùng nó để tìm dữ liệu "lạ":</p>
+<pre><code class="language-python">def doc_ten_file(p: Path) -&gt; dict | None:
+    """Tách 'ST1_20261005_00012_OK' thành dict; sai quy ước thì trả về None."""
+    phan = p.stem.split("_")
+    if len(phan) != 4:
+        return None
+    tram, ngay, stt, nhan = phan
+    if not (ngay.isdigit() and len(ngay) == 8 and stt.isdigit() and nhan in ("OK", "NG")):
+        return None
+    return {"tram": tram, "ngay": ngay, "stt": int(stt), "nhan": nhan}
+
+
+print(doc_ten_file(Path("ST1_20261005_00012_OK.png")))
+print(doc_ten_file(Path("anh chup tay.jpg")))
+
+sai_ten = [p.name for p in ds_anh if doc_ten_file(p) is None]
+lech_nhan = [p.relative_to(GOC).as_posix() for p in ds_anh
+             if (t := doc_ten_file(p)) and t["nhan"] != p.parent.name]
+print("Sai quy ước tên:", sai_ten)
+print("Nhãn trong tên khác thư mục:", lech_nhan)</code></pre>
+<pre><code class="language-text">{'tram': 'ST1', 'ngay': '20261005', 'stt': 12, 'nhan': 'OK'}
+None
+Sai quy ước tên: ['anh chup tay.jpg']
+Nhãn trong tên khác thư mục: ['20261006/LOT-A/OK/ST1_20261006_00999_NG.png']</code></pre>
+<p>Biểu thức <code>(t := doc_ten_file(p))</code> (toán tử "walrus", Python 3.8+) vừa gán vừa kiểm tra, để không phải gọi hàm hai lần. Viết dài hơn bằng vòng <code>for</code> thường cũng được.</p>
+<p>Ảnh NG nằm trong thư mục OK là lỗi <strong>gán nhãn</strong>: nếu đưa vào huấn luyện AI, mô hình sẽ học rằng một sản phẩm lỗi là "OK", góp phần gây ra lọt lỗi (escape). Kiểm tra chéo như trên mất vài dòng code nhưng cứu được cả một đợt huấn luyện.</p>
+
+<h2>4. Ghi kết quả ra CSV mở được bằng Excel</h2>
+<p>CSV (Comma-Separated Values) là file văn bản, mỗi dòng một bản ghi, các cột ngăn bằng dấu phẩy. Mọi công cụ đều đọc được: Excel, pandas, phần mềm MES của nhà máy. Dùng module <code>csv</code> có sẵn, <strong>đừng tự nối chuỗi bằng dấu phẩy</strong>: tên file có dấu phẩy hay dấu nháy sẽ làm vỡ cột, còn <code>csv</code> tự xử lý.</p>
+<pre><code class="language-python">import csv
+
+COT = ["duong_dan", "ngay", "lo", "nhan_thu_muc", "nhan_ten_file", "hop_le"]
+
+with open("danh_sach_anh.csv", "w", newline="", encoding="utf-8-sig") as f:
+    ghi = csv.DictWriter(f, fieldnames=COT)
+    ghi.writeheader()
+    for p in ds_anh:
+        phan = p.relative_to(GOC).parts               # (ngày, lô, OK/NG, tên file)
+        t = doc_ten_file(p)
+        ghi.writerow({
+            "duong_dan": p.relative_to(GOC).as_posix(),
+            "ngay": phan[0],
+            "lo": phan[1],
+            "nhan_thu_muc": phan[2],
+            "nhan_ten_file": t["nhan"] if t else "",
+            "hop_le": "có" if t and t["nhan"] == phan[2] else "không",
+        })
+
+dong = Path("danh_sach_anh.csv").read_text(encoding="utf-8-sig").splitlines()
+print(len(dong), "dòng (kể cả dòng tiêu đề)")
+print("\n".join(dong[:3]))</code></pre>
+<pre><code class="language-text">1204 dòng (kể cả dòng tiêu đề)
+duong_dan,ngay,lo,nhan_thu_muc,nhan_ten_file,hop_le
+20261005/LOT-A/NG/ST1_20261005_00181_NG.png,20261005,LOT-A,NG,NG,có
+20261005/LOT-A/NG/ST1_20261005_00182_NG.png,20261005,LOT-A,NG,NG,có</code></pre>
+<p>Ba chi tiết bắt buộc khi mở file CSV để ghi:</p>
+<ul>
+  <li><code>newline=""</code>: thiếu nó, trên Windows mỗi dòng bị chèn thêm một dòng trống.</li>
+  <li><code>encoding="utf-8-sig"</code>: thêm 3 byte đánh dấu (BOM) ở đầu file để Excel nhận ra UTF-8. Ghi bằng <code>utf-8</code> thường, Excel sẽ hiện "cÃ³" thay cho "có".</li>
+  <li><code>DictWriter</code> với danh sách cột cố định: thêm cột mới không làm lệch thứ tự cột cũ, quên một khóa thì ô đó để trống.</li>
+</ul>
+<p>Đọc lại để thống kê, dùng <code>DictReader</code>. Mọi giá trị đọc từ CSV đều là <strong>chuỗi</strong>, cần ép kiểu nếu là số:</p>
+<pre><code class="language-python">with open("danh_sach_anh.csv", newline="", encoding="utf-8-sig") as f:
+    ban_ghi = list(csv.DictReader(f))
+
+khong_hop_le = [r["duong_dan"] for r in ban_ghi if r["hop_le"] == "không"]
+print(len(ban_ghi), "bản ghi;", len(khong_hop_le), "không hợp lệ:")
+for d in khong_hop_le:
+    print("  ", d)</code></pre>
+<pre><code class="language-text">1203 bản ghi; 2 không hợp lệ:
+   20261006/LOT-A/OK/ST1_20261006_00999_NG.png
+   20261007/LOT-B/OK/anh chup tay.jpg</code></pre>
+<table>
+  <tr><th>Vấn đề khi mở bằng Excel</th><th>Nguyên nhân</th><th>Cách xử lý</th></tr>
+  <tr><td>Tiếng Việt thành ký tự lạ</td><td>File thiếu BOM</td><td>Ghi bằng <code>encoding="utf-8-sig"</code></td></tr>
+  <tr><td>Mọi thứ dồn vào cột A</td><td>Máy cài định dạng vùng dùng dấu phẩy thập phân (nhiều máy đặt định dạng Việt Nam), Excel chờ dấu <code>;</code> làm ký tự ngăn cột</td><td>Mở bằng <strong>Data → From Text/CSV</strong> và chọn dấu phẩy, hoặc thống nhất với nhóm dùng <code>csv.writer(f, delimiter=";")</code></td></tr>
+  <tr><td>Số 12.48 biến thành ngày tháng hoặc chữ</td><td>Excel hiểu dấu chấm theo định dạng vùng</td><td>Như trên: nhập qua Data → From Text/CSV và chọn kiểu cột</td></tr>
+  <tr><td>Mã <code>00123</code> mất số 0 đầu</td><td>Excel tự đổi thành số</td><td>Nhập cột đó dạng Text, hoặc thêm tiền tố chữ vào mã (<code>SP00123</code>)</td></tr>
+  <tr><td>Python báo <code>PermissionError</code> khi ghi</td><td>File đang mở trong Excel (Windows khóa file)</td><td>Đóng Excel, hoặc ghi ra tên file có thời gian</td></tr>
+</table>
+
+<h2>5. Chia train/val có thể tái lập</h2>
+<p>Trước khi huấn luyện AI (chặng 10–11), bạn chia ảnh thành tập <strong>train</strong> (để học) và <strong>val</strong> (để kiểm tra). Yêu cầu quan trọng nhất: chạy lại lần nào cũng ra <strong>đúng</strong> cách chia đó, nếu không bạn không thể so sánh hai lần huấn luyện. Ba nguyên tắc: sắp xếp trước, xáo trộn với <strong>seed</strong> cố định, và ghi kết quả chia ra file.</p>
+<pre><code class="language-python">import random
+
+
+def chia_train_val(ds, ti_le_val=0.2, seed=42):
+    """Trả về (train, val). Không sửa list đầu vào."""
+    ds = sorted(ds)                        # thứ tự đầu vào không ảnh hưởng kết quả
+    random.Random(seed).shuffle(ds)        # bộ sinh số ngẫu nhiên riêng, có seed
+    n_val = round(len(ds) * ti_le_val)
+    return ds[n_val:], ds[:n_val]
+
+
+ten = [f"img_{i:02d}.png" for i in range(10)]
+train, val = chia_train_val(ten)
+print("val:", val)
+print("Chạy lại giống hệt:", chia_train_val(ten) == (train, val))
+print("Đảo thứ tự đầu vào vẫn giống:", chia_train_val(ten[::-1]) == (train, val))
+print("Seed khác:", chia_train_val(ten, seed=7)[1])</code></pre>
+<pre><code class="language-text">val: ['img_07.png', 'img_03.png']
+Chạy lại giống hệt: True
+Đảo thứ tự đầu vào vẫn giống: True
+Seed khác: ['img_08.png', 'img_03.png']</code></pre>
+<ul>
+  <li><code>random.Random(seed)</code> tạo bộ sinh số ngẫu nhiên <strong>riêng</strong>. Gọi <code>random.seed(42)</code> toàn cục cũng được, nhưng bất kỳ đoạn code nào khác gọi <code>random</code> ở giữa sẽ làm kết quả thay đổi.</li>
+  <li>Ghi danh sách train/val ra <strong>CSV</strong> thay vì copy ảnh sang thư mục mới: không tốn gấp đôi ổ cứng, và file CSV chính là "biên bản" của lần chia, lưu cùng mô hình. Khi công cụ huấn luyện bắt buộc cấu trúc thư mục, mới copy bằng <code>shutil.copy2</code> (giữ cả thời gian tạo file).</li>
+</ul>
+<div class="warn"><strong>Chia ngẫu nhiên từng ảnh có thể "gian lận" mà không biết</strong>Ở nhà máy, ảnh chụp liên tiếp của cùng một lô thường gần giống nhau (cùng đèn, cùng phôi). Chia ngẫu nhiên từng ảnh thì ảnh gần như trùng nằm ở cả train lẫn val, mô hình đạt điểm val rất cao nhưng ra dây chuyền với lô mới lại kém. Khi có thông tin lô/ngày, hãy chia <strong>theo nhóm</strong>: xáo trộn danh sách các nhóm (ví dụ các cặp ngày + lô) rồi đưa <em>trọn</em> nhóm vào train hoặc val. Ngoài ra ảnh NG thường rất ít, nên chia <strong>riêng</strong> OK và NG theo cùng tỉ lệ (chia phân tầng, bài tập 3) để val chắc chắn có đủ ảnh NG.</div>
+
+<h2>6. Ghi log thay cho print</h2>
+<p><code>print</code> hiện ra màn hình rồi mất. Trạm kiểm tra chạy 24/7 cần <strong>log</strong>: ghi ra file, có thời gian, có mức độ nghiêm trọng, tự giới hạn dung lượng. Khi có sự cố lúc 3 giờ sáng, file log là thứ duy nhất cho biết chuyện gì đã xảy ra. Module <code>logging</code> có sẵn trong Python.</p>
+<table>
+  <tr><th>Mức</th><th>Dùng khi</th><th>Ví dụ ở trạm vision</th></tr>
+  <tr><td><code>DEBUG</code></td><td>Chi tiết để gỡ lỗi, bình thường tắt</td><td>Thời gian từng bước xử lý, giá trị trung gian</td></tr>
+  <tr><td><code>INFO</code></td><td>Sự kiện bình thường</td><td>Bắt đầu ca, xử lý xong lô, tổng kết</td></tr>
+  <tr><td><code>WARNING</code></td><td>Bất thường nhưng vẫn chạy tiếp được</td><td>Ảnh quá tối, tên file sai quy ước, xử lý chậm</td></tr>
+  <tr><td><code>ERROR</code></td><td>Một việc thất bại</td><td>Không đọc được ảnh, ghi file lỗi</td></tr>
+  <tr><td><code>CRITICAL</code></td><td>Hệ thống không thể tiếp tục</td><td>Mất kết nối camera, ổ cứng đầy</td></tr>
+</table>
+<pre><code class="language-python">import logging
+import sys
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
+
+
+def tao_logger(ten="tram1", file_log="vision.log"):
+    """Logger ghi ra file (đủ chi tiết) và ra màn hình (gọn)."""
+    log = logging.getLogger(ten)
+    log.setLevel(logging.DEBUG)
+    for h in list(log.handlers):              # gọi lại hàm không bị nhân đôi dòng log
+        h.close()
+        log.removeHandler(h)
+
+    ghi_file = RotatingFileHandler(file_log, maxBytes=5_000_000, backupCount=5, encoding="utf-8")
+    ghi_file.setLevel(logging.DEBUG)
+    ghi_file.setFormatter(logging.Formatter("%(asctime)s %(levelname)-8s %(name)s: %(message)s"))
+
+    man_hinh = logging.StreamHandler(sys.stdout)
+    man_hinh.setLevel(logging.INFO)           # màn hình chỉ hiện từ INFO trở lên
+    man_hinh.setFormatter(logging.Formatter("%(levelname)-8s %(message)s"))
+
+    log.addHandler(ghi_file)
+    log.addHandler(man_hinh)
+    log.propagate = False
+    return log
+
+
+log = tao_logger()
+log.info("Bắt đầu ca, ngưỡng sáng = %d", 128)
+log.debug("Chỉ có trong file: thời gian xử lý %.1f ms", 23.4)
+log.warning("Ảnh %s quá tối, độ sáng TB = %.1f", "ST1_00012_OK.png", 18.4)
+try:
+    1 / 0
+except ZeroDivisionError:
+    log.exception("Lỗi khi tính tỉ lệ NG")    # tự kèm traceback vào log
+
+print("--- nội dung vision.log ---")
+print(Path("vision.log").read_text(encoding="utf-8"))</code></pre>
+<pre><code class="language-text">INFO     Bắt đầu ca, ngưỡng sáng = 128
+WARNING  Ảnh ST1_00012_OK.png quá tối, độ sáng TB = 18.4
+ERROR    Lỗi khi tính tỉ lệ NG
+Traceback (most recent call last):
+  File "...\vidu_log.py", line 34, in &lt;module&gt;
+    1 / 0
+    ~~^~~
+ZeroDivisionError: division by zero
+--- nội dung vision.log ---
+2026-10-09 09:12:03,417 INFO     tram1: Bắt đầu ca, ngưỡng sáng = 128
+2026-10-09 09:12:03,417 DEBUG    tram1: Chỉ có trong file: thời gian xử lý 23.4 ms
+2026-10-09 09:12:03,417 WARNING  tram1: Ảnh ST1_00012_OK.png quá tối, độ sáng TB = 18.4
+2026-10-09 09:12:03,418 ERROR    tram1: Lỗi khi tính tỉ lệ NG
+Traceback (most recent call last):
+  File "...\vidu_log.py", line 34, in &lt;module&gt;
+    1 / 0
+    ~~^~~
+ZeroDivisionError: division by zero</code></pre>
+<p>Kết quả trên khi lưu khối code thành file <code>vidu_log.py</code> rồi chạy. Thời gian trong file log và đường dẫn file trong traceback sẽ khác trên máy bạn. Những điều cần học từ ví dụ:</p>
+<ul>
+  <li><strong>Hai "đầu ra" (handler) với hai mức khác nhau</strong>: file giữ cả <code>DEBUG</code> để điều tra sau, màn hình chỉ hiện từ <code>INFO</code> cho gọn.</li>
+  <li><code>RotatingFileHandler</code>: khi file đạt 5 MB thì đổi tên thành <code>vision.log.1</code> và mở file mới, giữ tối đa 5 file cũ. Không có nó, sau vài tháng file log có thể lớn tới hàng GB và làm đầy ổ. Muốn mỗi ngày một file thì dùng <code>TimedRotatingFileHandler(..., when="midnight")</code>.</li>
+  <li>Truyền tham số kiểu <code>log.info("... %d", 128)</code> thay vì f-string: chuỗi chỉ được định dạng khi dòng log thực sự được ghi (dòng <code>DEBUG</code> bị tắt thì không tốn công).</li>
+  <li><code>log.exception(...)</code> chỉ gọi trong khối <code>except</code>: ghi mức <code>ERROR</code> kèm toàn bộ traceback, đúng thứ bạn cần khi đọc lại log.</li>
+  <li><code>logging.basicConfig(...)</code> là cách cấu hình nhanh trong script nhỏ, nhưng nó <strong>không làm gì</strong> nếu logging đã được cấu hình trước đó (ví dụ bởi một thư viện khác), một nguồn gây bối rối. Tự tạo logger có tên như trên rõ ràng hơn.</li>
+</ul>
+
+<h2>7. Ghép lại: script quét thư mục ảnh</h2>
+<p>Script dưới đây gộp mọi thứ: duyệt ảnh, đọc từng ảnh bằng OpenCV, tính độ sáng trung bình, ghi CSV, ghi log, và <strong>không dừng</strong> khi gặp ảnh hỏng. Đây là khung bạn sẽ mở rộng ở "Dự án chặng 1: báo cáo chất lượng thư mục ảnh".</p>
+<pre><code class="language-python">"""quet_anh.py: quét thư mục ảnh, ghi ket_qua_quet.csv và quet_anh.log."""
+import csv
+import logging
+import sys
+import time
+from collections import Counter
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
+
+import cv2
+
+DUOI_ANH = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}
+NGUONG_TOI = 40          # độ sáng trung bình dưới mức này thì cảnh báo
+
+
+def tao_logger(ten, file_log):
+    log = logging.getLogger(ten)
+    log.setLevel(logging.DEBUG)
+    for h in list(log.handlers):
+        h.close()
+        log.removeHandler(h)
+    fh = RotatingFileHandler(file_log, maxBytes=5_000_000, backupCount=5, encoding="utf-8")
+    fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)-8s %(message)s"))
+    sh = logging.StreamHandler(sys.stdout)
+    sh.setLevel(logging.INFO)
+    sh.setFormatter(logging.Formatter("%(levelname)-8s %(message)s"))
+    log.addHandler(fh)
+    log.addHandler(sh)
+    log.propagate = False
+    return log
+
+
+def liet_ke_anh(goc):
+    return sorted(p for p in goc.rglob("*")
+                  if p.is_file() and not p.name.startswith((".", "~"))
+                  and p.suffix.lower() in DUOI_ANH)
+
+
+def quet(goc: Path, file_csv: Path, log) -&gt; Counter:
+    dem = Counter()
+    ds = liet_ke_anh(goc)
+    log.info("Bắt đầu quét %s: %d ảnh", goc, len(ds))
+    with open(file_csv, "w", newline="", encoding="utf-8-sig") as f:
+        ghi = csv.writer(f)
+        ghi.writerow(["duong_dan", "rong", "cao", "do_sang_tb", "trang_thai"])
+        for p in ds:
+            ten = p.relative_to(goc).as_posix()
+            try:
+                anh = cv2.imread(str(p), cv2.IMREAD_GRAYSCALE)
+                if anh is None:
+                    raise ValueError("OpenCV không giải mã được file")
+                sang = float(anh.mean())
+                trang_thai = "toi" if sang &lt; NGUONG_TOI else "tot"
+                if trang_thai == "toi":
+                    log.warning("Ảnh tối: %s (%.1f)", ten, sang)
+                ghi.writerow([ten, anh.shape[1], anh.shape[0], f"{sang:.1f}", trang_thai])
+            except Exception as loi:                    # một ảnh hỏng không làm dừng cả lô
+                trang_thai = "hong"
+                log.error("Bỏ qua %s: %s", ten, loi)
+                ghi.writerow([ten, "", "", "", trang_thai])
+            dem[trang_thai] += 1
+            log.debug("%s -&gt; %s", ten, trang_thai)
+    return dem
+
+
+log = tao_logger("quet_anh", "quet_anh.log")
+t0 = time.perf_counter()
+dem = quet(Path("anh_day_chuyen"), Path("ket_qua_quet.csv"), log)
+log.info("Xong: %s", dict(sorted(dem.items())))
+log.info("Thời gian: %.2f s", time.perf_counter() - t0)</code></pre>
+<pre><code class="language-text">INFO     Bắt đầu quét anh_day_chuyen: 1203 ảnh
+ERROR    Bỏ qua 20261007/LOT-B/OK/ST1_20261007_01201_OK.png: OpenCV không giải mã được file
+INFO     Xong: {'hong': 1, 'tot': 1202}
+INFO     Thời gian: 0.31 s</code></pre>
+<p>Thời gian chạy tùy máy. OpenCV còn in thêm một dòng cảnh báo riêng của nó (<code>[ WARN:...] imread_(...)</code>) khi gặp file hỏng; dòng đó đi ra luồng lỗi chuẩn, không nằm trong log của bạn. File <code>quet_anh.log</code> chứa thêm 1203 dòng <code>DEBUG</code>, mỗi ảnh một dòng: rất hữu ích khi cần tra "ảnh X lúc đó bị đánh giá thế nào".</p>
+<p>Để biến thành công cụ dòng lệnh (<code>python quet_anh.py D:\anh</code>), đọc đường dẫn từ <code>sys.argv[1]</code> hoặc dùng module <code>argparse</code>, và đặt ba dòng cuối vào khối <code>if __name__ == "__main__":</code> như bài "Hàm và module".</p>
+
+<h2>Lỗi thường gặp</h2>
+<table>
+  <tr><th>Lỗi</th><th>Hậu quả</th><th>Cách đúng</th></tr>
+  <tr><td>Không <code>sorted()</code> danh sách file trước khi chia</td><td>Máy khác chia ra train/val khác</td><td>Luôn sắp xếp, rồi mới xáo trộn có seed</td></tr>
+  <tr><td>Lọc đuôi bằng <code>rglob("*.jpg")</code></td><td>Sót <code>.JPG</code> trên Linux, đếm đôi trên Windows nếu thêm mẫu viết hoa</td><td><code>p.suffix.lower() in DUOI_ANH</code></td></tr>
+  <tr><td>Ghép đường dẫn bằng chuỗi <code>"a" + "\\" + ten</code></td><td>Chạy sai trên Linux</td><td><code>Path</code> và toán tử <code>/</code></td></tr>
+  <tr><td>Ghi CSV thiếu <code>newline=""</code> hoặc dùng <code>utf-8</code> thường</td><td>Dòng trống xen kẽ; Excel lỗi font tiếng Việt</td><td><code>open(..., "w", newline="", encoding="utf-8-sig")</code></td></tr>
+  <tr><td><code>except: pass</code> trong vòng lặp ảnh</td><td>Ảnh hỏng biến mất không dấu vết</td><td>Bắt lỗi, <code>log.error</code>/<code>log.exception</code>, ghi trạng thái "hong" vào CSV</td></tr>
+  <tr><td>Log không giới hạn dung lượng</td><td>Sau vài tháng đầy ổ cứng, trạm dừng</td><td><code>RotatingFileHandler</code> hoặc <code>TimedRotatingFileHandler</code></td></tr>
+</table>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Duyệt ảnh: <code>rglob("*")</code> + lọc <code>suffix.lower()</code> + bỏ file ẩn/tạm + <code>sorted()</code>; <code>relative_to</code> và <code>parts</code> để lấy ngày/lô/nhãn.</li>
+  <li>Kiểm tra quy ước tên và nhãn chéo giữa tên file với thư mục để bắt lỗi gán nhãn.</li>
+  <li>CSV: module <code>csv</code>, <code>newline=""</code>, <code>utf-8-sig</code>; đọc lại bằng <code>DictReader</code> (mọi giá trị là chuỗi).</li>
+  <li>Chia train/val: sắp xếp → <code>random.Random(seed).shuffle</code> → ghi CSV; cân nhắc chia theo lô và chia phân tầng OK/NG.</li>
+  <li>Log thay print: logger có tên, file + màn hình, <code>RotatingFileHandler</code>, <code>log.exception</code> trong <code>except</code>.</li>
+</ul>
 
 <h2>Bài tập</h2>
-<ol>
-  <li>Viết script đổi tên toàn bộ ảnh trong thư mục thành <code>ma-sp_ngay_stt.png</code>.</li>
-  <li>Chia dataset theo thư mục con (mỗi thư mục là một lô) thay vì ngẫu nhiên.</li>
-  <li>Tính độ sáng trung bình mỗi ảnh, ghi ra CSV, rồi mở bằng Excel vẽ biểu đồ theo thời gian.</li>
-</ol>
+<div class="ex">
+<h3>Bài 1. Đếm ảnh theo phần mở rộng</h3>
+<p>Viết script đếm số ảnh theo phần mở rộng (<code>.jpg</code>, <code>.png</code>, <code>.bmp</code>…) trong thư mục <code>anh_day_chuyen</code> và mọi thư mục con. Đuôi viết hoa và viết thường tính chung; bỏ qua file ẩn. In thêm số file <strong>không phải ảnh</strong> để biết thư mục có "rác" gì.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">from collections import Counter
+from pathlib import Path
+
+DUOI_ANH = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}
+goc = Path("anh_day_chuyen")
+
+dem_anh, khong_phai_anh = Counter(), []
+for p in goc.rglob("*"):
+    if not p.is_file() or p.name.startswith((".", "~")):
+        continue
+    duoi = p.suffix.lower()
+    if duoi in DUOI_ANH:
+        dem_anh[duoi] += 1
+    else:
+        khong_phai_anh.append(p.name)
+
+for duoi, so in dem_anh.most_common():
+    print(f"{duoi:6s} {so:5d}")
+print("Tổng ảnh:", sum(dem_anh.values()))
+print("Không phải ảnh:", sorted(khong_phai_anh))</code></pre>
+<pre><code class="language-text">.png     842
+.jpg     241
+.bmp     120
+Tổng ảnh: 1203
+Không phải ảnh: ['Thumbs.db', 'ghi_chu_ca_dem.txt']</code></pre>
+<p>241 file <code>.jpg</code> gồm 120 file <code>.jpg</code>, 120 file <code>.JPG</code> và "anh chup tay.jpg". <code>most_common()</code> trả về các cặp (đuôi, số lượng) xếp từ nhiều đến ít.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Chia train/val 80/20 và ghi CSV</h3>
+<p>Chia ngẫu nhiên toàn bộ ảnh trong <code>anh_day_chuyen</code> thành train/val theo tỉ lệ 80/20 với seed cố định 42. Ghi ra <code>chia_tap.csv</code> gồm các cột <code>duong_dan</code>, <code>nhan</code> (tên thư mục OK/NG), <code>tap</code> (train/val). In số ảnh mỗi tập và kiểm tra chạy hai lần cho cùng kết quả.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import csv
+import random
+from pathlib import Path
+
+DUOI_ANH = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}
+goc = Path("anh_day_chuyen")
+
+
+def chia(goc, ti_le_val=0.2, seed=42):
+    ds = sorted(p.relative_to(goc).as_posix() for p in goc.rglob("*")
+                if p.is_file() and not p.name.startswith((".", "~"))
+                and p.suffix.lower() in DUOI_ANH)
+    random.Random(seed).shuffle(ds)
+    n_val = round(len(ds) * ti_le_val)
+    return ds[n_val:], ds[:n_val]
+
+
+train, val = chia(goc)
+with open("chia_tap.csv", "w", newline="", encoding="utf-8-sig") as f:
+    ghi = csv.writer(f)
+    ghi.writerow(["duong_dan", "nhan", "tap"])
+    for tap, ds in (("train", train), ("val", val)):
+        for d in sorted(ds):
+            ghi.writerow([d, d.split("/")[-2], tap])
+
+print("train:", len(train), "val:", len(val))
+print("NG trong val:", sum(d.split("/")[-2] == "NG" for d in val))
+print("Chạy lại giống hệt:", chia(goc) == (train, val))</code></pre>
+<pre><code class="language-text">train: 962 val: 241
+NG trong val: 29
+Chạy lại giống hệt: True</code></pre>
+<p>Val có 29 ảnh NG trên 241 (12,0%), trong khi toàn bộ dữ liệu chỉ có 120/1203 (10%) là NG. Chia ngẫu nhiên từng ảnh làm tỉ lệ NG trong val lệch theo may rủi, với seed khác có thể lệch nhiều hơn: đó là lý do của bài 3. Dùng đường dẫn tương đối dạng <code>/</code> trong CSV để file dùng được trên cả Windows lẫn Linux.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 3. Chia phân tầng OK/NG</h3>
+<p>Sửa bài 2 để chia <strong>riêng</strong> ảnh OK và ảnh NG, mỗi nhóm 80/20, rồi gộp lại. Kiểm tra tỉ lệ NG trong val đúng bằng tỉ lệ NG chung.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import random
+from collections import defaultdict
+from pathlib import Path
+
+DUOI_ANH = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}
+goc = Path("anh_day_chuyen")
+
+theo_nhan = defaultdict(list)
+for p in goc.rglob("*"):
+    if p.is_file() and not p.name.startswith((".", "~")) and p.suffix.lower() in DUOI_ANH:
+        theo_nhan[p.parent.name].append(p.relative_to(goc).as_posix())
+
+rng = random.Random(42)
+train, val = [], []
+for nhan in sorted(theo_nhan):                 # sắp xếp cả tên nhóm để tái lập được
+    ds = sorted(theo_nhan[nhan])
+    rng.shuffle(ds)
+    n_val = round(len(ds) * 0.2)
+    val += ds[:n_val]
+    train += ds[n_val:]
+
+ng_val = sum(d.split("/")[-2] == "NG" for d in val)
+print("train:", len(train), "val:", len(val))
+print(f"NG trong val: {ng_val}/{len(val)} = {ng_val / len(val):.1%}")
+print(f"NG toàn bộ: {len(theo_nhan['NG'])}/{len(train) + len(val)}")</code></pre>
+<pre><code class="language-text">train: 962 val: 241
+NG trong val: 24/241 = 10.0%
+NG toàn bộ: 120/1203</code></pre>
+<p><code>defaultdict(list)</code> tự tạo list rỗng cho khóa mới, nên không cần kiểm tra khóa đã có chưa. Cùng ý tưởng này áp dụng cho chia theo lô: thay nhóm "OK/NG" bằng nhóm "ngày + lô" và đưa trọn nhóm vào một tập.</p>
+</details>
+</div>
+<p>Bài tiếp theo: <strong>NumPy cơ bản: mảng, slicing, vector hóa</strong>, công cụ để xử lý chính nội dung bên trong những file ảnh bạn vừa duyệt.</p>

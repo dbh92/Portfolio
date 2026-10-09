@@ -1,73 +1,458 @@
-<p>OpenCV là thư viện xử lý ảnh mã nguồn mở phổ biến nhất thế giới, dùng được từ Python, C++, C# (qua OpenCvSharp) và chạy trên hầu hết phần cứng. Bài này giúp bạn làm chủ ba việc cơ bản nhất: <strong>đọc/ghi ảnh, xử lý video và lấy hình từ camera</strong>.</p>
+<p>Chặng 2 bắt đầu với OpenCV, thư viện xử lý ảnh mã nguồn mở phổ biến nhất thế giới, dùng được từ Python, C++, C# (qua OpenCvSharp) và chạy trên hầu hết phần cứng. Ở chặng 1, bài "Ảnh là mảng số: NumPy cho xử lý ảnh" đã cho bạn thấy ảnh chỉ là mảng NumPy. Bài này dạy ba việc nền tảng mà mọi chương trình vision đều làm: <strong>đọc, hiển thị, ghi ảnh</strong> (kể cả đường dẫn tiếng Việt trên Windows), <strong>đọc và ghi video</strong>, và <strong>lấy hình từ camera theo thời gian thực</strong>. Bài tiếp theo, "Không gian màu BGR, HSV, Gray và tách màu", sẽ bắt đầu phân tích nội dung ảnh.</p>
 
-<h2>Cài đặt</h2>
-<pre><code>python -m venv .venv
-# Windows: .venv\Scripts\activate    Linux/macOS: source .venv/bin/activate
-pip install opencv-python numpy</code></pre>
-<p>Gói <code>opencv-python</code> có giao diện cửa sổ (<code>imshow</code>). Trên máy chủ không màn hình, dùng <code>opencv-python-headless</code>. Đừng cài cả hai cùng lúc vì chúng xung đột nhau.</p>
+<h2>1. Cài OpenCV và kiểm tra</h2>
+<p>Trong môi trường ảo của dự án (bài "Môi trường ảo, pip và thư viện cho AI Vision"):</p>
+<pre><code class="language-bash">python -m pip install opencv-python numpy</code></pre>
+<p>Gói <code>opencv-python</code> có giao diện cửa sổ (<code>cv2.imshow</code>). Trên máy chủ không màn hình hoặc Docker, dùng <code>opencv-python-headless</code>. <strong>Chỉ cài một gói OpenCV</strong>: các gói đều cung cấp module <code>cv2</code> và đè lên nhau (xem bảng 4 gói trong bài môi trường ảo). Kiểm tra:</p>
+<pre><code class="language-python">import cv2
 
-<h2>Đọc, hiển thị, ghi ảnh</h2>
-<pre><code>import cv2
+print("OpenCV", cv2.__version__)
+for dong in cv2.getBuildInformation().splitlines():
+    if dong.strip().startswith(("GUI:", "FFMPEG:")):
+        print(dong.strip())</code></pre>
+<pre><code class="language-text">OpenCV 5.0.0
+GUI:                           NONE
+FFMPEG:                      YES</code></pre>
+<p>Kết quả trên là của máy chạy thử bài viết, cài bản <strong>headless</strong> nên <code>GUI: NONE</code> (không mở được cửa sổ). Với <code>opencv-python</code> trên Windows bạn sẽ thấy dòng GUI có <code>WIN32UI</code>; trên Linux là <code>GTK</code> hoặc <code>QT</code>. Dòng <code>FFMPEG: YES</code> nghĩa là đọc/ghi được file video MP4, AVI. Các ví dụ trong bài chạy được trên cả OpenCV 4.x và 5.x; chỗ nào hai bản khác nhau sẽ được ghi chú.</p>
 
-img = cv2.imread("san-pham.jpg")
-if img is None:                       # imread KHÔNG báo lỗi khi sai đường dẫn
-    raise FileNotFoundError("Không đọc được ảnh")
+<h2>2. Ghi ảnh: imwrite</h2>
+<p>Tạo một ảnh "sản phẩm" để dùng cho cả bài, rồi ghi ra nhiều định dạng. OpenCV chọn định dạng theo <strong>đuôi file</strong>:</p>
+<pre><code class="language-python">import os
 
-cv2.imshow("Anh goc", img)
-cv2.waitKey(0)                        # chờ bấm phím
+import cv2
+import numpy as np
+
+rng = np.random.default_rng(0)
+anh = rng.integers(70, 90, size=(480, 640, 3), dtype=np.uint8)       # nền băng tải có nhiễu
+cv2.rectangle(anh, (200, 140), (440, 340), (190, 190, 190), -1)       # sản phẩm
+cv2.circle(anh, (320, 240), 40, (40, 40, 40), -1)                     # lỗ giữa
+cv2.putText(anh, "SP-01", (215, 175), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 200), 2)
+
+print(cv2.imwrite("san_pham.png", anh))                                      # PNG: không mất dữ liệu
+cv2.imwrite("san_pham_q95.jpg", anh, [cv2.IMWRITE_JPEG_QUALITY, 95])
+cv2.imwrite("san_pham_q50.jpg", anh, [cv2.IMWRITE_JPEG_QUALITY, 50])
+cv2.imwrite("san_pham.bmp", anh)                                             # không nén
+
+for ten in ["san_pham.bmp", "san_pham.png", "san_pham_q95.jpg", "san_pham_q50.jpg"]:
+    doc = cv2.imread(ten)
+    sai_lech = np.abs(doc.astype(int) - anh).max()
+    print(f"{ten:18s} {os.path.getsize(ten) / 1024:7.1f} KB   sai lệch tối đa: {sai_lech}")
+
+print("Ghi vào thư mục chưa có:", cv2.imwrite("chua_co/anh.png", anh))</code></pre>
+<pre><code class="language-text">True
+san_pham.bmp         900.1 KB   sai lệch tối đa: 0
+san_pham.png         491.6 KB   sai lệch tối đa: 0
+san_pham_q95.jpg      94.1 KB   sai lệch tối đa: 81
+san_pham_q50.jpg      11.0 KB   sai lệch tối đa: 92
+Ghi vào thư mục chưa có: False</code></pre>
+<p>Dung lượng có thể chênh một chút giữa các phiên bản thư viện. Điều cần thấy: PNG và BMP đọc lại <strong>đúng từng pixel</strong> (sai lệch 0), JPEG thì không, kể cả chất lượng 95. Với ảnh nền nhiễu như trên, JPEG chất lượng thấp còn sai lệch nhiều hơn ở các cạnh và vùng chi tiết.</p>
+<table>
+  <tr><th>Định dạng</th><th>Mất dữ liệu?</th><th>Dùng ở trạm kiểm tra</th></tr>
+  <tr><td>PNG</td><td>Không</td><td>Lưu ảnh NG để phân tích, dataset AI, ảnh 16 bit. Tham số <code>IMWRITE_PNG_COMPRESSION</code> (0–9) chỉ đổi tốc độ ghi và dung lượng, không đổi chất lượng; với ảnh nhiễu mức nén cao gần như không nhỏ hơn mà chậm hơn.</td></tr>
+  <tr><td>BMP</td><td>Không</td><td>Ghi nhanh nhất (không nén) khi cycle time gấp, nhưng tốn ổ cứng</td></tr>
+  <tr><td>JPEG</td><td>Có</td><td>Lưu ảnh OK số lượng lớn để tra cứu, gửi ảnh qua mạng. <strong>Không</strong> dùng cho ảnh cần đo đạc lại</td></tr>
+  <tr><td>TIFF</td><td>Tùy cấu hình</td><td>Ảnh 16 bit, ảnh từ phần mềm của hãng camera</td></tr>
+</table>
+<div class="warn"><strong>imwrite không tự tạo thư mục, và không ném lỗi</strong>Ghi vào thư mục chưa tồn tại, <code>imwrite</code> trả về <code>False</code> (có bản in thêm cảnh báo) và chương trình chạy tiếp như không có gì. Trên dây chuyền, điều đó nghĩa là cả ca không lưu được ảnh NG nào. Luôn <code>Path(...).mkdir(parents=True, exist_ok=True)</code> trước và kiểm tra giá trị trả về.</div>
+
+<h2>3. Đọc ảnh: imread</h2>
+<pre><code class="language-python">mau = cv2.imread("san_pham.png")                          # mặc định: màu BGR, uint8
+xam = cv2.imread("san_pham.png", cv2.IMREAD_GRAYSCALE)    # đọc thẳng thành ảnh xám
+nguyen = cv2.imread("san_pham.png", cv2.IMREAD_UNCHANGED) # giữ nguyên: 16 bit, kênh alpha...
+print(mau.shape, xam.shape, nguyen.shape, mau.dtype)
+
+khong_co = cv2.imread("khong_ton_tai.png")
+print("File không tồn tại:", khong_co)</code></pre>
+<pre><code class="language-text">(480, 640, 3) (480, 640) (480, 640, 3) uint8
+File không tồn tại: None</code></pre>
+<p><code>cv2.imread</code> <strong>không báo lỗi</strong> khi sai đường dẫn hay file hỏng: nó trả về <code>None</code> (và in một dòng cảnh báo <code>[ WARN:...]</code> ra luồng lỗi). Lỗi chỉ lộ ra ở dòng sau, với thông báo khó hiểu như <code>'NoneType' object has no attribute 'shape'</code> hoặc <code>(-215:Assertion failed) !_src.empty()</code>. Hãy bọc imread trong một hàm kiểm tra ngay:</p>
+<pre><code class="language-python">from pathlib import Path
+
+
+def doc_anh(duong_dan, co=cv2.IMREAD_COLOR):
+    """Đọc ảnh, báo lỗi rõ ràng thay vì trả về None."""
+    anh = cv2.imread(str(duong_dan), co)
+    if anh is None:
+        ly_do = "không tồn tại" if not Path(duong_dan).exists() else "không giải mã được (hỏng/sai định dạng)"
+        raise FileNotFoundError(f"Không đọc được ảnh {duong_dan}: {ly_do}")
+    return anh
+
+
+try:
+    doc_anh("anh_ca_dem/ST1_000128.png")
+except FileNotFoundError as loi:
+    print(loi)</code></pre>
+<pre><code class="language-text">Không đọc được ảnh anh_ca_dem/ST1_000128.png: không tồn tại</code></pre>
+<p>OpenCV 5 có thêm cờ <code>cv2.IMREAD_COLOR_RGB</code> để đọc thẳng ra RGB; nếu code cần chạy cả trên OpenCV 4.x, hãy đọc BGR rồi dùng <code>cv2.cvtColor</code> như bài trước.</p>
+
+<h2>4. Hiển thị: imshow và waitKey</h2>
+<pre><code class="language-python">import cv2
+
+anh = cv2.imread("san_pham.png")
+cv2.namedWindow("San pham", cv2.WINDOW_NORMAL)   # cửa sổ kéo giãn được (ảnh 5 MP không vừa màn hình)
+cv2.imshow("San pham", anh)
+phim = cv2.waitKey(0) &amp; 0xFF                     # 0: chờ đến khi bấm phím
 cv2.destroyAllWindows()
+print("Bạn đã bấm phím có mã", phim)</code></pre>
+<ul>
+  <li>Tên cửa sổ là định danh: gọi <code>imshow</code> lần nữa với cùng tên thì ảnh mới thay ảnh cũ trong cùng cửa sổ. Nên đặt tên <strong>không dấu</strong>: thanh tiêu đề trên một số hệ thống hiện sai tiếng Việt.</li>
+  <li><code>cv2.waitKey(ms)</code> vừa chờ phím vừa <strong>cho cửa sổ thời gian để vẽ</strong>. Không gọi <code>waitKey</code> thì cửa sổ trắng xóa hoặc "Not Responding". <code>waitKey(0)</code> chờ vô hạn; <code>waitKey(1)</code> chờ khoảng 1 ms, dùng trong vòng lặp video.</li>
+  <li><code>waitKey</code> trả về mã phím, hoặc <code>-1</code> nếu hết thời gian mà không có phím nào. Trên một số hệ thống, mã trả về có thêm bit trạng thái ở phần cao, nên ta viết <code>&amp; 0xFF</code> để chỉ giữ 8 bit thấp rồi so với <code>ord("q")</code>. Cần phím mũi tên thì dùng <code>cv2.waitKeyEx</code>.</li>
+  <li>Phím chỉ được nhận khi <strong>cửa sổ ảnh đang được chọn</strong> (focus), không phải cửa sổ terminal.</li>
+</ul>
+<div class="tip"><strong>Không có màn hình: headless và Jupyter</strong>Với gói <code>-headless</code>, <code>cv2.imshow</code> báo lỗi <code>The function is not implemented</code>. Khi đó lưu ảnh kết quả bằng <code>imwrite</code> rồi mở bằng trình xem ảnh. Trong notebook Jupyter, tránh <code>imshow</code> (dễ treo kernel); hiển thị bằng matplotlib: <code>plt.imshow(cv2.cvtColor(anh, cv2.COLOR_BGR2RGB))</code>, nhớ đổi BGR sang RGB.</div>
 
-cv2.imwrite("ket-qua.png", img)       # PNG không nén mất dữ liệu
-cv2.imwrite("ket-qua.jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 95])</code></pre>
-<p>Hai lưu ý quan trọng: <code>cv2.imread</code> trả về <code>None</code> thay vì báo lỗi, và trên Windows nó không đọc được đường dẫn có dấu tiếng Việt. Cách xử lý đường dẫn Unicode:</p>
-<pre><code>import numpy as np
-data = np.fromfile("D:/Ảnh mẫu/lỗi-01.png", dtype=np.uint8)
-img = cv2.imdecode(data, cv2.IMREAD_COLOR)</code></pre>
+<h2>5. Đường dẫn tiếng Việt trên Windows</h2>
+<p>Trên Windows, <code>cv2.imread</code> và <code>cv2.imwrite</code> của nhiều phiên bản OpenCV <strong>không xử lý được đường dẫn có ký tự ngoài bảng mã của hệ thống</strong>, ví dụ <code>D:\Ảnh mẫu\lỗi-01.png</code>: imread trả về <code>None</code>, imwrite trả về <code>False</code>, không có lỗi rõ ràng. Thư mục do người vận hành đặt tên có dấu là chuyện rất thường ở nhà máy Việt Nam. Cách chắc chắn chạy được trên mọi hệ điều hành và mọi phiên bản: để Python/NumPy đọc ghi <strong>bytes</strong> của file, còn OpenCV chỉ mã hóa/giải mã trong bộ nhớ.</p>
+<pre><code class="language-python">from pathlib import Path
 
-<h2>Đổi không gian màu</h2>
-<pre><code>gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-hsv  = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+import cv2
+import numpy as np
 
-# Lọc màu đỏ trong HSV (OpenCV dùng H: 0-179)
-mask1 = cv2.inRange(hsv, (0, 80, 60), (10, 255, 255))
-mask2 = cv2.inRange(hsv, (170, 80, 60), (179, 255, 255))
-red_mask = cv2.bitwise_or(mask1, mask2)</code></pre>
-<p>HSV tách <em>màu sắc</em> (H) khỏi <em>độ sáng</em> (V), nên lọc màu ổn định hơn nhiều so với lọc trực tiếp trên BGR khi ánh sáng thay đổi.</p>
 
-<h2>Vẽ kết quả lên ảnh</h2>
-<pre><code>cv2.rectangle(img, (50, 40), (220, 180), (0, 255, 0), 2)
-cv2.circle(img, (300, 200), 25, (255, 0, 0), -1)          # -1 = tô kín
-cv2.putText(img, "OK", (50, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)</code></pre>
-<p><code>putText</code> không hỗ trợ tiếng Việt có dấu; nếu cần, vẽ chữ bằng thư viện Pillow.</p>
+def doc_anh_unicode(duong_dan, co=cv2.IMREAD_COLOR):
+    """Đọc ảnh từ đường dẫn bất kỳ (kể cả tiếng Việt trên Windows)."""
+    du_lieu = np.fromfile(str(duong_dan), dtype=np.uint8)   # file không có → FileNotFoundError
+    anh = cv2.imdecode(du_lieu, co)
+    if anh is None:
+        raise ValueError(f"Không giải mã được ảnh: {duong_dan}")
+    return anh
 
-<h2>Đọc video và camera</h2>
-<pre><code>cap = cv2.VideoCapture(0)              # 0 = camera đầu tiên; hoặc "video.mp4"
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
+def ghi_anh_unicode(duong_dan, anh, tham_so=()):
+    """Ghi ảnh ra đường dẫn bất kỳ; định dạng theo đuôi file; tự tạo thư mục."""
+    duong_dan = Path(duong_dan)
+    duong_dan.parent.mkdir(parents=True, exist_ok=True)
+    ok, buf = cv2.imencode(duong_dan.suffix, anh, list(tham_so))
+    if not ok:
+        raise ValueError(f"Không mã hóa được ảnh theo định dạng {duong_dan.suffix}")
+    buf.tofile(str(duong_dan))
+
+
+anh = cv2.imread("san_pham.png")
+dich = Path("Ảnh mẫu") / "Ca đêm" / "lỗi-xước-01.png"
+ghi_anh_unicode(dich, anh)
+doc = doc_anh_unicode(dich)
+print(dich.as_posix(), doc.shape, "giống ảnh gốc:", np.array_equal(doc, anh))
+
+ghi_anh_unicode(dich.with_suffix(".jpg"), anh, [cv2.IMWRITE_JPEG_QUALITY, 90])
+print(sorted(p.name for p in dich.parent.iterdir()))</code></pre>
+<pre><code class="language-text">Ảnh mẫu/Ca đêm/lỗi-xước-01.png (480, 640, 3) giống ảnh gốc: True
+['lỗi-xước-01.jpg', 'lỗi-xước-01.png']</code></pre>
+<ul>
+  <li><code>np.fromfile</code> đọc toàn bộ file thành mảng byte; <code>cv2.imdecode</code> giải mã PNG/JPEG/BMP… từ mảng đó, nhận cùng các cờ <code>IMREAD_*</code> như imread.</li>
+  <li><code>cv2.imencode(".png", anh)</code> trả về <code>(ok, buf)</code>, <code>buf</code> là mảng byte của file PNG; <code>buf.tofile()</code> ghi ra đĩa. Cũng chính <code>imencode</code> dùng khi gửi ảnh qua mạng hay lưu vào cơ sở dữ liệu.</li>
+  <li>Hai hàm này nhanh tương đương imread/imwrite. Nhiều nhóm dùng chúng <strong>mặc định</strong> trong mọi dự án để khỏi phải nghĩ.</li>
+</ul>
+
+<h2>6. Đọc file video</h2>
+<p>Để có video thử mà không cần camera, ta tự tạo một đoạn "băng tải" 1 giây: một sản phẩm chạy từ trái sang phải. <code>cv2.VideoWriter</code> sẽ được giải thích kỹ ở mục 7.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+RONG, CAO, FPS, SO_KHUNG = 640, 480, 30, 30
+ghi = cv2.VideoWriter("bang_tai.mp4", cv2.VideoWriter_fourcc(*"mp4v"), FPS, (RONG, CAO))
+print("Mở được bộ ghi:", ghi.isOpened())
+for i in range(SO_KHUNG):
+    khung = np.full((CAO, RONG, 3), 70, np.uint8)
+    x = 40 + i * 18                                         # sản phẩm dịch 18 pixel mỗi khung
+    cv2.rectangle(khung, (x, 180), (x + 100, 300), (200, 200, 200), -1)
+    ghi.write(khung)
+ghi.release()
+print("Đã ghi", SO_KHUNG, "khung vào bang_tai.mp4")</code></pre>
+<pre><code class="language-text">Mở được bộ ghi: True
+Đã ghi 30 khung vào bang_tai.mp4</code></pre>
+<p>Đọc video: mở bằng <code>cv2.VideoCapture</code>, gọi <code>read()</code> lặp lại cho đến khi hết. <code>read()</code> trả về cặp <code>(ok, khung)</code>; <code>ok</code> là <code>False</code> khi hết video hoặc lỗi.</p>
+<pre><code class="language-python">import time
+
+import cv2
+
+cap = cv2.VideoCapture("bang_tai.mp4")
+if not cap.isOpened():
+    raise SystemExit("Không mở được video")
+
+fps = cap.get(cv2.CAP_PROP_FPS)
+rong = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+cao = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+tong = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))     # với một số định dạng chỉ là ước lượng
+print(f"{rong}x{cao}, {fps:.0f} FPS, khoảng {tong} khung = {tong / fps:.1f} s")
+
+dem = 0
+t0 = time.perf_counter()
+try:
+    while True:
+        ok, khung = cap.read()
+        if not ok:                                # hết video
+            break
+        dem += 1
+        xam = cv2.cvtColor(khung, cv2.COLOR_BGR2GRAY)
+        # ... xử lý từng khung ở đây ...
+finally:
+    cap.release()                                 # luôn giải phóng, kể cả khi có lỗi
+print("Đọc được", dem, "khung | khung cuối là None:", khung is None, "| ảnh xám:", xam.shape)
+print(f"Tốc độ xử lý: {dem / (time.perf_counter() - t0):.0f} khung/s")</code></pre>
+<pre><code class="language-text">640x480, 30 FPS, khoảng 30 khung = 1.0 s
+Đọc được 30 khung | khung cuối là None: True | ảnh xám: (480, 640)
+Tốc độ xử lý: 2345 khung/s</code></pre>
+<p>Dòng tốc độ phụ thuộc máy. Để ý: sau vòng lặp, <code>khung</code> là <code>None</code> (lần đọc cuối thất bại), vì vậy <strong>luôn kiểm tra <code>ok</code> trước khi dùng khung</strong>. Đọc file video chạy nhanh hết mức có thể, không theo FPS của video: muốn phát đúng tốc độ thì phải tự chờ (ví dụ <code>waitKey(int(1000 / fps))</code>).</p>
+<p>Nhảy tới một khung bất kỳ: <code>cap.set(cv2.CAP_PROP_POS_FRAMES, 100)</code> trước khi <code>read()</code>. Với video nén, việc nhảy có thể không chính xác tuyệt đối đến từng khung tùy codec; khi cần chính xác (ví dụ trích ảnh lỗi để làm dataset), đọc tuần tự và đếm.</p>
+
+<h2>7. Ghi video kết quả</h2>
+<p><code>cv2.VideoWriter(ten_file, fourcc, fps, (rộng, cao), isColor=True)</code>. <code>fourcc</code> là mã 4 ký tự chọn codec:</p>
+<table>
+  <tr><th>fourcc</th><th>Đuôi file</th><th>Ghi chú</th></tr>
+  <tr><td><code>mp4v</code></td><td><code>.mp4</code></td><td>Có sẵn trong gói pip, file nhỏ, xem được bằng hầu hết trình phát</td></tr>
+  <tr><td><code>MJPG</code></td><td><code>.avi</code></td><td>Mỗi khung là một ảnh JPEG: tương thích rộng, file lớn hơn, cắt khung dễ</td></tr>
+  <tr><td><code>XVID</code></td><td><code>.avi</code></td><td>Phổ biến trên Windows</td></tr>
+  <tr><td><code>avc1</code> / <code>H264</code></td><td><code>.mp4</code></td><td>Nén tốt nhất nhưng tùy bản build, thường <strong>không có</strong> trong gói pip. Kiểm tra <code>isOpened()</code></td></tr>
+</table>
+<p>Ví dụ: đọc video băng tải, vẽ số thứ tự khung và vị trí sản phẩm, ghi ra video kết quả để gửi cho đồng nghiệp xem:</p>
+<pre><code class="language-python">import cv2
+
+cap = cv2.VideoCapture("bang_tai.mp4")
+fps = cap.get(cv2.CAP_PROP_FPS) or 30            # một số nguồn trả về 0: dùng giá trị dự phòng
+rong = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+cao = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+ghi = cv2.VideoWriter("ket_qua.avi", cv2.VideoWriter_fourcc(*"MJPG"), fps, (rong, cao))
+if not ghi.isOpened():
+    raise SystemExit("Không tạo được file video (sai codec/đuôi file?)")
+
+so_khung = 0
 while True:
-    ok, frame = cap.read()
+    ok, khung = cap.read()
     if not ok:
         break
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    cv2.imshow("Camera", gray)
-    if cv2.waitKey(1) &amp; 0xFF == ord("q"):   # bấm q để thoát
-        break
-
+    so_khung += 1
+    cv2.putText(khung, f"Khung {so_khung}", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+    ghi.write(khung)                              # kích thước PHẢI đúng (rong, cao) đã khai báo
 cap.release()
-cv2.destroyAllWindows()</code></pre>
-<p><code>VideoCapture</code> dùng tốt cho webcam USB. Camera công nghiệp chuẩn GigE Vision/USB3 Vision thường cần SDK của hãng (hoặc thư viện như Harvesters), sau đó chuyển khung hình sang mảng NumPy để xử lý bằng OpenCV như bình thường.</p>
+ghi.release()                                     # quên release: file hỏng hoặc thiếu đoạn cuối
+print("Đã ghi", so_khung, "khung vào ket_qua.avi")</code></pre>
+<pre><code class="language-text">Đã ghi 30 khung vào ket_qua.avi</code></pre>
+<div class="warn"><strong>Ghi sai kích thước khung: video rỗng</strong>Nếu khung đưa vào <code>write()</code> khác kích thước <code>(rộng, cao)</code> đã khai báo (ví dụ bạn resize hoặc cắt ROI rồi quên sửa bộ ghi), OpenCV <strong>không ném lỗi</strong>: các khung bị bỏ qua (OpenCV 5 in cảnh báo "Failed to write frame", nhiều bản 4.x im lặng) và bạn nhận được file chỉ vài trăm byte, không mở được. Tương tự, ghi ảnh xám 2 chiều vào bộ ghi màu cũng hỏng: hoặc đổi ảnh về BGR bằng <code>cv2.COLOR_GRAY2BGR</code>, hoặc tạo bộ ghi với <code>isColor=False</code> (bài tập 2).</div>
 
-<h2>Ghi video</h2>
-<pre><code>fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-out = cv2.VideoWriter("ghi-lai.mp4", fourcc, 30.0, (1280, 720))
-# trong vòng lặp: out.write(frame)  (kích thước frame phải đúng 1280x720)
-out.release()</code></pre>
+<h2>8. Camera theo thời gian thực</h2>
+<p>Với webcam USB, chỉ cần thay tên file bằng <strong>số thứ tự camera</strong>: <code>0</code> là camera đầu tiên, <code>1</code> là camera thứ hai. Khung chương trình chuẩn: đọc → xử lý → hiển thị → kiểm tra phím, và giải phóng camera ở <code>finally</code>.</p>
+<pre><code class="language-python">import time
+
+import cv2
+
+cap = cv2.VideoCapture(0)                 # Windows: cv2.VideoCapture(0, cv2.CAP_DSHOW) thường mở nhanh hơn
+if not cap.isOpened():
+    raise SystemExit("Không mở được camera 0 (đang bị phần mềm khác dùng? sai số thứ tự?)")
+
+fps_tb = 0.0
+t_truoc = time.perf_counter()
+try:
+    while True:
+        ok, khung = cap.read()
+        if not ok:
+            print("Mất khung hình, dừng")
+            break
+
+        xam = cv2.cvtColor(khung, cv2.COLOR_BGR2GRAY)     # "xử lý" tạm thời
+
+        t_nay = time.perf_counter()
+        fps_tuc_thoi = 1.0 / max(t_nay - t_truoc, 1e-6)
+        t_truoc = t_nay
+        fps_tb = fps_tuc_thoi if fps_tb == 0 else 0.9 * fps_tb + 0.1 * fps_tuc_thoi   # làm mượt
+
+        cv2.putText(khung, f"FPS {fps_tb:.1f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+        cv2.imshow("Camera", khung)
+        cv2.imshow("Xam", xam)
+
+        phim = cv2.waitKey(1) &amp; 0xFF                     # gọi waitKey MỘT lần mỗi vòng
+        if phim == ord("q") or phim == 27:               # q hoặc Esc
+            break
+finally:
+    cap.release()
+    cv2.destroyAllWindows()</code></pre>
+<p>Chạy lên, bạn thấy hai cửa sổ ảnh màu và ảnh xám, góc trên hiện FPS (webcam laptop thường khoảng 15–30), bấm <kbd>q</kbd> hoặc <kbd>Esc</kbd> để thoát. Những điểm đáng học:</p>
+<ul>
+  <li><strong>FPS thực</strong> đo bằng <code>time.perf_counter()</code> giữa hai khung, làm mượt bằng trung bình trượt (mỗi khung chỉ đóng góp 10%) để số không nhảy loạn. Đây là FPS của <em>cả vòng lặp</em>: bị giới hạn bởi camera <strong>hoặc</strong> bởi xử lý của bạn, cái nào chậm hơn. Muốn biết riêng thời gian xử lý, đo quanh đoạn xử lý.</li>
+  <li><code>waitKey</code> chỉ gọi <strong>một lần</strong> mỗi vòng rồi lưu vào biến. Viết <code>if cv2.waitKey(1) == ord("q")</code> rồi lại <code>if cv2.waitKey(1) == ord("s")</code> sẽ làm "mất" phím bấm.</li>
+  <li><code>cap.release()</code> trong <code>finally</code>: nếu chương trình lỗi giữa chừng mà không giải phóng, camera có thể bị "giữ" và lần chạy sau báo không mở được.</li>
+  <li>Với camera, một lần <code>read()</code> thất bại có thể chỉ là trục trặc tạm thời (cáp USB lỏng). Ở trạm thật, nên đếm số lần lỗi liên tiếp, ghi log, thử mở lại camera thay vì dừng ngay.</li>
+</ul>
+
+<h3>Thuộc tính camera: set rồi phải get lại</h3>
+<pre><code class="language-python">import cv2
+
+cap = cv2.VideoCapture(0)
+yeu_cau = {cv2.CAP_PROP_FRAME_WIDTH: 1280, cv2.CAP_PROP_FRAME_HEIGHT: 720, cv2.CAP_PROP_FPS: 30}
+for thuoc_tinh, gia_tri in yeu_cau.items():
+    cap.set(thuoc_tinh, gia_tri)
+
+for _ in range(10):                  # bỏ vài khung đầu: tự động phơi sáng/cân bằng trắng đang ổn định
+    cap.read()
+
+rong = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+cao = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+fps = cap.get(cv2.CAP_PROP_FPS)
+print(f"Camera thực sự chạy: {rong}x{cao} @ {fps:.0f} FPS")
+cap.release()</code></pre>
+<p><code>cap.set()</code> chỉ là <strong>yêu cầu</strong>: camera không hỗ trợ độ phân giải đó thì driver chọn mức gần nhất, và <code>set</code> vẫn có thể trả về <code>True</code>. Vì vậy luôn <code>get</code> lại (hoặc xem <code>khung.shape</code>) để biết giá trị thật. Webcam laptop thường hỗ trợ 640×480 và 1280×720; nếu yêu cầu 1920×1080 mà nhận về 640×480, đó là giới hạn của camera.</p>
+<table>
+  <tr><th>Thuộc tính</th><th>Ý nghĩa</th><th>Lưu ý</th></tr>
+  <tr><td><code>CAP_PROP_FRAME_WIDTH</code> / <code>HEIGHT</code></td><td>Độ phân giải</td><td>Chỉ nhận các mức camera hỗ trợ</td></tr>
+  <tr><td><code>CAP_PROP_FPS</code></td><td>Tốc độ khung</td><td>Phơi sáng dài trong phòng tối sẽ kéo FPS xuống</td></tr>
+  <tr><td><code>CAP_PROP_AUTO_EXPOSURE</code>, <code>CAP_PROP_EXPOSURE</code></td><td>Tự động/thủ công thời gian phơi sáng</td><td>Giá trị và đơn vị <strong>khác nhau tùy backend và driver</strong> (DirectShow, Media Foundation, V4L2…); thử rồi get lại</td></tr>
+  <tr><td><code>CAP_PROP_AUTOFOCUS</code>, <code>CAP_PROP_FOCUS</code></td><td>Lấy nét</td><td>Ở trạm kiểm tra nên tắt tự lấy nét để ảnh ổn định</td></tr>
+  <tr><td><code>CAP_PROP_BUFFERSIZE</code></td><td>Số khung trong hàng đợi</td><td>Đặt 1 để giảm độ trễ; chỉ một số backend hỗ trợ</td></tr>
+</table>
+<div class="tip"><strong>Webcam khác camera công nghiệp</strong><code>VideoCapture</code> dùng tốt cho webcam USB và camera IP qua RTSP (<code>cv2.VideoCapture("rtsp://...")</code>). Camera công nghiệp chuẩn GigE Vision/USB3 Vision thường cần SDK của hãng (hoặc thư viện GenICam như Harvesters) để điều khiển trigger, exposure, gain đúng cách; SDK trả về khung hình, bạn chuyển thành mảng NumPy và xử lý bằng OpenCV như bình thường. Các chặng về camera và tích hợp sẽ học kỹ phần này. Ngoài ra, webcam tự động phơi sáng và cân bằng trắng: ánh sáng thay đổi thì ảnh thay đổi, nên kết quả kiểm tra bằng webcam luôn kém ổn định hơn hệ thống có đèn và camera chuyên dụng.</div>
+
+<h2>9. Lỗi thường gặp</h2>
+<table>
+  <tr><th>Hiện tượng</th><th>Nguyên nhân</th><th>Cách xử lý</th></tr>
+  <tr><td><code>(-215:Assertion failed) !_src.empty()</code></td><td>Ảnh là <code>None</code> do imread thất bại hoặc <code>read()</code> hết khung</td><td>Kiểm tra <code>None</code>/<code>ok</code> ngay sau khi đọc</td></tr>
+  <tr><td>imread trả về None dù file có thật (Windows)</td><td>Đường dẫn có dấu tiếng Việt</td><td><code>np.fromfile</code> + <code>cv2.imdecode</code></td></tr>
+  <tr><td>Cửa sổ trắng, "Not Responding"</td><td>Không gọi <code>waitKey</code></td><td>Gọi <code>cv2.waitKey(1)</code> mỗi vòng</td></tr>
+  <tr><td><code>The function is not implemented</code> khi imshow</td><td>Cài bản headless hoặc cài lẫn hai gói</td><td>Gỡ hết, cài lại <code>opencv-python</code></td></tr>
+  <tr><td>Camera không mở được</td><td>Phần mềm khác (Zoom, Teams, lần chạy trước chưa release) đang giữ camera; sai số thứ tự</td><td>Đóng phần mềm kia; thử 0, 1, 2; luôn <code>release()</code></td></tr>
+  <tr><td>File video vài trăm byte, không mở được</td><td>Khung sai kích thước, ảnh xám vào bộ ghi màu, codec không có, quên <code>release()</code></td><td>Kiểm tra <code>isOpened()</code>, kích thước khung, <code>isColor</code></td></tr>
+  <tr><td>Vài khung đầu tối hoặc ám màu</td><td>Webcam đang tự chỉnh phơi sáng</td><td>Bỏ 5–10 khung đầu</td></tr>
+</table>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Cài <strong>một</strong> gói OpenCV; <code>opencv-python</code> nếu cần cửa sổ, <code>-headless</code> cho máy chủ.</li>
+  <li><code>imread</code> trả về <code>None</code> chứ không ném lỗi; <code>imwrite</code> chọn định dạng theo đuôi, trả về <code>False</code> khi thất bại và không tự tạo thư mục. Ảnh cần đo lại: PNG/BMP, không JPEG.</li>
+  <li>Đường dẫn tiếng Việt trên Windows: <code>np.fromfile</code> + <code>imdecode</code>, <code>imencode</code> + <code>tofile</code>.</li>
+  <li>Video/camera: <code>VideoCapture</code> → vòng <code>read()</code> kiểm tra <code>ok</code> → <code>release()</code> trong <code>finally</code>; <code>waitKey(1) &amp; 0xFF</code> một lần mỗi vòng.</li>
+  <li><code>VideoWriter</code>: fourcc khớp đuôi file, khung đúng kích thước, <code>isColor=False</code> cho ảnh xám, nhớ <code>release()</code>.</li>
+  <li>Thuộc tính camera: <code>set</code> chỉ là yêu cầu, luôn <code>get</code> lại; đo FPS thực bằng <code>time.perf_counter()</code>.</li>
+</ul>
 
 <h2>Bài tập</h2>
-<ol>
-  <li>Mở webcam, hiển thị song song ảnh màu và ảnh xám.</li>
-  <li>Vẽ một khung ROI cố định giữa màn hình và in độ sáng trung bình của ROI lên ảnh theo thời gian thực.</li>
-  <li>Bấm phím <code>s</code> để lưu khung hình hiện tại thành file PNG có tên theo thời gian.</li>
-</ol>
-<p>Bài tiếp theo: <a href="phan-nguong-contour-dem-do-vat.html">phân ngưỡng và contour để đếm, đo vật thể</a>.</p>
+<div class="ex">
+<h3>Bài 1. Chụp ảnh từ webcam bằng phím</h3>
+<p>Viết chương trình mở webcam, hiển thị hình liên tục. Nhấn <kbd>s</kbd> để lưu khung hình hiện tại vào thư mục <code>anh_chup</code> với tên file chứa thời gian (đến mili giây, để chụp nhanh hai lần trong một giây không bị ghi đè). Nhấn <kbd>q</kbd> để thoát và in tổng số ảnh đã lưu.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">from datetime import datetime
+from pathlib import Path
+
+import cv2
+
+THU_MUC = Path("anh_chup")
+THU_MUC.mkdir(exist_ok=True)
+
+cap = cv2.VideoCapture(0)
+if not cap.isOpened():
+    raise SystemExit("Không mở được camera")
+
+so_anh = 0
+try:
+    while True:
+        ok, khung = cap.read()
+        if not ok:
+            break
+        hien_thi = khung.copy()                      # vẽ lên bản sao, LƯU ảnh gốc
+        cv2.putText(hien_thi, f"s: chup | q: thoat | da luu: {so_anh}", (10, 25),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+        cv2.imshow("Webcam", hien_thi)
+
+        phim = cv2.waitKey(1) &amp; 0xFF
+        if phim == ord("s"):
+            ten = datetime.now().strftime("anh_%Y%m%d_%H%M%S_%f")[:-3] + ".png"   # %f là micro giây
+            duong_dan = THU_MUC / ten
+            if cv2.imwrite(str(duong_dan), khung):
+                so_anh += 1
+                print("Đã lưu", duong_dan.as_posix())
+            else:
+                print("LỖI: không lưu được", duong_dan)
+        elif phim == ord("q"):
+            break
+finally:
+    cap.release()
+    cv2.destroyAllWindows()
+print("Tổng số ảnh đã lưu:", so_anh)</code></pre>
+<p>Ví dụ kết quả khi bấm <kbd>s</kbd> một lần rồi <kbd>q</kbd> (thời gian trong tên file sẽ khác):</p>
+<pre><code class="language-text">Đã lưu anh_chup/anh_20261009_222840_103.png
+Tổng số ảnh đã lưu: 1</code></pre>
+<p>Ba chi tiết quan trọng: lưu <code>khung</code> gốc chứ không lưu ảnh đã vẽ chữ (ảnh dataset không được có chữ đè lên); <code>%f</code> cho micro giây, cắt bớt 3 chữ số còn mili giây; kiểm tra giá trị trả về của <code>imwrite</code>. Tên file dạng <code>năm-tháng-ngày-giờ</code> còn có lợi là sắp xếp theo tên cũng chính là theo thời gian. Muốn lưu vào thư mục tiếng Việt, thay <code>cv2.imwrite</code> bằng hàm <code>ghi_anh_unicode</code> ở mục 5.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Chuyển video sang ảnh xám</h3>
+<p>Đọc video <code>bang_tai.mp4</code> (mục 6), chuyển từng khung sang ảnh xám và ghi ra video mới <code>bang_tai_xam.mp4</code>. Sau đó mở lại video mới, đếm số khung và in kích thước khung đọc được.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import cv2
+
+cap = cv2.VideoCapture("bang_tai.mp4")
+fps = cap.get(cv2.CAP_PROP_FPS) or 30
+rong = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+cao = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+ghi = cv2.VideoWriter("bang_tai_xam.mp4", cv2.VideoWriter_fourcc(*"mp4v"), fps, (rong, cao),
+                      isColor=False)                     # bộ ghi nhận ảnh xám 2 chiều
+if not ghi.isOpened():
+    raise SystemExit("Không tạo được bộ ghi video")
+
+so_khung = 0
+try:
+    while True:
+        ok, khung = cap.read()
+        if not ok:
+            break
+        xam = cv2.cvtColor(khung, cv2.COLOR_BGR2GRAY)    # shape (cao, rong)
+        ghi.write(xam)
+        so_khung += 1
+finally:
+    cap.release()
+    ghi.release()
+print("Đã ghi", so_khung, "khung xám")
+
+kiem_tra = cv2.VideoCapture("bang_tai_xam.mp4")
+dem, kich_thuoc = 0, None
+while True:
+    ok, khung = kiem_tra.read()
+    if not ok:
+        break
+    dem += 1
+    kich_thuoc = khung.shape
+kiem_tra.release()
+print("Đọc lại:", dem, "khung, kích thước", kich_thuoc)</code></pre>
+<pre><code class="language-text">Đã ghi 30 khung xám
+Đọc lại: 30 khung, kích thước (480, 640, 3)</code></pre>
+<p>Để ý dòng cuối: video ghi bằng ảnh xám nhưng đọc lại vẫn ra <strong>3 kênh</strong>. <code>VideoCapture</code> mặc định trả khung BGR (ba kênh giống nhau), nên chương trình đọc video xám vẫn phải <code>cvtColor</code> sang xám nếu cần mảng 2 chiều. Nếu quên <code>isColor=False</code> mà vẫn ghi ảnh xám 2 chiều, file sẽ rỗng như cảnh báo ở mục 7.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 3. Lưu ảnh NG vào thư mục tiếng Việt</h3>
+<p>Viết hàm <code>luu_anh_ng(anh, ma_loi)</code> lưu ảnh vào <code>Ảnh lỗi/&lt;ngày dạng YYYY-MM-DD&gt;/&lt;mã lỗi&gt;/</code> với tên file là số thứ tự tăng dần <code>0001.png</code>, <code>0002.png</code>… (không ghi đè ảnh cũ), chạy được với đường dẫn có dấu trên Windows. Trả về đường dẫn đã lưu. Thử lưu 3 ảnh với mã lỗi "xước" và 1 ảnh "móp".</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">from datetime import date
+from pathlib import Path
+
+import cv2
+import numpy as np
+
+
+def luu_anh_ng(anh, ma_loi, goc=Path("Ảnh lỗi")):
+    thu_muc = goc / date.today().isoformat() / ma_loi
+    thu_muc.mkdir(parents=True, exist_ok=True)
+    stt = len(list(thu_muc.glob("*.png"))) + 1
+    duong_dan = thu_muc / f"{stt:04d}.png"
+    while duong_dan.exists():                      # phòng khi có file bị xóa ở giữa
+        stt += 1
+        duong_dan = thu_muc / f"{stt:04d}.png"
+    ok, buf = cv2.imencode(".png", anh)
+    if not ok:
+        raise ValueError("Không mã hóa được ảnh")
+    buf.tofile(str(duong_dan))
+    return duong_dan
+
+
+anh = np.zeros((60, 80, 3), np.uint8)
+for ma in ["xước", "xước", "xước", "móp"]:
+    p = luu_anh_ng(anh, ma)
+    print(p.parent.name, p.name, cv2.imdecode(np.fromfile(str(p), np.uint8), cv2.IMREAD_COLOR).shape)</code></pre>
+<pre><code class="language-text">xước 0001.png (60, 80, 3)
+xước 0002.png (60, 80, 3)
+xước 0003.png (60, 80, 3)
+móp 0001.png (60, 80, 3)</code></pre>
+<p>Đếm file rồi cộng 1 là cách đơn giản để đánh số; vòng <code>while</code> đảm bảo không ghi đè nếu số thứ tự bị lủng. Ở trạm thật nhiều luồng cùng lưu ảnh, dùng tên theo thời gian như bài 1 an toàn hơn.</p>
+</details>
+</div>
+<p>Bài tiếp theo: <strong>Không gian màu BGR, HSV, Gray và tách màu</strong>, bạn sẽ bắt đầu phân tích nội dung khung hình vừa đọc được: tách vật theo màu sắc một cách ổn định dưới ánh sáng thay đổi.</p>

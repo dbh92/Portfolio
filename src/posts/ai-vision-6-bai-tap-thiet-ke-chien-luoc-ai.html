@@ -1,0 +1,264 @@
+<p>Bài tập tổng kết chặng 11 "AI Vision". Ở các bài trước, bạn đã học từng mảnh: "Rule-based hay Deep Learning?", "Tự xây dataset ảnh công nghiệp", "Công cụ gán nhãn dữ liệu ảnh miễn phí", "Dữ liệu tổng hợp (synthetic data) khi thiếu ảnh lỗi" và "Chọn ngưỡng và đánh giá theo escape, overkill, cycle time". Bây giờ bạn ghép chúng thành <strong>một tài liệu chiến lược AI</strong> cho một bài toán lỗi bề mặt thật, loại tài liệu mà trưởng nhóm vision viết trước khi chụp tấm ảnh đầu tiên và trước khi hứa bất cứ điều gì với khách hàng. Không có mô hình nào được huấn luyện trong bài này; thứ bạn nộp là các quyết định có lý lẽ và con số. Chặng 12 sau đó sẽ dạy chi tiết các kỹ thuật bạn chọn ở đây (YOLO26, phân đoạn, U-Net, anomaly detection).</p>
+<div class="tip"><strong>Sản phẩm bạn nộp</strong>Tài liệu chiến lược 3–5 trang gồm: phân tích bài toán và lựa chọn cách tiếp cận (có so sánh phương án), kiến trúc pipeline, kế hoạch dữ liệu có số lượng và lịch thu thập, hướng dẫn gán nhãn, cách chia tập chống rò rỉ, golden set và tiêu chí nghiệm thu (escape, overkill, cycle time p99), lộ trình theo giai đoạn và bảng rủi ro. Kèm một script Python nhỏ tính lịch thu thập, giờ công gán nhãn và chia tập theo lô.</div>
+
+<h2>1. Yêu cầu</h2>
+<h3>Thông tin đầu vào (khách hàng đã cung cấp)</h3>
+<table>
+  <tr><th>Hạng mục</th><th>Thông tin</th></tr>
+  <tr><td>Sản phẩm</td><td>Vỏ nhôm phay CNC, anod hóa màu đen mờ, kích thước 120 × 80 × 15 mm, cho thiết bị điện tử cầm tay. Mặt trên (vùng A) là mặt người dùng nhìn thấy; 4 mặt bên (vùng B) ít quan trọng hơn. Có 4 lỗ ren M2 ở mặt dưới</td></tr>
+  <tr><td>Sản lượng</td><td>2 ca × 8 giờ, 600 chi tiết/giờ, khoảng 9.600 chi tiết/ngày. Robot đặt chi tiết vào trạm, mỗi chi tiết 6 giây; trạm phải có kết quả trong 1,5 giây kể từ lúc chụp xong</td></tr>
+  <tr><td>Tỉ lệ lỗi hiện tại (QC thống kê 3 tháng)</td><td>Xước 0,20%; móp, va đập 0,08%; loang màu, đốm màu 0,08%; hở nhôm (lớp anod bị bong, lộ nhôm sáng) 0,03%; thiếu ren 0,01%</td></tr>
+  <tr><td>Tiêu chí lỗi (bản vẽ của khách hàng)</td><td>Vùng A: xước dài ≥ 2,0 mm là NG; móp đường kính ≥ 0,5 mm là NG; loang màu diện tích ≥ 1,0 mm² là NG; <strong>hở nhôm mọi kích thước ≥ 0,2 mm là NG (lỗi nghiêm trọng: gây ăn mòn)</strong>. Vùng B: giới hạn gấp đôi vùng A. Bụi, vân tay: không phải lỗi (lau được)</td></tr>
+  <tr><td>Dữ liệu sẵn có</td><td>Chưa có ảnh nào. QC đồng ý giữ lại chi tiết NG trong tủ cách ly 3 tháng (khoảng 70% số NG giữ được, phần còn lại đã bị đưa đi gia công lại trước khi kịp chụp). Ảnh OK: không giới hạn</td></tr>
+  <tr><td>Mục tiêu khách hàng</td><td>Thay 4 QC kiểm bằng mắt (2 người/ca). "Không để lọt hở nhôm". Lọt tổng ≤ 200 ppm. Loại nhầm không quá 2% (hàng bị loại sẽ có 1 người kiểm lại mỗi ca)</td></tr>
+  <tr><td>Phần cứng dự kiến</td><td>PC công nghiệp có GPU tầm trung; camera màu 12 MP cho mặt trên; chiếu sáng chưa chọn</td></tr>
+  <tr><td>Thời hạn</td><td>Khách hàng muốn chạy thử trong 2 tháng, nghiệm thu trong 5 tháng</td></tr>
+</table>
+<h3>Nhiệm vụ</h3>
+<table>
+  <tr><th>#</th><th>Việc phải làm</th><th>Đầu ra</th></tr>
+  <tr><td>1</td><td>Phân tích từng loại lỗi: đo được bằng rule-based không, cần biết vị trí và kích thước không, có đủ ảnh không</td><td>Bảng phân tích lỗi</td></tr>
+  <tr><td>2</td><td>So sánh các cách tiếp cận (phân loại, phát hiện, phân đoạn, anomaly detection, rule-based, kết hợp) và chọn kiến trúc pipeline</td><td>Bảng so sánh + sơ đồ pipeline</td></tr>
+  <tr><td>3</td><td>Lập kế hoạch dữ liệu: số ảnh mỗi lớp, lịch thu thập, giờ công gán nhãn, hướng dẫn gán nhãn, chia tập không rò rỉ</td><td>Kế hoạch dữ liệu + script</td></tr>
+  <tr><td>4</td><td>Thiết kế golden set và viết tiêu chí nghiệm thu đo được (escape, overkill, cycle time p99/max)</td><td>Bảng tiêu chí nghiệm thu</td></tr>
+  <tr><td>5</td><td>Lộ trình theo giai đoạn phù hợp thời hạn khách hàng; bảng rủi ro và biện pháp</td><td>Lộ trình + bảng rủi ro</td></tr>
+  <tr><td>6</td><td>Liệt kê những điều phải làm rõ với khách hàng trước khi ký</td><td>Danh sách câu hỏi</td></tr>
+</table>
+
+<h2>2. Kiến thức sử dụng</h2>
+<ul>
+  <li><strong>Rule-based hay Deep Learning?</strong>: chọn công cụ theo loại lỗi, hệ thống hybrid.</li>
+  <li><strong>Tự xây dataset ảnh công nghiệp</strong>: kế hoạch thu thập, metadata, phiên bản, chia theo lô.</li>
+  <li><strong>Công cụ gán nhãn dữ liệu ảnh miễn phí</strong>: đa giác hay khung bao, hướng dẫn gán nhãn, kiểm chéo.</li>
+  <li><strong>Dữ liệu tổng hợp (synthetic data) khi thiếu ảnh lỗi</strong>: cắt dán lỗi, chỉ đánh giá trên ảnh thật.</li>
+  <li><strong>Chọn ngưỡng và đánh giá theo escape, overkill, cycle time</strong>: ngưỡng theo ràng buộc, cận trên tin cậy, golden set, đo p99.</li>
+  <li>Chặng 5: <strong>Tiêu chí OK/NG, escape và overkill</strong> (tiêu chí đo được, vùng xám), <strong>Đặc tả kỹ thuật và nghiệm thu FAT/SAT</strong>. Chặng 6: chọn camera, độ phân giải, chiếu sáng. Chặng 10: <strong>Dataset, DataLoader và augmentation</strong> (augmentation an toàn cho ảnh công nghiệp).</li>
+</ul>
+
+<h2>3. Gợi ý thiết kế</h2>
+<ul>
+  <li><strong>Bắt đầu từ tiêu chí, không từ mô hình.</strong> Tiêu chí của khách hàng tính bằng mm và mm², theo vùng. Mô hình phân loại OK/NG không trả lời được "vết xước dài bao nhiêu mm"; hãy hỏi mỗi loại lỗi cần đầu ra gì (có/không, vị trí, kích thước).</li>
+  <li><strong>Tính độ phân giải trước</strong>: lỗi nhỏ nhất 0,2 mm cần ít nhất 3–5 pixel (chặng 6). Ảnh 12 MP rất lớn so với đầu vào mô hình: tính số ô (tile) phải chạy và kiểm tra cycle time.</li>
+  <li><strong>Tính thời gian thu thập</strong>: lỗi hiếm nhất quyết định lịch. So với thời hạn 2 tháng chạy thử, phương án nào triển khai được khi chưa có đủ ảnh lỗi?</li>
+  <li><strong>Phân biệt "chưa từng thấy" và "đã biết"</strong>: anomaly detection bắt được bất thường mới nhưng không đo kích thước theo tiêu chí; mô hình có giám sát đo được nhưng chỉ biết lỗi đã học.</li>
+  <li><strong>Đừng quên cái rule-based làm tốt hơn</strong>: định vị chi tiết, kiểm tra ren, quy đổi pixel sang mm, áp tiêu chí theo vùng.</li>
+  <li><strong>Mọi con số nghiệm thu phải kèm số mẫu</strong> và hiểu giới hạn của nó (quy tắc 3/n).</li>
+</ul>
+<p>Script khởi đầu để tính lịch thu thập, giờ công gán nhãn và số ô ảnh. Hãy thay các giả định bằng con số của bạn:</p>
+<pre><code class="language-python">import math
+
+SP_NGAY = 9_600                     # 2 ca × 8 h × 600 chi tiết/h
+GIU_LAI = 0.7                       # tỉ lệ chi tiết NG QC giữ lại được để chụp
+TI_LE = {"xuoc": 0.0020, "lom": 0.0008, "loang_mau": 0.0008, "ho_nhom": 0.0003}   # tỉ lệ lỗi / sản phẩm
+MUC_TIEU = {"xuoc": 300, "lom": 200, "loang_mau": 200, "ho_nhom": 150}           # chi tiết NG cần cho mô hình có giám sát
+
+print("loại lỗi   | NG/ngày | giữ được/ngày | số ngày sản xuất để đủ mục tiêu")
+for loai, p in TI_LE.items():
+    giu = SP_NGAY * p * GIU_LAI
+    print(f"{loai:10s} | {SP_NGAY * p:7.1f} | {giu:13.1f} | {math.ceil(MUC_TIEU[loai] / giu):3d} ngày")
+
+# Giờ công gán nhãn (giả định, hãy đo lại khi gán thử 50 ảnh đầu)
+n_ng, n_ok = sum(MUC_TIEU.values()), 3000
+VET_MOI_ANH = 1.3                   # số vết lỗi trung bình mỗi ảnh NG
+GIAY_DA_GIAC = 75                   # vẽ một đa giác vết lỗi
+GIAY_OK = 3                         # xác nhận nhanh một ảnh OK (xem lưới ảnh nhỏ)
+KIEM_CHEO, GIAY_KIEM = 0.3, 25      # 30% ảnh được người thứ hai kiểm, 25 s/ảnh
+giay = n_ng * VET_MOI_ANH * GIAY_DA_GIAC + n_ok * GIAY_OK + (n_ng + n_ok) * KIEM_CHEO * GIAY_KIEM
+print(f"gán nhãn {n_ng} ảnh NG + {n_ok} ảnh OK + kiểm chéo: {giay / 3600:.0f} giờ công")
+
+# Số ô (tile) cho ảnh 12 MP khi mô hình nhận ô 512×512, chồng lấn 64 px
+W, H, O, CL = 4000, 3000, 512, 64
+nx, ny = math.ceil((W - CL) / (O - CL)), math.ceil((H - CL) / (O - CL))
+print(f"ảnh {W}×{H}: {nx}×{ny} = {nx * ny} ô mỗi ảnh")</code></pre>
+<pre><code class="language-text">loại lỗi   | NG/ngày | giữ được/ngày | số ngày sản xuất để đủ mục tiêu
+xuoc       |    19.2 |          13.4 |  23 ngày
+lom        |     7.7 |           5.4 |  38 ngày
+loang_mau  |     7.7 |           5.4 |  38 ngày
+ho_nhom    |     2.9 |           2.0 |  75 ngày
+gán nhãn 850 ảnh NG + 3000 ảnh OK + kiểm chéo: 34 giờ công
+ảnh 4000×3000: 9×7 = 63 ô mỗi ảnh</code></pre>
+
+<h2>4. Lời giải mẫu</h2>
+<p>Hãy tự làm trước khi mở lời giải. Lời giải dưới đây là một phương án hợp lý, không phải phương án duy nhất; điều quan trọng là mỗi quyết định đều có lý do và con số.</p>
+<details><summary>Xem lời giải mẫu: tài liệu chiến lược AI đầy đủ</summary>
+
+<h3>4.1. Các con số thiết kế</h3>
+<ul>
+  <li><strong>Độ phân giải</strong>: mặt trên 120 × 80 mm, chừa biên định vị → trường nhìn khoảng 130 × 97 mm trên cảm biến 4000 × 3000 px: khoảng <strong>0,033 mm/px</strong>. Lỗi nhỏ nhất (hở nhôm 0,2 mm) phủ khoảng 6 px, xước 2,0 mm dài khoảng 60 px: đủ cho cả phát hiện lẫn đo.</li>
+  <li><strong>Số ô</strong>: 9 × 7 = 63 ô 512 × 512 mỗi ảnh. Không được thu nhỏ cả ảnh về 640 px: lỗi 6 px sẽ còn chưa đến 1 px.</li>
+  <li><strong>Ngân sách thời gian</strong>: 1,5 s cho tất cả ảnh của một chi tiết. Nếu dùng 2 ảnh chiếu sáng (mục 4.3) thì 126 ô; với mô hình phân đoạn nhỏ chạy batch trên GPU tầm trung, mục tiêu khoảng 3–5 ms/ô là khả thi nhưng <strong>phải đo trên phần cứng đích</strong> trong tuần đầu (rủi ro R3).</li>
+  <li><strong>Lịch thu thập</strong> (từ script): xước đủ 300 chi tiết sau khoảng 23 ngày sản xuất, móp và loang màu khoảng 38 ngày, <strong>hở nhôm cần khoảng 75 ngày</strong>. Thời hạn chạy thử 2 tháng nên mô hình có giám sát cho hở nhôm không thể sẵn sàng đúng hạn chỉ bằng dữ liệu thật.</li>
+  <li><strong>Gán nhãn</strong>: khoảng 34 giờ công cho bộ dữ liệu đầu tiên; chia cho 2 người trong 3 tuần, song song với thu thập.</li>
+</ul>
+
+<h3>4.2. Phân tích từng loại lỗi</h3>
+<table>
+  <tr><th>Lỗi</th><th>Đầu ra cần</th><th>Rule-based?</th><th>Dữ liệu</th><th>Kết luận</th></tr>
+  <tr><td>Xước</td><td>Vị trí, chiều dài (mm), vùng A/B</td><td>Khó: nền anod có vân phay, phản xạ thay đổi</td><td>23 ngày sản xuất (~4 tuần)</td><td>Phân đoạn có giám sát, đo chiều dài từ mặt nạ</td></tr>
+  <tr><td>Móp</td><td>Vị trí, đường kính</td><td>Khó với ánh sáng thường; dễ thấy hơn với đèn góc thấp</td><td>38 ngày sản xuất (~6–8 tuần)</td><td>Phân đoạn có giám sát</td></tr>
+  <tr><td>Loang màu</td><td>Diện tích (mm²)</td><td>Có thể một phần (so màu với vùng lân cận trong Lab), nhưng ranh giới mờ</td><td>38 ngày sản xuất (~6–8 tuần)</td><td>Phân đoạn có giám sát; rule-based màu làm kênh phụ</td></tr>
+  <tr><td>Hở nhôm</td><td>Có/không, vị trí (mọi kích thước ≥ 0,2 mm là NG)</td><td>Một phần: nhôm lộ ra rất sáng so với anod đen dưới đèn dome</td><td>75 ngày sản xuất (11–15 tuần tùy số ngày chạy mỗi tuần), quá thời hạn</td><td>Anomaly detection + luật độ sáng; phân đoạn khi đủ dữ liệu</td></tr>
+  <tr><td>Thiếu ren</td><td>Có/không cho 4 lỗ</td><td><strong>Có</strong>: lỗ ở vị trí cố định, ren tạo bóng đổ đặc trưng</td><td>Không cần nhiều</td><td>Rule-based (camera mặt dưới hoặc trạm khác)</td></tr>
+  <tr><td>Bụi, vân tay</td><td>Phải được coi là OK</td><td>Không</td><td>Nhiều, dễ thu</td><td>Lớp "OK khó" trong dữ liệu, golden set; nguồn overkill chính</td></tr>
+</table>
+
+<h3>4.3. So sánh cách tiếp cận và lựa chọn</h3>
+<table>
+  <tr><th>Cách tiếp cận</th><th>Ưu</th><th>Nhược với bài toán này</th><th>Quyết định</th></tr>
+  <tr><td>Phân loại ảnh OK/NG</td><td>Gán nhãn rẻ nhất</td><td>Không cho kích thước và vùng nên không áp được tiêu chí mm; 63 ô/ảnh mà lỗi chỉ ở 1 ô; khó giải thích cho QC</td><td>Không dùng làm chính</td></tr>
+  <tr><td>Phát hiện (khung bao)</td><td>Nhanh, công cụ sẵn (YOLO26)</td><td>Khung bao của vết xước chéo sai lệch diện tích lớn; không đo chiều dài, diện tích đúng</td><td>Không dùng</td></tr>
+  <tr><td>Phân đoạn có giám sát (instance segmentation, ví dụ YOLO26-seg; hoặc U-Net)</td><td>Cho mặt nạ: đo chiều dài, diện tích, vùng theo mm</td><td>Cần đa giác, nhiều ảnh mỗi loại; chỉ biết lỗi đã học</td><td><strong>Dùng</strong> cho xước, móp, loang màu (giai đoạn 2)</td></tr>
+  <tr><td>Anomaly detection (PatchCore)</td><td>Chỉ cần ảnh OK, triển khai sớm; bắt được lỗi lạ</td><td>Không phân loại loại lỗi, không đo theo tiêu chí; nhạy với thay đổi ánh sáng, vị trí; dễ overkill với bụi</td><td><strong>Dùng</strong> từ giai đoạn 1 làm "lưới an toàn", nhất là cho hở nhôm</td></tr>
+  <tr><td>Rule-based</td><td>Chính xác, giải thích được, không cần dữ liệu lỗi</td><td>Khó với lỗi bề mặt trên nền có vân</td><td><strong>Dùng</strong> cho định vị, ren, quy đổi mm, luật vùng, luật độ sáng hở nhôm</td></tr>
+</table>
+<p><strong>Kiến trúc chọn: hybrid ba lớp.</strong></p>
+<pre><code class="language-text">Chụp 2 ảnh: đèn dome (loang màu, hở nhôm) + đèn vòng góc thấp (xước, móp)
+  │
+  ├─ [Rule-based] định vị chi tiết (shape matching), căn ROI, tạo mặt nạ vùng A / vùng B
+  ├─ [Rule-based] kiểm tra 4 lỗ ren; luật độ sáng: điểm sáng bất thường trên anod đen → nghi hở nhôm
+  ├─ [AI] cắt 63 ô/ảnh → mô hình phân đoạn (xước, móp, loang màu) → mặt nạ lỗi
+  ├─ [AI] anomaly detection (PatchCore) trên cùng các ô → bản đồ bất thường
+  │
+  └─ [Quyết định] quy đổi mặt nạ sang mm, mm² theo vùng → so tiêu chí bản vẽ
+         • vượt tiêu chí → NG (kèm loại lỗi, kích thước, vị trí)
+         • anomaly cao nhưng không có lỗi đã biết, hoặc lỗi sát giới hạn → VÙNG XÁM, người kiểm lại
+         • thiếu ảnh, định vị thất bại, quá hạn chót → NG (an toàn)
+         → PLC: OK / NG / KIỂM LẠI; lưu ảnh, mặt nạ, điểm số, thời gian</code></pre>
+<p>Lý do: mỗi thành phần làm việc nó giỏi nhất; mô hình AI chỉ phải học trên ảnh đã căn chỉnh; quyết định cuối nằm ở lớp luật nên tiêu chí của khách hàng được áp dụng đúng nguyên văn, dễ giải thích và dễ sửa khi tiêu chí đổi. Vùng xám tận dụng người kiểm lại khách hàng đã có.</p>
+
+<h3>4.4. Kế hoạch dữ liệu</h3>
+<table>
+  <tr><th>Hạng mục</th><th>Kế hoạch</th></tr>
+  <tr><td>Số lượng mục tiêu (phiên bản dữ liệu v1)</td><td>Xước 300, móp 200, loang màu 200 chi tiết NG; hở nhôm: mọi chi tiết thu được đến tuần 8 (ước tính 2 chi tiết/ngày, khoảng 80), đủ 150 ở <code>data_v2</code>; 3.000 chi tiết OK trong đó ít nhất 300 "OK khó" (bụi, vân tay, vết gia công cho phép, sắc độ anod khác lô)</td></tr>
+  <tr><td>Thu thập</td><td>Tuần 1–2: lắp trạm thử cạnh QC, chụp 100% chi tiết đi qua (ảnh OK miễn phí). QC đánh dấu mã chi tiết NG vào tủ cách ly; mỗi tuần chụp lại toàn bộ tủ. Ghi metadata: mã chi tiết, lô anod, ngày, ca, máy CNC</td></tr>
+  <tr><td>Số ảnh mỗi chi tiết</td><td>Một chi tiết chụp tối đa 3 lần (đặt lại, xoay 180°) để tăng đa dạng; luôn coi các ảnh này là <strong>một nhóm</strong> khi chia tập</td></tr>
+  <tr><td>Dữ liệu tổng hợp</td><td>Cắt dán vết hở nhôm thật lên ảnh OK để tăng số mẫu huấn luyện cho hở nhôm ở giai đoạn 2; <strong>không bao giờ</strong> dùng ảnh tổng hợp trong val, test, golden</td></tr>
+  <tr><td>Gán nhãn</td><td>Đa giác trong CVAT (tự cài trên máy chủ nội bộ vì ảnh sản phẩm là thông tin mật); 2 người; 100 ảnh đầu gán chung và họp thống nhất; kiểm chéo 30%; đo mức độ thống nhất (IoU mặt nạ giữa hai người)</td></tr>
+  <tr><td>Hướng dẫn gán nhãn (trích)</td><td>(1) Đa giác bao sát vết, không bao bóng phản xạ quanh vết. (2) Xước đứt đoạn cách nhau &lt; 0,5 mm là một vết. (3) Bụi, vân tay: không gán (là OK) nhưng gắn thẻ ảnh "OK khó". (4) Không chắc là lỗi: gắn thẻ "cần QA", không tự quyết. (5) Lỗi ở vùng chuyển A/B: vẽ toàn bộ vết, phần mềm tự tách theo mặt nạ vùng</td></tr>
+  <tr><td>Chia tập</td><td>Theo <strong>lô anod</strong> (các chi tiết cùng lô có cùng sắc độ, cùng kiểu loang màu) và theo thời gian: các lô cũ nhất → train, lô giữa → val, lô mới nhất → test. Kiểm tra mỗi loại lỗi có mặt ở cả ba tập và không lô nào nằm ở hai tập (script bên dưới)</td></tr>
+  <tr><td>Phiên bản</td><td><code>data_v1</code> đóng băng cuối tuần 8; mọi mô hình ghi rõ phiên bản dữ liệu; thêm dữ liệu thành <code>data_v2</code>…</td></tr>
+</table>
+<p>Script chia tập theo lô và theo thời gian, kiểm tra rò rỉ và độ phủ loại lỗi (dữ liệu metadata được mô phỏng):</p>
+<pre><code class="language-python">import numpy as np
+
+rng = np.random.default_rng(0)
+LOAI = ["OK", "xuoc", "lom", "loang_mau", "ho_nhom"]
+XAC_SUAT = [0.82, 0.07, 0.04, 0.04, 0.03]      # tỉ lệ trong bộ ảnh đã thu (NG đã được làm giàu)
+
+# metadata mô phỏng: 60 lô anod theo thứ tự thời gian, mỗi lô 40–90 ảnh
+anh = []
+for lo in range(60):
+    for k in range(int(rng.integers(40, 90))):
+        anh.append({"lo": f"L{lo:03d}", "chi_tiet": f"L{lo:03d}-{k // 2:03d}",   # 2 ảnh / chi tiết
+                    "loai": str(rng.choice(LOAI, p=XAC_SUAT))})
+cac_lo = sorted({a["lo"] for a in anh})         # tên lô tăng theo thời gian
+
+# chia theo thời gian ở cấp LÔ: 70% lô cũ nhất → train, 15% → val, 15% mới nhất → test
+n = len(cac_lo)
+tap_cua_lo = {lo: ("train" if i &lt; 0.70 * n else "val" if i &lt; 0.85 * n else "test")
+              for i, lo in enumerate(cac_lo)}
+for a in anh:
+    a["tap"] = tap_cua_lo[a["lo"]]
+
+# kiểm tra 1: không lô nào, không chi tiết nào nằm ở hai tập
+for khoa in ("lo", "chi_tiet"):
+    tap_theo = {}
+    for a in anh:
+        tap_theo.setdefault(a[khoa], set()).add(a["tap"])
+    ro_ri = [k for k, v in tap_theo.items() if len(v) &gt; 1]
+    print(f"{khoa:8s} nằm ở nhiều tập: {len(ro_ri)}")
+
+# kiểm tra 2: số ảnh mỗi loại trong mỗi tập
+print(f"{'tập':6s} {'số lô':&gt;5s} " + " ".join(f"{l:&gt;9s}" for l in LOAI))
+for tap in ("train", "val", "test"):
+    con = [a for a in anh if a["tap"] == tap]
+    so_lo = len({a["lo"] for a in con})
+    print(f"{tap:6s} {so_lo:5d} " + " ".join(f"{sum(a['loai'] == l for a in con):9d}" for l in LOAI))
+thieu = [(tap, l) for tap in ("val", "test") for l in LOAI
+         if sum(a["tap"] == tap and a["loai"] == l for a in anh) &lt; 15]
+print("cảnh báo: loại có dưới 15 ảnh trong val/test:", thieu or "không có")</code></pre>
+<pre><code class="language-text">lo       nằm ở nhiều tập: 0
+chi_tiet nằm ở nhiều tập: 0
+tập    số lô        OK      xuoc       lom loang_mau   ho_nhom
+train     42      2219       205       118        94        84
+val        9       452        42        16        20        15
+test       9       525        45        14        21        20
+cảnh báo: loại có dưới 15 ảnh trong val/test: [('test', 'lom')]</code></pre>
+<p>Hai kiểm tra đều phải là thủ tục bắt buộc mỗi lần tạo phiên bản dữ liệu. Nếu một loại lỗi hiếm có quá ít ảnh trong val hoặc test (cảnh báo ở dòng cuối), không chia ngẫu nhiên lại để "cho đẹp": hãy thu thêm, hoặc báo cáo kết quả loại lỗi đó kèm số mẫu và cận trên tin cậy. Ở lần chạy mô phỏng này, tập test chỉ có 14 ảnh móp, đúng loại cảnh báo bạn sẽ gặp với dữ liệu thật.</p>
+
+<h3>4.5. Golden set và tiêu chí nghiệm thu</h3>
+<p><strong>golden_v1</strong> (đóng băng tuần 12, chụp từ các lô <em>sau</em> mọi lô dùng để huấn luyện, nhãn do QA khách hàng và kỹ sư vision xác nhận, có manifest và hash):</p>
+<table>
+  <tr><th>Nhóm</th><th>Số chi tiết</th></tr>
+  <tr><td>OK điển hình (nhiều lô anod, cả hai ca)</td><td>500</td></tr>
+  <tr><td>OK khó: bụi, vân tay, vết gia công cho phép, sắc độ ở biên dung sai</td><td>100</td></tr>
+  <tr><td>Xước / móp / loang màu</td><td>60 / 40 / 40</td></tr>
+  <tr><td>Hở nhôm (lỗi nghiêm trọng)</td><td>30 thật + tất cả chi tiết hở nhôm mới phát sinh đến ngày nghiệm thu</td></tr>
+  <tr><td>Mẫu giới hạn (ngay trên và dưới mỗi tiêu chí, QA ký)</td><td>20</td></tr>
+  <tr><td>Bất thường hệ thống: không có chi tiết, sai mã, đặt lệch, ảnh mờ</td><td>20</td></tr>
+</table>
+<table>
+  <tr><th>Mã</th><th>Tiêu chí nghiệm thu</th><th>Phương pháp</th></tr>
+  <tr><td>A1</td><td>Hở nhôm: 0 lọt trên golden_v1</td><td>Chạy golden; báo cáo kèm cận trên 95% (30 mẫu, 0 lọt → escape &lt; ~10%) và cam kết theo dõi trong sản xuất</td></tr>
+  <tr><td>A2</td><td>Tổng các lỗi khác: lọt ≤ 3/140 (≈ 2%) trên golden_v1, không lọt mẫu giới hạn phía NG nào lớn hơn 1,5 lần giới hạn</td><td>Chạy golden; liệt kê từng ảnh lọt</td></tr>
+  <tr><td>A3</td><td>Overkill ≤ 2% trên 500 OK điển hình; ≤ 10% trên 100 OK khó; vùng xám ≤ 3% sản lượng</td><td>Chạy golden; chạy bóng (shadow) 3 ngày so với QC</td></tr>
+  <tr><td>A4</td><td>Bất thường hệ thống: 20/20 cho kết quả NG hoặc lỗi, không bao giờ OK</td><td>Chạy golden</td></tr>
+  <tr><td>A5</td><td>Thời gian đầu cuối (2 ảnh, 126 ô, quyết định): p99 ≤ 0,8 s, max ≤ 1,2 s trong 10.000 chu kỳ liên tục trên PC đích, có ghi log và lưu ảnh chạy song song; warm-up khi khởi động</td><td>Log thời gian của trạm</td></tr>
+  <tr><td>A6</td><td>Hồi quy: phiên bản mô hình mới không được lọt ảnh NG nào mà phiên bản đang chạy bắt được</td><td>So sánh từng ảnh trên golden</td></tr>
+  <tr><td>A7</td><td>Lọt ra khách hàng ≤ 200 ppm</td><td>Không chứng minh được trong nghiệm thu; theo dõi 3 tháng sau SAT bằng khiếu nại và kiểm tra lại mẫu ngẫu nhiên hàng OK (ghi rõ trong hợp đồng)</td></tr>
+</table>
+
+<h3>4.6. Lộ trình theo giai đoạn</h3>
+<table>
+  <tr><th>Giai đoạn</th><th>Tuần</th><th>Nội dung</th><th>Cổng chuyển giai đoạn</th></tr>
+  <tr><td>0. Khả thi</td><td>1–2</td><td>Thử chiếu sáng với 20 chi tiết NG có sẵn; chốt camera, đèn; đo thời gian suy luận trên PC đích</td><td>Mọi loại lỗi nhìn thấy rõ trên ảnh, QA đồng ý</td></tr>
+  <tr><td>1. Chạy bóng</td><td>3–8</td><td>Rule-based (định vị, ren, luật độ sáng hở nhôm) + anomaly detection học từ ảnh OK; trạm chạy song song QC, <strong>không</strong> loại hàng; thu thập dữ liệu, gán nhãn</td><td>Anomaly bắt mọi hở nhôm QC phát hiện trong giai đoạn này; đủ data_v1 cho xước, móp, loang màu</td></tr>
+  <tr><td>2. Phân đoạn</td><td>9–14</td><td>Huấn luyện phân đoạn xước/móp/loang màu; chọn ngưỡng trên val; lớp quyết định theo mm; vùng xám</td><td>Đạt A1–A6 trên golden_v1</td></tr>
+  <tr><td>3. Nghiệm thu và vận hành</td><td>15–20</td><td>SAT, giảm dần QC kiểm 100% xuống kiểm lại vùng xám và lấy mẫu; theo dõi ppm, trôi dữ liệu; huấn luyện lại theo lịch có kiểm soát</td><td>A7 theo dõi; khách hàng ký SAT</td></tr>
+</table>
+
+<h3>4.7. Bảng rủi ro</h3>
+<table>
+  <tr><th>#</th><th>Rủi ro</th><th>Khả năng / Ảnh hưởng</th><th>Biện pháp</th></tr>
+  <tr><td>R1</td><td>Không đủ ảnh hở nhôm trước hạn</td><td>Cao / Cao</td><td>Anomaly detection + luật độ sáng từ giai đoạn 1; dữ liệu tổng hợp chỉ cho train; xin QC giữ thêm chi tiết từ trạm sửa chữa; thỏa thuận nghiệm thu hở nhôm theo số mẫu thực có</td></tr>
+  <tr><td>R2</td><td>Bụi, vân tay gây overkill cao</td><td>Cao / Trung bình</td><td>Thổi khí ion hóa trước trạm; lớp "OK khó" trong dữ liệu; vùng xám thay vì NG trực tiếp</td></tr>
+  <tr><td>R3</td><td>63–126 ô/chi tiết vượt ngân sách 1,5 s</td><td>Trung bình / Cao</td><td>Đo ngay tuần 1; xuất ONNX/TensorRT; chỉ chạy ô thuộc vùng A/B; giảm độ phân giải vùng B</td></tr>
+  <tr><td>R4</td><td>Sắc độ anod thay đổi theo lô làm anomaly score trôi</td><td>Trung bình / Cao</td><td>Chia tập theo lô; theo dõi phân bố điểm OK hằng ngày; cảnh báo khi trung vị điểm OK tăng; cập nhật memory bank có kiểm soát</td></tr>
+  <tr><td>R5</td><td>Tiêu chí "loang màu" chủ quan, hai QC đánh giá khác nhau</td><td>Cao / Trung bình</td><td>Đổi sang tiêu chí đo được (ΔE so với vùng lân cận, diện tích mm²) với mẫu giới hạn ký duyệt trước khi gán nhãn</td></tr>
+  <tr><td>R6</td><td>Rò rỉ dữ liệu làm kết quả val đẹp giả tạo</td><td>Trung bình / Cao</td><td>Chia theo lô và thời gian, nhóm theo mã chi tiết; golden từ lô sau cùng</td></tr>
+  <tr><td>R7</td><td>Thay đèn, bẩn ống kính, đổi đồ gá sau nghiệm thu</td><td>Trung bình / Cao</td><td>Ảnh chuẩn kiểm tra đầu ca; chạy lại golden sau mọi thay đổi phần cứng</td></tr>
+</table>
+
+<h3>4.8. Câu hỏi phải làm rõ với khách hàng</h3>
+<ol>
+  <li>"Không để lọt hở nhôm" được đo thế nào khi nghiệm thu? Đồng ý cách diễn đạt bằng số mẫu và cận trên tin cậy, cộng theo dõi sau SAT.</li>
+  <li>Tỉ lệ overkill 2% tính trên tổng sản lượng hay trên số OK? Hàng vùng xám có tính là overkill không?</li>
+  <li>Tiêu chí loang màu đo bằng gì (ΔE, điều kiện nhìn)? Có mẫu giới hạn ký duyệt không?</li>
+  <li>Bụi có được lau trước trạm không? Trạm có được thêm thổi khí không?</li>
+  <li>Quyền sử dụng ảnh sản phẩm để huấn luyện; ảnh có được rời khỏi nhà máy không?</li>
+  <li>Ai được phép đổi ngưỡng, ai ký phiên bản mô hình mới, chu kỳ huấn luyện lại?</li>
+</ol>
+</details>
+
+<h2>5. Tự đánh giá</h2>
+<table>
+  <tr><th>Tiêu chí</th><th>Đạt khi</th></tr>
+  <tr><td>Bắt đầu từ tiêu chí</td><td>Mỗi loại lỗi có đầu ra cần thiết (có/không, vị trí, kích thước mm) và lý do chọn công cụ tương ứng</td></tr>
+  <tr><td>So sánh phương án</td><td>Có ít nhất 4 cách tiếp cận được so sánh với ưu, nhược cụ thể cho bài toán này, không chung chung</td></tr>
+  <tr><td>Kiến trúc hybrid hợp lý</td><td>Rule-based làm định vị, ren, quy đổi mm, áp tiêu chí; AI làm phần bề mặt; có đường đi an toàn khi lỗi hệ thống</td></tr>
+  <tr><td>Con số thiết kế</td><td>Có độ phân giải (mm/px), số ô, ngân sách thời gian, lịch thu thập theo loại lỗi hiếm nhất</td></tr>
+  <tr><td>Kế hoạch dữ liệu</td><td>Có số lượng mỗi lớp, nguồn "OK khó", giờ công gán nhãn, hướng dẫn gán nhãn có quy tắc cho trường hợp khó</td></tr>
+  <tr><td>Chống rò rỉ</td><td>Chia theo lô/thời gian, nhóm ảnh cùng chi tiết; có script kiểm tra; golden từ lô sau cùng</td></tr>
+  <tr><td>Tiêu chí nghiệm thu đo được</td><td>Escape, overkill có mẫu số và số mẫu; lỗi nghiêm trọng tách riêng; cycle time bằng p99 và max trên phần cứng đích; có tiêu chí hồi quy</td></tr>
+  <tr><td>Trung thực về giới hạn</td><td>Không hứa "0 lọt"; nói rõ cái gì không chứng minh được trong nghiệm thu và cách theo dõi sau đó</td></tr>
+  <tr><td>Rủi ro</td><td>Ít nhất 5 rủi ro có biện pháp cụ thể, trong đó có thiếu dữ liệu lỗi hiếm, trôi dữ liệu, cycle time</td></tr>
+</table>
+
+<h2>6. Mở rộng</h2>
+<ul>
+  <li><strong>Ước lượng chi phí</strong>: thêm vào script giờ công kỹ sư, giờ công gán nhãn, thời gian QC giữ hàng, so với chi phí 4 QC trong 2 năm để tính thời gian hoàn vốn.</li>
+  <li><strong>Học chủ động (active learning)</strong>: thiết kế quy trình đưa ảnh vùng xám và ảnh mô hình không chắc chắn về hàng đợi gán nhãn mỗi tuần, ưu tiên ảnh giúp mô hình nhiều nhất.</li>
+  <li><strong>Giám sát trôi dữ liệu</strong>: chọn 3 chỉ số theo dõi hằng ngày (trung vị điểm anomaly của OK, tỉ lệ vùng xám, độ sáng trung bình ảnh) và ngưỡng cảnh báo.</li>
+  <li><strong>Áp dụng cho bài toán của bạn</strong>: viết lại tài liệu này cho một trạm bạn biết, hoặc cho một lớp của bộ MVTec AD, bộ dữ liệu bạn sẽ dùng trong dự án anomaly detection cuối chặng 12.</li>
+</ul>
+<p>Bài tiếp theo bắt đầu chặng 12: <strong>Object Detection với YOLO26: huấn luyện mô hình đầu tiên</strong>.</p>
