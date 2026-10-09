@@ -438,17 +438,17 @@ class TramVision:
         tong = 0
         try:
             while tong &lt; so_chu_ky and time.monotonic() &lt; het_han:
-                if not self.client.connected:
-                    if not self.client.connect():
-                        time.sleep(self.cfg.cho_ket_noi_lai_s)
-                        continue
-                    self.so_lan_ket_noi += 1
-                    self.log.info("Kết nối PLC %s:%d (lần %d)", self.cfg.host, self.cfg.port, self.so_lan_ket_noi)
-                    if self.so_lan_ket_noi &gt; 1:
-                        print("  ... đã kết nối lại PLC")
-                    self._tin_hieu(ready=True, busy=False, done=False)  # PLC có thể vừa khởi động lại
-                    trigger_truoc = False
                 try:
+                    if not self.client.connected:
+                        if not self.client.connect():
+                            time.sleep(self.cfg.cho_ket_noi_lai_s)
+                            continue
+                        self.so_lan_ket_noi += 1
+                        self.log.info("Kết nối PLC %s:%d (lần %d)", self.cfg.host, self.cfg.port, self.so_lan_ket_noi)
+                        if self.so_lan_ket_noi &gt; 1:
+                            print("  ... đã kết nối lại PLC")
+                        self._tin_hieu(ready=True, busy=False, done=False)  # PLC có thể vừa khởi động lại
+                        trigger_truoc = False
                     trigger = self._doc_trigger()
                     if trigger and not trigger_truoc:
                         trigger = self._mot_chu_ky()
@@ -456,7 +456,7 @@ class TramVision:
                     trigger_truoc = trigger
                     self._nhip_tim()
                     time.sleep(self.cfg.chu_ky_doc_s)
-                except ModbusException as e:
+                except (ModbusException, OSError) as e:      # OSError: socket bị reset, ống dẫn gãy...
                     self.log.warning("Mất kết nối PLC (%s)", type(e).__name__)
                     print("  ... mất kết nối PLC, đang thử lại")
                     self.client.close()
@@ -465,7 +465,7 @@ class TramVision:
             if self.client.connected:
                 try:
                     self._tin_hieu(ready=False, busy=False, done=False)   # tắt READY khi dừng
-                except ModbusException:
+                except (ModbusException, OSError):
                     pass
             self.client.close()
             self.log.info("Dừng trạm sau %d chu kỳ", tong)</code></pre>

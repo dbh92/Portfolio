@@ -220,6 +220,289 @@ window.HF_POSTS = [
   ]
  },
  {
+  "t": "Ống kính telecentric: khi nào cần cho bài đo bằng camera?",
+  "u": "hoc/camera-4-ong-kinh-telecentric.html",
+  "e": "Tính sai số phối cảnh của ống kính thường, hiểu ưu nhược điểm ống kính telecentric và quyết định bằng số có cần nó cho bài đo hay không.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 25,
+  "img": "assets/images/posts/camera-4-ong-kinh-telecentric.webp",
+  "tags": [
+   "Machine Vision",
+   "Camera",
+   "Đo lường"
+  ]
+ },
+ {
+  "t": "Bài tập: chọn camera, ống kính, đèn cho trạm kiểm tra thép dập",
+  "u": "hoc/camera-8-bai-tap-chon-cau-hinh.html",
+  "e": "Bài tập tổng hợp: tính FOV, độ phân giải, tiêu cự, phơi sáng, DOF, chọn telecentric và chiếu sáng theo lỗi, lập BOM có lý do bằng số.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 28,
+  "img": "assets/images/posts/camera-8-bai-tap-chon-cau-hinh.webp",
+  "tags": [
+   "Machine Vision",
+   "Camera",
+   "Chiếu sáng"
+  ]
+ },
+ {
+  "t": "Quy đổi pixel sang mm bằng vật chuẩn và đánh giá sai số đo",
+  "u": "hoc/calib-1-quy-doi-pixel-sang-mm.html",
+  "e": "Hiệu chuẩn tỉ lệ mm/pixel bằng tấm lưới chấm và căn mẫu, đo lặp lại để tính độ lặp lại, bias, tỉ số năng lực, và biết khi nào cần hiệu chuẩn đầy đủ.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 30,
+  "img": "assets/images/posts/calib-1-quy-doi-pixel-sang-mm.webp",
+  "tags": [
+   "Calibration",
+   "Đo lường",
+   "Python"
+  ]
+ },
+ {
+  "t": "Đo cạnh subpixel, fitting đường thẳng và đường tròn với OpenCV",
+  "u": "hoc/do-luong-1-do-canh-subpixel-fitting.html",
+  "e": "Tìm cạnh chính xác dưới 1 pixel bằng caliper, fit đường thẳng và đường tròn bằng bình phương tối thiểu, loại ba via và đánh giá độ lặp lại phép đo.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 39,
+  "img": "assets/images/posts/do-luong-1-do-canh-subpixel-fitting.webp",
+  "tags": [
+   "Machine Vision",
+   "Đo lường",
+   "OpenCV"
+  ]
+ },
+ {
+  "t": "Template matching trong OpenCV: định vị chi tiết trên dây chuyền",
+  "u": "hoc/do-luong-2-template-matching.html",
+  "e": "Dùng matchTemplate đúng cách: chọn phương pháp chịu thay đổi ánh sáng, tìm nhiều vật với NMS, tăng tốc bằng kim tự tháp và dời ROI theo vị trí vật.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 28,
+  "img": "assets/images/posts/do-luong-2-template-matching.webp",
+  "tags": [
+   "Machine Vision",
+   "OpenCV",
+   "Python"
+  ]
+ },
+ {
+  "t": "Feature matching ORB và shape-based matching khi vật xoay",
+  "u": "hoc/do-luong-3-feature-va-shape-matching.html",
+  "e": "Định vị vật xoay bằng ORB và RANSAC, so khớp hình dạng bằng Hu moments, và tự cài đặt shape-based matching theo hướng gradient để hiểu vì sao nó bền vững.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 36,
+  "img": "assets/images/posts/do-luong-3-feature-va-shape-matching.webp",
+  "tags": [
+   "Machine Vision",
+   "OpenCV",
+   "Computer Vision"
+  ]
+ },
+ {
+  "t": "I/O số 24 V, NPN/PNP và handshake trigger–done với PLC",
+  "u": "hoc/tich-hop-1-io-so-va-handshake-plc.html",
+  "e": "Đấu đúng NPN/PNP, thiết kế bắt tay trigger–busy–done–OK/NG có timeout, đọc giản đồ thời gian và mô phỏng PLC + vision bằng Python.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 27,
+  "img": "assets/images/posts/tich-hop-1-io-so-va-handshake-plc.webp",
+  "tags": [
+   "PLC",
+   "Industrial Vision",
+   "Python"
+  ]
+ },
+ {
+  "t": "Modbus TCP bằng Python với pymodbus cho trạm vision",
+  "u": "hoc/tich-hop-3-modbus-tcp-python.html",
+  "e": "Đọc ghi coil, holding register, gửi số thực 32 bit đúng thứ tự byte và viết vòng lặp chờ trigger từ PLC có tự kết nối lại.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 24,
+  "img": "assets/images/posts/tich-hop-3-modbus-tcp-python.webp",
+  "tags": [
+   "PLC",
+   "Python",
+   "Industrial Vision"
+  ]
+ },
+ {
+  "t": "TCP socket Python: gửi kết quả và tọa độ cho robot",
+  "u": "hoc/tich-hop-5-tcp-socket-gui-toa-do-robot.html",
+  "e": "Viết server, client TCP; đóng khung tin bằng ký tự kết thúc, xử lý tin dính/vỡ, timeout, kết nối lại và gửi lại không gắp hai lần.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 21,
+  "img": "assets/images/posts/tich-hop-5-tcp-socket-gui-toa-do-robot.webp",
+  "tags": [
+   "Robot",
+   "Python",
+   "Industrial Vision"
+  ]
+ },
+ {
+  "t": "Lưu kết quả kiểm tra vào SQLite, ảnh NG theo ngày và dọn ổ đĩa",
+  "u": "hoc/tich-hop-8-luu-ket-qua-sqlite-anh-ng.html",
+  "e": "Thiết kế bảng SQLite có chỉ mục, truy vấn yield và lỗi NG, lưu ảnh theo ngày, tự dọn ảnh cũ và ghi nền không chặn cycle time.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 25,
+  "img": "assets/images/posts/tich-hop-8-luu-ket-qua-sqlite-anh-ng.webp",
+  "tags": [
+   "Python",
+   "Industrial Vision",
+   "Machine Vision"
+  ]
+ },
+ {
+  "t": "Dự án trạm vision hoàn chỉnh: Modbus TCP, OpenCV, SQLite, log",
+  "u": "hoc/tich-hop-9-du-an-tram-vision-mo-phong.html",
+  "e": "Ghép trigger Modbus TCP, kiểm tra ảnh OpenCV, trả kết quả cho PLC, lưu SQLite và ảnh NG, log xoay vòng, tự phục hồi khi mất kết nối.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 25,
+  "img": "assets/images/posts/tich-hop-9-du-an-tram-vision-mo-phong.webp",
+  "tags": [
+   "PLC",
+   "Python",
+   "Industrial Vision"
+  ]
+ },
+ {
+  "t": "Hệ thống Machine Vision gồm những gì: camera, quang học, chiếu sáng, I/O",
+  "u": "hoc/machine-vision-1-kien-truc-he-thong.html",
+  "e": "Sơ đồ khối một trạm Machine Vision, đi dọc trạm kiểm tra nắp chai từ cảm biến tới van loại, và mô phỏng vì sao chiếu sáng quyết định thành công.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 22,
+  "img": "assets/images/posts/machine-vision-1-kien-truc-he-thong.webp",
+  "tags": [
+   "Machine Vision",
+   "Chiếu sáng",
+   "Camera"
+  ]
+ },
+ {
+  "t": "5 nhóm bài toán Machine Vision và cách giải: từ có/không đến dẫn hướng",
+  "u": "hoc/machine-vision-2-nam-nhom-bai-toan.html",
+  "e": "Nhận diện nhóm bài toán, kỹ thuật và con số cần hỏi cho từng nhóm, ví dụ OpenCV chạy được và bảng chấm độ khó 0–16 cho một yêu cầu.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 23,
+  "img": "assets/images/posts/machine-vision-2-nam-nhom-bai-toan.webp",
+  "tags": [
+   "Machine Vision",
+   "OpenCV",
+   "Python"
+  ]
+ },
+ {
+  "t": "Chọn công cụ Machine Vision: Halcon, VisionPro, OpenCV hay smart camera",
+  "u": "hoc/machine-vision-3-thu-vien-va-phan-mem.html",
+  "e": "So sánh thư viện thương mại và mã nguồn mở, khi nào dùng smart camera, tính chi phí theo số trạm và các bẫy bản quyền.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 20,
+  "img": "assets/images/posts/machine-vision-3-thu-vien-va-phan-mem.webp",
+  "tags": [
+   "Machine Vision",
+   "OpenCV"
+  ]
+ },
+ {
+  "t": "Bài tập: phân tích một yêu cầu kiểm tra Machine Vision từ email khách hàng",
+  "u": "hoc/machine-vision-4-phan-tich-yeu-cau-kiem-tra.html",
+  "e": "Biến email khách hàng thành bài toán kỹ thuật: tính FOV và độ phân giải, sổ rủi ro, câu hỏi cần làm rõ, phần cứng sơ bộ, có lời giải mẫu.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 22,
+  "img": "assets/images/posts/machine-vision-4-phan-tich-yeu-cau-kiem-tra.webp",
+  "tags": [
+   "Machine Vision",
+   "Camera"
+  ]
+ },
+ {
+  "t": "Trigger, encoder và cycle time: tính thời gian xử lý cho trạm vision",
+  "u": "hoc/industrial-vision-1-trigger-encoder-cycle-time.html",
+  "e": "Chuỗi cảm biến → trigger → xử lý → loại hàng, tính thời gian xử lý tối đa từ tốc độ dây chuyền và dùng encoder khi băng tải đổi tốc độ.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 28,
+  "img": "assets/images/posts/industrial-vision-1-trigger-encoder-cycle-time.webp",
+  "tags": [
+   "Industrial Vision",
+   "Machine Vision",
+   "PLC"
+  ]
+ },
+ {
+  "t": "Tiêu chí OK/NG, escape và overkill: chọn ngưỡng theo chi phí",
+  "u": "hoc/industrial-vision-3-tieu-chi-ok-ng-escape-overkill.html",
+  "e": "Định nghĩa lỗi bằng con số đo được, mô phỏng escape và overkill theo ngưỡng, chi phí mỗi ca, vùng xám kiểm lại và số mẫu cần để chứng minh.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 21,
+  "img": "assets/images/posts/industrial-vision-3-tieu-chi-ok-ng-escape-overkill.webp",
+  "tags": [
+   "Industrial Vision",
+   "Machine Vision",
+   "Python"
+  ]
+ },
+ {
+  "t": "Đặc tả kỹ thuật trạm vision và nghiệm thu FAT/SAT",
+  "u": "hoc/industrial-vision-5-dac-ta-va-nghiem-thu-fat-sat.html",
+  "e": "Mẫu đặc tả 12 mục, bộ mẫu chuẩn, bài thử độ lặp lại (%GRR, Cg/Cgk) và phát hiện lỗi, phân biệt FAT và SAT.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 26,
+  "img": "assets/images/posts/industrial-vision-5-dac-ta-va-nghiem-thu-fat-sat.webp",
+  "tags": [
+   "Industrial Vision",
+   "Đo lường",
+   "Machine Vision"
+  ]
+ },
+ {
+  "t": "Bài tập: viết đặc tả và kế hoạch FAT cho trạm kiểm tra nắp chai",
+  "u": "hoc/industrial-vision-6-bai-tap-viet-dac-ta.html",
+  "e": "Viết đặc tả hoàn chỉnh cho trạm kiểm tra nắp chai: tính toán thiết kế, tiêu chí lỗi đo được, giao tiếp PLC, bộ mẫu và kế hoạch FAT/SAT.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 23,
+  "img": "assets/images/posts/industrial-vision-6-bai-tap-viet-dac-ta.webp",
+  "tags": [
+   "Industrial Vision",
+   "PLC",
+   "Machine Vision"
+  ]
+ },
+ {
   "t": "Lộ trình 700 TOEIC trong 5 tháng cho người đi làm",
   "u": "ngoai-ngu/lo-trinh-700-toeic.html",
   "e": "Cấu trúc đề 200 câu, phân bổ điểm mục tiêu, kế hoạch từng tháng, lịch học 60–90 phút mỗi ngày và mốc thi thử để theo dõi tiến độ.",
@@ -1931,7 +2214,7 @@ window.HF_TOPICS = [
   "u": "hoc/python.html",
   "s": "Học AI & Lập trình",
   "g": "Programming",
-  "n": 25
+  "n": 34
  },
  {
   "t": "C#",
@@ -1980,7 +2263,7 @@ window.HF_TOPICS = [
   "u": "hoc/opencv.html",
   "s": "Học AI & Lập trình",
   "g": "Computer Vision",
-  "n": 18
+  "n": 23
  },
  {
   "t": "Image Processing",
@@ -1994,7 +2277,7 @@ window.HF_TOPICS = [
   "u": "hoc/computer-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Computer Vision",
-  "n": 14
+  "n": 15
  },
  {
   "t": "OCR",
@@ -2022,7 +2305,7 @@ window.HF_TOPICS = [
   "u": "hoc/machine-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 21
+  "n": 35
  },
  {
   "t": "AI Vision",
@@ -2036,14 +2319,14 @@ window.HF_TOPICS = [
   "u": "hoc/industrial-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 5
+  "n": 14
  },
  {
   "t": "Camera & Lens",
   "u": "hoc/camera-lens.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 7
+  "n": 11
  },
  {
   "t": "Lighting",
@@ -2057,14 +2340,14 @@ window.HF_TOPICS = [
   "u": "hoc/calibration.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 5
+  "n": 6
  },
  {
   "t": "PLC / Robot / MES",
   "u": "hoc/plc-robot-mes.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 6
+  "n": 12
  },
  {
   "t": "Vision Deployment",
@@ -2120,14 +2403,14 @@ window.HF_TOPICS = [
   "u": "kien-thuc/computer-vision.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 14
+  "n": 15
  },
  {
   "t": "Machine Vision",
   "u": "kien-thuc/machine-vision.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 21
+  "n": 35
  },
  {
   "t": "AI Vision",
@@ -2141,7 +2424,7 @@ window.HF_TOPICS = [
   "u": "kien-thuc/industrial-automation.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 5
+  "n": 10
  },
  {
   "t": "Tools & Frameworks",

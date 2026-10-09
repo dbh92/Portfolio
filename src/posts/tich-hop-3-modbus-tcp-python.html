@@ -302,20 +302,20 @@ class TramVision:
         trigger_truoc = False
         het_han = time.monotonic() + thoi_han_s
         while self.da_xu_ly &lt; so_chu_ky and time.monotonic() &lt; het_han:
-            if not self.client.connected:
-                if not self.client.connect():
-                    time.sleep(0.5)                      # PLC chưa lên: thử lại sau
-                    continue
-                print("Đã kết nối PLC, ghi lại READY")
-                self.trang_thai(ready=True, busy=False, done=False)
-                trigger_truoc = False
             try:
+                if not self.client.connected:
+                    if not self.client.connect():
+                        time.sleep(0.5)                  # PLC chưa lên: thử lại sau
+                        continue
+                    print("Đã kết nối PLC, ghi lại READY")
+                    self.trang_thai(ready=True, busy=False, done=False)
+                    trigger_truoc = False
                 trigger = self.doc_bit(TRIGGER)
                 if trigger and not trigger_truoc:        # chỉ bắt SƯỜN LÊN
                     trigger = self.mot_chu_ky()          # cập nhật mức đã thấy SAU chu kỳ
                 trigger_truoc = trigger
                 time.sleep(self.chu_ky_doc)
-            except ModbusException as e:                 # gồm cả ConnectionException
+            except (ModbusException, OSError) as e:      # ConnectionException, socket bị reset...
                 print(f"Mất kết nối PLC ({type(e).__name__}), sẽ kết nối lại")
                 self.client.close()
                 time.sleep(0.5)
@@ -453,7 +453,7 @@ DCBA 123.456</code></pre>
 <ul>
   <li>Modbus TCP: PC vision là client hỏi vòng, PLC là server; cổng 502; dữ liệu chỉ là bit và thanh ghi 16 bit.</li>
   <li>Bốn vùng: coil (đọc/ghi bit), discrete input (chỉ đọc bit), input register (chỉ đọc), holding register (đọc/ghi). 40001 trong tài liệu = địa chỉ 0 trên dây.</li>
-  <li>pymodbus 3.15: <code>device_id=</code> (không còn <code>slave=</code>), server khai báo bằng <code>SimData</code>/<code>SimDevice</code>; luôn kiểm tra <code>isError()</code>, bắt <code>ModbusException</code> khi mất kết nối.</li>
+  <li>pymodbus 3.15: <code>device_id=</code> (không còn <code>slave=</code>), server khai báo bằng <code>SimData</code>/<code>SimDevice</code>; luôn kiểm tra <code>isError()</code>, bắt cả <code>ModbusException</code> và <code>OSError</code> khi mất kết nối (socket bị reset giữa chừng ném <code>ConnectionResetError</code>, không phải lỗi của pymodbus).</li>
   <li>float32 = 2 thanh ghi; thống nhất ABCD/CDAB/BADC/DCBA bằng giá trị mồi, kiểm tra bằng <code>struct</code>, ghi trong một lệnh.</li>
   <li>Vòng lặp: bắt sườn lên TRIGGER, ghi kết quả trước rồi DONE, chờ TRIGGER tắt có timeout, trả lại số chu kỳ, kết nối lại và khởi tạo lại tín hiệu sau sự cố.</li>
 </ul>

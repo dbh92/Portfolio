@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="vi" data-root="../">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quy đổi pixel sang mm bằng vật chuẩn và đánh giá sai số đo | HọcFree</title>
+<meta name="description" content="Hiệu chuẩn tỉ lệ mm/pixel bằng tấm lưới chấm và căn mẫu, đo lặp lại để tính độ lặp lại, bias, tỉ số năng lực, và biết khi nào cần hiệu chuẩn đầy đủ.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://hocfree.vn/hoc/calib-1-quy-doi-pixel-sang-mm.html">
+<meta property="og:site_name" content="HọcFree">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Quy đổi pixel sang mm bằng vật chuẩn và đánh giá sai số đo">
+<meta property="og:description" content="Hiệu chuẩn tỉ lệ mm/pixel bằng tấm lưới chấm và căn mẫu, đo lặp lại để tính độ lặp lại, bias, tỉ số năng lực, và biết khi nào cần hiệu chuẩn đầy đủ.">
+<meta property="og:url" content="https://hocfree.vn/hoc/calib-1-quy-doi-pixel-sang-mm.html">
+<meta property="og:image" content="https://hocfree.vn/assets/images/posts/calib-1-quy-doi-pixel-sang-mm.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="Quy đổi pixel sang mm bằng vật chuẩn và đánh giá sai số đo">
+<meta property="og:locale" content="vi_VN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Quy đổi pixel sang mm bằng vật chuẩn và đánh giá sai số đo">
+<meta name="twitter:description" content="Hiệu chuẩn tỉ lệ mm/pixel bằng tấm lưới chấm và căn mẫu, đo lặp lại để tính độ lặp lại, bias, tỉ số năng lực, và biết khi nào cần hiệu chuẩn đầy đủ.">
+<meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/calib-1-quy-doi-pixel-sang-mm.jpg">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/fonts.css?v=20261009">
+<link rel="stylesheet" href="../assets/css/style.css?v=20261009">
+<script>try{var t=localStorage.getItem('hf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
+<meta property="article:published_time" content="2026-10-09">
+<meta property="article:section" content="Học AI &amp; Lập trình">
+<meta property="article:tag" content="Calibration">
+<meta property="article:tag" content="Đo lường">
+<meta property="article:tag" content="Python">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "Quy đổi pixel sang mm bằng vật chuẩn và đánh giá sai số đo", "description": "Hiệu chuẩn tỉ lệ mm/pixel bằng tấm lưới chấm và căn mẫu, đo lặp lại để tính độ lặp lại, bias, tỉ số năng lực, và biết khi nào cần hiệu chuẩn đầy đủ.", "image": ["https://hocfree.vn/assets/images/posts/calib-1-quy-doi-pixel-sang-mm.jpg"], "datePublished": "2026-10-09", "dateModified": "2026-10-09", "inLanguage": "vi", "articleSection": "Học AI & Lập trình", "keywords": "Calibration, Đo lường, Python", "wordCount": 5291, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/hoc/calib-1-quy-doi-pixel-sang-mm.html"}, "isPartOf": {"@type": "Course", "name": "Trở thành Vision Engineer", "url": "https://hocfree.vn/lo-trinh/vision-engineer.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Learning Paths", "item": "https://hocfree.vn/lo-trinh/"}, {"@type": "ListItem", "position": 3, "name": "Trở thành Vision Engineer", "item": "https://hocfree.vn/lo-trinh/vision-engineer.html"}, {"@type": "ListItem", "position": 4, "name": "Chặng 8: Calibration", "item": "https://hocfree.vn/lo-trinh/vision-engineer/calibration.html"}, {"@type": "ListItem", "position": 5, "name": "Quy đổi pixel sang mm bằng vật chuẩn và đánh giá sai số đo"}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div class="progress" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="container wide header-top">
+    <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="nav-scrim" hidden></div>
+    <a class="logo" href="../" aria-label="HọcFree – Trang chủ"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+    <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
+    <div class="header-actions">
+      <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="login-link" href="../dang-nhap.html">Đăng nhập</a>
+      <a class="btn start-btn" href="../lo-trinh/">Bắt đầu học</a>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="container wide">
+      <nav class="site-nav" id="site-nav" aria-label="Menu chính">
+        <div class="drawer-head">
+          <a class="logo" href="../" tabindex="-1"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+          <button class="icon-btn nav-close" aria-label="Đóng menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <button type="button" class="drawer-search search-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Tìm bài học, chủ đề…</span></button>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="../">Trang chủ</a></li><li class="nav-item has-panel is-mega"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-hoc">Học AI &amp; Lập trình<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel mega" id="nav-panel-hoc">
+  <div class="container wide mega-inner">
+    <div class="mega-groups"><div class="mega-group"><a class="mega-group-title" href="../hoc/#programming">Programming</a><ul><li><a href="../hoc/python.html">Python</a></li><li><a href="../hoc/csharp.html">C#</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#ai-machine-learning">AI &amp; Machine Learning</a><ul><li><a href="../hoc/machine-learning.html">Machine Learning</a></li><li><a href="../hoc/deep-learning.html">Deep Learning</a></li><li><a href="../hoc/pytorch.html">PyTorch</a></li><li><a href="../hoc/generative-ai.html">Generative AI</a></li><li><a href="../hoc/llm-ai-agents.html">LLM / AI Agents</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#computer-vision">Computer Vision</a><ul><li><a href="../hoc/opencv.html">OpenCV</a></li><li><a href="../hoc/image-processing.html">Image Processing</a></li><li><a href="../hoc/computer-vision.html">Computer Vision</a></li><li><a href="../hoc/ocr.html">OCR</a></li><li><a href="../hoc/object-detection.html">Object Detection</a></li><li><a href="../hoc/segmentation.html">Segmentation</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#vision-engineering">Vision Engineering</a><ul><li><a href="../hoc/machine-vision.html">Machine Vision</a></li><li><a href="../hoc/ai-vision.html">AI Vision</a></li><li><a href="../hoc/industrial-vision.html">Industrial Vision</a></li><li><a href="../hoc/camera-lens.html">Camera &amp; Lens</a></li><li><a href="../hoc/lighting.html">Lighting</a></li><li><a href="../hoc/calibration.html">Calibration</a></li><li><a href="../hoc/plc-robot-mes.html">PLC / Robot / MES</a></li><li><a href="../hoc/vision-deployment.html">Vision Deployment</a></li></ul></div></div>
+    <a class="feature-card" href="../lo-trinh/vision-engineer.html">
+  <span class="feature-eyebrow">⭐ Learning Path nổi bật</span>
+  <span class="feature-title">Trở thành Vision Engineer</span>
+  <span class="feature-sub">Machine Vision + AI Vision + Industrial Automation</span>
+  <span class="feature-desc">Lộ trình thực chiến từ Python, OpenCV và Machine Vision đến Deep Learning, AI Vision, Camera, PLC, Robot và triển khai hệ thống Vision trong nhà máy.</span>
+  <span class="feature-chain" aria-label="Các chặng chính"><span>Python</span><i aria-hidden="true">→</i><span>OpenCV</span><i aria-hidden="true">→</i><span>Machine Vision</span><i aria-hidden="true">→</i><span>AI Vision</span><i aria-hidden="true">→</i><span class="chain-goal">🎯 Vision Engineer</span></span>
+  <span class="feature-meta">14 chặng · 5 giai đoạn · ~12 tháng</span>
+  <span class="feature-cta">Xem lộ trình →</span>
+</a>
+  </div>
+  <div class="mega-foot"><div class="container wide mega-foot-inner"><ol class="journey compact" aria-label="Học, thực hành, trở thành kỹ sư"><li><a href="../hoc/" aria-current="step"><span class="journey-n">1</span><span class="journey-t"><b>Học</b><small>Học AI &amp; Lập trình</small></span></a></li><li><a href="../projects/"><span class="journey-n">2</span><span class="journey-t"><b>Thực hành</b><small>Projects</small></span></a></li><li><a href="../lo-trinh/"><span class="journey-n">3</span><span class="journey-t"><b>Trở thành kỹ sư</b><small>Learning Paths</small></span></a></li></ol><a class="panel-all" href="../hoc/">Xem tất cả Học AI &amp; Lập trình →</a></div></div>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-projects">Projects<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-projects">
+  <p class="panel-kicker"><span>Bước 2 · Thực hành</span>Áp dụng vào dự án thật</p>
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../projects/ai-projects.html"><span class="drop-label">AI Projects</span><span class="drop-desc">Ứng dụng ML và LLM, từ ý tưởng đến bản demo</span></a></li><li><a class="drop-link" href="../projects/computer-vision-projects.html"><span class="drop-label">Computer Vision Projects</span><span class="drop-desc">Phát hiện, nhận dạng và theo dõi đối tượng</span></a></li><li><a class="drop-link" href="../projects/industrial-vision-projects.html"><span class="drop-label">Industrial Vision Projects</span><span class="drop-desc">Đo kích thước, kiểm tra lỗi, đọc mã trên dây chuyền</span></a></li></ul></div></div>
+  <a class="panel-all" href="../projects/">Xem tất cả Projects →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger is-active" aria-expanded="false" aria-controls="nav-panel-lo-trinh" aria-current="true">Learning Paths<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-lo-trinh">
+  <p class="panel-kicker"><span>Bước 3 · Trở thành kỹ sư</span>Định hướng nghề nghiệp</p>
+  <ul class="drop-list"><li><a class="drop-link is-flagship" href="../lo-trinh/vision-engineer.html"><span class="drop-label">⭐ Trở thành Vision Engineer</span><span class="drop-desc">Machine Vision + AI Vision + Industrial Automation · 14 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/#python-developer"><span class="drop-label">Python Developer<span class="badge-soon">Sắp ra mắt</span></span><span class="drop-desc">Python, công cụ, tự động hóa</span></a></li></ul>
+  <a class="panel-all" href="../lo-trinh/">Xem tất cả lộ trình →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-kien-thuc">Kiến thức<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-kien-thuc">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Lĩnh vực</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/programming.html"><span class="drop-label">Programming</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-machine-learning.html"><span class="drop-label">AI / Machine Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/deep-learning.html"><span class="drop-label">Deep Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/machine-vision.html"><span class="drop-label">Machine Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-vision.html"><span class="drop-label">AI Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/industrial-automation.html"><span class="drop-label">Industrial Automation</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Công cụ &amp; mẹo</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/tools-frameworks.html"><span class="drop-label">Tools &amp; Frameworks</span></a></li><li><a class="drop-link" href="../kien-thuc/tips-tricks.html"><span class="drop-label">Tips &amp; Tricks</span></a></li></ul></div></div>
+  <a class="panel-all" href="../kien-thuc/">Xem tất cả Kiến thức →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tin-tuc-ai">Tin tức AI<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tin-tuc-ai">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tin-tuc-ai/ai-news.html"><span class="drop-label">AI News</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-models.html"><span class="drop-label">AI Models</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/technology.html"><span class="drop-label">Technology</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/robotics.html"><span class="drop-label">Robotics</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-industry.html"><span class="drop-label">AI Industry</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tin-tuc-ai/">Xem tất cả Tin tức AI →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-ngoai-ngu">Ngoại ngữ<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-ngoai-ngu">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/english.html"><span class="drop-label">English</span><span class="drop-desc">Lộ trình 700 TOEIC, phương pháp học, giáo trình HF-700TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chinese.html"><span class="drop-label">Chinese</span><span class="drop-desc">Lộ trình HSK3, phương pháp học, giáo trình HF-HSK3</span></a></li></ul></div></div>
+  <a class="panel-all" href="../ngoai-ngu/">Xem tất cả Ngoại ngữ →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tai-nguyen">Tài nguyên<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tai-nguyen">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tai-nguyen/source-code.html"><span class="drop-label">Source Code</span><span class="drop-desc">Mã nguồn mẫu đi kèm bài học</span></a></li><li><a class="drop-link" href="../tai-nguyen/dataset.html"><span class="drop-label">Dataset</span><span class="drop-desc">Bộ dữ liệu ảnh để luyện tập</span></a></li><li><a class="drop-link" href="../tai-nguyen/cheat-sheets.html"><span class="drop-label">Cheat Sheets</span><span class="drop-desc">Tóm tắt nhanh trong một trang</span></a></li><li><a class="drop-link" href="../tai-nguyen/documentation.html"><span class="drop-label">Documentation</span><span class="drop-desc">Tài liệu tra cứu thư viện, API</span></a></li><li><a class="drop-link" href="../tai-nguyen/ebook.html"><span class="drop-label">Ebook / Tài liệu</span><span class="drop-desc">Sách và tài liệu tham khảo</span></a></li><li><a class="drop-link" href="../tai-nguyen/ai-tools.html"><span class="drop-label">AI Tools</span><span class="drop-desc">Công cụ AI hữu ích cho việc học</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tai-nguyen/">Xem tất cả Tài nguyên →</a>
+</div></li></ul>
+        <div class="drawer-foot">
+          <a class="btn ghost" href="../dang-nhap.html">Đăng nhập</a>
+          <a class="btn" href="../lo-trinh/">Bắt đầu học</a>
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+<div class="search-dialog" hidden>
+  <div class="search-scrim"></div>
+  <div class="search-box" role="dialog" aria-modal="true" aria-label="Tìm kiếm">
+    <form class="search-form" action="../search.html" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" placeholder="Tìm bài học, chủ đề, bài viết…" autocomplete="off" aria-label="Từ khóa tìm kiếm" aria-controls="search-suggest">
+      <button type="button" class="icon-btn search-close" aria-label="Đóng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </form>
+    <div class="search-suggest" id="search-suggest" aria-live="polite">
+      <div class="search-empty">
+        <p class="search-group-title">Chủ đề phổ biến</p>
+        <div class="chips"><a class="chip" href="../hoc/python.html">Python</a><a class="chip" href="../hoc/opencv.html">OpenCV</a><a class="chip" href="../hoc/machine-vision.html">Machine Vision</a><a class="chip" href="../hoc/deep-learning.html">Deep Learning</a><a class="chip" href="../hoc/ai-vision.html">AI Vision</a><a class="chip" href="../hoc/object-detection.html">Object Detection</a><a class="chip" href="../hoc/pytorch.html">PyTorch</a><a class="chip" href="../ngoai-ngu/english.html">English</a></div>
+        <p class="search-group-title">Lộ trình nổi bật</p>
+        <a class="search-item" href="../lo-trinh/vision-engineer.html"><span class="search-ico" aria-hidden="true">⭐</span><span>Trở thành Vision Engineer<small>Learning Path · Machine Vision + AI Vision + Industrial Automation</small></span></a>
+      </div>
+    </div>
+    <div class="search-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> chọn</span><span><kbd>Enter</kbd> mở</span><span><kbd>Esc</kbd> đóng</span></div>
+  </div>
+</div>
+<main id="main">
+  <div class="container layout article-layout">
+    <article class="article">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../lo-trinh/">Learning Paths</a><span>/</span><a href="../lo-trinh/vision-engineer.html">Vision Engineer</a><span>/</span><a href="../lo-trinh/vision-engineer/calibration.html">Chặng 8: Calibration</a></nav>
+      <header class="article-head">
+        <div class="course-bar" data-course="vision-engineer"><a class="course-chip" href="../lo-trinh/vision-engineer/calibration.html">⭐ Vision Engineer · Chặng 8</a><span class="lesson-no">Bài 1/6</span><span class="kind kind-lesson">Bài học</span><span class="lesson-min"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></svg>~60 phút</span></div>
+        <h1>Quy đổi pixel sang mm bằng vật chuẩn và đánh giá sai số đo</h1>
+        <p class="lead">Hiệu chuẩn tỉ lệ mm/pixel bằng tấm lưới chấm và căn mẫu, đo lặp lại để tính độ lặp lại, bias, tỉ số năng lực, và biết khi nào cần hiệu chuẩn đầy đủ.</p>
+        <div class="article-meta">
+          <span class="avatar" aria-hidden="true">HF</span>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>30 phút đọc</span></div>
+        </div>
+      </header>
+      <figure class="article-cover">
+        <img src="../assets/images/posts/calib-1-quy-doi-pixel-sang-mm.webp" alt="Quy đổi pixel sang mm bằng vật chuẩn và đánh giá sai số đo" width="1200" height="675" fetchpriority="high" decoding="async">
+      </figure>
+      <section class="lesson-goals" aria-label="Mục tiêu bài học"><h2>Học xong bài này, bạn sẽ</h2><ul><li>Hiệu chuẩn tỉ lệ bằng vật chuẩn</li><li>Đánh giá độ lặp lại và sai số</li><li>Biết khi nào quy đổi đơn giản là đủ</li></ul><p class="goals-before">Nên học trước: <a href="../projects/doc-so-seri-linh-kien-ocr-ocv.html">Dự án chặng 7: đọc và xác minh số seri</a></p></section>
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol class="toc-plain"><li><a href="#1-quy-doi-don-gian-la-gi-va-no-gia-dinh-dieu-gi">1. Quy đổi đơn giản là gì, và nó giả định điều gì?</a></li><li><a href="#2-chon-vat-chuan">2. Chọn vật chuẩn</a></li><li><a href="#3-du-lieu-mo-phong">3. Dữ liệu mô phỏng</a></li><li><a href="#4-hieu-chuan-ti-le-bang-tam-luoi-cham">4. Hiệu chuẩn tỉ lệ bằng tấm lưới chấm</a></li><li><a href="#5-sai-lech-bien-va-do-chi-tiet">5. Sai lệch biên và đo chi tiết</a></li><li><a href="#6-do-lap-lai-sai-lech-va-nang-luc-do">6. Độ lặp lại, sai lệch và năng lực đo</a></li><li><a href="#7-khi-nao-quy-doi-don-gian-khong-con-du">7. Khi nào quy đổi đơn giản không còn đủ?</a></li><li><a href="#8-nhung-loi-thuong-gap">8. Những lỗi thường gặp</a></li><li><a href="#9-bai-tap">9. Bài tập</a></li><li><a href="#tom-tat">Tóm tắt</a></li></ol></details>
+      <div class="prose">
+<p>Ở chặng 7, bài <em>Đo cạnh subpixel, fitting đường thẳng và đường tròn</em> đã cho bạn vị trí cạnh chính xác tới một phần nhỏ của pixel. Nhưng bản vẽ ghi <strong>mm</strong>, PLC cần <strong>mm</strong>, và câu hỏi của trưởng ca luôn là "máy đo có tin được không?". Chặng Calibration bắt đầu bằng cách đơn giản nhất và cũng được dùng nhiều nhất trong nhà máy: <strong>quy đổi pixel sang mm bằng một hệ số tỉ lệ</strong>, đo trên vật chuẩn. Bài này dạy cách làm đúng, cách chứng minh bằng số rằng hệ đo đủ tốt so với dung sai (độ lặp lại, sai lệch), và quan trọng nhất là biết <strong>khi nào cách đơn giản này không còn đủ</strong> để chuyển sang hiệu chuẩn đầy đủ ở các bài sau.</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Từ ảnh tấm chuẩn lưới chấm và căn mẫu, tính được hệ số mm/pixel theo x và y, sai lệch biên cần bù; đo 30 lần một chi tiết, tính trung bình, độ lệch chuẩn, ±3σ, bias, rồi kết luận hệ đo có dùng được cho dung sai ±0,05 mm hay không.</div>
+
+<h2 id="1-quy-doi-don-gian-la-gi-va-no-gia-dinh-dieu-gi">1. Quy đổi đơn giản là gì, và nó giả định điều gì?</h2>
+<pre><code class="language-text">kích thước (mm) = kích thước (pixel) × s        s: hệ số tỉ lệ, đơn vị mm/pixel
+
+Nếu tỉ lệ hai chiều khác nhau:
+  Δx (mm) = Δu (px) × sx        Δy (mm) = Δv (px) × sy</code></pre>
+<p>Công thức chỉ có một dòng nhưng đứng trên bốn giả định. Ghi nhớ chúng, vì mỗi lần một giả định bị vi phạm là một nguồn sai số:</p>
+<table>
+  <tr><th>Giả định</th><th>Bị vi phạm khi</th><th>Hậu quả</th></tr>
+  <tr><td>Camera nhìn vuông góc với mặt phẳng đo</td><td>Giá camera lệch, cố tình đặt nghiêng</td><td>Tỉ lệ thay đổi dần theo vị trí trong ảnh; sx ≠ sy</td></tr>
+  <tr><td>Ống kính không méo</td><td>Ống kính tiêu cự ngắn, góc rộng</td><td>Tỉ lệ ở mép ảnh khác ở tâm ảnh</td></tr>
+  <tr><td>Mọi đặc trưng nằm trên cùng một mặt phẳng, đúng mặt phẳng hiệu chuẩn</td><td>Vật lên xuống, vật dày, đo mặt trên nhưng hiệu chuẩn ở mặt đáy</td><td>Đổi tỉ lệ ΔZ/Z (bài <em>Ống kính telecentric: khi nào cần?</em>)</td></tr>
+  <tr><td>Vị trí cạnh tìm được trùng với cạnh thật</td><td>Đèn nền khuếch tán, ngưỡng cắt khác 50%, ba-via</td><td>Sai lệch biên cố định (bias), trái dấu cho kích thước ngoài và kích thước trong</td></tr>
+</table>
+<p>Vì sao lại có trường hợp <strong>sx ≠ sy</strong>? Camera area scan có pixel vuông nên sx = sy nếu camera vuông góc. Hai trường hợp hay gặp: camera nghiêng quanh một trục (chiều bị nghiêng "co" lại theo cos của góc nghiêng), và camera <strong>line scan</strong>, nơi sx do ống kính quyết định còn sy do tốc độ băng tải và encoder quyết định (bài tập 3). Hiệu chuẩn hai hệ số riêng không tốn thêm công sức, nên hãy luôn làm.</p>
+
+<h2 id="2-chon-vat-chuan">2. Chọn vật chuẩn</h2>
+<table>
+  <tr><th>Vật chuẩn</th><th>Đo được gì</th><th>Ghi chú</th></tr>
+  <tr><td>Tấm lưới chấm tròn (circle grid) hoặc bàn cờ trên kính / gốm</td><td>Hệ số tỉ lệ sx, sy từ <strong>khoảng cách tâm</strong>; phần dư cho biết méo/nghiêng</td><td>Có giấy chứng nhận bước lưới. Dùng được với đèn nền (chấm crôm trên kính) hoặc đèn chiếu mặt trên</td></tr>
+  <tr><td>Căn mẫu (gauge block)</td><td>Kích thước <strong>cạnh tới cạnh</strong> đã biết → sai lệch biên của cả hệ</td><td>Rất chính xác, rẻ, có sẵn trong phòng QC. Đặt đúng mặt phẳng đo</td></tr>
+  <tr><td>Thước kính vạch (stage micrometer)</td><td>Tỉ lệ theo một chiều</td><td>Tiện cho FOV nhỏ</td></tr>
+  <tr><td>Chốt chuẩn, vòng chuẩn (pin / ring gauge)</td><td>Bù biên cho đường kính ngoài và đường kính lỗ</td><td>Dùng khi đo đường kính là chính</td></tr>
+  <tr><td>Chi tiết mẫu đã đo bằng CMM (golden sample)</td><td>Kiểm tra toàn chuỗi trên chính sản phẩm</td><td>Dùng cho kiểm tra đầu ca (bài <em>Kiểm tra hiệu chuẩn định kỳ</em>)</td></tr>
+</table>
+<p>Quy tắc kinh nghiệm: sai số của vật chuẩn nên nhỏ hơn ít nhất khoảng 10 lần (tối thiểu khoảng 4 lần) sai số bạn muốn kiểm chứng. Thước kẹp in trên giấy A4 không phải vật chuẩn.</p>
+<div class="warn"><strong>Hiệu chuẩn trong đúng điều kiện đo</strong>Vật chuẩn phải nằm đúng mặt phẳng của đặc trưng cần đo (cùng độ cao), chụp với cùng đèn, cùng khẩu độ, cùng lấy nét, cùng thuật toán tìm cạnh. Đổi bất kỳ thứ gì trong số đó là phải hiệu chuẩn lại.</div>
+
+<h2 id="3-du-lieu-mo-phong">3. Dữ liệu mô phỏng</h2>
+<p>Để có số liệu kiểm chứng được, ta mô phỏng một camera nhìn xuống đèn nền. Script vẽ vật với độ chính xác dưới pixel (siêu lấy mẫu 8 × 8), làm mờ như ống kính thật, thêm nhiễu cảm biến. Ba "sự thật" được giấu trong mô phỏng mà phần mềm đo không biết, và bạn sẽ phải tìm ra:</p>
+<ul>
+  <li>Tỉ lệ thật sx = 0,02500 mm/px, sy = 0,02510 mm/px (camera hơi nghiêng).</li>
+  <li>Đèn nền khuếch tán làm biên vật tối bị "ăn" vào 4 µm mỗi phía.</li>
+  <li>Chi tiết trên băng tải lên xuống ±0,1 mm ở khoảng cách 200 mm.</li>
+</ul>
+<pre><code class="language-python">import os
+
+import cv2
+import numpy as np
+
+SX, SY = 0.02500, 0.02510       # mm/pixel THẬT (phần mềm không biết): y lớn hơn 0,4% do camera hơi nghiêng
+W, H = 640, 480
+NEN, VAT = 220.0, 30.0          # mức xám nền sáng (backlight) và vật tối
+AN_BIEN = 0.004                 # đèn nền khuếch tán "ăn" vào biên vật tối 4 µm mỗi phía
+K = 8                           # siêu lấy mẫu 8×8 điểm mỗi pixel → biên chính xác dưới pixel
+
+
+def ve(hinh, x0, y0, rng, ti_le=1.0):
+    """hinh: danh sách ('tron', cx, cy, r) hoặc ('chu_nhat', x1, y1, x2, y2), đơn vị mm.
+    (x0, y0): tọa độ mm tại pixel (0, 0); ti_le: hệ số đổi tỉ lệ khi vật lên/xuống."""
+    sx, sy = SX * ti_le, SY * ti_le
+    phu = np.zeros((H, W), np.float32)                      # tỉ lệ diện tích pixel bị vật che
+    o = (np.arange(K) + 0.5) / K - 0.5                      # vị trí mẫu con quanh tâm pixel
+    for h in hinh:
+        if h[0] == "tron":
+            _, cx, cy, r = h
+            r -= AN_BIEN
+            bx1, by1, bx2, by2 = cx - r, cy - r, cx + r, cy + r
+        else:
+            bx1, by1, bx2, by2 = h[1] + AN_BIEN, h[2] + AN_BIEN, h[3] - AN_BIEN, h[4] - AN_BIEN
+        u1, u2 = int((bx1 - x0) / sx) - 2, int((bx2 - x0) / sx) + 3
+        v1, v2 = int((by1 - y0) / sy) - 2, int((by2 - y0) / sy) + 3
+        uu = (np.arange(u1, u2)[:, None] + o[None, :]).ravel()
+        vv = (np.arange(v1, v2)[:, None] + o[None, :]).ravel()
+        X, Y = np.meshgrid(x0 + uu * sx, y0 + vv * sy)
+        if h[0] == "tron":
+            trong = (X - cx) ** 2 + (Y - cy) ** 2 &lt;= r * r
+        else:
+            trong = (X &gt;= bx1) &amp; (X &lt;= bx2) &amp; (Y &gt;= by1) &amp; (Y &lt;= by2)
+        cov = trong.reshape(v2 - v1, K, u2 - u1, K).mean(axis=(1, 3))
+        phu[v1:v2, u1:u2] = np.maximum(phu[v1:v2, u1:u2], cov)
+    anh = NEN - (NEN - VAT) * phu
+    anh = cv2.GaussianBlur(anh, (0, 0), 0.8)                # ống kính không nét tuyệt đối
+    anh += rng.normal(0, 2.0, anh.shape)                    # nhiễu cảm biến
+    return np.clip(np.round(anh), 0, 255).astype(np.uint8)
+
+
+rng = np.random.default_rng(7)
+for d in ("tam_chuan", "can_mau", "chi_tiet"):
+    os.makedirs(d, exist_ok=True)
+
+# 1) Tấm chuẩn lưới chấm tròn 5 × 4, bước 2,500 mm, chấm Ø1,250 mm; vị trí chấm sai cỡ 0,5 µm
+sai = rng.normal(0, 0.0005, (20, 2))
+luoi = [("tron", i * 2.5 + sai[5 * j + i, 0], j * 2.5 + sai[5 * j + i, 1], 0.625)
+        for j in range(4) for i in range(5)]
+for k in range(10):
+    lx, ly = rng.uniform(-0.2, 0.2, 2)
+    cv2.imwrite(f"tam_chuan/tc_{k:02d}.png", ve(luoi, -3.0 + lx, -2.25 + ly, rng))
+
+# 2) Căn mẫu (gauge block) rộng 10,000 mm, đặt đúng mặt phẳng đo
+for k in range(10):
+    lx, ly = rng.uniform(-0.2, 0.2, 2)
+    cv2.imwrite(f"can_mau/cm_{k:02d}.png", ve([("chu_nhat", 0, 0, 10.0, 4.0)], -3.0 + lx, -4.0 + ly, rng))
+
+# 3) Chi tiết THẬT 8,012 × 5,000 mm (bản vẽ 8,00 ± 0,05 và 5,00 ± 0,05), chụp 30 lần trên băng tải:
+#    vị trí lệch ±0,3 mm, chiều cao lên xuống ±0,1 mm ở Z = 200 mm
+for k in range(30):
+    lx, ly = rng.uniform(-0.3, 0.3, 2)
+    dz = rng.uniform(-0.1, 0.1)
+    cv2.imwrite(f"chi_tiet/ct_{k:02d}.png",
+                ve([("chu_nhat", 0, 0, 8.012, 5.000)], -4.0 + lx, -3.5 + ly, rng, ti_le=(200 + dz) / 200))
+print("Đã tạo 10 ảnh tấm chuẩn, 10 ảnh căn mẫu, 30 ảnh chi tiết")</code></pre>
+<pre><code class="language-text">Đã tạo 10 ảnh tấm chuẩn, 10 ảnh căn mẫu, 30 ảnh chi tiết</code></pre>
+
+<h2 id="4-hieu-chuan-ti-le-bang-tam-luoi-cham">4. Hiệu chuẩn tỉ lệ bằng tấm lưới chấm</h2>
+<p>Tâm của một chấm tròn là đặc trưng rất ổn định: nó <strong>không phụ thuộc ngưỡng cắt</strong> hay việc biên bị ăn vào đều các phía. Vì vậy hệ số tỉ lệ nên lấy từ khoảng cách tâm, không lấy từ đường kính chấm. Tâm được tính bằng trọng tâm có trọng số theo độ tối (subpixel), sau đó fit một phép biến đổi affine từ tọa độ lưới (mm) sang tọa độ ảnh (pixel) bằng bình phương tối thiểu. Fit affine cho phép tấm chuẩn đặt hơi xoay, và cho ra hai hệ số sx, sy riêng.</p>
+<pre><code class="language-python">import glob
+import json
+
+import cv2
+import numpy as np
+
+BUOC, COT, HANG = 2.5, 5, 4          # bước lưới (mm) và số chấm theo giấy chứng nhận tấm chuẩn
+
+
+def tam_cac_cham(anh):
+    """Tâm subpixel của các chấm tối: trọng tâm có trọng số theo độ tối trong vùng quanh mỗi chấm."""
+    _, nhi_phan = cv2.threshold(anh, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    cs, _ = cv2.findContours(nhi_phan, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    nen = float(np.median(anh))
+    vat = float(np.percentile(anh, 1))
+    tam = []
+    for c in cs:
+        if cv2.contourArea(c) &lt; 50:
+            continue
+        x, y, w, h = cv2.boundingRect(c)
+        x, y = x - 4, y - 4
+        roi = anh[y:y + h + 8, x:x + w + 8].astype(np.float64)
+        trong_so = np.clip((nen - roi) / (nen - vat), 0, 1)       # 0 ở nền, 1 trong chấm
+        yy, xx = np.mgrid[0:roi.shape[0], 0:roi.shape[1]]
+        tam.append((x + (trong_so * xx).sum() / trong_so.sum(), y + (trong_so * yy).sum() / trong_so.sum()))
+    tam = sorted(tam, key=lambda p: p[1])                              # xếp theo hàng rồi theo cột
+    hang = [sorted(tam[i * COT:(i + 1) * COT]) for i in range(HANG)]
+    return np.array([p for h in hang for p in h])
+
+
+def hieu_chuan(anh):
+    uv = tam_cac_cham(anh)
+    the_gioi = np.array([(i * BUOC, j * BUOC) for j in range(HANG) for i in range(COT)])
+    A = np.column_stack([the_gioi, np.ones(len(the_gioi))])
+    he_so, *_ = np.linalg.lstsq(A, uv, rcond=None)                     # u, v = a·X + b·Y + c
+    sx = 1 / np.hypot(he_so[0, 0], he_so[0, 1])                        # mm/pixel theo x
+    sy = 1 / np.hypot(he_so[1, 0], he_so[1, 1])                        # mm/pixel theo y
+    du = (uv - A @ he_so) * [sx, sy]                                   # phần dư quy ra mm
+    return sx, sy, np.sqrt((du ** 2).sum(axis=1)).max()
+
+
+files = sorted(glob.glob("tam_chuan/*.png"))
+sx, sy, du_max = hieu_chuan(cv2.imread(files[0], cv2.IMREAD_GRAYSCALE))
+print(f"Ảnh 1: sx = {1000 * sx:.4f} µm/px, sy = {1000 * sy:.4f} µm/px, phần dư lớn nhất {1000 * du_max:.2f} µm")
+
+ket_qua = np.array([hieu_chuan(cv2.imread(f, cv2.IMREAD_GRAYSCALE))[:2] for f in files])
+tb, ds = ket_qua.mean(axis=0), ket_qua.std(axis=0, ddof=1)
+print(f"10 ảnh: sx = {1000 * tb[0]:.4f} ± {1000 * ds[0]:.4f} µm/px, sy = {1000 * tb[1]:.4f} ± {1000 * ds[1]:.4f} µm/px")
+print(f"sy/sx = {tb[1] / tb[0]:.4f} → chênh {100 * (tb[1] / tb[0] - 1):.2f}%")
+json.dump({"sx": tb[0], "sy": tb[1]}, open("ti_le.json", "w"))</code></pre>
+<pre><code class="language-text">Ảnh 1: sx = 24.9998 µm/px, sy = 25.0998 µm/px, phần dư lớn nhất 1.03 µm
+10 ảnh: sx = 25.0002 ± 0.0002 µm/px, sy = 25.1000 ± 0.0001 µm/px
+sy/sx = 1.0040 → chênh 0.40%</code></pre>
+<ul>
+  <li>Phần mềm tìm lại đúng sx = 25,000 µm/px và sy = 25,100 µm/px: chênh <strong>0,40%</strong>. Dùng một hệ số chung cho cả hai chiều thì chiều cao 5 mm sẽ sai 20 µm, tức 20% dải dung sai ±0,05 mm (mục 5 kiểm chứng điều này).</li>
+  <li><strong>Phần dư lớn nhất khoảng 1 µm</strong> là sai số chế tạo của chính tấm chuẩn: lưới thẳng, không có dấu hiệu méo. Với camera thật, đây là con số đầu tiên cần nhìn: phần dư lớn và có quy luật (lớn dần ra mép ảnh) nghĩa là ống kính méo hoặc phối cảnh, quy đổi đơn giản sẽ không đủ (mục 7).</li>
+  <li>Độ lệch chuẩn của hệ số qua 10 ảnh rất nhỏ (cỡ 0,0002 µm/px), vì 20 chấm, mỗi chấm hàng nghìn pixel, tự trung bình hóa nhiễu. Với chi tiết 8 mm (320 pixel), sai số do hệ số gây ra chỉ cỡ 320 × 0,0002 µm ≈ 0,06 µm, không đáng kể.</li>
+  <li>Thực tế nên dùng tấm chuẩn phủ khoảng 70–80% trường nhìn và chụp ở vài vị trí, để phần dư phản ánh được cả vùng mép ảnh.</li>
+</ul>
+
+<h2 id="5-sai-lech-bien-va-do-chi-tiet">5. Sai lệch biên và đo chi tiết</h2>
+<p>Hệ số tỉ lệ lấy từ tâm chấm thì không thấy được sai lệch biên. Nhưng kích thước chi tiết là khoảng cách <strong>cạnh tới cạnh</strong>, nên mọi hiệu ứng làm cạnh dịch chuyển (đèn nền khuếch tán, ngưỡng, độ mờ không đối xứng) đều đi thẳng vào kết quả. Cách xử lý chuẩn: đo một căn mẫu có kích thước biết trước bằng <em>chính</em> thuật toán đo chi tiết, lấy chênh lệch làm giá trị bù.</p>
+<p>Thuật toán đo cạnh: với mỗi hàng (hoặc cột) quét ngang vật, tìm nơi profile độ sáng cắt mức 50% giữa nền và vật, nội suy tuyến tính giữa hai pixel để có vị trí subpixel, rồi lấy trung bình nhiều đường quét ở nửa giữa vật (tránh góc).</p>
+<pre><code class="language-python">import csv
+import glob
+import json
+
+import cv2
+import numpy as np
+
+
+def canh_subpixel(prof, muc):
+    """Vị trí subpixel nơi profile cắt mức `muc` lần đầu (cạnh trái/trên) và lần cuối (cạnh phải/dưới)."""
+    duoi = prof &lt; muc
+    i = int(np.argmax(duoi))                         # pixel tối đầu tiên
+    j = len(prof) - 1 - int(np.argmax(duoi[::-1]))   # pixel tối cuối cùng
+    dau = i - 1 + (prof[i - 1] - muc) / (prof[i - 1] - prof[i])
+    cuoi = j + (prof[j] - muc) / (prof[j] - prof[j + 1])
+    return dau, cuoi
+
+
+def do_vat(anh):
+    """Bề rộng (theo x) và chiều cao (theo y) của vật tối, pixel, trung bình nhiều đường quét."""
+    a = anh.astype(np.float64)
+    _, nhi_phan = cv2.threshold(anh, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    x, y, w, h = cv2.boundingRect(cv2.findNonZero(nhi_phan))
+    muc = (np.median(a[nhi_phan == 0]) + np.median(a[nhi_phan &gt; 0])) / 2   # mức 50% nền/vật
+    rong = [np.subtract(*canh_subpixel(a[r], muc)[::-1]) for r in range(y + h // 4, y + 3 * h // 4)]
+    cao = [np.subtract(*canh_subpixel(a[:, c], muc)[::-1]) for c in range(x + w // 4, x + 3 * w // 4)]
+    return np.mean(rong), np.mean(cao)
+
+
+tl = json.load(open("ti_le.json"))
+
+# Bước 1: đo căn mẫu 10,000 mm để tìm sai lệch biên (bias) của cả chuỗi đèn + ống kính + thuật toán
+do_cm = [do_vat(cv2.imread(f, cv2.IMREAD_GRAYSCALE))[0] * tl["sx"] for f in sorted(glob.glob("can_mau/*.png"))]
+bu = 10.000 - np.mean(do_cm)
+print(f"Căn mẫu 10,000 mm đo được {np.mean(do_cm):.4f} mm → bù biên {bu:+.4f} mm cho kích thước ngoài")
+tl["bu_bien"] = bu
+json.dump(tl, open("ti_le.json", "w"))
+
+# Bước 2: đo 30 ảnh chi tiết, ghi cả kết quả thô và kết quả đã bù
+with open("ket_qua_lap.csv", "w", newline="") as f:
+    ghi = csv.writer(f)
+    ghi.writerow(["anh", "rong_tho", "cao_tho", "rong", "cao"])
+    for k, fn in enumerate(sorted(glob.glob("chi_tiet/*.png"))):
+        rong_px, cao_px = do_vat(cv2.imread(fn, cv2.IMREAD_GRAYSCALE))
+        rong, cao = rong_px * tl["sx"], cao_px * tl["sy"]
+        ghi.writerow([fn, rong, cao, rong + bu, cao + bu])
+        if k == 0:
+            print(f"Ảnh đầu: rộng {rong_px:.3f} px → {rong:.4f} mm, bù → {rong + bu:.4f} mm")
+            print(f"         cao  {cao_px:.3f} px → {cao:.4f} mm, bù → {cao + bu:.4f} mm"
+                  f" (dùng nhầm sx: {cao_px * tl['sx'] + bu:.4f} mm)")
+print("Đã ghi ket_qua_lap.csv")</code></pre>
+<pre><code class="language-text">Căn mẫu 10,000 mm đo được 9.9913 mm → bù biên +0.0087 mm cho kích thước ngoài
+Ảnh đầu: rộng 320.196 px → 8.0049 mm, bù → 8.0136 mm
+         cao  198.900 px → 4.9924 mm, bù → 5.0011 mm (dùng nhầm sx: 4.9812 mm)
+Đã ghi ket_qua_lap.csv</code></pre>
+<ul>
+  <li>Căn mẫu 10,000 mm đo ra 9,9913 mm: hệ đo "thấy" vật nhỏ hơn thật khoảng 8,7 µm (4 µm mỗi phía do đèn, phần còn lại do mờ và lấy mẫu). Đây là <strong>sai số hệ thống</strong>, lặp lại được nên bù được.</li>
+  <li>Bù +0,0087 mm áp dụng cho <strong>kích thước ngoài</strong> (bề rộng vật). Với kích thước trong (đường kính lỗ), biên dịch theo chiều ngược lại nên dấu bù ngược lại: hãy xác định riêng bằng vòng chuẩn. Khoảng cách tâm tới tâm thì không cần bù.</li>
+  <li>Dùng nhầm sx cho chiều cao: 4,9812 mm thay vì 5,0011 mm, sai gần 20 µm như đã dự đoán ở mục 4.</li>
+</ul>
+
+<h2 id="6-do-lap-lai-sai-lech-va-nang-luc-do">6. Độ lặp lại, sai lệch và năng lực đo</h2>
+<p>Một lần đo không nói lên gì. Phải đo <strong>cùng một chi tiết nhiều lần</strong> (ở đây 30 lần, mỗi lần chi tiết nằm ở vị trí và độ cao hơi khác, như trên băng tải thật) rồi tính:</p>
+<table>
+  <tr><th>Đại lượng</th><th>Công thức</th><th>Ý nghĩa</th></tr>
+  <tr><td>Trung bình</td><td>x̄ = Σxᵢ / n</td><td>Hệ đo "cho" giá trị nào</td></tr>
+  <tr><td>Độ lệch chuẩn σ</td><td>√(Σ(xᵢ − x̄)² / (n − 1))</td><td>Độ phân tán khi đo lặp lại</td></tr>
+  <tr><td>Độ lặp lại (repeatability)</td><td>±3σ (dải 6σ)</td><td>Khoảng chứa gần như mọi kết quả đo lặp lại (khoảng 99,7% nếu phân bố chuẩn)</td></tr>
+  <tr><td>Sai lệch (bias)</td><td>x̄ − giá trị thật</td><td>Sai số hệ thống; giá trị thật lấy từ CMM hoặc vật chuẩn</td></tr>
+  <tr><td>Tỉ số năng lực (đơn giản hóa)</td><td>dải dung sai / [2 × (|bias| + 3σ)]</td><td>Dải dung sai lớn gấp bao nhiêu lần dải sai số của hệ đo</td></tr>
+</table>
+<p>Hướng dẫn thường dùng (quy tắc kinh nghiệm, không phải tiêu chuẩn bắt buộc): tỉ số <strong>≥ 10:1</strong> là tốt, có thể dùng thẳng cho quyết định OK/NG; <strong>từ 4:1 tới 10:1</strong> chấp nhận được có điều kiện (cần dải bảo vệ, xem bài tập 1); <strong>dưới 4:1</strong> hệ đo không đủ năng lực cho dung sai này. Doanh nghiệp có hệ thống chất lượng thường đánh giá chính thức bằng nghiên cứu Gage R&amp;R; tỉ số ở đây là bước kiểm tra nhanh trước đó.</p>
+<pre><code class="language-python">import csv
+
+import numpy as np
+
+THAT = {"rong": 8.012, "cao": 5.000}       # giá trị thật (đo bằng máy CMM)
+DUNG_SAI = 0.05                            # bản vẽ: ±0,05 mm → dải dung sai 0,10 mm
+
+dong = list(csv.DictReader(open("ket_qua_lap.csv")))
+print("kích thước   |  TB (mm) |  σ (µm) | ±3σ (µm) | bias (µm) | dải DS / 2(|bias|+3σ)")
+for cot in ("rong_tho", "rong", "cao_tho", "cao"):
+    x = np.array([float(d[cot]) for d in dong])
+    tb, s = x.mean(), x.std(ddof=1)
+    bias = tb - THAT[cot.replace("_tho", "")]
+    ti_so = 2 * DUNG_SAI / (2 * (abs(bias) + 3 * s))
+    print(f"{cot:12s} | {tb:8.4f} | {1000 * s:7.2f} | {3000 * s:8.2f} | {1000 * bias:+9.2f} | {ti_so:6.1f}")</code></pre>
+<pre><code class="language-text">kích thước   |  TB (mm) |  σ (µm) | ±3σ (µm) | bias (µm) | dải DS / 2(|bias|+3σ)
+rong_tho     |   8.0037 |    2.13 |     6.38 |     -8.26 |    3.4
+rong         |   8.0124 |    2.13 |     6.38 |     +0.42 |    7.4
+cao_tho      |   4.9919 |    1.38 |     4.15 |     -8.06 |    4.1
+cao          |   5.0006 |    1.38 |     4.15 |     +0.61 |   10.5</code></pre>
+<p>Đọc bảng như một kỹ sư đo lường:</p>
+<ul>
+  <li><strong>Trước khi bù</strong>, bề rộng có bias −8,3 µm và tỉ số chỉ 3,4: <strong>không đạt</strong> 4:1. Hệ quả: chi tiết thật 7,955 mm (đạt) bị đo thành khoảng 7,947 mm và bị loại oan (overkill); chi tiết thật 8,055 mm (không đạt) bị đo thành khoảng 8,047 mm và lọt qua (escape).</li>
+  <li><strong>Sau khi bù</strong> bằng căn mẫu, bias còn dưới 1 µm, tỉ số bề rộng 7,4 (chấp nhận được có điều kiện), chiều cao 10,5 (tốt).</li>
+  <li>Vì sao σ của bề rộng (2,1 µm) lớn hơn chiều cao (1,4 µm)? Phần lớn σ đến từ việc chi tiết lên xuống ±0,1 mm: sai số tỉ lệ ΔZ/Z = 0,05% nhân với kích thước. Kích thước lớn hơn thì σ lớn hơn. Muốn tăng tỉ số bề rộng lên 10:1, cách hiệu quả nhất không phải thuật toán mà là <strong>đồ gá giữ chiều cao</strong> (hoặc ống kính telecentric).</li>
+</ul>
+<div class="tip"><strong>Quy trình tại hiện trường</strong>(1) Hiệu chuẩn tỉ lệ bằng tấm lưới ở đúng mặt phẳng đo; kiểm tra phần dư. (2) Đo căn mẫu hoặc vòng chuẩn để lấy giá trị bù biên cho từng loại kích thước. (3) Đo một chi tiết đã có số CMM 30 lần, mỗi lần nhấc ra đặt lại như sản xuất thật. (4) Tính σ, bias, tỉ số so với dung sai; ghi hồ sơ. (5) Chỉ đưa vào sản xuất khi tỉ số đạt yêu cầu đã thống nhất với khách hàng.</div>
+
+<h2 id="7-khi-nao-quy-doi-don-gian-khong-con-du">7. Khi nào quy đổi đơn giản không còn đủ?</h2>
+<p>Đoạn mô phỏng dưới đây dùng mô hình camera đầy đủ của OpenCV (<code>cv2.projectPoints</code>): ống kính 25 mm, cảm biến 2448 × 2048, pixel 3,45 µm, cách vật 200 mm (FOV khoảng 68 × 57 mm). Hệ số tỉ lệ được hiệu chuẩn ở tâm ảnh. Sau đó đo một đoạn 10 mm ở tâm, giữa và gần góc ảnh, với bốn tình huống:</p>
+<pre><code class="language-python">import math
+
+import cv2
+import numpy as np
+
+f_px = 25 / 0.00345                        # ống kính 25 mm, pixel 3,45 µm
+K = np.array([[f_px, 0, 1224], [0, f_px, 1024], [0, 0, 1]])   # cảm biến 2448 × 2048
+Z = 200.0                                  # FOV khoảng 68 × 57 mm
+
+
+def do_doan(cx, cy, dist, goc_nghieng=0.0, cao=0.0, L=10.0):
+    """Chiều dài (pixel) trên ảnh của đoạn L mm nằm ngang, tâm (cx, cy) mm, cao `cao` mm trên mặt phẳng."""
+    pts = np.array([[cx - L / 2, cy, -cao], [cx + L / 2, cy, -cao]], np.float64)
+    rvec = np.array([math.radians(goc_nghieng), 0, 0])
+    uv, _ = cv2.projectPoints(pts, rvec, np.array([0, 0, Z]), K, dist)
+    return np.linalg.norm(uv[1, 0] - uv[0, 0])
+
+
+khong_meo = np.zeros(5)
+meo = np.array([-0.1, 0, 0, 0, 0])         # méo thùng nhẹ: khoảng -0,5% ở góc ảnh
+truong_hop = [("Lý tưởng", khong_meo, 0, 0), ("Méo thùng k1 = -0,1", meo, 0, 0),
+              ("Camera nghiêng 2°", khong_meo, 2, 0), ("Vật cao hơn 1 mm", khong_meo, 0, 1)]
+vi_tri = [(0, 0), (15, 12), (28, 24)]
+print("Sai số đo đoạn 10 mm (µm), tỉ lệ hiệu chuẩn ở tâm ảnh trên mặt phẳng chuẩn")
+print(f"{'trường hợp':22s}" + "".join(f"  tại ({x:2d},{y:2d})" for x, y in vi_tri))
+for ten, dist, nghieng, cao in truong_hop:
+    s0 = 10.0 / do_doan(0, 0, dist, nghieng)                 # mm/px đo bằng vật chuẩn ở tâm
+    sai = [1000 * (do_doan(x, y, dist, nghieng, cao) * s0 - 10.0) for x, y in vi_tri]
+    print(f"{ten:22s}" + "".join(f"  {e:+11.1f}" for e in sai))</code></pre>
+<pre><code class="language-text">Sai số đo đoạn 10 mm (µm), tỉ lệ hiệu chuẩn ở tâm ảnh trên mặt phẳng chuẩn
+trường hợp              tại ( 0, 0)  tại (15,12)  tại (28,24)
+Lý tưởng                       +0.0         +0.0         +0.0
+Méo thùng k1 = -0,1            +0.0        -20.5        -73.1
+Camera nghiêng 2°              +0.0        -20.9        -41.7
+Vật cao hơn 1 mm              +50.3        +50.3        +50.3</code></pre>
+<table>
+  <tr><th>Tình huống</th><th>Đặc điểm sai số</th><th>Cách nhận ra</th><th>Giải pháp</th></tr>
+  <tr><td>Méo ống kính</td><td>0 ở tâm, tăng nhanh ra mép (−73 µm gần góc ảnh, dù méo chỉ cỡ 0,5% ở góc)</td><td>Phần dư fit lưới lớn dần ra mép theo dạng xuyên tâm</td><td>Bài tiếp theo: <em>Hiệu chuẩn camera: nội tại và méo ống kính</em></td></tr>
+  <tr><td>Camera nghiêng</td><td>Thay đổi tuyến tính theo một hướng (−42 µm ở y = 24 mm với 2°)</td><td>sx ≠ sy; phần dư nghiêng một chiều</td><td>Chỉnh lại giá camera; hoặc <em>Homography: đo trên mặt phẳng khi camera nghiêng</em></td></tr>
+  <tr><td>Vật cao hơn mặt hiệu chuẩn</td><td>Như nhau ở mọi vị trí (+50 µm cho 1 mm chênh cao)</td><td>Đo căn mẫu kê cao sẽ thấy ngay</td><td>Hiệu chuẩn đúng độ cao, đồ gá, hoặc telecentric</td></tr>
+</table>
+<p>Kết luận thực hành. Quy đổi đơn giản (sx, sy cộng giá trị bù biên) là <strong>đủ</strong> khi tất cả các điều kiện sau đúng:</p>
+<ol>
+  <li>Phần dư lớn nhất khi fit lưới chuẩn phủ toàn vùng đo nhỏ hơn khoảng 1/10 dải dung sai.</li>
+  <li>Chiều cao các đặc trưng đo nằm trong một mặt phẳng ổn định: L · ΔZ / Z nhỏ so với dải dung sai.</li>
+  <li>Thử nghiệm lặp lại ở mục 6 đạt tỉ số đã thống nhất, với chi tiết đặt ở <strong>nhiều vị trí khác nhau trong ảnh</strong> (tâm và mép), không chỉ ở tâm.</li>
+</ol>
+<p>Rất nhiều trạm đo thực tế thỏa mãn được ba điều kiện này: ống kính tiêu cự dài hoặc telecentric, camera vuông góc, đồ gá tốt, dung sai cỡ vài phần trăm mm trở lên. Khi một điều kiện không đạt, đừng cố "chỉnh hệ số cho khớp" bằng tay: hãy chuyển sang mô hình đúng cho nguồn sai số đó.</p>
+
+<h2 id="8-nhung-loi-thuong-gap">8. Những lỗi thường gặp</h2>
+<ul>
+  <li><strong>Lấy tỉ lệ từ đường kính chấm hoặc chiều dài vật</strong> thay vì khoảng cách tâm: tỉ lệ bị lẫn sai lệch biên, rồi lại dùng tỉ lệ đó đo lỗ (sai lệch biên ngược dấu) nên sai gấp đôi.</li>
+  <li><strong>Hiệu chuẩn bằng tấm chuẩn đặt trên mặt bàn</strong> trong khi chi tiết nằm trên đồ gá cao 5 mm.</li>
+  <li><strong>Chỉ đo lặp lại mà không nhấc chi tiết ra đặt lại</strong>: σ rất đẹp nhưng không phản ánh sản xuất thật (sai lệch vị trí, chiều cao, góc xoay).</li>
+  <li><strong>Đo lặp lại chỉ ở tâm ảnh</strong>, bỏ qua méo ở mép.</li>
+  <li><strong>Báo cáo kết quả với 4 chữ số thập phân</strong> khi σ là 5 µm: số chữ số không phải là độ chính xác.</li>
+  <li><strong>Quên hiệu chuẩn lại</strong> sau khi xoay vòng nét, đổi khẩu độ hoặc thay đèn.</li>
+</ul>
+
+<h2 id="9-bai-tap">9. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Một trạm đo khe hở có dung sai ±0,03 mm. Thử lặp lại cho σ = 4 µm, bias = +6 µm. Tính tỉ số năng lực trước và sau khi bù bias. Để đạt 4:1 và 10:1 sau khi bù, σ phải nhỏ hơn bao nhiêu?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">dung_sai = 0.03                 # ±0,03 mm
+sigma, bias = 0.004, 0.006      # mm
+dai_sai_so = 2 * (abs(bias) + 3 * sigma)
+print(f"Dải sai số đo {dai_sai_so:.3f} mm, tỉ số {2 * dung_sai / dai_sai_so:.2f}")
+print(f"Sau khi bù bias: tỉ số {2 * dung_sai / (6 * sigma):.2f}")
+print(f"σ cần để đạt 4:1 sau bù: ≤ {2 * dung_sai / 4 / 6 * 1000:.1f} µm; đạt 10:1: ≤ {2 * dung_sai / 10 / 6 * 1000:.1f} µm")</code></pre>
+<pre><code class="language-text">Dải sai số đo 0.036 mm, tỉ số 1.67
+Sau khi bù bias: tỉ số 2.50
+σ cần để đạt 4:1 sau bù: ≤ 2.5 µm; đạt 10:1: ≤ 1.0 µm</code></pre>
+<p>Hệ đo này <strong>không dùng được</strong> cho dung sai ±0,03 mm kể cả khi bù bias: cần σ ≤ 2,5 µm để đạt 4:1. Hướng cải thiện: giảm FOV để pixel nhỏ hơn, giảm dao động chiều cao, cải thiện chiếu sáng biên. Nếu tạm thời phải dùng hệ đo ở mức 4:1 đến 10:1, áp dụng <strong>dải bảo vệ</strong> (guard band): thu hẹp giới hạn chấp nhận vào trong mỗi phía một khoảng cỡ 3σ để giảm nguy cơ lọt hàng lỗi, đổi lại tăng loại oan.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Dùng ảnh căn mẫu và ảnh tấm chuẩn đã tạo ở mục 3, đo bề rộng căn mẫu và bước lưới (khoảng cách tâm chấm, tính bằng nhị phân hóa rồi lấy trọng tâm vùng) với mức cắt 30%, 50%, 70%. Kết quả chứng minh điều gì?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import glob
+import json
+
+import cv2
+import numpy as np
+
+tl = json.load(open("ti_le.json"))
+cm = cv2.imread(sorted(glob.glob("can_mau/*.png"))[0], cv2.IMREAD_GRAYSCALE).astype(np.float64)
+tc = cv2.imread(sorted(glob.glob("tam_chuan/*.png"))[0], cv2.IMREAD_GRAYSCALE)
+nen, vat = np.median(cm), np.percentile(cm, 1)
+
+print("mức cắt | rộng căn mẫu (mm) | bước lưới từ tâm chấm (px)")
+for p in (0.3, 0.5, 0.7):
+    muc = vat + p * (nen - vat)
+    rong = []
+    for r in range(200, 280):                                   # các hàng cắt ngang căn mẫu
+        prof = cm[r]
+        duoi = np.where(prof &lt; muc)[0]
+        i, j = duoi[0], duoi[-1]
+        trai = i - 1 + (prof[i - 1] - muc) / (prof[i - 1] - prof[i])
+        phai = j + (prof[j] - muc) / (prof[j] - prof[j + 1])
+        rong.append(phai - trai)
+    _, nhi_phan = cv2.threshold(tc, muc, 255, cv2.THRESH_BINARY_INV)
+    n, _, st, tam = cv2.connectedComponentsWithStats(nhi_phan.astype(np.uint8))
+    tam = tam[1:][st[1:, cv2.CC_STAT_AREA] &gt; 50]
+    hang_dau = np.sort(tam[tam[:, 1] &lt; tam[:, 1].min() + 20][:, 0])  # 5 chấm hàng trên cùng
+    print(f"  {int(100 * p)}%   | {np.mean(rong) * tl['sx']:17.4f} | {np.diff(hang_dau).mean():10.3f}")</code></pre>
+<pre><code class="language-text">mức cắt | rộng căn mẫu (mm) | bước lưới từ tâm chấm (px)
+  30%   |            9.9632 |     99.994
+  50%   |            9.9877 |    100.003
+  70%   |           10.0156 |     99.992</code></pre>
+<p>Bề rộng căn mẫu thay đổi hơn 50 µm chỉ vì đổi mức cắt (mức thấp thì biên vật tối "co" vào), trong khi bước lưới giữ nguyên khoảng 100,00 px vì tâm chấm không phụ thuộc mức cắt. Đó là lý do: lấy <strong>tỉ lệ từ khoảng cách tâm</strong>, lấy <strong>giá trị bù biên từ vật chuẩn cạnh tới cạnh</strong>, và giữ mức cắt cố định giữa lúc hiệu chuẩn và lúc đo.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Camera line scan có sx = 0,050 mm/px (đo bằng tấm chuẩn). Encoder 5000 xung/vòng gắn trên con lăn Ø50 mm, camera chụp một dòng mỗi 2 xung. Tính sy. Một chi tiết tròn Ø10 mm hiện ra trên ảnh như thế nào? Muốn pixel "vuông" thì cần bao nhiêu xung mỗi dòng?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import math
+
+sx = 0.050                                   # mm/px theo chiều ngang, đo bằng tấm chuẩn
+chu_vi = math.pi * 50.0                      # con lăn encoder Ø50 mm
+mm_moi_xung = chu_vi / 5000                  # encoder 5000 xung/vòng
+sy = 2 * mm_moi_xung                         # mỗi 2 xung chụp 1 dòng
+print(f"mm/xung = {mm_moi_xung:.6f}, sy = {sy:.6f} mm/dòng, sy/sx = {sy / sx:.4f}")
+print(f"Đồng xu Ø10 mm hiện thành elip {10 / sx:.0f} × {10 / sy:.1f} px")
+print(f"Muốn sy = sx: {sx / mm_moi_xung:.4f} xung mỗi dòng")</code></pre>
+<pre><code class="language-text">mm/xung = 0.031416, sy = 0.062832 mm/dòng, sy/sx = 1.2566
+Đồng xu Ø10 mm hiện thành elip 200 × 159.2 px
+Muốn sy = sx: 1.5915 xung mỗi dòng</code></pre>
+<p>sy lớn hơn sx 26%: chi tiết tròn hiện thành elip 200 × 159 px. Có hai cách: dùng bộ chia/nhân xung có hệ số lẻ (nhiều camera line scan hỗ trợ) để được khoảng 1,59 xung/dòng, hoặc giữ nguyên và <strong>quy đổi riêng sx, sy</strong>. Lưu ý sy còn phụ thuộc trượt giữa băng tải và con lăn encoder, nên hiệu chuẩn sy bằng vật chuẩn chạy qua băng tải thật, không chỉ tính từ đường kính con lăn.</p>
+</details>
+</div>
+
+<h2 id="tom-tat">Tóm tắt</h2>
+<ul>
+  <li>Quy đổi đơn giản: mm = pixel × s, với sx, sy riêng. Đúng khi camera vuông góc, ống kính ít méo, đặc trưng nằm trên mặt phẳng hiệu chuẩn.</li>
+  <li>Lấy tỉ lệ từ khoảng cách tâm trên tấm lưới chuẩn (không phụ thuộc ngưỡng); lấy giá trị bù biên từ căn mẫu, vòng chuẩn bằng chính thuật toán đo. Bù ngược dấu cho kích thước ngoài và kích thước trong.</li>
+  <li>Đánh giá hệ đo: đo lặp lại ≥ 30 lần trong điều kiện thật, tính σ, ±3σ, bias, tỉ số dải dung sai / 2(|bias| + 3σ). Hướng dẫn: ≥ 10:1 tốt, 4:1 tới 10:1 có điều kiện, dưới 4:1 không đạt.</li>
+  <li>Phần dư fit lưới là "máy dò" méo và nghiêng; sai số đều ở mọi vị trí là dấu hiệu chênh chiều cao.</li>
+  <li>Khi méo, nghiêng hoặc chiều cao vượt ngân sách sai số: chuyển sang hiệu chuẩn đầy đủ, homography, đồ gá hoặc telecentric.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Hiệu chuẩn camera: nội tại và méo ống kính</strong>, nơi bạn mô hình hóa và khử chính loại sai số đã thấy ở mép ảnh trong mục 7.</p>
+
+      </div>
+      <div class="lesson-done" data-course="vision-engineer"><button type="button" class="lesson-done-btn" data-lesson-done="calib-1-quy-doi-pixel-sang-mm" aria-pressed="false"><span class="box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></span><span class="off">Đánh dấu đã học xong</span><span class="on">Đã học xong bài này</span></button><a class="btn lg" href="../hoc/hieu-chuan-camera-intrinsic-meo-ong-kinh.html">Bài tiếp theo<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a></div>
+      <footer class="article-foot">
+        <div class="tags"><a class="tag" href="../search.html?q=Calibration">#Calibration</a><a class="tag" href="../search.html?q=Đo lường">#Đo lường</a><a class="tag" href="../search.html?q=Python">#Python</a></div>
+        <div class="share">
+      <span>Chia sẻ:</span>
+      <a class="share-btn fb" href="https://www.facebook.com/sharer/sharer.php?u=https://hocfree.vn/hoc/calib-1-quy-doi-pixel-sang-mm.html" target="_blank" rel="noopener" aria-label="Chia sẻ Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8z"/></svg></a>
+      <a class="share-btn x" href="https://twitter.com/intent/tweet?url=https://hocfree.vn/hoc/calib-1-quy-doi-pixel-sang-mm.html" target="_blank" rel="noopener" aria-label="Chia sẻ X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+      <button class="share-btn copy-link" data-url="https://hocfree.vn/hoc/calib-1-quy-doi-pixel-sang-mm.html" aria-label="Sao chép liên kết"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+    </div>
+      </footer>
+      <div class="author-box">
+        <span class="avatar lg" aria-hidden="true">HF</span>
+        <div>
+          <strong>Ban biên tập HọcFree</strong>
+          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và ngoại ngữ, hoàn toàn miễn phí.</p>
+        </div>
+      </div>
+      <nav class="pager lesson-pager" aria-label="Bài học trước/sau"><a class="prev" href="../projects/doc-so-seri-linh-kien-ocr-ocv.html"><span>← Bài trước · Bài 8 · Chặng 7</span>Dự án chặng 7: đọc và xác minh số seri</a><a class="next" href="../hoc/hieu-chuan-camera-intrinsic-meo-ong-kinh.html"><span>Bài tiếp → · Bài 2</span>Hiệu chuẩn camera: nội tại và méo ống kính</a></nav>
+    </article>
+    <aside class="sidebar course-side" data-course="vision-engineer">
+      <section class="widget course-toc">
+        <p class="widget-title">Chặng 8/14 · Vision Engineer</p>
+        <a class="course-toc-title" href="../lo-trinh/vision-engineer/calibration.html">Calibration</a>
+        <div class="lc" data-lesson-count="calib-1-quy-doi-pixel-sang-mm hieu-chuan-camera-intrinsic-meo-ong-kinh homography-do-tren-mat-phang hand-eye-calibration-camera-robot kiem-tra-hieu-chuan-dinh-ky-san-xuat do-kich-thuoc-chi-tiet-bang-camera"><div class="lc-bar"><span data-lc-bar></span></div><span data-lc-text>0/6 bài</span></div>
+        <ol class="toc-lessons"><li data-lesson="calib-1-quy-doi-pixel-sang-mm" class="is-current"><a href="../hoc/calib-1-quy-doi-pixel-sang-mm.html" aria-current="page"><span class="tn">1</span><span class="tt">Quy đổi pixel sang mm và đánh giá sai số</span></a></li><li data-lesson="hieu-chuan-camera-intrinsic-meo-ong-kinh"><a href="../hoc/hieu-chuan-camera-intrinsic-meo-ong-kinh.html"><span class="tn">2</span><span class="tt">Hiệu chuẩn camera: nội tại và méo ống kính</span></a></li><li data-lesson="homography-do-tren-mat-phang"><a href="../kien-thuc/homography-do-tren-mat-phang.html"><span class="tn">3</span><span class="tt">Homography: đo trên mặt phẳng khi camera nghiêng</span></a></li><li data-lesson="hand-eye-calibration-camera-robot"><a href="../hoc/hand-eye-calibration-camera-robot.html"><span class="tn">4</span><span class="tt">Hand-eye calibration camera – robot</span></a></li><li data-lesson="kiem-tra-hieu-chuan-dinh-ky-san-xuat"><a href="../kien-thuc/kiem-tra-hieu-chuan-dinh-ky-san-xuat.html"><span class="tn">5</span><span class="tt">Kiểm tra hiệu chuẩn định kỳ</span></a></li><li data-lesson="do-kich-thuoc-chi-tiet-bang-camera"><a href="../projects/do-kich-thuoc-chi-tiet-bang-camera.html"><span class="tn">6</span><span class="tt">Dự án chặng 8: đo kích thước chi tiết cơ khí</span></a></li></ol>
+        <a class="more" href="../lo-trinh/vision-engineer.html">Xem toàn bộ lộ trình<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a>
+      </section>
+    </aside>
+  </div>
+  <section class="band">
+    <div class="container">
+      <div class="section-title"><h2>Có thể bạn quan tâm</h2></div>
+      <div class="card-grid"><article class="card">
+  <a class="thumb" href="../hoc/python-1-cai-dat-python-va-vs-code.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-1-cai-dat-python-va-vs-code.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-1-cai-dat-python-va-vs-code.html">Python cơ bản: cài Python, VS Code và chạy chương trình đầu tiên</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>7 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/python-2-bien-kieu-du-lieu-toan-tu.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-2-bien-kieu-du-lieu-toan-tu.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-2-bien-kieu-du-lieu-toan-tu.html">Python cơ bản: biến, kiểu dữ liệu và toán tử</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/python-3-re-nhanh-va-vong-lap.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-3-re-nhanh-va-vong-lap.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-3-re-nhanh-va-vong-lap.html">Python cơ bản: rẽ nhánh và vòng lặp</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article></div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <a class="logo" href="../"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+      <p>HọcFree.vn – nền tảng học miễn phí về AI, lập trình, Computer Vision, Machine Vision, tin tức AI và ngoại ngữ dành cho người Việt.</p>
+    </div>
+    <div><h3>Học &amp; thực hành</h3><ul><li><a href="../hoc/">Học AI &amp; Lập trình</a></li><li><a href="../projects/">Projects</a></li><li><a href="../lo-trinh/">Learning Paths</a></li></ul></div>
+    <div><h3>Khám phá</h3><ul><li><a href="../kien-thuc/">Kiến thức</a></li><li><a href="../tin-tuc-ai/">Tin tức AI</a></li><li><a href="../ngoai-ngu/">Ngoại ngữ</a></li><li><a href="../tai-nguyen/">Tài nguyên</a></li></ul></div>
+    <div><h3>Bài mới</h3><ul><li><a href="../hoc/python-1-cai-dat-python-va-vs-code.html">Python cơ bản: cài Python, VS Code và chạy chương trình đầu tiên</a></li><li><a href="../hoc/python-2-bien-kieu-du-lieu-toan-tu.html">Python cơ bản: biến, kiểu dữ liệu và toán tử</a></li><li><a href="../hoc/python-3-re-nhanh-va-vong-lap.html">Python cơ bản: rẽ nhánh và vòng lặp</a></li><li><a href="../hoc/python-4-list-tuple-dict-set.html">Python cơ bản: list, tuple, dict và set</a></li></ul></div>
+    <div>
+      <h3>HọcFree</h3>
+      <ul>
+        <li><a href="../gioi-thieu.html">Giới thiệu</a></li>
+        <li><a href="../search.html">Tìm kiếm</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">© 2026 HọcFree.vn · Kiến thức là để chia sẻ.</div>
+  </div>
+</footer>
+<button class="to-top" aria-label="Lên đầu trang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<script src="../assets/js/search-data.js?v=20261009" defer></script>
+<script src="../assets/js/main.js?v=20261009" defer></script>
+</body>
+</html>

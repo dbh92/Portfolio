@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="vi" data-root="../">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TCP socket Python: gửi kết quả và tọa độ cho robot | HọcFree</title>
+<meta name="description" content="Viết server, client TCP; đóng khung tin bằng ký tự kết thúc, xử lý tin dính/vỡ, timeout, kết nối lại và gửi lại không gắp hai lần.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://hocfree.vn/hoc/tich-hop-5-tcp-socket-gui-toa-do-robot.html">
+<meta property="og:site_name" content="HọcFree">
+<meta property="og:type" content="article">
+<meta property="og:title" content="TCP socket Python: gửi kết quả và tọa độ cho robot">
+<meta property="og:description" content="Viết server, client TCP; đóng khung tin bằng ký tự kết thúc, xử lý tin dính/vỡ, timeout, kết nối lại và gửi lại không gắp hai lần.">
+<meta property="og:url" content="https://hocfree.vn/hoc/tich-hop-5-tcp-socket-gui-toa-do-robot.html">
+<meta property="og:image" content="https://hocfree.vn/assets/images/posts/tich-hop-5-tcp-socket-gui-toa-do-robot.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="TCP socket Python: gửi kết quả và tọa độ cho robot">
+<meta property="og:locale" content="vi_VN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="TCP socket Python: gửi kết quả và tọa độ cho robot">
+<meta name="twitter:description" content="Viết server, client TCP; đóng khung tin bằng ký tự kết thúc, xử lý tin dính/vỡ, timeout, kết nối lại và gửi lại không gắp hai lần.">
+<meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/tich-hop-5-tcp-socket-gui-toa-do-robot.jpg">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/fonts.css?v=20261009">
+<link rel="stylesheet" href="../assets/css/style.css?v=20261009">
+<script>try{var t=localStorage.getItem('hf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
+<meta property="article:published_time" content="2026-10-09">
+<meta property="article:section" content="Học AI &amp; Lập trình">
+<meta property="article:tag" content="Robot">
+<meta property="article:tag" content="Python">
+<meta property="article:tag" content="Industrial Vision">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "TCP socket Python: gửi kết quả và tọa độ cho robot", "description": "Viết server, client TCP; đóng khung tin bằng ký tự kết thúc, xử lý tin dính/vỡ, timeout, kết nối lại và gửi lại không gắp hai lần.", "image": ["https://hocfree.vn/assets/images/posts/tich-hop-5-tcp-socket-gui-toa-do-robot.jpg"], "datePublished": "2026-10-09", "dateModified": "2026-10-09", "inLanguage": "vi", "articleSection": "Học AI & Lập trình", "keywords": "Robot, Python, Industrial Vision", "wordCount": 3716, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/hoc/tich-hop-5-tcp-socket-gui-toa-do-robot.html"}, "isPartOf": {"@type": "Course", "name": "Trở thành Vision Engineer", "url": "https://hocfree.vn/lo-trinh/vision-engineer.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Learning Paths", "item": "https://hocfree.vn/lo-trinh/"}, {"@type": "ListItem", "position": 3, "name": "Trở thành Vision Engineer", "item": "https://hocfree.vn/lo-trinh/vision-engineer.html"}, {"@type": "ListItem", "position": 4, "name": "Chặng 9: PLC / Robot / MES", "item": "https://hocfree.vn/lo-trinh/vision-engineer/plc-robot-mes.html"}, {"@type": "ListItem", "position": 5, "name": "TCP socket Python: gửi kết quả và tọa độ cho robot"}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div class="progress" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="container wide header-top">
+    <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="nav-scrim" hidden></div>
+    <a class="logo" href="../" aria-label="HọcFree – Trang chủ"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+    <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
+    <div class="header-actions">
+      <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="login-link" href="../dang-nhap.html">Đăng nhập</a>
+      <a class="btn start-btn" href="../lo-trinh/">Bắt đầu học</a>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="container wide">
+      <nav class="site-nav" id="site-nav" aria-label="Menu chính">
+        <div class="drawer-head">
+          <a class="logo" href="../" tabindex="-1"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+          <button class="icon-btn nav-close" aria-label="Đóng menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <button type="button" class="drawer-search search-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Tìm bài học, chủ đề…</span></button>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="../">Trang chủ</a></li><li class="nav-item has-panel is-mega"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-hoc">Học AI &amp; Lập trình<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel mega" id="nav-panel-hoc">
+  <div class="container wide mega-inner">
+    <div class="mega-groups"><div class="mega-group"><a class="mega-group-title" href="../hoc/#programming">Programming</a><ul><li><a href="../hoc/python.html">Python</a></li><li><a href="../hoc/csharp.html">C#</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#ai-machine-learning">AI &amp; Machine Learning</a><ul><li><a href="../hoc/machine-learning.html">Machine Learning</a></li><li><a href="../hoc/deep-learning.html">Deep Learning</a></li><li><a href="../hoc/pytorch.html">PyTorch</a></li><li><a href="../hoc/generative-ai.html">Generative AI</a></li><li><a href="../hoc/llm-ai-agents.html">LLM / AI Agents</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#computer-vision">Computer Vision</a><ul><li><a href="../hoc/opencv.html">OpenCV</a></li><li><a href="../hoc/image-processing.html">Image Processing</a></li><li><a href="../hoc/computer-vision.html">Computer Vision</a></li><li><a href="../hoc/ocr.html">OCR</a></li><li><a href="../hoc/object-detection.html">Object Detection</a></li><li><a href="../hoc/segmentation.html">Segmentation</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#vision-engineering">Vision Engineering</a><ul><li><a href="../hoc/machine-vision.html">Machine Vision</a></li><li><a href="../hoc/ai-vision.html">AI Vision</a></li><li><a href="../hoc/industrial-vision.html">Industrial Vision</a></li><li><a href="../hoc/camera-lens.html">Camera &amp; Lens</a></li><li><a href="../hoc/lighting.html">Lighting</a></li><li><a href="../hoc/calibration.html">Calibration</a></li><li><a href="../hoc/plc-robot-mes.html">PLC / Robot / MES</a></li><li><a href="../hoc/vision-deployment.html">Vision Deployment</a></li></ul></div></div>
+    <a class="feature-card" href="../lo-trinh/vision-engineer.html">
+  <span class="feature-eyebrow">⭐ Learning Path nổi bật</span>
+  <span class="feature-title">Trở thành Vision Engineer</span>
+  <span class="feature-sub">Machine Vision + AI Vision + Industrial Automation</span>
+  <span class="feature-desc">Lộ trình thực chiến từ Python, OpenCV và Machine Vision đến Deep Learning, AI Vision, Camera, PLC, Robot và triển khai hệ thống Vision trong nhà máy.</span>
+  <span class="feature-chain" aria-label="Các chặng chính"><span>Python</span><i aria-hidden="true">→</i><span>OpenCV</span><i aria-hidden="true">→</i><span>Machine Vision</span><i aria-hidden="true">→</i><span>AI Vision</span><i aria-hidden="true">→</i><span class="chain-goal">🎯 Vision Engineer</span></span>
+  <span class="feature-meta">14 chặng · 5 giai đoạn · ~12 tháng</span>
+  <span class="feature-cta">Xem lộ trình →</span>
+</a>
+  </div>
+  <div class="mega-foot"><div class="container wide mega-foot-inner"><ol class="journey compact" aria-label="Học, thực hành, trở thành kỹ sư"><li><a href="../hoc/" aria-current="step"><span class="journey-n">1</span><span class="journey-t"><b>Học</b><small>Học AI &amp; Lập trình</small></span></a></li><li><a href="../projects/"><span class="journey-n">2</span><span class="journey-t"><b>Thực hành</b><small>Projects</small></span></a></li><li><a href="../lo-trinh/"><span class="journey-n">3</span><span class="journey-t"><b>Trở thành kỹ sư</b><small>Learning Paths</small></span></a></li></ol><a class="panel-all" href="../hoc/">Xem tất cả Học AI &amp; Lập trình →</a></div></div>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-projects">Projects<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-projects">
+  <p class="panel-kicker"><span>Bước 2 · Thực hành</span>Áp dụng vào dự án thật</p>
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../projects/ai-projects.html"><span class="drop-label">AI Projects</span><span class="drop-desc">Ứng dụng ML và LLM, từ ý tưởng đến bản demo</span></a></li><li><a class="drop-link" href="../projects/computer-vision-projects.html"><span class="drop-label">Computer Vision Projects</span><span class="drop-desc">Phát hiện, nhận dạng và theo dõi đối tượng</span></a></li><li><a class="drop-link" href="../projects/industrial-vision-projects.html"><span class="drop-label">Industrial Vision Projects</span><span class="drop-desc">Đo kích thước, kiểm tra lỗi, đọc mã trên dây chuyền</span></a></li></ul></div></div>
+  <a class="panel-all" href="../projects/">Xem tất cả Projects →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger is-active" aria-expanded="false" aria-controls="nav-panel-lo-trinh" aria-current="true">Learning Paths<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-lo-trinh">
+  <p class="panel-kicker"><span>Bước 3 · Trở thành kỹ sư</span>Định hướng nghề nghiệp</p>
+  <ul class="drop-list"><li><a class="drop-link is-flagship" href="../lo-trinh/vision-engineer.html"><span class="drop-label">⭐ Trở thành Vision Engineer</span><span class="drop-desc">Machine Vision + AI Vision + Industrial Automation · 14 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/#python-developer"><span class="drop-label">Python Developer<span class="badge-soon">Sắp ra mắt</span></span><span class="drop-desc">Python, công cụ, tự động hóa</span></a></li></ul>
+  <a class="panel-all" href="../lo-trinh/">Xem tất cả lộ trình →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-kien-thuc">Kiến thức<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-kien-thuc">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Lĩnh vực</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/programming.html"><span class="drop-label">Programming</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-machine-learning.html"><span class="drop-label">AI / Machine Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/deep-learning.html"><span class="drop-label">Deep Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/machine-vision.html"><span class="drop-label">Machine Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-vision.html"><span class="drop-label">AI Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/industrial-automation.html"><span class="drop-label">Industrial Automation</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Công cụ &amp; mẹo</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/tools-frameworks.html"><span class="drop-label">Tools &amp; Frameworks</span></a></li><li><a class="drop-link" href="../kien-thuc/tips-tricks.html"><span class="drop-label">Tips &amp; Tricks</span></a></li></ul></div></div>
+  <a class="panel-all" href="../kien-thuc/">Xem tất cả Kiến thức →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tin-tuc-ai">Tin tức AI<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tin-tuc-ai">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tin-tuc-ai/ai-news.html"><span class="drop-label">AI News</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-models.html"><span class="drop-label">AI Models</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/technology.html"><span class="drop-label">Technology</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/robotics.html"><span class="drop-label">Robotics</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-industry.html"><span class="drop-label">AI Industry</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tin-tuc-ai/">Xem tất cả Tin tức AI →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-ngoai-ngu">Ngoại ngữ<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-ngoai-ngu">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/english.html"><span class="drop-label">English</span><span class="drop-desc">Lộ trình 700 TOEIC, phương pháp học, giáo trình HF-700TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chinese.html"><span class="drop-label">Chinese</span><span class="drop-desc">Lộ trình HSK3, phương pháp học, giáo trình HF-HSK3</span></a></li></ul></div></div>
+  <a class="panel-all" href="../ngoai-ngu/">Xem tất cả Ngoại ngữ →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tai-nguyen">Tài nguyên<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tai-nguyen">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tai-nguyen/source-code.html"><span class="drop-label">Source Code</span><span class="drop-desc">Mã nguồn mẫu đi kèm bài học</span></a></li><li><a class="drop-link" href="../tai-nguyen/dataset.html"><span class="drop-label">Dataset</span><span class="drop-desc">Bộ dữ liệu ảnh để luyện tập</span></a></li><li><a class="drop-link" href="../tai-nguyen/cheat-sheets.html"><span class="drop-label">Cheat Sheets</span><span class="drop-desc">Tóm tắt nhanh trong một trang</span></a></li><li><a class="drop-link" href="../tai-nguyen/documentation.html"><span class="drop-label">Documentation</span><span class="drop-desc">Tài liệu tra cứu thư viện, API</span></a></li><li><a class="drop-link" href="../tai-nguyen/ebook.html"><span class="drop-label">Ebook / Tài liệu</span><span class="drop-desc">Sách và tài liệu tham khảo</span></a></li><li><a class="drop-link" href="../tai-nguyen/ai-tools.html"><span class="drop-label">AI Tools</span><span class="drop-desc">Công cụ AI hữu ích cho việc học</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tai-nguyen/">Xem tất cả Tài nguyên →</a>
+</div></li></ul>
+        <div class="drawer-foot">
+          <a class="btn ghost" href="../dang-nhap.html">Đăng nhập</a>
+          <a class="btn" href="../lo-trinh/">Bắt đầu học</a>
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+<div class="search-dialog" hidden>
+  <div class="search-scrim"></div>
+  <div class="search-box" role="dialog" aria-modal="true" aria-label="Tìm kiếm">
+    <form class="search-form" action="../search.html" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" placeholder="Tìm bài học, chủ đề, bài viết…" autocomplete="off" aria-label="Từ khóa tìm kiếm" aria-controls="search-suggest">
+      <button type="button" class="icon-btn search-close" aria-label="Đóng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </form>
+    <div class="search-suggest" id="search-suggest" aria-live="polite">
+      <div class="search-empty">
+        <p class="search-group-title">Chủ đề phổ biến</p>
+        <div class="chips"><a class="chip" href="../hoc/python.html">Python</a><a class="chip" href="../hoc/opencv.html">OpenCV</a><a class="chip" href="../hoc/machine-vision.html">Machine Vision</a><a class="chip" href="../hoc/deep-learning.html">Deep Learning</a><a class="chip" href="../hoc/ai-vision.html">AI Vision</a><a class="chip" href="../hoc/object-detection.html">Object Detection</a><a class="chip" href="../hoc/pytorch.html">PyTorch</a><a class="chip" href="../ngoai-ngu/english.html">English</a></div>
+        <p class="search-group-title">Lộ trình nổi bật</p>
+        <a class="search-item" href="../lo-trinh/vision-engineer.html"><span class="search-ico" aria-hidden="true">⭐</span><span>Trở thành Vision Engineer<small>Learning Path · Machine Vision + AI Vision + Industrial Automation</small></span></a>
+      </div>
+    </div>
+    <div class="search-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> chọn</span><span><kbd>Enter</kbd> mở</span><span><kbd>Esc</kbd> đóng</span></div>
+  </div>
+</div>
+<main id="main">
+  <div class="container layout article-layout">
+    <article class="article">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../lo-trinh/">Learning Paths</a><span>/</span><a href="../lo-trinh/vision-engineer.html">Vision Engineer</a><span>/</span><a href="../lo-trinh/vision-engineer/plc-robot-mes.html">Chặng 9: PLC / Robot / MES</a></nav>
+      <header class="article-head">
+        <div class="course-bar" data-course="vision-engineer"><a class="course-chip" href="../lo-trinh/vision-engineer/plc-robot-mes.html">⭐ Vision Engineer · Chặng 9</a><span class="lesson-no">Bài 5/9</span><span class="kind kind-lesson">Bài học</span><span class="lesson-min"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></svg>~75 phút</span></div>
+        <h1>TCP socket Python: gửi kết quả và tọa độ cho robot</h1>
+        <p class="lead">Viết server, client TCP; đóng khung tin bằng ký tự kết thúc, xử lý tin dính/vỡ, timeout, kết nối lại và gửi lại không gắp hai lần.</p>
+        <div class="article-meta">
+          <span class="avatar" aria-hidden="true">HF</span>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>21 phút đọc</span></div>
+        </div>
+      </header>
+      <figure class="article-cover">
+        <img src="../assets/images/posts/tich-hop-5-tcp-socket-gui-toa-do-robot.webp" alt="TCP socket Python: gửi kết quả và tọa độ cho robot" width="1200" height="675" fetchpriority="high" decoding="async">
+      </figure>
+      <section class="lesson-goals" aria-label="Mục tiêu bài học"><h2>Học xong bài này, bạn sẽ</h2><ul><li>Viết server, client TCP bằng Python</li><li>Thiết kế giao thức tin nhắn có kết thúc rõ ràng</li><li>Xử lý mất kết nối, timeout</li></ul><p class="goals-before">Nên học trước: <a href="../kien-thuc/opc-ua-cho-ky-su-vision.html">OPC UA cho kỹ sư Vision</a></p></section>
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol class="toc-plain"><li><a href="#1-tcp-la-dong-byte-khong-phai-goi-tin">1. TCP là dòng byte, không phải gói tin</a></li><li><a href="#2-dong-khung-tin-nhan-framing">2. Đóng khung tin nhắn (framing)</a></li><li><a href="#3-bo-dem-nhan-gom-byte-thanh-tin">3. Bộ đệm nhận: gom byte thành tin</a></li><li><a href="#4-thiet-ke-tin-nhan-cho-robot">4. Thiết kế tin nhắn cho robot</a></li><li><a href="#5-cach-thu-hai-tien-to-do-dai">5. Cách thứ hai: tiền tố độ dài</a></li><li><a href="#6-ai-la-server-ai-la-client">6. Ai là server, ai là client?</a></li><li><a href="#7-timeout-mat-ket-noi-ket-noi-lai-va-gui-lai">7. Timeout, mất kết nối, kết nối lại và gửi lại</a></li><li><a href="#8-loi-thuong-gap">8. Lỗi thường gặp</a></li><li><a href="#9-bai-tap">9. Bài tập</a></li><li><a href="#tom-tat">Tóm tắt</a></li></ol></details>
+      <div class="prose">
+<p>Modbus và OPC UA hợp với dữ liệu kiểu "ô nhớ": vài bit, vài thanh ghi. Nhưng khi vision cần gửi cho robot <em>tọa độ gắp</em> (x, y, góc) cho từng vật, hoặc nhận lệnh "chụp đi" từ robot, cách phổ biến nhất trong thực tế lại là <strong>TCP socket với tin nhắn văn bản tự định nghĩa</strong>: robot của gần như mọi hãng đều có lệnh mở socket, gửi và đọc chuỗi. Đơn giản đến mức rất nhiều trạm chạy "gần đúng" trong nhiều tháng rồi mới hỏng vì một lỗi kinh điển: coi mỗi lần <code>recv</code> là một tin. Bài này nối tiếp "Modbus TCP bằng Python với pymodbus" và "OPC UA cho kỹ sư Vision", dạy bạn viết client/server TCP đúng cách, thiết kế giao thức có kết thúc rõ ràng và chịu được mất kết nối. Bài sau, "Vision dẫn hướng robot gắp vật", sẽ dùng chính kênh này để gửi tọa độ đã đổi sang hệ robot.</p>
+
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Viết được TCP server và client bằng thư viện chuẩn <code>socket</code>; thiết kế tin nhắn có ký tự kết thúc, số thập phân cố định, số thứ tự và xác nhận ACK; xử lý tin dính/tin vỡ bằng bộ đệm; xử lý timeout, mất kết nối, kết nối lại và gửi lại mà robot không gắp hai lần.</div>
+
+<h2 id="1-tcp-la-dong-byte-khong-phai-goi-tin">1. TCP là dòng byte, không phải gói tin</h2>
+<p>TCP đảm bảo các byte đến <strong>đủ và đúng thứ tự</strong>, nhưng <strong>không giữ ranh giới</strong> giữa các lần gửi. Hai lần <code>sendall</code> có thể đến bên kia trong một lần <code>recv</code> (tin dính), một lần <code>sendall</code> có thể bị chia ra nhiều lần <code>recv</code> (tin vỡ). Trên mạng thật điều này phụ thuộc kích thước gói, thuật toán Nagle, tải của máy; trên bàn thử nghiệm thì hầu như không xảy ra, nên lỗi chỉ lộ ra ở hiện trường. Ví dụ dưới dùng <code>socket.socketpair()</code> (hai đầu của một kết nối dòng byte, không cần mạng) để tái hiện cả hai trường hợp một cách chắc chắn:</p>
+<pre><code class="language-python">import socket
+
+vision, robot = socket.socketpair()      # hai đầu của một kết nối dòng byte, không cần mạng
+
+# Trường hợp 1: vision gửi hai tin liên tiếp, robot recv một lần
+vision.sendall(b"OK,123.45,67.89,30.00\r\n")
+vision.sendall(b"NG,0.00,0.00,0.00\r\n")
+lan1 = robot.recv(1024)
+print("recv 1:", lan1)
+
+# Trường hợp 2: một tin đến thành hai mảnh
+vision.sendall(b"OK,101.2")
+print("recv 2:", robot.recv(1024))
+vision.sendall(b"5,55.10,90.00\r\n")
+print("recv 3:", robot.recv(1024))
+
+# Code "ngây thơ": coi mỗi lần recv là một tin
+truong = lan1.decode("ascii").strip().split(",")
+print("Robot hiểu:", len(truong), "trường →", truong[:5], "...")
+vision.close()
+robot.close()</code></pre>
+<pre><code class="language-text">recv 1: b'OK,123.45,67.89,30.00\r\nNG,0.00,0.00,0.00\r\n'
+recv 2: b'OK,101.2'
+recv 3: b'5,55.10,90.00\r\n'
+Robot hiểu: 7 trường → ['OK', '123.45', '67.89', '30.00\r\nNG', '0.00'] ...</code></pre>
+<p>Robot đọc theo kiểu "mỗi recv là một tin" sẽ thấy 7 trường, trường thứ tư là <code>'30.00\r\nNG'</code>: tùy cách robot xử lý lỗi, nó dừng chương trình, hoặc tệ hơn, gắp ở góc sai. Ở trường hợp 2, nó nhận <code>OK,101.2</code> và có thể hiểu x = 101.2 thay vì 101.25.</p>
+
+<h2 id="2-dong-khung-tin-nhan-framing">2. Đóng khung tin nhắn (framing)</h2>
+<p>Vì TCP không có ranh giới, chính <strong>giao thức của bạn</strong> phải nói tin nhắn kết thúc ở đâu. Hai cách chuẩn:</p>
+<table>
+  <tr><th></th><th>Ký tự kết thúc (delimiter)</th><th>Tiền tố độ dài (length prefix)</th></tr>
+  <tr><td>Ví dụ</td><td><code>OK,123.45,67.89,30.00\r\n</code></td><td><code>00 1F</code> + 31 byte nội dung</td></tr>
+  <tr><td>Ưu điểm</td><td>Đọc được bằng mắt, gõ thử bằng công cụ terminal, robot nào cũng có lệnh "đọc đến ký tự"</td><td>Chứa được dữ liệu bất kỳ (nhị phân, JSON nhiều dòng, ảnh), biết trước cần đọc bao nhiêu</td></tr>
+  <tr><td>Nhược điểm</td><td>Nội dung không được chứa ký tự kết thúc</td><td>Lệch 1 byte là lệch toàn bộ phần sau; khó gõ thử bằng tay</td></tr>
+  <tr><td>Dùng khi</td><td>Giao tiếp với robot, PLC, thiết bị đọc mã (phổ biến nhất)</td><td>PC ↔ PC, gửi ảnh, gửi bản ghi lớn</td></tr>
+</table>
+<p>Ký tự kết thúc hay dùng là <code>\r\n</code> (CR LF) hoặc chỉ <code>\r</code>, tùy thiết bị. Ghi rõ trong tài liệu giao thức, kèm mã hex (0x0D 0x0A), vì "xuống dòng" là cách nói không đủ chính xác.</p>
+
+<h2 id="3-bo-dem-nhan-gom-byte-thanh-tin">3. Bộ đệm nhận: gom byte thành tin</h2>
+<p>Cách đúng: mọi byte nhận được đổ vào một bộ đệm; mỗi lần đổ, cắt ra <strong>tất cả</strong> các tin đã có đủ ký tự kết thúc, phần dở dang giữ lại chờ lần sau. Thêm một giới hạn độ dài để rác trên đường truyền (hoặc bên kia quên ký tự kết thúc) không làm bộ đệm phình mãi.</p>
+<pre><code class="language-python">class BoDemDong:
+    """Gom dòng byte thành từng tin hoàn chỉnh kết thúc bằng b'\\r\\n'."""
+
+    def __init__(self, ket_thuc=b"\r\n", dai_toi_da=256):
+        self.buf = bytearray()
+        self.ket_thuc = ket_thuc
+        self.dai_toi_da = dai_toi_da
+
+    def nap(self, du_lieu):
+        """Nạp một khối byte vừa recv được, trả về danh sách các tin ĐỦ (chưa có ký tự kết thúc)."""
+        self.buf += du_lieu
+        cac_tin = []
+        while True:
+            vi_tri = self.buf.find(self.ket_thuc)
+            if vi_tri &lt; 0:
+                break
+            cac_tin.append(bytes(self.buf[:vi_tri]).decode("ascii"))
+            del self.buf[:vi_tri + len(self.ket_thuc)]
+        if len(self.buf) &gt; self.dai_toi_da:           # rác hoặc thiếu ký tự kết thúc: đừng phình bộ nhớ
+            raise ValueError(f"Tin quá dài ({len(self.buf)} byte) mà chưa thấy ký tự kết thúc")
+        return cac_tin
+
+
+dong = b"OK,123.45,67.89,30.00\r\nNG,0.00,0.00,0.00\r\nOK,101.25,55.10,90.00\r\n"
+
+# Cắt dòng byte theo ba cách khác nhau: kết quả phải giống hệt nhau
+for kich_thuoc in (len(dong), 7, 1):
+    bd = BoDemDong()
+    tin = []
+    for i in range(0, len(dong), kich_thuoc):
+        tin += bd.nap(dong[i:i + kich_thuoc])
+    print(f"mảnh {kich_thuoc:&gt;2} byte →", tin)</code></pre>
+<pre><code class="language-text">mảnh 65 byte → ['OK,123.45,67.89,30.00', 'NG,0.00,0.00,0.00', 'OK,101.25,55.10,90.00']
+mảnh  7 byte → ['OK,123.45,67.89,30.00', 'NG,0.00,0.00,0.00', 'OK,101.25,55.10,90.00']
+mảnh  1 byte → ['OK,123.45,67.89,30.00', 'NG,0.00,0.00,0.00', 'OK,101.25,55.10,90.00']</code></pre>
+<p>Dù dòng byte đến nguyên khối, từng 7 byte hay từng byte một, kết quả vẫn là đúng ba tin. Đây là bài kiểm tra bạn nên viết cho mọi bộ phân tích giao thức.</p>
+
+<h2 id="4-thiet-ke-tin-nhan-cho-robot">4. Thiết kế tin nhắn cho robot</h2>
+<p>Dạng tối thiểu là <code>OK,123.45,67.89,30.00\r\n</code>. Trong dự án thật, nên thêm số thứ tự ở đầu và yêu cầu robot xác nhận:</p>
+<pre><code class="language-text">Vision → Robot :  0007,OK,123.46,67.89,30.00\r\n
+                  │    │  │      │     └ góc (độ), 2 chữ số thập phân
+                  │    │  │      └ y (mm, hệ tọa độ robot)
+                  │    │  └ x (mm, hệ tọa độ robot)
+                  │    └ OK = gắp, NG = bỏ qua
+                  └ số thứ tự 0000–9999, quay vòng
+Robot → Vision :  ACK,0007\r\n</code></pre>
+<ul>
+  <li><strong>Số thập phân cố định</strong> (<code>{x:.2f}</code>): độ dài tin ổn định, robot dễ cắt chuỗi, và không bao giờ xuất hiện dạng <code>1e-05</code> hay <code>123.45600000000002</code>.</li>
+  <li><strong>Luôn dùng dấu chấm thập phân, ASCII.</strong> Python f-string luôn dùng dấu chấm, nhưng nếu phần mềm vision viết bằng C#/.NET chạy trên Windows cài định dạng Việt Nam, <code>ToString()</code> sẽ ra <code>123,45</code> và phá vỡ dấu phẩy phân cách trường. Bên .NET phải dùng <code>CultureInfo.InvariantCulture</code>.</li>
+  <li><strong>Đơn vị và hệ tọa độ</strong> ghi trong tài liệu: mm hay 0,01 mm, hệ tọa độ user frame nào của robot, góc theo chiều nào, khoảng giá trị hợp lệ.</li>
+  <li><strong>Số thứ tự + ACK</strong>: vision biết robot đã nhận đúng tin nào; khi phải gửi lại, robot nhận ra tin trùng và không gắp hai lần (mục 7).</li>
+  <li><strong>Bên nhận kiểm tra, không đoán</strong>: sai số trường, sai chữ, số ngoài khoảng → từ chối và báo lỗi.</li>
+</ul>
+<pre><code class="language-python">def tao_tin(seq, ok, x, y, goc):
+    """Tin vision → robot: seq,OK|NG,x,y,góc  (mm, mm, độ; luôn 2 chữ số thập phân, dấu chấm)."""
+    if not (0 &lt;= seq &lt;= 9999):
+        raise ValueError("seq phải trong 0..9999")
+    return f"{seq:04d},{'OK' if ok else 'NG'},{x:.2f},{y:.2f},{goc:.2f}\r\n".encode("ascii")
+
+
+def doc_tin(dong):
+    """Phía robot: tách và KIỂM TRA một tin. Sai định dạng thì báo lỗi, không đoán."""
+    truong = dong.split(",")
+    if len(truong) != 5:
+        raise ValueError(f"cần 5 trường, nhận {len(truong)}: {dong!r}")
+    seq, kq, x, y, goc = truong
+    if kq not in ("OK", "NG"):
+        raise ValueError(f"kết quả lạ: {kq!r}")
+    return {"seq": int(seq), "ok": kq == "OK", "x": float(x), "y": float(y), "goc": float(goc)}
+
+
+print(tao_tin(7, True, 123.4567, 67.891, 30))
+print(tao_tin(8, False, 0, 0, 0))
+print(doc_tin("0007,OK,123.46,67.89,30.00"))
+for xau in ["0007,OK,123,46,67,89,30,00", "0007,ok,1.00,2.00,3.00"]:
+    try:
+        doc_tin(xau)
+    except ValueError as e:
+        print("Từ chối:", e)</code></pre>
+<pre><code class="language-text">b'0007,OK,123.46,67.89,30.00\r\n'
+b'0008,NG,0.00,0.00,0.00\r\n'
+{'seq': 7, 'ok': True, 'x': 123.46, 'y': 67.89, 'goc': 30.0}
+Từ chối: cần 5 trường, nhận 8: '0007,OK,123,46,67,89,30,00'
+Từ chối: kết quả lạ: 'ok'</code></pre>
+<p>Tin thứ hai bị từ chối chính là trường hợp dấu phẩy thập phân kiểu Việt Nam. Nhờ kiểm tra số trường, lỗi bị chặn ngay thay vì thành tọa độ x = 123, y = 46.</p>
+
+<h2 id="5-cach-thu-hai-tien-to-do-dai">5. Cách thứ hai: tiền tố độ dài</h2>
+<p>Khi gửi dữ liệu lớn hoặc nhị phân giữa hai chương trình PC (ví dụ gửi bản ghi JSON nhiều điểm, hay ảnh), dùng 2 hoặc 4 byte đầu để ghi độ dài. Chìa khóa là hàm <code>nhan_du</code>: <code>recv(n)</code> có thể trả về <em>ít hơn</em> n byte, nên phải lặp tới khi đủ.</p>
+<pre><code class="language-python">import json
+import socket
+import struct
+
+
+def gui_khung(sock, payload: bytes):
+    sock.sendall(struct.pack("&gt;H", len(payload)) + payload)     # 2 byte độ dài (big-endian) + nội dung
+
+
+def nhan_du(sock, n):
+    """recv tới khi đủ đúng n byte (recv có thể trả về ít hơn n)."""
+    buf = bytearray()
+    while len(buf) &lt; n:
+        manh = sock.recv(n - len(buf))
+        if not manh:
+            raise ConnectionError("đầu kia đóng kết nối giữa chừng")
+        buf += manh
+    return bytes(buf)
+
+
+def nhan_khung(sock):
+    (do_dai,) = struct.unpack("&gt;H", nhan_du(sock, 2))
+    return nhan_du(sock, do_dai)
+
+
+a, b = socket.socketpair()
+tin = json.dumps({"seq": 9, "ok": True, "diem": [[10.5, 20.25], [30.0, 40.75]]}).encode()
+gui_khung(a, tin)
+gui_khung(a, b"")                                  # khung rỗng vẫn hợp lệ
+print(len(tin), "byte →", json.loads(nhan_khung(b)))
+print("khung 2:", nhan_khung(b))
+a.close()
+b.close()</code></pre>
+<pre><code class="language-text">62 byte → {'seq': 9, 'ok': True, 'diem': [[10.5, 20.25], [30.0, 40.75]]}
+khung 2: b''</code></pre>
+
+<h2 id="6-ai-la-server-ai-la-client">6. Ai là server, ai là client?</h2>
+<p>Server mở cổng và chờ (<code>listen</code>/<code>accept</code>); client chủ động kết nối (<code>connect</code>). Về lâu dài, quy tắc quan trọng nhất là: <strong>client chịu trách nhiệm kết nối lại</strong>, server chỉ cần luôn sẵn sàng nhận kết nối mới.</p>
+<table>
+  <tr><th>Cách bố trí</th><th>Khi nào hợp</th><th>Lưu ý</th></tr>
+  <tr><td>Robot là server, vision là client</td><td>Robot đứng chờ lệnh; vision chủ động gửi khi có kết quả</td><td>Vision phải tự kết nối lại khi robot khởi động lại chương trình</td></tr>
+  <tr><td>Vision là server, robot là client</td><td>Robot điều khiển nhịp: gửi "TRIG", chờ tọa độ (rất phổ biến trong pick &amp; place)</td><td>Vision phải chấp nhận kết nối mới khi kết nối cũ chết; chỉ giữ một kết nối hoạt động</td></tr>
+  <tr><td>Hai kết nối, mỗi bên một server</td><td>Ít khi cần</td><td>Phức tạp gấp đôi, tránh nếu được</td></tr>
+</table>
+<p>Hỏi kỹ sư robot xem bộ điều khiển hỗ trợ vai nào, ký tự kết thúc nào, độ dài chuỗi tối đa bao nhiêu, và robot làm gì khi socket đứt giữa chương trình (dừng có báo lỗi, hay tự mở lại).</p>
+
+<h2 id="7-timeout-mat-ket-noi-ket-noi-lai-va-gui-lai">7. Timeout, mất kết nối, kết nối lại và gửi lại</h2>
+<p>Các tình huống phía client phải xử lý:</p>
+<table>
+  <tr><th>Tình huống</th><th>Python báo thế nào</th><th>Xử lý</th></tr>
+  <tr><td>Robot chưa bật / sai IP</td><td><code>ConnectionRefusedError</code> hoặc <code>TimeoutError</code> khi <code>connect</code></td><td>Chờ rồi thử lại, báo lỗi cho PLC nếu quá số lần</td></tr>
+  <tr><td>Robot đóng kết nối "lịch sự"</td><td><code>recv</code> trả về <code>b""</code> (không phải exception!)</td><td>Coi như mất kết nối: đóng, kết nối lại</td></tr>
+  <tr><td>Robot reset kết nối</td><td><code>ConnectionResetError</code>, <code>BrokenPipeError</code></td><td>Như trên</td></tr>
+  <tr><td>Robot im lặng (bận, treo, rút dây)</td><td>Không có gì cả, nếu không đặt timeout thì <code>recv</code> chờ mãi</td><td><strong>Luôn</strong> <code>settimeout</code>; quá hạn chờ ACK → đóng, kết nối lại, gửi lại</td></tr>
+</table>
+<p>Một chi tiết hay bị bỏ qua: khi rút dây mạng, không có gói nào báo cho bên kia biết. Cơ chế keepalive của TCP mặc định tắt, và kể cả khi bật (<code>SO_KEEPALIVE</code>), Linux mặc định chỉ bắt đầu thăm dò sau 2 giờ im lặng. Vì vậy phát hiện mất kết nối phải dựa vào <strong>timeout của giao thức</strong> (chờ ACK, hoặc tin heartbeat định kỳ), không trông chờ hệ điều hành.</p>
+<p>Gửi lại sinh ra vấn đề mới: nếu robot <em>đã gắp</em> nhưng ACK đến trễ, vision gửi lại và robot gắp lần hai vào chỗ trống. Số thứ tự giải quyết việc này: robot nhớ các seq đã thực hiện, gặp lại thì chỉ ACK lại. Demo dưới chạy một robot giả làm server trên 127.0.0.1:6020 với hai sự cố: rớt kết nối khi nhận tin #3 (chưa kịp gắp), và ACK trễ 1,3 s ở tin #5 trong khi vision chỉ chờ 1 s. Code dùng lại <code>BoDemDong</code>, <code>tao_tin</code>, <code>doc_tin</code> ở trên.</p>
+<pre><code class="language-python">import socket
+import threading
+import time
+
+
+class RobotGia:
+    """Robot giả làm TCP server. Kịch bản lỗi: rớt kết nối khi nhận tin #3, ACK chậm ở tin #5."""
+
+    def __init__(self, port, rot_o=3, cham_o=5, tre_ack=1.3):
+        self.port, self.rot_o, self.cham_o, self.tre_ack = port, rot_o, cham_o, tre_ack
+        self.dung = threading.Event()
+        self.da_rot = self.da_cham = False
+        self.da_thuc_hien = set()
+        self.nhat_ky = []
+        self.srv = socket.create_server(("127.0.0.1", port))   # mở cổng ngay, trước khi client kết nối
+        self.srv.settimeout(0.2)
+        self.thread = threading.Thread(target=self._chay, daemon=True)
+        self.thread.start()
+
+    def _chay(self):
+        with self.srv:
+            while not self.dung.is_set():
+                try:
+                    conn, _ = self.srv.accept()
+                except TimeoutError:
+                    continue
+                self.nhat_ky.append("robot: có client kết nối")
+                with conn:
+                    self._phuc_vu(conn)
+
+    def _phuc_vu(self, conn):
+        conn.settimeout(0.2)
+        bd = BoDemDong()
+        while not self.dung.is_set():
+            try:
+                du_lieu = conn.recv(1024)
+            except TimeoutError:
+                continue
+            except OSError:
+                return
+            if not du_lieu:                                    # client đã đóng
+                return
+            for dong in bd.nap(du_lieu):
+                tin = doc_tin(dong)
+                seq = tin["seq"]
+                if seq == self.rot_o and not self.da_rot:
+                    self.da_rot = True
+                    self.nhat_ky.append(f"robot: nhận #{seq} rồi rớt kết nối (chưa thực hiện)")
+                    return
+                if seq in self.da_thuc_hien:
+                    self.nhat_ky.append(f"robot: #{seq} bị gửi lại, KHÔNG gắp lần hai, chỉ ACK lại")
+                else:
+                    self.da_thuc_hien.add(seq)
+                    hanh_dong = f"gắp tại ({tin['x']}, {tin['y']}, {tin['goc']}°)" if tin["ok"] else "bỏ qua (NG)"
+                    self.nhat_ky.append(f"robot: #{seq} {hanh_dong}")
+                if seq == self.cham_o and not self.da_cham:
+                    self.da_cham = True
+                    time.sleep(self.tre_ack)                       # robot bận, ACK trễ
+                try:
+                    conn.sendall(f"ACK,{seq:04d}\r\n".encode("ascii"))
+                except OSError:
+                    return
+
+    def tat(self):
+        self.dung.set()
+        self.thread.join(timeout=2)
+
+
+class GuiRobot:
+    """Phía vision là TCP client: gửi tin, chờ ACK đúng seq, có timeout và kết nối lại."""
+
+    def __init__(self, host, port, timeout=1.0, so_lan_thu=3):
+        self.host, self.port, self.timeout, self.so_lan_thu = host, port, timeout, so_lan_thu
+        self.sock = None
+
+    def _ket_noi(self):
+        self.sock = socket.create_connection((self.host, self.port), timeout=self.timeout)
+        self.sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)   # tin nhỏ: gửi ngay
+        self.bd = BoDemDong()                                               # bỏ mọi dữ liệu dở dang cũ
+
+    def _dong(self):
+        if self.sock:
+            self.sock.close()
+        self.sock = None
+
+    def _cho_ack(self, seq):
+        han = time.monotonic() + self.timeout
+        while True:
+            con_lai = han - time.monotonic()
+            if con_lai &lt;= 0:
+                raise TimeoutError("quá hạn chờ ACK")
+            self.sock.settimeout(con_lai)
+            du_lieu = self.sock.recv(1024)
+            if not du_lieu:
+                raise ConnectionError("robot đóng kết nối")
+            for dong in self.bd.nap(du_lieu):
+                if dong == f"ACK,{seq:04d}":
+                    return
+                # ACK của tin cũ hoặc tin lạ: bỏ qua, tiếp tục chờ
+
+    def gui(self, seq, ok, x, y, goc):
+        tin = tao_tin(seq, ok, x, y, goc)
+        for lan in range(1, self.so_lan_thu + 1):
+            try:
+                if self.sock is None:
+                    self._ket_noi()
+                self.sock.sendall(tin)
+                self._cho_ack(seq)
+                return True
+            except OSError as e:                # TimeoutError, ConnectionError... đều là OSError
+                print(f"  #{seq} lần {lan}: {type(e).__name__} ({e}) → đóng socket, thử lại")
+                self._dong()
+                time.sleep(0.1)
+        return False
+
+    def dong(self):
+        self._dong()
+
+
+robot = RobotGia(port=6020)
+vision = GuiRobot("127.0.0.1", 6020, timeout=1.0)
+cac_vat = [(True, 120.5, 60.25, 15.0), (False, 0, 0, 0), (True, 98.123, 70.0, -30.5),
+           (True, 101.0, 65.5, 0.0), (True, 130.75, 58.1, 45.0)]
+for seq, (ok, x, y, goc) in enumerate(cac_vat, start=1):
+    thanh_cong = vision.gui(seq, ok, x, y, goc)
+    print(f"#{seq}: {'đã ACK' if thanh_cong else 'THẤT BẠI → báo lỗi cho PLC'}")
+vision.dong()
+time.sleep(0.3)                                  # cho robot ghi nốt nhật ký
+robot.tat()
+print("\n".join(robot.nhat_ky))</code></pre>
+<pre><code class="language-text">#1: đã ACK
+#2: đã ACK
+  #3 lần 1: ConnectionError (robot đóng kết nối) → đóng socket, thử lại
+#3: đã ACK
+#4: đã ACK
+  #5 lần 1: TimeoutError (timed out) → đóng socket, thử lại
+#5: đã ACK
+robot: có client kết nối
+robot: #1 gắp tại (120.5, 60.25, 15.0°)
+robot: #2 bỏ qua (NG)
+robot: nhận #3 rồi rớt kết nối (chưa thực hiện)
+robot: có client kết nối
+robot: #3 gắp tại (98.12, 70.0, -30.5°)
+robot: #4 gắp tại (101.0, 65.5, 0.0°)
+robot: #5 gắp tại (130.75, 58.1, 45.0°)
+robot: có client kết nối
+robot: #5 bị gửi lại, KHÔNG gắp lần hai, chỉ ACK lại</code></pre>
+<p>Đọc kết quả: tin #3 bị rớt trước khi robot thực hiện, vision kết nối lại và gửi lại, robot gắp đúng một lần. Tin #5 thì ngược lại: robot đã gắp nhưng ACK trễ, vision hết giờ, kết nối lại và gửi lại; nhờ số thứ tự, robot nhận ra tin trùng và <strong>không gắp lần hai</strong>. Khi thử hết <code>so_lan_thu</code> mà vẫn thất bại, hàm trả về <code>False</code>: lúc đó vision phải báo lỗi cho PLC (ERROR) để dừng hoặc giữ sản phẩm, không được im lặng bỏ qua.</p>
+<div class="warn"><strong>Sau timeout, đừng đọc tiếp trên socket cũ</strong>ACK trễ của tin cũ có thể đến ngay sau khi bạn gửi tin mới, và bị hiểu là ACK của tin mới. Có hai cách an toàn: so khớp seq trong ACK (code trên bỏ qua ACK không đúng seq), và đóng socket sau timeout để bắt đầu lại với bộ đệm sạch. Code trên làm cả hai.</div>
+
+<h2 id="8-loi-thuong-gap">8. Lỗi thường gặp</h2>
+<table>
+  <tr><th>Hiện tượng</th><th>Nguyên nhân</th><th>Cách xử lý</th></tr>
+  <tr><td>Thỉnh thoảng robot báo "định dạng sai" hoặc gắp lệch</td><td>Coi mỗi <code>recv</code> là một tin</td><td>Bộ đệm + ký tự kết thúc</td></tr>
+  <tr><td>Chương trình treo, không báo lỗi</td><td><code>recv</code> không có timeout</td><td><code>settimeout</code> mọi socket, kể cả <code>accept</code></td></tr>
+  <tr><td>CPU 100%, log đầy dòng trống</td><td>Không xử lý <code>recv</code> trả về <code>b""</code>, vòng lặp chạy liên tục</td><td><code>b""</code> = đầu kia đã đóng: thoát vòng, kết nối lại</td></tr>
+  <tr><td>Chỉ gửi được một phần tin</td><td>Dùng <code>send</code> thay vì <code>sendall</code></td><td>Luôn <code>sendall</code></td></tr>
+  <tr><td>Tọa độ sai sau khi đổi máy tính</td><td>Định dạng số theo vùng (dấu phẩy thập phân)</td><td>Định dạng cố định, dấu chấm, bên nhận kiểm tra số trường</td></tr>
+  <tr><td>Robot gắp hai lần một vật</td><td>Gửi lại sau timeout mà không có số thứ tự</td><td>seq + robot bỏ qua tin trùng</td></tr>
+  <tr><td><code>OSError: Address already in use</code> khi chạy lại server</td><td>Cổng cũ còn trong trạng thái chờ đóng</td><td><code>socket.create_server</code> đã bật <code>SO_REUSEADDR</code> trên Linux; đóng server đúng cách khi thoát</td></tr>
+</table>
+
+<h2 id="9-bai-tap">9. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Bộ điều khiển robot chỉ đọc được chuỗi tối đa 32 ký tự mỗi tin (kể cả ký tự kết thúc). Biết x, y nằm trong khoảng −9999,99…9999,99 mm và góc trong −180…180 độ, định dạng ở mục 4 có vừa không? Nếu không, bạn sửa thế nào?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">tin_dai_nhat = tao_tin(9999, True, -9999.99, -9999.99, -180)
+print(tin_dai_nhat, len(tin_dai_nhat), "byte")</code></pre>
+<pre><code class="language-text">b'9999,OK,-9999.99,-9999.99,-180.00\r\n' 35 byte</code></pre>
+<p>35 byte, không vừa. Các cách sửa: thu hẹp khoảng giá trị theo vùng làm việc thật của robot (ví dụ x, y trong −999,99…999,99 thì tiết kiệm 2 byte), bỏ số 0 đệm của seq, rút gọn OK/NG thành 1/0 (tiết kiệm 1 byte), hoặc gửi đơn vị 0,1 mm với 1 chữ số thập phân. Dù chọn gì, ghi rõ trong tài liệu giao thức và để <code>tao_tin</code> báo lỗi khi vượt độ dài thay vì cắt bớt âm thầm.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Đổi vai: robot là client, gửi <code>TRIG,&lt;seq&gt;\r\n</code>; vision là server, mỗi lần nhận trigger thì trả về một tin kết quả theo định dạng mục 4. Viết cả hai phía, chạy trên 127.0.0.1.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import socket
+import threading
+
+
+def ket_qua_gia(seq):
+    return (seq % 3 != 0), 100 + seq * 1.5, 50 - seq * 0.25, 10.0 * seq    # vật thứ 3, 6… là NG
+
+
+def vision_server(srv, so_lan):
+    """Vision là SERVER: chờ robot kết nối, mỗi 'TRIG,&lt;seq&gt;' trả về một tin kết quả."""
+    conn, _ = srv.accept()
+    with conn:
+        conn.settimeout(2.0)
+        bd = BoDemDong()
+        da_tra = 0
+        while da_tra &lt; so_lan:
+            du_lieu = conn.recv(1024)
+            if not du_lieu:
+                break
+            for dong in bd.nap(du_lieu):
+                lenh, seq = dong.split(",")
+                if lenh == "TRIG":
+                    conn.sendall(tao_tin(int(seq), *ket_qua_gia(int(seq))))
+                    da_tra += 1
+
+
+srv = socket.create_server(("127.0.0.1", 6021))
+srv.settimeout(3.0)
+t = threading.Thread(target=vision_server, args=(srv, 3), daemon=True)
+t.start()
+
+# Robot là CLIENT
+with socket.create_connection(("127.0.0.1", 6021), timeout=2.0) as robot:
+    bd = BoDemDong()
+    for seq in (1, 2, 3):
+        robot.sendall(f"TRIG,{seq:04d}\r\n".encode("ascii"))
+        tin = []
+        while not tin:
+            du_lieu = robot.recv(1024)
+            if not du_lieu:
+                raise ConnectionError("vision đóng kết nối")
+            tin = bd.nap(du_lieu)
+        print("robot nhận:", doc_tin(tin[0]))
+t.join(timeout=3)
+srv.close()</code></pre>
+<pre><code class="language-text">robot nhận: {'seq': 1, 'ok': True, 'x': 101.5, 'y': 49.75, 'goc': 10.0}
+robot nhận: {'seq': 2, 'ok': True, 'x': 103.0, 'y': 49.5, 'goc': 20.0}
+robot nhận: {'seq': 3, 'ok': False, 'x': 104.5, 'y': 49.25, 'goc': 30.0}</code></pre>
+<p>Server đặt timeout cho cả <code>accept</code> và <code>recv</code> để không treo mãi; phía robot cũng dùng <code>BoDemDong</code> vì tin kết quả có thể đến thành nhiều mảnh. Trong trạm thật, vòng <code>accept</code> phải nằm trong vòng lặp ngoài để chấp nhận kết nối mới mỗi khi robot khởi động lại.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Một trạm chạy tốt nhiều tuần, rồi một hôm ai đó rút nhầm dây mạng của robot 10 giây rồi cắm lại. Từ đó vision báo "đã gửi" nhưng robot không nhận gì, đến khi khởi động lại phần mềm vision. Giải thích và đề xuất sửa.</p>
+<details><summary>Xem đáp án</summary>
+<p>Khi rút dây, không bên nào nhận được gói đóng kết nối. Robot thường phát hiện socket hỏng (hoặc chương trình robot bị reset) và mở lại cổng chờ kết nối mới, trong khi vision vẫn giữ socket cũ "nửa mở": <code>sendall</code> vẫn thành công vì dữ liệu chỉ được chép vào bộ đệm gửi của hệ điều hành. Nếu vision không chờ ACK, nó không bao giờ biết. Sửa: (1) luôn chờ ACK có timeout, timeout → đóng socket và kết nối lại như demo; (2) gửi heartbeat định kỳ khi không có sản phẩm, để phát hiện sự cố trước khi có vật cần gắp; (3) ghi log mọi lần kết nối lại để bảo trì biết chuyện gì đã xảy ra.</p>
+</details>
+</div>
+
+<h2 id="tom-tat">Tóm tắt</h2>
+<ul>
+  <li>TCP là dòng byte: tin có thể dính hoặc vỡ. Không bao giờ coi một lần <code>recv</code> là một tin.</li>
+  <li>Đóng khung bằng ký tự kết thúc (<code>\r\n</code>, hợp với robot/PLC) hoặc tiền tố độ dài (hợp PC ↔ PC, dữ liệu lớn); dùng bộ đệm hoặc <code>nhan_du</code>.</li>
+  <li>Tin cho robot: số thứ tự, OK/NG, tọa độ thập phân cố định, dấu chấm, ASCII; robot trả ACK kèm seq; bên nhận kiểm tra định dạng.</li>
+  <li>Client chịu trách nhiệm kết nối lại; server luôn sẵn sàng nhận kết nối mới.</li>
+  <li>Luôn đặt timeout; <code>b""</code> nghĩa là đầu kia đã đóng; sau timeout thì đóng socket, kết nối lại, gửi lại; seq giúp robot không thực hiện hai lần.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Vision dẫn hướng robot gắp vật</strong>, nơi tọa độ ảnh được đổi sang tọa độ robot trước khi gửi qua kênh socket bạn vừa xây.</p>
+
+      </div>
+      <div class="lesson-done" data-course="vision-engineer"><button type="button" class="lesson-done-btn" data-lesson-done="tich-hop-5-tcp-socket-gui-toa-do-robot" aria-pressed="false"><span class="box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></span><span class="off">Đánh dấu đã học xong</span><span class="on">Đã học xong bài này</span></button><a class="btn lg" href="../hoc/vision-dan-huong-robot-gap-vat.html">Bài tiếp theo<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a></div>
+      <footer class="article-foot">
+        <div class="tags"><a class="tag" href="../search.html?q=Robot">#Robot</a><a class="tag" href="../search.html?q=Python">#Python</a><a class="tag" href="../search.html?q=Industrial Vision">#Industrial Vision</a></div>
+        <div class="share">
+      <span>Chia sẻ:</span>
+      <a class="share-btn fb" href="https://www.facebook.com/sharer/sharer.php?u=https://hocfree.vn/hoc/tich-hop-5-tcp-socket-gui-toa-do-robot.html" target="_blank" rel="noopener" aria-label="Chia sẻ Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8z"/></svg></a>
+      <a class="share-btn x" href="https://twitter.com/intent/tweet?url=https://hocfree.vn/hoc/tich-hop-5-tcp-socket-gui-toa-do-robot.html" target="_blank" rel="noopener" aria-label="Chia sẻ X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+      <button class="share-btn copy-link" data-url="https://hocfree.vn/hoc/tich-hop-5-tcp-socket-gui-toa-do-robot.html" aria-label="Sao chép liên kết"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+    </div>
+      </footer>
+      <div class="author-box">
+        <span class="avatar lg" aria-hidden="true">HF</span>
+        <div>
+          <strong>Ban biên tập HọcFree</strong>
+          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và ngoại ngữ, hoàn toàn miễn phí.</p>
+        </div>
+      </div>
+      <nav class="pager lesson-pager" aria-label="Bài học trước/sau"><a class="prev" href="../kien-thuc/opc-ua-cho-ky-su-vision.html"><span>← Bài trước · Bài 4</span>OPC UA cho kỹ sư Vision</a><a class="next" href="../hoc/vision-dan-huong-robot-gap-vat.html"><span>Bài tiếp → · Bài 6</span>Vision dẫn hướng robot gắp vật</a></nav>
+    </article>
+    <aside class="sidebar course-side" data-course="vision-engineer">
+      <section class="widget course-toc">
+        <p class="widget-title">Chặng 9/14 · Vision Engineer</p>
+        <a class="course-toc-title" href="../lo-trinh/vision-engineer/plc-robot-mes.html">PLC / Robot / MES</a>
+        <div class="lc" data-lesson-count="tich-hop-1-io-so-va-handshake-plc giao-tiep-camera-vision-voi-plc tich-hop-3-modbus-tcp-python opc-ua-cho-ky-su-vision tich-hop-5-tcp-socket-gui-toa-do-robot vision-dan-huong-robot-gap-vat mes-truy-xuat-nguon-goc-vision tich-hop-8-luu-ket-qua-sqlite-anh-ng tich-hop-9-du-an-tram-vision-mo-phong"><div class="lc-bar"><span data-lc-bar></span></div><span data-lc-text>0/9 bài</span></div>
+        <ol class="toc-lessons"><li data-lesson="tich-hop-1-io-so-va-handshake-plc"><a href="../hoc/tich-hop-1-io-so-va-handshake-plc.html"><span class="tn">1</span><span class="tt">I/O số và handshake với PLC</span></a></li><li data-lesson="giao-tiep-camera-vision-voi-plc"><a href="../kien-thuc/giao-tiep-camera-vision-voi-plc.html"><span class="tn">2</span><span class="tt">Các chuẩn giao tiếp: Modbus TCP, EtherNet/IP, PROFINET</span></a></li><li data-lesson="tich-hop-3-modbus-tcp-python"><a href="../hoc/tich-hop-3-modbus-tcp-python.html"><span class="tn">3</span><span class="tt">Modbus TCP bằng Python với pymodbus</span></a></li><li data-lesson="opc-ua-cho-ky-su-vision"><a href="../kien-thuc/opc-ua-cho-ky-su-vision.html"><span class="tn">4</span><span class="tt">OPC UA cho kỹ sư Vision</span></a></li><li data-lesson="tich-hop-5-tcp-socket-gui-toa-do-robot" class="is-current"><a href="../hoc/tich-hop-5-tcp-socket-gui-toa-do-robot.html" aria-current="page"><span class="tn">5</span><span class="tt">TCP socket: gửi kết quả và tọa độ cho robot</span></a></li><li data-lesson="vision-dan-huong-robot-gap-vat"><a href="../hoc/vision-dan-huong-robot-gap-vat.html"><span class="tn">6</span><span class="tt">Vision dẫn hướng robot gắp vật</span></a></li><li data-lesson="mes-truy-xuat-nguon-goc-vision"><a href="../kien-thuc/mes-truy-xuat-nguon-goc-vision.html"><span class="tn">7</span><span class="tt">MES và truy xuất nguồn gốc</span></a></li><li data-lesson="tich-hop-8-luu-ket-qua-sqlite-anh-ng"><a href="../hoc/tich-hop-8-luu-ket-qua-sqlite-anh-ng.html"><span class="tn">8</span><span class="tt">Lưu kết quả và ảnh NG: SQLite, thư mục, dọn ổ đĩa</span></a></li><li data-lesson="tich-hop-9-du-an-tram-vision-mo-phong"><a href="../hoc/tich-hop-9-du-an-tram-vision-mo-phong.html"><span class="tn">9</span><span class="tt">Dự án chặng 9: trạm vision hoàn chỉnh với PLC mô phỏng</span></a></li></ol>
+        <a class="more" href="../lo-trinh/vision-engineer.html">Xem toàn bộ lộ trình<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a>
+      </section>
+    </aside>
+  </div>
+  <section class="band">
+    <div class="container">
+      <div class="section-title"><h2>Có thể bạn quan tâm</h2></div>
+      <div class="card-grid"><article class="card">
+  <a class="thumb" href="../hoc/python-1-cai-dat-python-va-vs-code.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-1-cai-dat-python-va-vs-code.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-1-cai-dat-python-va-vs-code.html">Python cơ bản: cài Python, VS Code và chạy chương trình đầu tiên</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>7 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/python-2-bien-kieu-du-lieu-toan-tu.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-2-bien-kieu-du-lieu-toan-tu.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-2-bien-kieu-du-lieu-toan-tu.html">Python cơ bản: biến, kiểu dữ liệu và toán tử</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/python-3-re-nhanh-va-vong-lap.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-3-re-nhanh-va-vong-lap.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-3-re-nhanh-va-vong-lap.html">Python cơ bản: rẽ nhánh và vòng lặp</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article></div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <a class="logo" href="../"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+      <p>HọcFree.vn – nền tảng học miễn phí về AI, lập trình, Computer Vision, Machine Vision, tin tức AI và ngoại ngữ dành cho người Việt.</p>
+    </div>
+    <div><h3>Học &amp; thực hành</h3><ul><li><a href="../hoc/">Học AI &amp; Lập trình</a></li><li><a href="../projects/">Projects</a></li><li><a href="../lo-trinh/">Learning Paths</a></li></ul></div>
+    <div><h3>Khám phá</h3><ul><li><a href="../kien-thuc/">Kiến thức</a></li><li><a href="../tin-tuc-ai/">Tin tức AI</a></li><li><a href="../ngoai-ngu/">Ngoại ngữ</a></li><li><a href="../tai-nguyen/">Tài nguyên</a></li></ul></div>
+    <div><h3>Bài mới</h3><ul><li><a href="../hoc/python-1-cai-dat-python-va-vs-code.html">Python cơ bản: cài Python, VS Code và chạy chương trình đầu tiên</a></li><li><a href="../hoc/python-2-bien-kieu-du-lieu-toan-tu.html">Python cơ bản: biến, kiểu dữ liệu và toán tử</a></li><li><a href="../hoc/python-3-re-nhanh-va-vong-lap.html">Python cơ bản: rẽ nhánh và vòng lặp</a></li><li><a href="../hoc/python-4-list-tuple-dict-set.html">Python cơ bản: list, tuple, dict và set</a></li></ul></div>
+    <div>
+      <h3>HọcFree</h3>
+      <ul>
+        <li><a href="../gioi-thieu.html">Giới thiệu</a></li>
+        <li><a href="../search.html">Tìm kiếm</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">© 2026 HọcFree.vn · Kiến thức là để chia sẻ.</div>
+  </div>
+</footer>
+<button class="to-top" aria-label="Lên đầu trang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<script src="../assets/js/search-data.js?v=20261009" defer></script>
+<script src="../assets/js/main.js?v=20261009" defer></script>
+</body>
+</html>

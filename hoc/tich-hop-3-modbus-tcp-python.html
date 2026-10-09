@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="vi" data-root="../">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modbus TCP bằng Python với pymodbus cho trạm vision | HọcFree</title>
+<meta name="description" content="Đọc ghi coil, holding register, gửi số thực 32 bit đúng thứ tự byte và viết vòng lặp chờ trigger từ PLC có tự kết nối lại.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://hocfree.vn/hoc/tich-hop-3-modbus-tcp-python.html">
+<meta property="og:site_name" content="HọcFree">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Modbus TCP bằng Python với pymodbus cho trạm vision">
+<meta property="og:description" content="Đọc ghi coil, holding register, gửi số thực 32 bit đúng thứ tự byte và viết vòng lặp chờ trigger từ PLC có tự kết nối lại.">
+<meta property="og:url" content="https://hocfree.vn/hoc/tich-hop-3-modbus-tcp-python.html">
+<meta property="og:image" content="https://hocfree.vn/assets/images/posts/tich-hop-3-modbus-tcp-python.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="Modbus TCP bằng Python với pymodbus cho trạm vision">
+<meta property="og:locale" content="vi_VN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Modbus TCP bằng Python với pymodbus cho trạm vision">
+<meta name="twitter:description" content="Đọc ghi coil, holding register, gửi số thực 32 bit đúng thứ tự byte và viết vòng lặp chờ trigger từ PLC có tự kết nối lại.">
+<meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/tich-hop-3-modbus-tcp-python.jpg">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/fonts.css?v=20261009">
+<link rel="stylesheet" href="../assets/css/style.css?v=20261009">
+<script>try{var t=localStorage.getItem('hf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
+<meta property="article:published_time" content="2026-10-09">
+<meta property="article:section" content="Học AI &amp; Lập trình">
+<meta property="article:tag" content="PLC">
+<meta property="article:tag" content="Python">
+<meta property="article:tag" content="Industrial Vision">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "Modbus TCP bằng Python với pymodbus cho trạm vision", "description": "Đọc ghi coil, holding register, gửi số thực 32 bit đúng thứ tự byte và viết vòng lặp chờ trigger từ PLC có tự kết nối lại.", "image": ["https://hocfree.vn/assets/images/posts/tich-hop-3-modbus-tcp-python.jpg"], "datePublished": "2026-10-09", "dateModified": "2026-10-09", "inLanguage": "vi", "articleSection": "Học AI & Lập trình", "keywords": "PLC, Python, Industrial Vision", "wordCount": 4173, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/hoc/tich-hop-3-modbus-tcp-python.html"}, "isPartOf": {"@type": "Course", "name": "Trở thành Vision Engineer", "url": "https://hocfree.vn/lo-trinh/vision-engineer.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Learning Paths", "item": "https://hocfree.vn/lo-trinh/"}, {"@type": "ListItem", "position": 3, "name": "Trở thành Vision Engineer", "item": "https://hocfree.vn/lo-trinh/vision-engineer.html"}, {"@type": "ListItem", "position": 4, "name": "Chặng 9: PLC / Robot / MES", "item": "https://hocfree.vn/lo-trinh/vision-engineer/plc-robot-mes.html"}, {"@type": "ListItem", "position": 5, "name": "Modbus TCP bằng Python với pymodbus cho trạm vision"}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div class="progress" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="container wide header-top">
+    <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="nav-scrim" hidden></div>
+    <a class="logo" href="../" aria-label="HọcFree – Trang chủ"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+    <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
+    <div class="header-actions">
+      <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="login-link" href="../dang-nhap.html">Đăng nhập</a>
+      <a class="btn start-btn" href="../lo-trinh/">Bắt đầu học</a>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="container wide">
+      <nav class="site-nav" id="site-nav" aria-label="Menu chính">
+        <div class="drawer-head">
+          <a class="logo" href="../" tabindex="-1"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+          <button class="icon-btn nav-close" aria-label="Đóng menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <button type="button" class="drawer-search search-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Tìm bài học, chủ đề…</span></button>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="../">Trang chủ</a></li><li class="nav-item has-panel is-mega"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-hoc">Học AI &amp; Lập trình<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel mega" id="nav-panel-hoc">
+  <div class="container wide mega-inner">
+    <div class="mega-groups"><div class="mega-group"><a class="mega-group-title" href="../hoc/#programming">Programming</a><ul><li><a href="../hoc/python.html">Python</a></li><li><a href="../hoc/csharp.html">C#</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#ai-machine-learning">AI &amp; Machine Learning</a><ul><li><a href="../hoc/machine-learning.html">Machine Learning</a></li><li><a href="../hoc/deep-learning.html">Deep Learning</a></li><li><a href="../hoc/pytorch.html">PyTorch</a></li><li><a href="../hoc/generative-ai.html">Generative AI</a></li><li><a href="../hoc/llm-ai-agents.html">LLM / AI Agents</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#computer-vision">Computer Vision</a><ul><li><a href="../hoc/opencv.html">OpenCV</a></li><li><a href="../hoc/image-processing.html">Image Processing</a></li><li><a href="../hoc/computer-vision.html">Computer Vision</a></li><li><a href="../hoc/ocr.html">OCR</a></li><li><a href="../hoc/object-detection.html">Object Detection</a></li><li><a href="../hoc/segmentation.html">Segmentation</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#vision-engineering">Vision Engineering</a><ul><li><a href="../hoc/machine-vision.html">Machine Vision</a></li><li><a href="../hoc/ai-vision.html">AI Vision</a></li><li><a href="../hoc/industrial-vision.html">Industrial Vision</a></li><li><a href="../hoc/camera-lens.html">Camera &amp; Lens</a></li><li><a href="../hoc/lighting.html">Lighting</a></li><li><a href="../hoc/calibration.html">Calibration</a></li><li><a href="../hoc/plc-robot-mes.html">PLC / Robot / MES</a></li><li><a href="../hoc/vision-deployment.html">Vision Deployment</a></li></ul></div></div>
+    <a class="feature-card" href="../lo-trinh/vision-engineer.html">
+  <span class="feature-eyebrow">⭐ Learning Path nổi bật</span>
+  <span class="feature-title">Trở thành Vision Engineer</span>
+  <span class="feature-sub">Machine Vision + AI Vision + Industrial Automation</span>
+  <span class="feature-desc">Lộ trình thực chiến từ Python, OpenCV và Machine Vision đến Deep Learning, AI Vision, Camera, PLC, Robot và triển khai hệ thống Vision trong nhà máy.</span>
+  <span class="feature-chain" aria-label="Các chặng chính"><span>Python</span><i aria-hidden="true">→</i><span>OpenCV</span><i aria-hidden="true">→</i><span>Machine Vision</span><i aria-hidden="true">→</i><span>AI Vision</span><i aria-hidden="true">→</i><span class="chain-goal">🎯 Vision Engineer</span></span>
+  <span class="feature-meta">14 chặng · 5 giai đoạn · ~12 tháng</span>
+  <span class="feature-cta">Xem lộ trình →</span>
+</a>
+  </div>
+  <div class="mega-foot"><div class="container wide mega-foot-inner"><ol class="journey compact" aria-label="Học, thực hành, trở thành kỹ sư"><li><a href="../hoc/" aria-current="step"><span class="journey-n">1</span><span class="journey-t"><b>Học</b><small>Học AI &amp; Lập trình</small></span></a></li><li><a href="../projects/"><span class="journey-n">2</span><span class="journey-t"><b>Thực hành</b><small>Projects</small></span></a></li><li><a href="../lo-trinh/"><span class="journey-n">3</span><span class="journey-t"><b>Trở thành kỹ sư</b><small>Learning Paths</small></span></a></li></ol><a class="panel-all" href="../hoc/">Xem tất cả Học AI &amp; Lập trình →</a></div></div>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-projects">Projects<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-projects">
+  <p class="panel-kicker"><span>Bước 2 · Thực hành</span>Áp dụng vào dự án thật</p>
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../projects/ai-projects.html"><span class="drop-label">AI Projects</span><span class="drop-desc">Ứng dụng ML và LLM, từ ý tưởng đến bản demo</span></a></li><li><a class="drop-link" href="../projects/computer-vision-projects.html"><span class="drop-label">Computer Vision Projects</span><span class="drop-desc">Phát hiện, nhận dạng và theo dõi đối tượng</span></a></li><li><a class="drop-link" href="../projects/industrial-vision-projects.html"><span class="drop-label">Industrial Vision Projects</span><span class="drop-desc">Đo kích thước, kiểm tra lỗi, đọc mã trên dây chuyền</span></a></li></ul></div></div>
+  <a class="panel-all" href="../projects/">Xem tất cả Projects →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger is-active" aria-expanded="false" aria-controls="nav-panel-lo-trinh" aria-current="true">Learning Paths<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-lo-trinh">
+  <p class="panel-kicker"><span>Bước 3 · Trở thành kỹ sư</span>Định hướng nghề nghiệp</p>
+  <ul class="drop-list"><li><a class="drop-link is-flagship" href="../lo-trinh/vision-engineer.html"><span class="drop-label">⭐ Trở thành Vision Engineer</span><span class="drop-desc">Machine Vision + AI Vision + Industrial Automation · 14 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/#python-developer"><span class="drop-label">Python Developer<span class="badge-soon">Sắp ra mắt</span></span><span class="drop-desc">Python, công cụ, tự động hóa</span></a></li></ul>
+  <a class="panel-all" href="../lo-trinh/">Xem tất cả lộ trình →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-kien-thuc">Kiến thức<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-kien-thuc">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Lĩnh vực</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/programming.html"><span class="drop-label">Programming</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-machine-learning.html"><span class="drop-label">AI / Machine Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/deep-learning.html"><span class="drop-label">Deep Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/machine-vision.html"><span class="drop-label">Machine Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-vision.html"><span class="drop-label">AI Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/industrial-automation.html"><span class="drop-label">Industrial Automation</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Công cụ &amp; mẹo</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/tools-frameworks.html"><span class="drop-label">Tools &amp; Frameworks</span></a></li><li><a class="drop-link" href="../kien-thuc/tips-tricks.html"><span class="drop-label">Tips &amp; Tricks</span></a></li></ul></div></div>
+  <a class="panel-all" href="../kien-thuc/">Xem tất cả Kiến thức →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tin-tuc-ai">Tin tức AI<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tin-tuc-ai">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tin-tuc-ai/ai-news.html"><span class="drop-label">AI News</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-models.html"><span class="drop-label">AI Models</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/technology.html"><span class="drop-label">Technology</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/robotics.html"><span class="drop-label">Robotics</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-industry.html"><span class="drop-label">AI Industry</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tin-tuc-ai/">Xem tất cả Tin tức AI →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-ngoai-ngu">Ngoại ngữ<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-ngoai-ngu">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/english.html"><span class="drop-label">English</span><span class="drop-desc">Lộ trình 700 TOEIC, phương pháp học, giáo trình HF-700TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chinese.html"><span class="drop-label">Chinese</span><span class="drop-desc">Lộ trình HSK3, phương pháp học, giáo trình HF-HSK3</span></a></li></ul></div></div>
+  <a class="panel-all" href="../ngoai-ngu/">Xem tất cả Ngoại ngữ →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tai-nguyen">Tài nguyên<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tai-nguyen">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tai-nguyen/source-code.html"><span class="drop-label">Source Code</span><span class="drop-desc">Mã nguồn mẫu đi kèm bài học</span></a></li><li><a class="drop-link" href="../tai-nguyen/dataset.html"><span class="drop-label">Dataset</span><span class="drop-desc">Bộ dữ liệu ảnh để luyện tập</span></a></li><li><a class="drop-link" href="../tai-nguyen/cheat-sheets.html"><span class="drop-label">Cheat Sheets</span><span class="drop-desc">Tóm tắt nhanh trong một trang</span></a></li><li><a class="drop-link" href="../tai-nguyen/documentation.html"><span class="drop-label">Documentation</span><span class="drop-desc">Tài liệu tra cứu thư viện, API</span></a></li><li><a class="drop-link" href="../tai-nguyen/ebook.html"><span class="drop-label">Ebook / Tài liệu</span><span class="drop-desc">Sách và tài liệu tham khảo</span></a></li><li><a class="drop-link" href="../tai-nguyen/ai-tools.html"><span class="drop-label">AI Tools</span><span class="drop-desc">Công cụ AI hữu ích cho việc học</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tai-nguyen/">Xem tất cả Tài nguyên →</a>
+</div></li></ul>
+        <div class="drawer-foot">
+          <a class="btn ghost" href="../dang-nhap.html">Đăng nhập</a>
+          <a class="btn" href="../lo-trinh/">Bắt đầu học</a>
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+<div class="search-dialog" hidden>
+  <div class="search-scrim"></div>
+  <div class="search-box" role="dialog" aria-modal="true" aria-label="Tìm kiếm">
+    <form class="search-form" action="../search.html" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" placeholder="Tìm bài học, chủ đề, bài viết…" autocomplete="off" aria-label="Từ khóa tìm kiếm" aria-controls="search-suggest">
+      <button type="button" class="icon-btn search-close" aria-label="Đóng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </form>
+    <div class="search-suggest" id="search-suggest" aria-live="polite">
+      <div class="search-empty">
+        <p class="search-group-title">Chủ đề phổ biến</p>
+        <div class="chips"><a class="chip" href="../hoc/python.html">Python</a><a class="chip" href="../hoc/opencv.html">OpenCV</a><a class="chip" href="../hoc/machine-vision.html">Machine Vision</a><a class="chip" href="../hoc/deep-learning.html">Deep Learning</a><a class="chip" href="../hoc/ai-vision.html">AI Vision</a><a class="chip" href="../hoc/object-detection.html">Object Detection</a><a class="chip" href="../hoc/pytorch.html">PyTorch</a><a class="chip" href="../ngoai-ngu/english.html">English</a></div>
+        <p class="search-group-title">Lộ trình nổi bật</p>
+        <a class="search-item" href="../lo-trinh/vision-engineer.html"><span class="search-ico" aria-hidden="true">⭐</span><span>Trở thành Vision Engineer<small>Learning Path · Machine Vision + AI Vision + Industrial Automation</small></span></a>
+      </div>
+    </div>
+    <div class="search-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> chọn</span><span><kbd>Enter</kbd> mở</span><span><kbd>Esc</kbd> đóng</span></div>
+  </div>
+</div>
+<main id="main">
+  <div class="container layout article-layout">
+    <article class="article">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../lo-trinh/">Learning Paths</a><span>/</span><a href="../lo-trinh/vision-engineer.html">Vision Engineer</a><span>/</span><a href="../lo-trinh/vision-engineer/plc-robot-mes.html">Chặng 9: PLC / Robot / MES</a></nav>
+      <header class="article-head">
+        <div class="course-bar" data-course="vision-engineer"><a class="course-chip" href="../lo-trinh/vision-engineer/plc-robot-mes.html">⭐ Vision Engineer · Chặng 9</a><span class="lesson-no">Bài 3/9</span><span class="kind kind-lesson">Bài học</span><span class="lesson-min"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></svg>~75 phút</span></div>
+        <h1>Modbus TCP bằng Python với pymodbus cho trạm vision</h1>
+        <p class="lead">Đọc ghi coil, holding register, gửi số thực 32 bit đúng thứ tự byte và viết vòng lặp chờ trigger từ PLC có tự kết nối lại.</p>
+        <div class="article-meta">
+          <span class="avatar" aria-hidden="true">HF</span>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>24 phút đọc</span></div>
+        </div>
+      </header>
+      <figure class="article-cover">
+        <img src="../assets/images/posts/tich-hop-3-modbus-tcp-python.webp" alt="Modbus TCP bằng Python với pymodbus cho trạm vision" width="1200" height="675" fetchpriority="high" decoding="async">
+      </figure>
+      <section class="lesson-goals" aria-label="Mục tiêu bài học"><h2>Học xong bài này, bạn sẽ</h2><ul><li>Đọc ghi coil, holding register</li><li>Gửi số thực 32 bit đúng thứ tự byte</li><li>Viết vòng lặp chờ trigger từ PLC</li></ul><p class="goals-before">Nên học trước: <a href="../kien-thuc/giao-tiep-camera-vision-voi-plc.html">Các chuẩn giao tiếp: Modbus TCP, EtherNet/IP, PROFINET</a></p></section>
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol class="toc-plain"><li><a href="#1-modbus-tcp-trong-nam-phut">1. Modbus TCP trong năm phút</a></li><li><a href="#2-mo-hinh-du-lieu-va-cach-danh-dia-chi">2. Mô hình dữ liệu và cách đánh địa chỉ</a></li><li><a href="#3-cai-dat-va-luu-y-phien-ban">3. Cài đặt và lưu ý phiên bản</a></li><li><a href="#4-plc-gia-va-cac-lenh-doc-ghi-co-ban">4. PLC giả và các lệnh đọc/ghi cơ bản</a></li><li><a href="#5-so-thuc-32-bit-qua-hai-thanh-ghi">5. Số thực 32 bit qua hai thanh ghi</a></li><li><a href="#6-bang-dia-chi-cho-tram-vision">6. Bảng địa chỉ cho trạm vision</a></li><li><a href="#7-vong-lap-cho-trigger">7. Vòng lặp chờ trigger</a></li><li><a href="#8-chay-voi-plc-that">8. Chạy với PLC thật</a></li><li><a href="#9-loi-thuong-gap">9. Lỗi thường gặp</a></li><li><a href="#10-bai-tap">10. Bài tập</a></li><li><a href="#tom-tat">Tóm tắt</a></li></ol></details>
+      <div class="prose">
+<p>I/O số chỉ gửi được vài bit. Khi PLC cần biết <em>đường kính đo được là bao nhiêu</em>, mã lỗi nào, hay trạm đang chạy công thức (recipe) nào, bạn cần một giao thức mạng. <strong>Modbus TCP</strong> là lựa chọn đơn giản và phổ biến nhất: gần như PLC nào cũng hỗ trợ, đặc tả mở, và Python có thư viện <code>pymodbus</code> rất đầy đủ. Bài này dùng lại đúng trình tự bắt tay ở bài "I/O số và handshake với PLC", nhưng thay dây điện bằng các ô nhớ Modbus; bài "Các chuẩn giao tiếp: Modbus TCP, EtherNet/IP, PROFINET" đã cho bạn bức tranh tổng quát, ở đây là code chạy được. Mọi ví dụ đều chạy trên máy bạn với một <strong>PLC giả</strong> khởi động ngay trong script.</p>
+
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Đọc/ghi coil và holding register bằng pymodbus; gửi một số thực 32 bit qua hai thanh ghi đúng thứ tự byte và tự kiểm tra bằng <code>struct</code>; viết vòng lặp chờ trigger từ PLC có bắt sườn, timeout và tự kết nối lại.</div>
+
+<h2 id="1-modbus-tcp-trong-nam-phut">1. Modbus TCP trong năm phút</h2>
+<ul>
+  <li><strong>Client / server</strong> (tài liệu cũ gọi là master / slave). Client gửi yêu cầu, server trả lời. Server không bao giờ tự gửi gì. Trong trạm vision, PLC thường là <strong>server</strong>, PC vision là <strong>client</strong> và phải <strong>hỏi vòng (polling)</strong> liên tục: "có trigger chưa?".</li>
+  <li>Chạy trên TCP, cổng mặc định <strong>502</strong>. Trên Linux, mở cổng dưới 1024 cần quyền root, nên các ví dụ dùng cổng 5020.</li>
+  <li>Mỗi yêu cầu mang một <strong>Unit ID</strong> (pymodbus gọi là <code>device_id</code>). Với PLC nối thẳng Ethernet, giá trị này thường bị bỏ qua hoặc phải là 1 hay 255 tùy hãng; nó chỉ thực sự quan trọng khi đi qua gateway Modbus TCP → RTU.</li>
+  <li>Không có kiểu dữ liệu: mọi thứ là <strong>bit</strong> hoặc <strong>thanh ghi 16 bit</strong>. Số thực, số 32 bit, chuỗi… là do hai bên tự thống nhất cách ghép.</li>
+</ul>
+
+<h2 id="2-mo-hinh-du-lieu-va-cach-danh-dia-chi">2. Mô hình dữ liệu và cách đánh địa chỉ</h2>
+<table>
+  <tr><th>Vùng</th><th>Kích thước</th><th>Client được</th><th>Mã hàm</th><th>Ký hiệu "5 chữ số"</th></tr>
+  <tr><td>Coil</td><td>1 bit</td><td>đọc, ghi</td><td>01 đọc; 05 ghi một; 15 ghi nhiều</td><td>00001–09999</td></tr>
+  <tr><td>Discrete input</td><td>1 bit</td><td>chỉ đọc</td><td>02</td><td>10001–19999</td></tr>
+  <tr><td>Input register</td><td>16 bit</td><td>chỉ đọc</td><td>04</td><td>30001–39999</td></tr>
+  <tr><td>Holding register</td><td>16 bit</td><td>đọc, ghi</td><td>03 đọc; 06 ghi một; 16 ghi nhiều</td><td>40001–49999</td></tr>
+</table>
+<p>Một lần đọc được tối đa 125 thanh ghi hoặc 2000 bit; một lần ghi nhiều tối đa 123 thanh ghi. Mỗi PLC ánh xạ các vùng này vào bộ nhớ riêng của nó (thanh ghi D, khối DB, vùng %MW…): hãy xin kỹ sư PLC bảng ánh xạ cụ thể.</p>
+<p><strong>Bẫy kinh điển: 0 hay 1?</strong> Trên dây, địa chỉ luôn bắt đầu từ 0. Ký hiệu "40001" là cách viết của tài liệu: chữ số đầu chỉ vùng, phần còn lại đếm từ 1. Vì vậy:</p>
+<table>
+  <tr><th>Tài liệu ghi</th><th>Vùng</th><th>Địa chỉ truyền cho pymodbus</th></tr>
+  <tr><td>40001</td><td>holding register</td><td><code>read_holding_registers(0, ...)</code></td></tr>
+  <tr><td>40101–40102</td><td>holding register</td><td><code>read_holding_registers(100, count=2, ...)</code></td></tr>
+  <tr><td>00005</td><td>coil</td><td><code>read_coils(4, ...)</code></td></tr>
+  <tr><td>"HR 100" hoặc "%MW100"</td><td>tùy hãng</td><td>Hỏi lại! Có tài liệu đã đếm từ 0, có tài liệu đếm từ 1</td></tr>
+</table>
+<p>Lệch một địa chỉ là lỗi rất khó thấy: bạn vẫn đọc/ghi thành công, chỉ là vào <em>ô bên cạnh</em>. Cách kiểm tra khi chạy thử: nhờ kỹ sư PLC ghi một giá trị "lạ" (ví dụ 1234) vào đúng ô, bạn đọc ra phải thấy 1234.</p>
+
+<h2 id="3-cai-dat-va-luu-y-phien-ban">3. Cài đặt và lưu ý phiên bản</h2>
+<pre><code class="language-bash">pip install pymodbus
+python -c "import pymodbus; print(pymodbus.__version__)"</code></pre>
+<p>Bài viết dùng <strong>pymodbus 3.15.0</strong>. Thư viện này đổi API khá thường xuyên, nên nếu bạn đọc code trên mạng hãy để ý:</p>
+<ul>
+  <li>Tham số chọn thiết bị hiện là <code>device_id=</code>. Các bản 3.x cũ dùng <code>slave=</code>, bản rất cũ dùng <code>unit=</code>. Gặp <code>TypeError: ... unexpected keyword argument 'slave'</code> là dấu hiệu code viết cho bản cũ.</li>
+  <li>Phía server, bản 3.15 dùng <code>SimData</code> / <code>SimDevice</code> để khai báo bộ nhớ. Các lớp cũ <code>ModbusSequentialDataBlock</code>, <code>ModbusDeviceContext</code> (trước nữa là <code>ModbusSlaveContext</code>) vẫn chạy nhưng in cảnh báo "deprecated" và sẽ bị bỏ ở bản 4.</li>
+  <li>Các tham số sau địa chỉ (<code>count</code>, <code>device_id</code>) phải truyền theo tên: <code>read_coils(0, count=4, device_id=1)</code>.</li>
+</ul>
+
+<h2 id="4-plc-gia-va-cac-lenh-doc-ghi-co-ban">4. PLC giả và các lệnh đọc/ghi cơ bản</h2>
+<p>Lớp <code>PlcGia</code> chạy một Modbus TCP server trong thread riêng (pymodbus server dùng <code>asyncio</code>), với bộ nhớ gồm 16 coil, 16 discrete input, 32 holding register, 16 input register, đều bắt đầu từ địa chỉ 0. Hàm <code>doc_coil</code>, <code>ghi_hr</code>… đóng vai "chương trình PLC" tự đọc/ghi bộ nhớ của nó; phía vision chỉ dùng <code>ModbusTcpClient</code> như với PLC thật.</p>
+<pre><code class="language-python">import asyncio
+import threading
+import time
+
+from pymodbus.client import ModbusTcpClient
+from pymodbus.server import ModbusTcpServer
+from pymodbus.simulator import DataType, SimData, SimDevice
+
+
+class PlcGia:
+    """PLC giả: một Modbus TCP server chạy trong thread riêng, có hàm đọc/ghi bộ nhớ của chính nó."""
+
+    def __init__(self, port=5020):
+        self.port = port
+
+    def bat(self):
+        self._da_nghe = threading.Event()
+        self._thread = threading.Thread(target=lambda: asyncio.run(self._main()), daemon=True)
+        self._thread.start()
+        if not self._da_nghe.wait(timeout=3):
+            raise RuntimeError("PLC giả không khởi động được")
+
+    async def _main(self):
+        self.loop = asyncio.get_running_loop()
+        bo_nho = SimDevice(id=1, simdata=(
+            [SimData(0, count=16, values=False, datatype=DataType.BITS)],   # coils 0..15
+            [SimData(0, count=16, values=False, datatype=DataType.BITS)],   # discrete inputs 0..15
+            [SimData(0, count=32, values=0, datatype=DataType.REGISTERS)],  # holding registers 0..31
+            [SimData(0, count=16, values=0, datatype=DataType.REGISTERS)],  # input registers 0..15
+        ))
+        self.server = ModbusTcpServer(bo_nho, address=("127.0.0.1", self.port))
+        await self.server.serve_forever(background=True)          # mở cổng rồi trả về ngay
+        self._da_nghe.set()
+        await self.server.serving                                 # chờ tới khi shutdown()
+
+    def tat(self):
+        asyncio.run_coroutine_threadsafe(self.server.shutdown(), self.loop).result(timeout=3)
+        self._thread.join(timeout=3)
+
+    # "Chương trình PLC" đọc/ghi bộ nhớ của chính nó (mã hàm 1 = coil, 3 = holding register)
+    def _goi(self, coro):
+        return asyncio.run_coroutine_threadsafe(coro, self.loop).result(timeout=2)
+
+    def doc_coil(self, dia_chi):
+        return self._goi(self.server.async_getValues(1, 1, dia_chi, 1))[0]
+
+    def ghi_coil(self, dia_chi, gia_tri):
+        self._goi(self.server.async_setValues(1, 5, dia_chi, [bool(gia_tri)]))
+
+    def doc_hr(self, dia_chi, so_luong=1):
+        return self._goi(self.server.async_getValues(1, 3, dia_chi, so_luong))
+
+    def ghi_hr(self, dia_chi, gia_tri):
+        self._goi(self.server.async_setValues(1, 16, dia_chi, list(gia_tri)))
+
+
+plc = PlcGia(port=5020)
+plc.bat()
+plc.ghi_hr(0, [7, 1])                 # "chương trình PLC": mã sản phẩm 7, chu kỳ số 1
+
+client = ModbusTcpClient("127.0.0.1", port=5020, timeout=1)
+print("Kết nối:", client.connect())
+
+# Đọc 2 holding register từ địa chỉ 0 (= 40001, 40002)
+rr = client.read_holding_registers(0, count=2, device_id=1)
+print("HR[0..1] =", rr.registers)
+
+# Ghi coil 1 (READY) và đọc lại 4 coil đầu
+client.write_coil(1, True, device_id=1)
+rr = client.read_coils(0, count=4, device_id=1)
+print("Coil[0..3] =", rr.bits[:4], "(nhận về", len(rr.bits), "bit)")
+
+# Ghi một và nhiều holding register (mã hàm 06 và 16)
+client.write_register(10, 1, device_id=1)
+client.write_registers(11, [42, 500], device_id=1)
+print("PLC thấy HR[10..12] =", plc.doc_hr(10, 3))
+
+# Đọc địa chỉ không tồn tại: KHÔNG có exception, mà là một phản hồi lỗi
+rr = client.read_holding_registers(100, count=1, device_id=1)
+print("Đọc HR 100:", rr.isError(), rr)</code></pre>
+<pre><code class="language-text">Kết nối: True
+HR[0..1] = [7, 1]
+Coil[0..3] = [False, True, False, False] (nhận về 8 bit)
+PLC thấy HR[10..12] = [1, 42, 500]
+Đọc HR 100: True ExceptionResponse(dev_id=1, function_code=131, exception_code=2)</code></pre>
+<p>Ba điều cần nhớ từ kết quả trên:</p>
+<ul>
+  <li><code>read_coils(0, count=4)</code> trả về <strong>8</strong> bit: các bit được đóng gói theo byte, phần dư là 0. Luôn cắt <code>bits[:count]</code>.</li>
+  <li>Đọc sai địa chỉ <strong>không</strong> ném exception: pymodbus trả về <code>ExceptionResponse</code>. Mã hàm 131 = 0x80 + 3 (lỗi của lệnh đọc holding register), <code>exception_code=2</code> là ILLEGAL DATA ADDRESS. Phải kiểm tra <code>rr.isError()</code> sau mỗi lệnh. Ngược lại, mất kết nối thì có exception (<code>ConnectionException</code>).</li>
+  <li>pymodbus tự ghi log lỗi kết nối ra stderr (ví dụ "Connection refused"). Đó là log của thư viện, không phải lỗi của code; trong dự án bạn sẽ chuyển chúng vào file log.</li>
+</ul>
+
+<h2 id="5-so-thuc-32-bit-qua-hai-thanh-ghi">5. Số thực 32 bit qua hai thanh ghi</h2>
+<p>Một số <code>float32</code> theo chuẩn IEEE 754 chiếm 4 byte, gọi là A B C D (A chứa bit dấu). Modbus chỉ quy định <em>trong một thanh ghi</em> byte cao đi trước; còn thanh ghi nào chứa nửa nào của số thực thì chuẩn không nói. Vì vậy ngoài thực tế có bốn kiểu:</p>
+<pre><code class="language-python">import struct
+
+gia_tri = 123.456
+b = struct.pack("&gt;f", gia_tri)                     # 4 byte IEEE 754, big-endian: A B C D
+print("Byte:", b.hex(" ").upper())
+
+def thanh_ghi(bon_byte):
+    """Ghép 4 byte thành 2 thanh ghi 16 bit (mỗi thanh ghi big-endian như chuẩn Modbus)."""
+    return [int.from_bytes(bon_byte[0:2], "big"), int.from_bytes(bon_byte[2:4], "big")]
+
+A, B, C, D = b
+thu_tu = {
+    "ABCD (big-endian)":     bytes([A, B, C, D]),
+    "CDAB (đảo word)":       bytes([C, D, A, B]),
+    "BADC (đảo byte)":       bytes([B, A, D, C]),
+    "DCBA (little-endian)":  bytes([D, C, B, A]),
+}
+for ten, bb in thu_tu.items():
+    regs = thanh_ghi(bb)
+    hieu_sai = struct.unpack("&gt;f", bb)[0]           # nếu bên nhận cứ đọc như ABCD
+    print(f"{ten:&lt;22} thanh ghi = [0x{regs[0]:04X}, 0x{regs[1]:04X}]   đọc như ABCD = {hieu_sai:.6g}")</code></pre>
+<pre><code class="language-text">Byte: 42 F6 E9 79
+ABCD (big-endian)      thanh ghi = [0x42F6, 0xE979]   đọc như ABCD = 123.456
+CDAB (đảo word)        thanh ghi = [0xE979, 0x42F6]   đọc như ABCD = -1.88337e+25
+BADC (đảo byte)        thanh ghi = [0xF642, 0x79E9]   đọc như ABCD = -9.86112e+32
+DCBA (little-endian)   thanh ghi = [0x79E9, 0xF642]   đọc như ABCD = 1.5185e+35</code></pre>
+<p>Hãy nhìn cột cuối: đọc sai thứ tự không báo lỗi gì, chỉ ra một con số vô lý (hoặc tệ hơn, một con số trông hợp lý nếu giá trị nhỏ). Hai kiểu hay gặp nhất là <strong>ABCD</strong> (big-endian, nhiều tài liệu gọi là "float, big endian") và <strong>CDAB</strong> ("word swap", thường gặp ở PLC lưu dữ liệu little-endian theo word). pymodbus hỗ trợ trực tiếp hai kiểu này qua <code>word_order</code>; kiểu đảo byte (BADC, DCBA) phải tự xử lý bằng <code>struct</code> như trên.</p>
+<pre><code class="language-python">F32 = client.DATATYPE.FLOAT32
+
+regs_big = client.convert_to_registers(123.456, F32)                          # ABCD
+regs_swap = client.convert_to_registers(123.456, F32, word_order="little")   # CDAB
+print("big   :", [hex(r) for r in regs_big])
+print("little:", [hex(r) for r in regs_swap])
+
+# Gửi số đo lên HR 12-13 trong MỘT lệnh ghi (mã hàm 16)
+client.write_registers(12, regs_big, device_id=1)
+tren_plc = plc.doc_hr(12, 2)
+print("PLC nhận:", tren_plc)
+print("Giải mã đúng thứ tự :", round(client.convert_from_registers(tren_plc, F32), 4))
+print("Giải mã sai thứ tự  :", client.convert_from_registers(tren_plc, F32, word_order="little"))
+
+# Kiểm tra chéo bằng struct: không phụ thuộc thư viện
+raw = b"".join(r.to_bytes(2, "big") for r in tren_plc)
+print("struct &gt;f           :", round(struct.unpack("&gt;f", raw)[0], 4))
+
+client.close()
+plc.tat()</code></pre>
+<pre><code class="language-text">big   : ['0x42f6', '0xe979']
+little: ['0xe979', '0x42f6']
+PLC nhận: [17142, 59769]
+Giải mã đúng thứ tự : 123.456
+Giải mã sai thứ tự  : -1.8833671448184637e+25
+struct &gt;f           : 123.456</code></pre>
+<div class="warn"><strong>Ghi số 32 bit bằng một lệnh</strong>Luôn ghi cả hai thanh ghi bằng <code>write_registers</code> (mã hàm 16), không ghi lần lượt hai lệnh <code>write_register</code>. Nếu PLC đọc đúng lúc giữa hai lệnh, nó thấy nửa số mới ghép với nửa số cũ: một giá trị hoàn toàn vô nghĩa.</div>
+<p><strong>Cách thống nhất thứ tự byte khi chạy thử</strong>: vision gửi một "giá trị mồi" dễ nhận ra như 123.456 hoặc 1.0 (0x3F800000) vào ô số thực, kỹ sư PLC xem trên màn hình giám sát. Nếu thấy 123.456 là xong; nếu thấy số khổng lồ, thử đổi <code>word_order</code>. Một cách khác được nhiều đội chọn để tránh hẳn vấn đề: gửi <strong>số nguyên đã nhân hệ số</strong>, ví dụ đường kính 10.004 mm gửi thành 10004 (đơn vị µm) trong một thanh ghi INT16 hoặc hai thanh ghi INT32. PLC nào cũng hiểu số nguyên và dễ hiển thị trên HMI.</p>
+
+<h2 id="6-bang-dia-chi-cho-tram-vision">6. Bảng địa chỉ cho trạm vision</h2>
+<p>Bảng dưới đây là "hợp đồng" giữa bạn và kỹ sư PLC, dùng cho phần còn lại của bài và cho dự án cuối chặng. Nguyên tắc vàng: <strong>mỗi ô nhớ chỉ có một bên ghi</strong>.</p>
+<table>
+  <tr><th>Địa chỉ (giao thức)</th><th>Tài liệu</th><th>Bên ghi</th><th>Nội dung</th></tr>
+  <tr><td>coil 0</td><td>00001</td><td>PLC</td><td>TRIGGER</td></tr>
+  <tr><td>coil 1, 2, 3</td><td>00002–00004</td><td>Vision</td><td>READY, BUSY, DONE</td></tr>
+  <tr><td>HR 0</td><td>40001</td><td>PLC</td><td>Mã sản phẩm / số công thức</td></tr>
+  <tr><td>HR 1</td><td>40002</td><td>PLC</td><td>Số thứ tự chu kỳ (tăng mỗi sản phẩm)</td></tr>
+  <tr><td>HR 10</td><td>40011</td><td>Vision</td><td>Kết quả: 1 = OK, 2 = NG (0 = chưa có kết quả nào từ lúc khởi động)</td></tr>
+  <tr><td>HR 11</td><td>40012</td><td>Vision</td><td>Số chu kỳ mà kết quả này thuộc về (trả lại HR 1)</td></tr>
+  <tr><td>HR 12–13</td><td>40013–40014</td><td>Vision</td><td>Đường kính đo được, float32 ABCD, đơn vị mm</td></tr>
+</table>
+<p>HR 11 là chi tiết đáng giá: PLC so HR 11 với số chu kỳ nó đã gửi. Nếu khác, kết quả thuộc về sản phẩm khác, xử lý như NG. Đây là bản mạng của quy tắc "bỏ kết quả muộn" ở bài trước.</p>
+<pre><code class="language-python"># Bảng địa chỉ thống nhất với kỹ sư PLC (địa chỉ giao thức, bắt đầu từ 0)
+TRIGGER, READY, BUSY, DONE = 0, 1, 2, 3        # coil 00001..00004
+HR_MA_SP, HR_CHU_KY = 0, 1                     # 40001, 40002  (PLC ghi)
+HR_KET_QUA = 10                                # 40011: 1 = OK, 2 = NG (vision ghi)
+HR_CHU_KY_TRA = 11                             # 40012: vision trả lại số chu kỳ đã xử lý
+HR_DO = 12                                     # 40013-40014: đường kính (float32, ABCD)
+TB = 1                                         # device_id (Unit ID)
+
+for ten, dc in [("TRIGGER", TRIGGER), ("DONE", DONE)]:
+    print(f"coil {ten:&lt;8} địa chỉ {dc} = {dc + 1:05d}")
+for ten, dc in [("HR_KET_QUA", HR_KET_QUA), ("HR_DO", HR_DO)]:
+    print(f"HR   {ten:&lt;10} địa chỉ {dc} = {40001 + dc}")</code></pre>
+<pre><code class="language-text">coil TRIGGER  địa chỉ 0 = 00001
+coil DONE     địa chỉ 3 = 00004
+HR   HR_KET_QUA địa chỉ 10 = 40011
+HR   HR_DO      địa chỉ 12 = 40013</code></pre>
+
+<h2 id="7-vong-lap-cho-trigger">7. Vòng lặp chờ trigger</h2>
+<p>Vòng lặp phía vision làm đúng trình tự bắt tay 4 pha, chỉ khác là "đọc dây" thành <code>read_coils</code> và "bật dây" thành <code>write_coils</code>:</p>
+<ol>
+  <li>Đọc coil TRIGGER mỗi 10 ms. Chỉ bắt đầu chu kỳ khi thấy <strong>sườn lên</strong>.</li>
+  <li>BUSY = 1, đọc mã sản phẩm và số chu kỳ, chụp, xử lý.</li>
+  <li>Ghi kết quả + số chu kỳ + số thực trong <strong>một</strong> lệnh <code>write_registers</code>; chờ server xác nhận <em>rồi</em> mới bật DONE.</li>
+  <li>Chờ PLC tắt TRIGGER (có timeout), rồi DONE = 0, READY = 1.</li>
+  <li>Mất kết nối: đóng socket, chờ 0,5 s, kết nối lại; sau khi kết nối lại <strong>ghi lại trạng thái READY</strong> vì PLC có thể đã khởi động lại và mất bộ nhớ.</li>
+</ol>
+<p>Để thử phần kết nối lại, chương trình PLC giả sẽ "mất điện" 1 giây sau sản phẩm thứ 2 (tắt server rồi bật lại với bộ nhớ trắng). Code dùng tiếp lớp <code>PlcGia</code> và bảng địa chỉ ở trên.</p>
+<pre><code class="language-python">import threading
+import time
+
+import cv2
+import numpy as np
+from pymodbus.client import ModbusTcpClient
+from pymodbus.exceptions import ModbusException
+
+MM_MOI_PX = 0.05
+
+
+def chup_anh_gia(chu_ky):
+    """Ảnh giả: một vòng đệm, bán kính thay đổi theo chu kỳ (chu kỳ 3 bị to)."""
+    ban_kinh = {3: 104}.get(chu_ky, 100)
+    anh = np.full((300, 300), 30, np.uint8)
+    cv2.circle(anh, (150, 150), ban_kinh, 220, -1)
+    return anh
+
+
+def do_duong_kinh(anh):
+    _, nhi_phan = cv2.threshold(anh, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    cs, _ = cv2.findContours(nhi_phan, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    (_, _), r = cv2.minEnclosingCircle(max(cs, key=cv2.contourArea))
+    return 2 * r * MM_MOI_PX
+
+
+def kiem(rr):
+    """pymodbus trả phản hồi lỗi chứ không ném exception: tự đổi thành exception."""
+    if rr.isError():
+        raise ModbusException(f"PLC trả lỗi: {rr}")
+    return rr
+
+
+class TramVision:
+    def __init__(self, host, port, timeout_trigger_tat=2.0, chu_ky_doc=0.01):
+        self.client = ModbusTcpClient(host, port=port, timeout=0.5, retries=1)
+        self.timeout_trigger_tat = timeout_trigger_tat
+        self.chu_ky_doc = chu_ky_doc
+        self.da_xu_ly = 0
+
+    def doc_bit(self, dia_chi):
+        return kiem(self.client.read_coils(dia_chi, count=1, device_id=TB)).bits[0]
+
+    def trang_thai(self, ready, busy, done):
+        kiem(self.client.write_coils(READY, [ready, busy, done], device_id=TB))  # coil 1..3 một lệnh
+
+    def mot_chu_ky(self):
+        self.trang_thai(ready=False, busy=True, done=False)
+        ma_sp, chu_ky = kiem(self.client.read_holding_registers(HR_MA_SP, count=2, device_id=TB)).registers
+        d = do_duong_kinh(chup_anh_gia(chu_ky))
+        ok = 9.90 &lt;= d &lt;= 10.10
+        regs = [1 if ok else 2, chu_ky] + self.client.convert_to_registers(d, self.client.DATATYPE.FLOAT32)
+        kiem(self.client.write_registers(HR_KET_QUA, regs, device_id=TB))   # 1) kết quả TRƯỚC
+        self.trang_thai(ready=False, busy=False, done=True)                  # 2) rồi mới DONE
+        han = time.monotonic() + self.timeout_trigger_tat
+        trigger = True
+        while trigger:                                                       # 3) chờ PLC tắt TRIGGER
+            if time.monotonic() &gt; han:
+                print("  ! PLC không tắt TRIGGER, tự xóa DONE")
+                break
+            time.sleep(self.chu_ky_doc)
+            trigger = self.doc_bit(TRIGGER)
+        self.trang_thai(ready=True, busy=False, done=False)                  # 4) sẵn sàng lại
+        self.da_xu_ly += 1
+        print(f"Chu kỳ {chu_ky}: SP mã {ma_sp}, d = {d:.3f} mm → {'OK' if ok else 'NG'}")
+        return trigger                    # mức TRIGGER thấy lần cuối (thường là False)
+
+    def chay(self, so_chu_ky, thoi_han_s=20):
+        trigger_truoc = False
+        het_han = time.monotonic() + thoi_han_s
+        while self.da_xu_ly &lt; so_chu_ky and time.monotonic() &lt; het_han:
+            try:
+                if not self.client.connected:
+                    if not self.client.connect():
+                        time.sleep(0.5)                  # PLC chưa lên: thử lại sau
+                        continue
+                    print("Đã kết nối PLC, ghi lại READY")
+                    self.trang_thai(ready=True, busy=False, done=False)
+                    trigger_truoc = False
+                trigger = self.doc_bit(TRIGGER)
+                if trigger and not trigger_truoc:        # chỉ bắt SƯỜN LÊN
+                    trigger = self.mot_chu_ky()          # cập nhật mức đã thấy SAU chu kỳ
+                trigger_truoc = trigger
+                time.sleep(self.chu_ky_doc)
+            except (ModbusException, OSError) as e:      # ConnectionException, socket bị reset...
+                print(f"Mất kết nối PLC ({type(e).__name__}), sẽ kết nối lại")
+                self.client.close()
+                time.sleep(0.5)
+        self.client.close()
+
+
+def chuong_trinh_plc(plc, so_sp, nhat_ky):
+    """Logic PLC giả: bật trigger, chờ DONE, đọc kết quả. Sau SP2 thì 'khởi động lại'."""
+    def cho(dieu_kien, timeout):
+        han = time.monotonic() + timeout
+        while not dieu_kien():
+            if time.monotonic() &gt; han:
+                return False
+            time.sleep(0.005)
+        return True
+
+    for k in range(1, so_sp + 1):
+        if not cho(lambda: plc.doc_coil(READY), 5):
+            nhat_ky.append(f"SP{k}: vision không READY")
+            continue
+        plc.ghi_hr(HR_MA_SP, [7, k])
+        plc.ghi_coil(TRIGGER, 1)
+        if cho(lambda: plc.doc_coil(DONE), 2.0):
+            kq, k_tra, *f = plc.doc_hr(HR_KET_QUA, 4)
+            d = ModbusTcpClient.convert_from_registers(f, ModbusTcpClient.DATATYPE.FLOAT32)
+            khop = "khớp" if k_tra == k else "LỆCH"
+            nhat_ky.append(f"SP{k}: {'OK' if kq == 1 else 'NG'}, d={d:.3f}, số chu kỳ {khop}")
+        else:
+            nhat_ky.append(f"SP{k}: TIMEOUT → loại")
+        plc.ghi_coil(TRIGGER, 0)
+        cho(lambda: not plc.doc_coil(DONE), 2.0)
+        if k == 2:                                   # mô phỏng PLC mất điện 1 giây
+            plc.tat()
+            time.sleep(1.0)
+            plc.bat()                                # bộ nhớ khởi tạo lại về 0
+
+
+plc = PlcGia(port=5020)
+plc.bat()
+nhat_ky_plc = []
+t_plc = threading.Thread(target=chuong_trinh_plc, args=(plc, 4, nhat_ky_plc), daemon=True)
+t_plc.start()
+
+tram = TramVision("127.0.0.1", 5020)
+tram.chay(so_chu_ky=4)
+t_plc.join(timeout=5)
+plc.tat()
+print("Nhật ký PLC:", *nhat_ky_plc, sep="\n  ")</code></pre>
+<pre><code class="language-text">Đã kết nối PLC, ghi lại READY
+Chu kỳ 1: SP mã 7, d = 10.000 mm → OK
+Chu kỳ 2: SP mã 7, d = 10.000 mm → OK
+Mất kết nối PLC (ConnectionException), sẽ kết nối lại
+Đã kết nối PLC, ghi lại READY
+Chu kỳ 3: SP mã 7, d = 10.400 mm → NG
+Chu kỳ 4: SP mã 7, d = 10.000 mm → OK
+Nhật ký PLC:
+  SP1: OK, d=10.000, số chu kỳ khớp
+  SP2: OK, d=10.000, số chu kỳ khớp
+  SP3: NG, d=10.400, số chu kỳ khớp
+  SP4: OK, d=10.000, số chu kỳ khớp</code></pre>
+<p>Chu kỳ 3 có đường kính 10,4 mm nằm ngoài dung sai 10,00 ± 0,10 mm nên NG; nhật ký phía PLC xác nhận nó nhận đúng số thực và số chu kỳ khớp. Khi PLC "mất điện", lệnh đọc kế tiếp ném <code>ConnectionException</code>, vòng lặp thử lại đến khi PLC lên, ghi lại READY và chạy tiếp như chưa có gì xảy ra. Trên stderr bạn sẽ thấy vài dòng log "Connection refused" của pymodbus trong lúc PLC tắt: đó là bình thường.</p>
+<div class="warn"><strong>Lỗi bắt sườn rất dễ mắc</strong>Bản đầu tiên của vòng lặp gán <code>trigger_truoc = trigger</code> với giá trị đọc <em>trước</em> chu kỳ (True). Trong lúc vision chờ TRIGGER tắt, PLC đã tắt rồi bật lại TRIGGER cho sản phẩm sau; vòng lặp đọc thấy True, so với True cũ, kết luận "không có sườn" và bỏ qua sản phẩm: PLC báo TIMEOUT ở mọi sản phẩm chẵn. Cách sửa: sau mỗi chu kỳ, cập nhật <code>trigger_truoc</code> bằng mức TRIGGER thấy <strong>lần cuối</strong> (hàm <code>mot_chu_ky</code> trả về giá trị đó).</div>
+
+<h3 id="mot-vai-con-so-ve-thoi-gian">Một vài con số về thời gian</h3>
+<p>Mỗi lệnh Modbus TCP trên mạng LAN công nghiệp thường mất cỡ vài ms (phụ thuộc chu kỳ xử lý truyền thông của PLC). Hỏi vòng mỗi 10 ms tức là khoảng 100 yêu cầu mỗi giây: đa số PLC xử lý thoải mái, nhưng đừng hạ xuống 1 ms "cho nhanh" vì PLC có thể phải dành thời gian cho truyền thông thay vì chạy chương trình. Độ trễ phát hiện trigger trung bình bằng nửa chu kỳ hỏi vòng cộng thời gian một lệnh. Nếu ứng dụng cần phản ứng dưới 1 ms (chụp vật đang chạy nhanh), dùng <strong>trigger phần cứng</strong> vào camera như bài trước, còn Modbus chỉ dùng để trả kết quả.</p>
+
+<h2 id="8-chay-voi-plc-that">8. Chạy với PLC thật</h2>
+<ul>
+  <li>Thay <code>"127.0.0.1", 5020</code> bằng IP của PLC và cổng 502. Đặt IP tĩnh cho PC vision cùng dải mạng, kiểm tra bằng <code>ping</code> trước.</li>
+  <li>Thử bằng một công cụ "Modbus poll / Modbus master" có giao diện trước khi chạy code: nếu công cụ đọc được đúng ô, code của bạn cũng sẽ đọc được.</li>
+  <li>Bật Modbus server trên PLC (nhiều PLC phải khai báo khối chức năng hoặc tùy chọn trong phần mềm cấu hình) và hỏi kỹ sư PLC giới hạn số kết nối đồng thời.</li>
+  <li>Wireshark với bộ lọc <code>mbtcp</code> cho bạn xem từng gói: mã hàm, địa chỉ, giá trị. Đây là bằng chứng khách quan nhất khi hai bên tranh luận "ai gửi sai".</li>
+</ul>
+
+<h2 id="9-loi-thuong-gap">9. Lỗi thường gặp</h2>
+<table>
+  <tr><th>Hiện tượng</th><th>Nguyên nhân</th><th>Cách xử lý</th></tr>
+  <tr><td>Đọc được nhưng giá trị "của ô bên cạnh"</td><td>Lệch 0/1 khi đổi từ ký hiệu 4xxxx</td><td>Kiểm tra bằng giá trị mồi do PLC ghi</td></tr>
+  <tr><td>Số thực ra 1e+35, -9e+32…</td><td>Sai thứ tự word/byte</td><td>Thử <code>word_order="little"</code>; kiểm tra bằng <code>struct</code></td></tr>
+  <tr><td>Số thực thỉnh thoảng nhảy giá trị lạ</td><td>Ghi hai thanh ghi bằng hai lệnh riêng</td><td>Một lệnh <code>write_registers</code></td></tr>
+  <tr><td>Code chạy "êm" nhưng PLC không nhận gì</td><td>Không kiểm tra <code>isError()</code>, lệnh ghi thực ra bị từ chối</td><td>Bọc mọi phản hồi bằng hàm <code>kiem()</code></td></tr>
+  <tr><td>Sau khi PLC khởi động lại, dây chuyền đứng</td><td>Vision không ghi lại READY sau khi kết nối lại</td><td>Khởi tạo lại mọi tín hiệu của mình sau mỗi lần kết nối</td></tr>
+  <tr><td><code>TypeError: unexpected keyword 'slave'</code></td><td>Code viết cho pymodbus cũ</td><td>Đổi thành <code>device_id=</code></td></tr>
+  <tr><td>Hai bên cùng ghi một ô, giá trị "tự nhảy"</td><td>Bảng địa chỉ không rõ bên ghi</td><td>Mỗi ô một bên ghi, ghi rõ trong bảng</td></tr>
+</table>
+
+<h2 id="10-bai-tap">10. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Tài liệu PLC ghi: "Đường kính đo: 40101–40102, kiểu REAL, word swap". Bạn gọi hàm đọc với địa chỉ nào, <code>count</code> bao nhiêu và giải mã thế nào? Giả sử đọc được <code>[0xE979, 0x42F6]</code>.</p>
+<details><summary>Xem đáp án</summary>
+<p>Địa chỉ giao thức = 40101 − 40001 = 100, <code>count=2</code>. "Word swap" là CDAB, tương ứng <code>word_order="little"</code>:</p>
+<pre><code class="language-python">from pymodbus.client import ModbusTcpClient
+
+# Tài liệu: "Đường kính: 40101–40102, REAL, word swap" → địa chỉ giao thức 100, word_order="little"
+regs_doc_duoc = [0xE979, 0x42F6]                  # giả sử read_holding_registers(100, count=2) trả về
+d = ModbusTcpClient.convert_from_registers(regs_doc_duoc, ModbusTcpClient.DATATYPE.FLOAT32,
+                                           word_order="little")
+print(round(d, 3))</code></pre>
+<pre><code class="language-text">123.456</code></pre>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Khi chạy thử, bạn nhờ PLC ghi giá trị mồi 123.456 và đọc về hai thanh ghi <code>[0x79E9, 0xF642]</code>. Viết đoạn code thử cả bốn thứ tự để xác định PLC dùng kiểu nào.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import struct
+
+regs = [0x79E9, 0xF642]
+raw = b"".join(r.to_bytes(2, "big") for r in regs)          # đúng thứ tự trên dây
+cach_doc = {
+    "ABCD": raw,
+    "CDAB": raw[2:4] + raw[0:2],
+    "BADC": bytes([raw[1], raw[0], raw[3], raw[2]]),
+    "DCBA": raw[::-1],
+}
+for ten, bb in cach_doc.items():
+    print(ten, f"{struct.unpack('&gt;f', bb)[0]:.6g}")</code></pre>
+<pre><code class="language-text">ABCD 1.5185e+35
+CDAB -9.86112e+32
+BADC -1.88337e+25
+DCBA 123.456</code></pre>
+<p>Chỉ DCBA cho ra 123.456: PLC này lưu số thực little-endian hoàn toàn (đảo cả byte lẫn word). pymodbus không có tùy chọn sẵn cho kiểu này, bạn ghi chú vào bảng địa chỉ và dùng <code>struct</code> như trên cho cả chiều gửi.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Kỹ sư PLC đề nghị thêm thanh ghi HR 15 "heartbeat": vision tăng giá trị lên 1 mỗi giây, PLC báo lỗi nếu 3 giây không thấy đổi. Kết nối TCP đã có rồi, sao còn cần heartbeat? Bạn sửa vòng lặp ở mục 7 thế nào?</p>
+<details><summary>Xem đáp án</summary>
+<ul>
+  <li>Kết nối TCP còn sống không có nghĩa chương trình vision còn chạy đúng: vòng lặp có thể kẹt trong một hàm xử lý ảnh, camera mất ảnh, hoặc client bị treo trong khi hệ điều hành vẫn giữ socket. Không có heartbeat, PLC chỉ phát hiện khi một sản phẩm thật bị TIMEOUT; có heartbeat, PLC báo lỗi <em>trước</em> khi sản phẩm tới.</li>
+  <li>Sửa vòng lặp: giữ biến <code>t_heartbeat</code>; trong vòng lặp chính, nếu <code>time.monotonic() - t_heartbeat &gt;= 1.0</code> thì <code>dem = (dem + 1) % 65536</code> và <code>write_register(15, dem, device_id=1)</code>. Đặt việc này trong vòng lặp chính (không phải thread riêng) để heartbeat dừng đúng khi vòng lặp chính bị kẹt; đó chính là điều PLC cần phát hiện.</li>
+</ul>
+</details>
+</div>
+
+<h2 id="tom-tat">Tóm tắt</h2>
+<ul>
+  <li>Modbus TCP: PC vision là client hỏi vòng, PLC là server; cổng 502; dữ liệu chỉ là bit và thanh ghi 16 bit.</li>
+  <li>Bốn vùng: coil (đọc/ghi bit), discrete input (chỉ đọc bit), input register (chỉ đọc), holding register (đọc/ghi). 40001 trong tài liệu = địa chỉ 0 trên dây.</li>
+  <li>pymodbus 3.15: <code>device_id=</code> (không còn <code>slave=</code>), server khai báo bằng <code>SimData</code>/<code>SimDevice</code>; luôn kiểm tra <code>isError()</code>, bắt cả <code>ModbusException</code> và <code>OSError</code> khi mất kết nối (socket bị reset giữa chừng ném <code>ConnectionResetError</code>, không phải lỗi của pymodbus).</li>
+  <li>float32 = 2 thanh ghi; thống nhất ABCD/CDAB/BADC/DCBA bằng giá trị mồi, kiểm tra bằng <code>struct</code>, ghi trong một lệnh.</li>
+  <li>Vòng lặp: bắt sườn lên TRIGGER, ghi kết quả trước rồi DONE, chờ TRIGGER tắt có timeout, trả lại số chu kỳ, kết nối lại và khởi tạo lại tín hiệu sau sự cố.</li>
+</ul>
+<p>Bài tiếp theo: <strong>OPC UA cho kỹ sư Vision</strong>, chuẩn giao tiếp có kiểu dữ liệu và tên biến rõ ràng, so sánh trực tiếp với Modbus TCP bạn vừa học.</p>
+
+      </div>
+      <div class="lesson-done" data-course="vision-engineer"><button type="button" class="lesson-done-btn" data-lesson-done="tich-hop-3-modbus-tcp-python" aria-pressed="false"><span class="box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></span><span class="off">Đánh dấu đã học xong</span><span class="on">Đã học xong bài này</span></button><a class="btn lg" href="../kien-thuc/opc-ua-cho-ky-su-vision.html">Bài tiếp theo<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a></div>
+      <footer class="article-foot">
+        <div class="tags"><a class="tag" href="../search.html?q=PLC">#PLC</a><a class="tag" href="../search.html?q=Python">#Python</a><a class="tag" href="../search.html?q=Industrial Vision">#Industrial Vision</a></div>
+        <div class="share">
+      <span>Chia sẻ:</span>
+      <a class="share-btn fb" href="https://www.facebook.com/sharer/sharer.php?u=https://hocfree.vn/hoc/tich-hop-3-modbus-tcp-python.html" target="_blank" rel="noopener" aria-label="Chia sẻ Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8z"/></svg></a>
+      <a class="share-btn x" href="https://twitter.com/intent/tweet?url=https://hocfree.vn/hoc/tich-hop-3-modbus-tcp-python.html" target="_blank" rel="noopener" aria-label="Chia sẻ X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+      <button class="share-btn copy-link" data-url="https://hocfree.vn/hoc/tich-hop-3-modbus-tcp-python.html" aria-label="Sao chép liên kết"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+    </div>
+      </footer>
+      <div class="author-box">
+        <span class="avatar lg" aria-hidden="true">HF</span>
+        <div>
+          <strong>Ban biên tập HọcFree</strong>
+          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và ngoại ngữ, hoàn toàn miễn phí.</p>
+        </div>
+      </div>
+      <nav class="pager lesson-pager" aria-label="Bài học trước/sau"><a class="prev" href="../kien-thuc/giao-tiep-camera-vision-voi-plc.html"><span>← Bài trước · Bài 2</span>Các chuẩn giao tiếp: Modbus TCP, EtherNet/IP, PROFINET</a><a class="next" href="../kien-thuc/opc-ua-cho-ky-su-vision.html"><span>Bài tiếp → · Bài 4</span>OPC UA cho kỹ sư Vision</a></nav>
+    </article>
+    <aside class="sidebar course-side" data-course="vision-engineer">
+      <section class="widget course-toc">
+        <p class="widget-title">Chặng 9/14 · Vision Engineer</p>
+        <a class="course-toc-title" href="../lo-trinh/vision-engineer/plc-robot-mes.html">PLC / Robot / MES</a>
+        <div class="lc" data-lesson-count="tich-hop-1-io-so-va-handshake-plc giao-tiep-camera-vision-voi-plc tich-hop-3-modbus-tcp-python opc-ua-cho-ky-su-vision tich-hop-5-tcp-socket-gui-toa-do-robot vision-dan-huong-robot-gap-vat mes-truy-xuat-nguon-goc-vision tich-hop-8-luu-ket-qua-sqlite-anh-ng tich-hop-9-du-an-tram-vision-mo-phong"><div class="lc-bar"><span data-lc-bar></span></div><span data-lc-text>0/9 bài</span></div>
+        <ol class="toc-lessons"><li data-lesson="tich-hop-1-io-so-va-handshake-plc"><a href="../hoc/tich-hop-1-io-so-va-handshake-plc.html"><span class="tn">1</span><span class="tt">I/O số và handshake với PLC</span></a></li><li data-lesson="giao-tiep-camera-vision-voi-plc"><a href="../kien-thuc/giao-tiep-camera-vision-voi-plc.html"><span class="tn">2</span><span class="tt">Các chuẩn giao tiếp: Modbus TCP, EtherNet/IP, PROFINET</span></a></li><li data-lesson="tich-hop-3-modbus-tcp-python" class="is-current"><a href="../hoc/tich-hop-3-modbus-tcp-python.html" aria-current="page"><span class="tn">3</span><span class="tt">Modbus TCP bằng Python với pymodbus</span></a></li><li data-lesson="opc-ua-cho-ky-su-vision"><a href="../kien-thuc/opc-ua-cho-ky-su-vision.html"><span class="tn">4</span><span class="tt">OPC UA cho kỹ sư Vision</span></a></li><li data-lesson="tich-hop-5-tcp-socket-gui-toa-do-robot"><a href="../hoc/tich-hop-5-tcp-socket-gui-toa-do-robot.html"><span class="tn">5</span><span class="tt">TCP socket: gửi kết quả và tọa độ cho robot</span></a></li><li data-lesson="vision-dan-huong-robot-gap-vat"><a href="../hoc/vision-dan-huong-robot-gap-vat.html"><span class="tn">6</span><span class="tt">Vision dẫn hướng robot gắp vật</span></a></li><li data-lesson="mes-truy-xuat-nguon-goc-vision"><a href="../kien-thuc/mes-truy-xuat-nguon-goc-vision.html"><span class="tn">7</span><span class="tt">MES và truy xuất nguồn gốc</span></a></li><li data-lesson="tich-hop-8-luu-ket-qua-sqlite-anh-ng"><a href="../hoc/tich-hop-8-luu-ket-qua-sqlite-anh-ng.html"><span class="tn">8</span><span class="tt">Lưu kết quả và ảnh NG: SQLite, thư mục, dọn ổ đĩa</span></a></li><li data-lesson="tich-hop-9-du-an-tram-vision-mo-phong"><a href="../hoc/tich-hop-9-du-an-tram-vision-mo-phong.html"><span class="tn">9</span><span class="tt">Dự án chặng 9: trạm vision hoàn chỉnh với PLC mô phỏng</span></a></li></ol>
+        <a class="more" href="../lo-trinh/vision-engineer.html">Xem toàn bộ lộ trình<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a>
+      </section>
+    </aside>
+  </div>
+  <section class="band">
+    <div class="container">
+      <div class="section-title"><h2>Có thể bạn quan tâm</h2></div>
+      <div class="card-grid"><article class="card">
+  <a class="thumb" href="../hoc/python-1-cai-dat-python-va-vs-code.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-1-cai-dat-python-va-vs-code.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-1-cai-dat-python-va-vs-code.html">Python cơ bản: cài Python, VS Code và chạy chương trình đầu tiên</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>7 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/python-2-bien-kieu-du-lieu-toan-tu.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-2-bien-kieu-du-lieu-toan-tu.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-2-bien-kieu-du-lieu-toan-tu.html">Python cơ bản: biến, kiểu dữ liệu và toán tử</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/python-3-re-nhanh-va-vong-lap.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-3-re-nhanh-va-vong-lap.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-3-re-nhanh-va-vong-lap.html">Python cơ bản: rẽ nhánh và vòng lặp</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-09">09/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article></div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <a class="logo" href="../"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+      <p>HọcFree.vn – nền tảng học miễn phí về AI, lập trình, Computer Vision, Machine Vision, tin tức AI và ngoại ngữ dành cho người Việt.</p>
+    </div>
+    <div><h3>Học &amp; thực hành</h3><ul><li><a href="../hoc/">Học AI &amp; Lập trình</a></li><li><a href="../projects/">Projects</a></li><li><a href="../lo-trinh/">Learning Paths</a></li></ul></div>
+    <div><h3>Khám phá</h3><ul><li><a href="../kien-thuc/">Kiến thức</a></li><li><a href="../tin-tuc-ai/">Tin tức AI</a></li><li><a href="../ngoai-ngu/">Ngoại ngữ</a></li><li><a href="../tai-nguyen/">Tài nguyên</a></li></ul></div>
+    <div><h3>Bài mới</h3><ul><li><a href="../hoc/python-1-cai-dat-python-va-vs-code.html">Python cơ bản: cài Python, VS Code và chạy chương trình đầu tiên</a></li><li><a href="../hoc/python-2-bien-kieu-du-lieu-toan-tu.html">Python cơ bản: biến, kiểu dữ liệu và toán tử</a></li><li><a href="../hoc/python-3-re-nhanh-va-vong-lap.html">Python cơ bản: rẽ nhánh và vòng lặp</a></li><li><a href="../hoc/python-4-list-tuple-dict-set.html">Python cơ bản: list, tuple, dict và set</a></li></ul></div>
+    <div>
+      <h3>HọcFree</h3>
+      <ul>
+        <li><a href="../gioi-thieu.html">Giới thiệu</a></li>
+        <li><a href="../search.html">Tìm kiếm</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">© 2026 HọcFree.vn · Kiến thức là để chia sẻ.</div>
+  </div>
+</footer>
+<button class="to-top" aria-label="Lên đầu trang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<script src="../assets/js/search-data.js?v=20261009" defer></script>
+<script src="../assets/js/main.js?v=20261009" defer></script>
+</body>
+</html>
