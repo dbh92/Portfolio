@@ -10,16 +10,19 @@ hoc/ projects/ lo-trinh/   Các mục menu: trang tổng, trang chủ đề và 
 kien-thuc/ tin-tuc-ai/ ngoai-ngu/ tai-nguyen/
 search.html, gioi-thieu.html, dang-nhap.html, 404.html
 assets/css/style.css       Giao diện (sáng/tối, responsive)
+assets/css/fonts.css       Khai báo font tự host (assets/fonts/)
 assets/js/main.js          Tìm kiếm, menu mobile, copy code, dark mode…
 assets/js/search-data.js   Chỉ mục tìm kiếm (tự sinh)
-assets/images/posts/       Ảnh đại diện bài viết (1200x675)
-assets/images/illustrations/ Minh họa trang chủ (SVG từ unDraw, undraw.co)
+assets/images/posts/       Ảnh đại diện bài viết 1200x675: .webp hiển thị trên trang, .jpg cho og:image
+site.webmanifest           Thông tin ứng dụng web (tên, icon)
 src/posts.json             Thông tin website, danh sách bài viết, bài "đọc nhiều"
 src/posts/<slug>.html      Nội dung từng bài (tạo thư mục khi viết bài đầu tiên)
 src/nav.json               Menu chính: mục → nhóm → chủ đề
 src/learning-paths.json    Learning Paths (lộ trình Vision Engineer…)
+src/icons.json             Icon Lucide dùng trong trang (SVG nội tuyến)
 tools/build.py             Sinh toàn bộ trang HTML từ src/
-tools/make_thumbs.py       Vẽ ảnh đại diện tự động
+tools/make_thumbs.py       Vẽ ảnh đại diện tự động (JPG + WebP)
+tools/fonts/               Font Be Vietnam Pro (TTF) để vẽ ảnh đại diện
 CNAME                      Tên miền riêng: hocfree.vn
 ```
 
@@ -92,9 +95,12 @@ Cloudflare → `hocfree.vn` → **DNS → Records** (thêm ở Mắt Bão sẽ k
 
 Sau khi DNS cập nhật: GitHub repo → Settings → Pages → Custom domain `hocfree.vn` → bật **Enforce HTTPS**.
 
-## Hình minh họa
+## Font, icon, SEO
 
-Minh họa trên trang chủ (`assets/images/illustrations/`) lấy từ [unDraw](https://undraw.co) của Katerina Limpitsouni,
-qua gói npm `react-undraw-illustrations` (MIT), đổi màu chủ đạo sang cam `#f04e23` của HọcFree.
-Giấy phép unDraw cho phép dùng miễn phí cho dự án cá nhân và thương mại, không bắt buộc ghi nguồn.
-Muốn đổi hình: thay file SVG cùng tên, hoặc sửa tên file trong `build_home()` của `tools/build.py`.
+- **Font**: Be Vietnam Pro và JetBrains Mono tự host trong `assets/fonts/` (lấy từ Fontsource, giấy phép SIL OFL 1.1),
+  chỉ gồm các subset vietnamese, latin, latin-ext. Không gọi Google Fonts nên tải nhanh hơn.
+- **Icon**: [Lucide](https://lucide.dev) (ISC), lưu trong `src/icons.json`. Thêm icon: chép phần bên trong `<svg>`
+  từ gói npm `lucide-static` vào file này, rồi dùng `icon("tên")` trong `tools/build.py`.
+- **SEO**: mỗi trang có title, description riêng, canonical dạng thư mục (`/hoc/`), Open Graph + Twitter Card,
+  JSON-LD (WebSite + SearchAction, Organization, Article, BreadcrumbList, CollectionPage, Course), `sitemap.xml`
+  và `robots.txt`. Chủ đề chưa có bài để `noindex`.

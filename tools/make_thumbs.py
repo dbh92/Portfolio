@@ -1,26 +1,36 @@
-"""Vẽ ảnh đại diện (1200x675 JPG) cho các bài viết trong src/posts.json.
+"""Vẽ ảnh đại diện 1200x675 cho các bài viết trong src/posts.json.
+
+Mỗi bài có 2 file: <slug>.jpg (og:image, chia sẻ mạng xã hội) và <slug>.webp (hiển thị trên trang, nhẹ hơn).
 
 Chạy:  python tools/make_thumbs.py          (chỉ tạo ảnh còn thiếu)
        python tools/make_thumbs.py --all    (vẽ lại toàn bộ)
 
-Muốn dùng ảnh thật: chỉ cần chép file <slug>.jpg vào assets/images/posts/
-để thay thế, script sẽ không ghi đè (trừ khi dùng --all).
+Muốn dùng ảnh thật: chép <slug>.jpg vào assets/images/posts/ rồi chạy lại script,
+nó sẽ tạo <slug>.webp từ ảnh đó mà không vẽ đè (trừ khi dùng --all).
+
+Font: tools/fonts/BeVietnamPro-*.ttf (SIL OFL 1.1), cùng font với website.
 """
 import json
 import os
-import random
 import sys
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(ROOT, "assets", "images", "posts")
+FONT_DIR = os.path.join(ROOT, "tools", "fonts")
 W, H = 1200, 675
-FONT_DIRS = [r"C:\Windows\Fonts", "/usr/share/fonts/truetype/dejavu", "/usr/share/fonts/truetype/wqy", "/Library/Fonts"]
+INK = (11, 13, 18)
+ACCENT = (240, 78, 35)
+SYS_FONT_DIRS = ["/usr/share/fonts/truetype/dejavu", "/usr/share/fonts/truetype/wqy", r"C:\Windows\Fonts", "/Library/Fonts"]
 
 
-def font(names, size):
-    for d in FONT_DIRS:
+def font(weight, size):
+    return ImageFont.truetype(os.path.join(FONT_DIR, f"BeVietnamPro-{weight}.ttf"), size)
+
+
+def sys_font(names, size):
+    for d in SYS_FONT_DIRS:
         for n in names:
             p = os.path.join(d, n)
             if os.path.exists(p):
@@ -28,148 +38,139 @@ def font(names, size):
     return ImageFont.load_default()
 
 
+def glyph_font(text, size):
+    """Be Vietnam Pro cho chữ Latin/Việt; chữ Hán và ký hiệu toán dùng font hệ thống."""
+    if any(0x3000 <= ord(c) <= 0x9FFF for c in text):
+        return sys_font(["wqy-zenhei.ttc", "msyhbd.ttc"], size)
+    if any(ord(c) > 0x2000 for c in text):
+        return sys_font(["DejaVuSans-Bold.ttf", "arialbd.ttf"], size)
+    return font("ExtraBold", size)
+
+
 def hex_rgb(h):
     h = h.lstrip("#")
     return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
 
 
-def gradient(c1, c2):
-    base = Image.new("RGB", (W, H), c1)
-    top = Image.new("RGB", (W, H), c2)
-    mask = Image.new("L", (W, H))
-    md = mask.load()
-    for y in range(H):
-        for x in range(0, W, 4):
-            v = int(255 * min(1, (x / W) * 0.6 + (y / H) * 0.6))
-            for k in range(4):
-                if x + k < W:
-                    md[x + k, y] = v
-    return Image.composite(top, base, mask)
+def mix(a, b, t):
+    return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(3))
 
 
-def overlay(img, draw_fn, blur=0):
-    layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    draw_fn(ImageDraw.Draw(layer))
-    if blur:
-        layer = layer.filter(ImageFilter.GaussianBlur(blur))
-    return Image.alpha_composite(img, layer)
+def layer():
+    return Image.new("RGBA", (W, H), (0, 0, 0, 0))
 
 
-def deco_code(d, rnd):
-    """Khung cửa sổ code cho chuyên mục lập trình."""
-    x0, y0, x1, y1 = 70, 150, 520, 560
-    d.rounded_rectangle((x0, y0, x1, y1), 22, fill=(0, 0, 0, 70), outline=(255, 255, 255, 60), width=2)
-    for i, c in enumerate([(255, 95, 86), (255, 189, 46), (39, 201, 63)]):
-        d.ellipse((x0 + 24 + i * 30, y0 + 22, x0 + 42 + i * 30, y0 + 40), fill=c + (230,))
-    y = y0 + 75
-    while y < y1 - 30:
-        indent = rnd.choice([0, 0, 28, 28, 56])
-        w = rnd.randint(80, 300 - indent)
-        col = rnd.choice([(255, 255, 255, 150), (255, 255, 255, 90), (255, 230, 150, 140)])
-        d.rounded_rectangle((x0 + 30 + indent, y, x0 + 30 + indent + w, y + 14), 7, fill=col)
-        if rnd.random() < .5:
-            w2 = rnd.randint(40, 90)
-            d.rounded_rectangle((x0 + 45 + indent + w, y, x0 + 45 + indent + w + w2, y + 14), 7,
-                                fill=(140, 220, 255, 140))
-        y += 34
+def blurred(draw_fn, radius):
+    lay = layer()
+    draw_fn(ImageDraw.Draw(lay))
+    return lay.filter(ImageFilter.GaussianBlur(radius))
 
 
-def deco_chat(d, rnd):
-    """Bong bóng hội thoại cho chuyên mục ngoại ngữ."""
-    bubbles = [(70, 170, 430, 270, False), (190, 300, 520, 400, True), (70, 430, 400, 530, False)]
-    for x0, y0, x1, y1, right in bubbles:
-        fill = (255, 255, 255, 60) if right else (0, 0, 0, 70)
-        d.rounded_rectangle((x0, y0, x1, y1), 30, fill=fill, outline=(255, 255, 255, 70), width=2)
-        tx = x1 - 40 if right else x0 + 40
-        d.polygon([(tx, y1 - 2), (tx + (15 if right else -15), y1 + 26), (tx + (-25 if right else 25), y1 - 2)], fill=fill)
-        for j in range(2):
-            w = rnd.randint(140, x1 - x0 - 80)
-            d.rounded_rectangle((x0 + 35, y0 + 28 + j * 30, x0 + 35 + w, y0 + 42 + j * 30), 7,
-                                fill=(255, 255, 255, 150 - j * 50))
+def grid_layer():
+    """Lưới mảnh mờ dần ra rìa."""
+    lay = layer()
+    d = ImageDraw.Draw(lay)
+    for x in range(0, W, 56):
+        d.line([(x, 0), (x, H)], fill=(255, 255, 255, 26), width=1)
+    for y in range(0, H, 56):
+        d.line([(0, y), (W, y)], fill=(255, 255, 255, 26), width=1)
+    mask = Image.new("L", (W, H), 0)
+    ImageDraw.Draw(mask).ellipse((W * .25, -H * .4, W * 1.15, H * .95), fill=255)
+    mask = mask.filter(ImageFilter.GaussianBlur(160))
+    lay.putalpha(ImageChops.multiply(lay.getchannel("A"), mask))
+    return lay
 
 
-def deco_note(d, rnd):
-    """Trang sổ tay cho chuyên mục blog."""
-    x0, y0, x1, y1 = 80, 140, 500, 570
-    d.rounded_rectangle((x0 + 18, y0 + 18, x1 + 18, y1 + 18), 18, fill=(0, 0, 0, 60))
-    d.rounded_rectangle((x0, y0, x1, y1), 18, fill=(255, 255, 255, 55), outline=(255, 255, 255, 90), width=2)
-    for i in range(7):
-        d.ellipse((x0 - 12, y0 + 40 + i * 58, x0 + 12, y0 + 64 + i * 58), fill=(255, 255, 255, 120))
-    y = y0 + 60
-    d.rounded_rectangle((x0 + 45, y, x0 + 300, y + 22), 10, fill=(255, 255, 255, 200))
-    y += 60
-    while y < y1 - 30:
-        w = rnd.randint(200, x1 - x0 - 90)
-        d.rounded_rectangle((x0 + 45, y, x0 + 45 + w, y + 12), 6, fill=(255, 255, 255, 110))
-        y += 32
-
-
-DECOS = {"hoc": deco_code, "projects": deco_code, "ngoai-ngu": deco_chat}  # còn lại: deco_note
-
-
-def fit_font(draw, text, names, max_w, max_h, start=300):
+def fit(text, max_w, max_h, start=300):
     size = start
-    while size > 40:
-        f = font(names, size)
-        b = draw.textbbox((0, 0), text, font=f)
+    probe = ImageDraw.Draw(Image.new("L", (1, 1)))
+    while size > 48:
+        f = glyph_font(text, size)
+        b = probe.textbbox((0, 0), text, font=f)
         if b[2] - b[0] <= max_w and b[3] - b[1] <= max_h:
             return f, b
         size -= 6
-    f = font(names, size)
-    return f, draw.textbbox((0, 0), text, font=f)
+    f = glyph_font(text, size)
+    return f, probe.textbbox((0, 0), text, font=f)
 
 
-def make(post, cat_name, path):
-    rnd = random.Random(post["slug"])
-    c1, c2 = (hex_rgb(c) for c in post["thumb"]["colors"])
-    img = gradient(c1, c2).convert("RGBA")
-
-    # Quầng sáng mờ tạo chiều sâu
-    def glow(d):
-        d.ellipse((650, -200, 1350, 500), fill=(255, 255, 255, 55))
-        d.ellipse((-250, 380, 450, 1000), fill=(0, 0, 0, 70))
-    img = overlay(img, glow, blur=90)
-
-    # Lưới chấm
-    def dots(d):
-        for y in range(30, H, 36):
-            for x in range(30, W, 36):
-                d.ellipse((x - 1.5, y - 1.5, x + 1.5, y + 1.5), fill=(255, 255, 255, 38))
-    img = overlay(img, dots)
-
-    img = overlay(img, lambda d: DECOS.get(post["category"], deco_note)(d, rnd))
-
-    # Chữ lớn (glyph)
-    glyph = post["thumb"]["glyph"]
-    is_cjk = any(ord(ch) > 0x3000 for ch in glyph)
-    names = ["msyhbd.ttc", "malgunbd.ttf", "wqy-zenhei.ttc"] if is_cjk else ["seguibl.ttf", "segoeuib.ttf", "arialbd.ttf", "DejaVuSans-Bold.ttf"]
-    tmp = ImageDraw.Draw(img)
-    f, b = fit_font(tmp, glyph, names, 560, 300)
-    gw, gh = b[2] - b[0], b[3] - b[1]
-    cx, cy = 850, 330
-    gx, gy = cx - gw / 2 - b[0], cy - gh / 2 - b[1]
-    img = overlay(img, lambda d: d.text((gx + 8, gy + 14), glyph, font=f, fill=(0, 0, 0, 110)), blur=10)
-    img = overlay(img, lambda d: d.text((gx, gy), glyph, font=f, fill=(255, 255, 255, 255)))
-
-    # Nhãn chuyên mục + thương hiệu
-    def labels(d):
-        lf = font(["segoeuib.ttf", "arialbd.ttf", "DejaVuSans-Bold.ttf"], 26)
-        label = cat_name.upper()
-        lb = d.textbbox((0, 0), label, font=lf)
-        lw = lb[2] - lb[0]
-        d.rounded_rectangle((70, 60, 70 + lw + 40, 108), 24, fill=(255, 255, 255, 235))
-        d.text((90, 84), label, font=lf, fill=c2 + (255,), anchor="lm")
-        bf = font(["seguibl.ttf", "segoeuib.ttf", "arialbd.ttf", "DejaVuSans-Bold.ttf"], 34)
-        d.text((1130, 615), "hocfree.vn", font=bf, fill=(255, 255, 255, 220), anchor="rm")
-    img = overlay(img, labels)
-
-    img.convert("RGB").save(path, "JPEG", quality=86, optimize=True, progressive=True)
+def gradient_text(text, f, b, x, y, top, bottom):
+    """Chữ tô gradient dọc (trắng → sắc màu chuyên mục)."""
+    mask = Image.new("L", (W, H), 0)
+    ImageDraw.Draw(mask).text((x - b[0], y - b[1]), text, font=f, fill=255)
+    grad = Image.new("RGBA", (W, H))
+    gd = ImageDraw.Draw(grad)
+    h = max(1, b[3] - b[1])
+    for yy in range(H):
+        t = min(1, max(0, (yy - y) / h))
+        gd.line([(0, yy), (W, yy)], fill=mix(top, bottom, t) + (255,))
+    grad.putalpha(mask)
+    return grad
 
 
-def make_default(path):
-    post = {"slug": "default", "category": "hoc",
-            "thumb": {"glyph": "HọcFree", "colors": ["#f04e23", "#7a1d0c"]}}
-    make(post, "Chia sẻ kiến thức miễn phí", path)
+def logo_mark(size):
+    s = size * 4
+    im = Image.new("RGBA", (s, s), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    d.rounded_rectangle((0, 0, s - 1, s - 1), radius=int(s * .24), fill=ACCENT + (255,))
+    k, w = s / 40, int(3.4 * s / 40)
+    for pts in (((11, 13), (6, 20), (11, 27)), ((29, 13), (34, 20), (29, 27)), ((23, 10), (17, 30))):
+        d.line([(x * k, y * k) for x, y in pts], fill="white", width=w, joint="curve")
+    return im.resize((size, size), Image.LANCZOS)
+
+
+def render(glyph, chip, c1, c2):
+    tint = mix(c1, (255, 255, 255), .25)
+    img = Image.new("RGBA", (W, H), mix(c2, INK, .6) + (255,))
+    # Quầng sáng màu chuyên mục
+    img = Image.alpha_composite(img, blurred(lambda d: d.ellipse((560, -420, 1560, 420), fill=c1 + (215,)), 150))
+    img = Image.alpha_composite(img, blurred(lambda d: d.ellipse((-380, 380, 520, 1100), fill=mix(c1, (99, 102, 241), .5) + (90,)), 170))
+    img = Image.alpha_composite(img, grid_layer())
+
+    # Vòng tròn đồng tâm bên phải (gợi ống kính / vùng quan sát)
+    def rings(d):
+        cx, cy = 960, 330
+        for r, a in ((140, 46), (220, 30), (300, 18), (380, 10)):
+            d.ellipse((cx - r, cy - r, cx + r, cy + r), outline=(255, 255, 255, a), width=2)
+        d.ellipse((cx + 214, cy - 62, cx + 230, cy - 46), fill=tint + (230,))
+    img = Image.alpha_composite(img, blurred(rings, 0.6))
+
+    # Tối dần phía dưới để chữ nổi
+    def shade(d):
+        for y in range(H // 2, H):
+            d.line([(0, y), (W, y)], fill=(0, 0, 0, int(110 * (y - H / 2) / (H / 2))))
+    img = Image.alpha_composite(img, blurred(shade, 0))
+
+    # Chữ lớn
+    f, b = fit(glyph, 860, 290)
+    gh = b[3] - b[1]
+    x, y = 76, 352 - gh / 2
+    img = Image.alpha_composite(img, blurred(lambda d: d.text((x - b[0] + 6, y - b[1] + 16), glyph, font=f, fill=(0, 0, 0, 120)), 14))
+    img = Image.alpha_composite(img, gradient_text(glyph, f, b, x, y, (255, 255, 255), tint))
+
+    # Nhãn chuyên mục (pill kính mờ)
+    d = ImageDraw.Draw(img)
+    cf = font("SemiBold", 25)
+    cb = d.textbbox((0, 0), chip, font=cf)
+    cw = cb[2] - cb[0]
+    over = layer()
+    od = ImageDraw.Draw(over)
+    od.rounded_rectangle((72, 60, 72 + cw + 74, 112), 26, fill=(255, 255, 255, 30), outline=(255, 255, 255, 70), width=2)
+    od.ellipse((96, 79, 110, 93), fill=c1 + (255,))
+    od.text((124, 86), chip, font=cf, fill=(255, 255, 255, 240), anchor="lm")
+    img = Image.alpha_composite(img, over)
+
+    # Thương hiệu
+    img.alpha_composite(logo_mark(44), (76, 582))
+    d = ImageDraw.Draw(img)
+    d.text((134, 604), "hocfree.vn", font=font("SemiBold", 27), fill=(255, 255, 255, 215), anchor="lm")
+    return img.convert("RGB")
+
+
+def save(img, jpg_path, webp=True):
+    img.save(jpg_path, "JPEG", quality=86, optimize=True, progressive=True)
+    if webp:
+        img.save(os.path.splitext(jpg_path)[0] + ".webp", "WEBP", quality=80, method=6)
 
 
 def main():
@@ -180,13 +181,18 @@ def main():
         cats = {s["slug"]: s["label"] for s in json.load(fh)["sections"] if s.get("groups")}
     os.makedirs(OUT_DIR, exist_ok=True)
     for p in data["posts"]:
-        out = os.path.join(OUT_DIR, p["slug"] + ".jpg")
-        if force or not os.path.exists(out):
-            make(p, cats[p["category"]], out)
-            print("  vẽ", os.path.relpath(out, ROOT))
+        jpg = os.path.join(OUT_DIR, p["slug"] + ".jpg")
+        webp = os.path.splitext(jpg)[0] + ".webp"
+        if force or not os.path.exists(jpg):
+            c1, c2 = (hex_rgb(c) for c in p["thumb"]["colors"])
+            save(render(p["thumb"]["glyph"], cats[p["category"]], c1, c2), jpg)
+            print("  vẽ", os.path.relpath(jpg, ROOT))
+        elif not os.path.exists(webp):  # ảnh thật do người dùng chép vào: chỉ tạo bản WebP
+            Image.open(jpg).convert("RGB").save(webp, "WEBP", quality=80, method=6)
+            print("  webp", os.path.relpath(webp, ROOT))
     og = os.path.join(ROOT, "assets", "images", "og-default.jpg")
     if force or not os.path.exists(og):
-        make_default(og)
+        save(render("HọcFree", "Học AI, lập trình & Computer Vision", (240, 78, 35), (122, 29, 12)), og, webp=False)
         print("  vẽ", os.path.relpath(og, ROOT))
 
 

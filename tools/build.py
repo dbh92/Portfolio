@@ -55,6 +55,12 @@ def post_url(p):
 
 
 def img_url(p):
+    """Ảnh hiển thị trên trang (WebP, nhẹ)."""
+    return f"assets/images/posts/{p['slug']}.webp"
+
+
+def og_img(p):
+    """Ảnh chia sẻ mạng xã hội / JSON-LD (JPG, tương thích mọi nền tảng)."""
     return f"assets/images/posts/{p['slug']}.jpg"
 
 
@@ -106,13 +112,19 @@ for _p in POSTS:
 
 
 def section_url(sec):
+    """URL thư mục (hoc/, lo-trinh/…) trùng với canonical; trang chủ là chuỗi rỗng."""
     if "href" in sec:
-        return sec["href"]
-    return f"{sec.get('category') or sec['slug']}/index.html"
+        return "" if sec["href"] == "index.html" else sec["href"]
+    return f"{sec.get('category') or sec['slug']}/"
+
+
+def link(root, rel=""):
+    """Ghép đường dẫn tương đối; rỗng (trang chủ từ trang chủ) thành ./"""
+    return f"{root}{rel}" or "./"
 
 
 def path_url(p):
-    return f"lo-trinh/{p['slug']}.html" if p.get("steps") else f"lo-trinh/index.html#{p['slug']}"
+    return f"lo-trinh/{p['slug']}.html" if p.get("steps") else f"lo-trinh/#{p['slug']}"
 
 
 def match_posts(item):
@@ -180,9 +192,45 @@ ICON = {
 }
 
 
-def head(root, title, desc, canonical, image, og_type="website", extra=""):
-    full_title = f"{title} | {SITE['name']}" if title != SITE["name"] else f"{SITE['name']} – {SITE['tagline']}"
+with open(os.path.join(SRC, "icons.json"), encoding="utf-8") as fh:
+    ICONS = json.load(fh)["icons"]
+
+
+def icon(name, cls=""):
+    c = f' class="{cls}"' if cls else ""
+    return f'<svg{c} viewBox="0 0 24 24" aria-hidden="true">{ICONS[name]}</svg>'
+
+
+def ld_json(*objs):
+    """Một hoặc nhiều khối JSON-LD (schema.org)."""
+    return "".join(f'<script type="application/ld+json">{json.dumps(o, ensure_ascii=False)}</script>\n' for o in objs)
+
+
+def breadcrumb_ld(items):
+    """items: [(tên, url tương đối hoặc None cho trang hiện tại)], không gồm Trang chủ."""
+    trail = [("Trang chủ", "")] + items
+    return {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [
+        {"@type": "ListItem", "position": i, "name": n, **({"item": f"{SITE['domain']}/{u}"} if u is not None else {})}
+        for i, (n, u) in enumerate(trail, 1)]}
+
+
+ORG = {"@type": "Organization", "name": SITE["name"], "url": SITE["domain"] + "/",
+       "logo": {"@type": "ImageObject", "url": f"{SITE['domain']}/assets/images/icon-512.png", "width": 512, "height": 512}}
+
+# Font chính (Be Vietnam Pro 400 + 800, latin + vietnamese) tải sớm để chữ không nhảy
+PRELOAD_FONTS = ["be-vietnam-pro-latin-400-normal", "be-vietnam-pro-vietnamese-400-normal", "be-vietnam-pro-latin-800-normal"]
+
+
+def head(root, title, desc, canonical, image, og_type="website", extra="", robots=None):
+    robots = robots or "index, follow, max-image-preview:large"
+    if title == SITE["name"]:
+        full_title = f"{SITE['name']} – {SITE['tagline']}"
+    else:  # tiêu đề dài thì bỏ hậu tố tên site để Google không cắt mất nội dung chính
+        full_title = f"{title} | {SITE['name']}" if len(title) <= 58 else title
     img_abs = f"{SITE['domain']}/{image}"
+    url_abs = f"{SITE['domain']}/{canonical}"
+    preload = "".join(f'<link rel="preload" href="{root}assets/fonts/{f}.woff2" as="font" type="font/woff2" crossorigin>\n'
+                      for f in PRELOAD_FONTS)
     return f"""<!DOCTYPE html>
 <html lang="vi" data-root="{root}">
 <head>
@@ -190,21 +238,28 @@ def head(root, title, desc, canonical, image, og_type="website", extra=""):
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{e(full_title)}</title>
 <meta name="description" content="{e(desc)}">
-<link rel="canonical" href="{SITE['domain']}/{canonical}">
+<meta name="robots" content="{robots}">
+<link rel="canonical" href="{url_abs}">
 <meta property="og:site_name" content="{e(SITE['name'])}">
 <meta property="og:type" content="{og_type}">
 <meta property="og:title" content="{e(title)}">
 <meta property="og:description" content="{e(desc)}">
-<meta property="og:url" content="{SITE['domain']}/{canonical}">
+<meta property="og:url" content="{url_abs}">
 <meta property="og:image" content="{img_abs}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="{e(title)}">
 <meta property="og:locale" content="vi_VN">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{e(title)}">
+<meta name="twitter:description" content="{e(desc)}">
+<meta name="twitter:image" content="{img_abs}">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#111318" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="{root}assets/images/favicon.svg" type="image/svg+xml">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="apple-touch-icon" href="{root}assets/images/apple-touch-icon.png">
+<link rel="manifest" href="{root}site.webmanifest">
+{preload}<link rel="stylesheet" href="{root}assets/css/fonts.css?v={VERSION}">
 <link rel="stylesheet" href="{root}assets/css/style.css?v={VERSION}">
 <script>try{{var t=localStorage.getItem('hf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}}catch(e){{}}</script>
 {extra}</head>
@@ -218,7 +273,7 @@ def journey(root, current=None, cls=""):
     lis = ""
     for s in JOURNEY:
         cur = ' aria-current="step"' if s["key"] == current else ""
-        lis += (f'<li><a href="{root}{section_url(s)}"{cur}><span class="journey-n">{s["step"]}</span>'
+        lis += (f'<li><a href="{link(root, section_url(s))}"{cur}><span class="journey-n">{s["step"]}</span>'
                 f'<span class="journey-t"><b>{e(s["stepLabel"])}</b><small>{e(s["label"])}</small></span></a></li>')
     return f'<ol class="journey {cls}" aria-label="Học, thực hành, trở thành kỹ sư">{lis}</ol>'
 
@@ -247,14 +302,14 @@ def _panel_kicker(sec):
 
 def nav_panel(root, sec):
     pid = f"nav-panel-{sec['key']}"
-    all_link = f'<a class="panel-all" href="{root}{section_url(sec)}">Xem tất cả {e(sec["label"])} →</a>'
+    all_link = f'<a class="panel-all" href="{link(root, section_url(sec))}">Xem tất cả {e(sec["label"])} →</a>'
 
     if sec.get("layout") == "mega":
         groups = ""
         for g in sec["groups"]:
             lis = "".join(f'<li><a href="{root}{TOPIC_BY[sec["slug"] + "/" + i["slug"]]["url"]}">{e(i["label"])}</a></li>'
                           for i in g["items"])
-            groups += (f'<div class="mega-group"><a class="mega-group-title" href="{root}{section_url(sec)}#{g["slug"]}">'
+            groups += (f'<div class="mega-group"><a class="mega-group-title" href="{link(root, section_url(sec))}#{g["slug"]}">'
                        f'{e(g["label"])}</a><ul>{lis}</ul></div>')
         return f"""<div class="nav-panel mega" id="{pid}">
   <div class="container wide mega-inner">
@@ -276,7 +331,7 @@ def nav_panel(root, sec):
         return f"""<div class="nav-panel drop" id="{pid}">
   {_panel_kicker(sec)}
   <ul class="drop-list">{lis}</ul>
-  <a class="panel-all" href="{root}{section_url(sec)}">Xem tất cả lộ trình →</a>
+  <a class="panel-all" href="{link(root, section_url(sec))}">Xem tất cả lộ trình →</a>
 </div>"""
 
     groups = sec["groups"]
@@ -304,7 +359,7 @@ def header(root, active=""):
         act = " is-active" if cur else ""
         if "groups" not in sec and sec.get("layout") != "paths":
             aria = ' aria-current="page"' if cur else ""
-            items += f'<li class="nav-item"><a class="nav-link{act}" href="{root}{section_url(sec)}"{aria}>{e(sec["label"])}</a></li>'
+            items += f'<li class="nav-item"><a class="nav-link{act}" href="{link(root, section_url(sec))}"{aria}>{e(sec["label"])}</a></li>'
             continue
         cls = "nav-item has-panel"
         cls += " is-mega" if sec.get("layout") == "mega" else ""
@@ -314,14 +369,14 @@ def header(root, active=""):
                   f' aria-expanded="false" aria-controls="nav-panel-{sec["key"]}"{aria}>'
                   f'{e(sec["label"])}{ICON["chev"]}</button>{nav_panel(root, sec)}</li>')
 
-    start = f"{root}lo-trinh/index.html"
+    start = f"{root}lo-trinh/"
     login = f"{root}dang-nhap.html"
     return f"""<div class="progress" aria-hidden="true"></div>
 <header class="site-header">
   <div class="container wide header-top">
     <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav">{ICON['menu']}</button>
     <div class="nav-scrim" hidden></div>
-    <a class="logo" href="{root}index.html" aria-label="{e(SITE['name'])} – Trang chủ">{LOGO}<span>Học<b>Free</b></span></a>
+    <a class="logo" href="{link(root)}" aria-label="{e(SITE['name'])} – Trang chủ">{LOGO}<span>Học<b>Free</b></span></a>
     <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)">{ICON['search']}<span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
     <div class="header-actions">
       <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối">{ICON['moon']}</button>
@@ -333,7 +388,7 @@ def header(root, active=""):
     <div class="container wide">
       <nav class="site-nav" id="site-nav" aria-label="Menu chính">
         <div class="drawer-head">
-          <a class="logo" href="{root}index.html" tabindex="-1">{LOGO}<span>Học<b>Free</b></span></a>
+          <a class="logo" href="{link(root)}" tabindex="-1">{LOGO}<span>Học<b>Free</b></span></a>
           <button class="icon-btn nav-close" aria-label="Đóng menu">{ICON['close']}</button>
         </div>
         <button type="button" class="drawer-search search-open">{ICON['search']}<span>Tìm bài học, chủ đề…</span></button>
@@ -377,7 +432,7 @@ def search_dialog(root):
 
 def footer(root):
     def col(title, secs):
-        lis = "".join(f'<li><a href="{root}{section_url(s)}">{e(s["label"])}</a></li>' for s in secs)
+        lis = "".join(f'<li><a href="{link(root, section_url(s))}">{e(s["label"])}</a></li>' for s in secs)
         return f"<div><h3>{title}</h3><ul>{lis}</ul></div>"
     learn = col("Học &amp; thực hành", JOURNEY)
     explore = col("Khám phá", [s for s in SECTIONS if s.get("groups") and not s.get("step")])
@@ -387,7 +442,7 @@ def footer(root):
     return f"""<footer class="site-footer">
   <div class="container footer-grid">
     <div class="footer-about">
-      <a class="logo" href="{root}index.html">{LOGO}<span>Học<b>Free</b></span></a>
+      <a class="logo" href="{link(root)}">{LOGO}<span>Học<b>Free</b></span></a>
       <p>{e(SITE['description'])}</p>
     </div>
     {learn}
@@ -416,7 +471,7 @@ def footer(root):
 
 # ---------------------------------------------------------------- thành phần
 def cat_pill(root, p, cls="pill"):
-    return f'<a class="{cls} cat-{p["category"]}" href="{root}{p["category"]}/index.html">{e(p["cat"]["name"])}</a>'
+    return f'<a class="{cls} cat-{p["category"]}" href="{root}{p["category"]}/">{e(p["cat"]["name"])}</a>'
 
 
 def meta(p, author=False):
@@ -452,7 +507,7 @@ def sidebar(root, current=None):
         f'<li><a href="{root}{post_url(p)}"><span class="num">{i}</span><span class="t">{e(p["title"])}</span></a></li>'
         for i, p in enumerate(popular, 1))
     secs = "".join(
-        f'<li><a href="{root}{section_url(s)}"><span>{e(s["label"])}</span>'
+        f'<li><a href="{link(root, section_url(s))}"><span>{e(s["label"])}</span>'
         f'<span class="count">{count_label(len(section_posts(s)))}</span></a></li>'
         for s in SECTIONS if s.get("groups"))
     tags = sorted({t for p in POSTS for t in p["tags"]}, key=str.lower)
@@ -480,118 +535,202 @@ def section_title(text, link=None, root=""):
 
 
 # ---------------------------------------------------------------- trang chủ
-ILLU = "assets/images/illustrations/"  # minh họa unDraw (undraw.co, dùng miễn phí), xem README
+# Hình mô phỏng màn hình kiểm tra Vision (trang trí, aria-hidden): băng tải, 3 bo mạch, khung OK/NG
+def _pcb(x, y, scratch=False):
+    pads = "".join(f'<circle cx="{x + dx}" cy="{y + dy}" r="4" fill="#d4b26a"/>' for dx, dy in ((12, 12), (108, 12), (12, 76), (108, 76)))
+    pins = "".join(f'<rect x="{x + 45 + i * 8}" y="{y + 22}" width="3" height="6" fill="#c9a24b"/><rect x="{x + 45 + i * 8}" y="{y + 60}" width="3" height="6" fill="#c9a24b"/>' for i in range(4))
+    traces = (f'<path d="M{x + 16} {y + 44}H{x + 42}M{x + 78} {y + 44}H{x + 104}M{x + 60} {y + 66}V{y + 80}" stroke="#3fa57f" stroke-width="2.5" fill="none"/>')
+    cut = (f'<path d="M{x + 70} {y + 14}l10 9-6 4 12 10-5 3 9 9" stroke="#ff6b6b" stroke-width="3" fill="none" stroke-linecap="round"/>'
+           if scratch else "")
+    return (f'<rect x="{x}" y="{y}" width="120" height="88" rx="8" fill="#1d6b51" stroke="#2c8a69" stroke-width="2"/>{traces}{pads}{pins}'
+            f'<rect x="{x + 42}" y="{y + 27}" width="36" height="34" rx="4" fill="#0e1117"/>{cut}')
 
 
-def illu(root, name, cls="", eager=False):
-    return (f'<img class="{cls}" src="{root}{ILLU}{name}.svg" alt="" width="1000" height="560"'
-            f'{"" if eager else " loading=\"lazy\""} decoding="async">')
+def _box(x, y, w, ok, label):
+    c, tc = ("#4ade80", "#052e16") if ok else ("#f87171", "#450a0a")
+    return (f'<rect x="{x}" y="{y}" width="{w}" height="106" rx="6" fill="none" stroke="{c}" stroke-width="2.5"/>'
+            f'<rect x="{x - 1.25}" y="{y - 24}" width="{len(label) * 7.6 + 16}" height="22" rx="5" fill="{c}"/>'
+            f'<text x="{x + 7}" y="{y - 8.5}" font-size="12.5" fill="{tc}">{label}</text>')
 
 
-def post_card(root, p):
-    return (f'<a class="pcard" href="{root}{post_url(p)}">'
-            f'<img src="{root}{img_url(p)}" alt="" width="1200" height="675" loading="lazy" decoding="async">'
-            f'<span class="pcard-cat">{e(p["cat"]["name"])}</span>'
-            f'<span class="pcard-title">{e(p["title"])}</span></a>')
+def vision_mock():
+    belt = "".join(f'<path d="M{x} 300l26-60" stroke="#1f2633" stroke-width="10"/>' for x in range(-20, 640, 36))
+    scene = (
+        '<svg viewBox="0 0 600 320" role="presentation">'
+        '<rect width="600" height="320" fill="#0c1018"/>'
+        '<path d="M300 44 120 236M300 44 480 236" stroke="rgba(255,255,255,.12)" stroke-dasharray="4 6"/>'
+        '<rect x="276" y="14" width="48" height="30" rx="6" fill="#2a3242"/><circle cx="300" cy="44" r="9" fill="#11151d" stroke="#3b4456" stroke-width="3"/>'
+        '<text x="18" y="28" font-size="11" fill="#6f7686">CAM 0 · frame 1284</text>'
+        '<text x="582" y="28" font-size="11" fill="#6f7686" text-anchor="end">YOLO26 · 640px</text>'
+        f'<g><rect y="236" width="600" height="84" fill="#151a24"/>{belt}<rect y="236" width="600" height="3" fill="#2a3242"/></g>'
+        + _pcb(40, 140) + _pcb(240, 140, scratch=True) + _pcb(440, 140)
+        + _box(32, 132, 136, True, "OK 0.98") + _box(232, 132, 136, False, "NG · scratch 0.91") + _box(432, 132, 136, True, "OK 0.97")
+        + "</svg>")
+    code = ('<span class="k">from</span> ultralytics <span class="k">import</span> YOLO\n'
+            'model = YOLO(<span class="s">"hocfree-defect.pt"</span>)\n'
+            '<span class="k">for</span> r <span class="k">in</span> model(<span class="s">"cam0"</span>, stream=<span class="k">True</span>):\n'
+            '    plc.send(r.verdict)  <span class="c"># OK / NG</span>')
+    return f"""<div class="hx-visual" aria-hidden="true">
+        <div class="mock">
+          <div class="mock-bar"><i></i><i></i><i></i><span>inspection.py — HọcFree Vision</span><b class="mock-live">LIVE</b></div>
+          <div class="mock-view">{scene}<span class="mock-scan"></span></div>
+        </div>
+        <pre class="mock-code">{code}</pre>
+        <div class="mock-metric"><span class="mm-ico">{icon("check")}</span><div><b>99,2%</b><small>chính xác</small></div><div><b>38 ms</b><small>mỗi sản phẩm</small></div></div>
+      </div>"""
+
+
+TOPIC_ICON = {"hoc/python": "code-xml", "hoc/opencv": "scan-eye", "hoc/machine-vision": "camera", "hoc/deep-learning": "brain",
+              "hoc/ai-vision": "scan-search", "hoc/object-detection": "box-select", "hoc/pytorch": "flame", "ngoai-ngu/english": "languages"}
+
+
+def sec_head(eyebrow, title, sub="", more=None, center=False, hid=""):
+    more_html = f'<a class="more" href="{more[1]}">{e(more[0])}{icon("arrow-right")}</a>' if more else ""
+    sub_html = f'<p class="sub">{e(sub)}</p>' if sub else ""
+    return (f'<div class="sec-head{" center" if center else ""}"><div><p class="eyebrow">{e(eyebrow)}</p>'
+            f'<h2 id="{hid}">{title}</h2>{sub_html}</div>{more_html}</div>')
 
 
 def build_home():
-    """Trang chủ: ít chữ, nhiều hình. Mỗi khối một ý, mỗi thẻ một dòng mô tả."""
+    """Trang chủ: hero tối có mô phỏng Vision, 3 bước, lộ trình nổi bật, chủ đề, bài mới, khám phá, CTA."""
     root = ""
     flag = next(p for p in PATHS if p.get("flagship"))
-    n_topics = len(TOPICS)
+    steps = flag["steps"]
 
-    steps = [  # (mục, minh họa, mô tả ngắn)
-        (SEC["hoc"], "studying", "Python, AI, Computer Vision, Machine Vision"),
-        (SEC["projects"], "coding", "Dự án có mã nguồn, làm theo từng bước"),
-        (SEC["lo-trinh"], "qa-engineers", "Lộ trình nghề nghiệp rõ ràng"),
+    flow_data = [  # (mục, icon, mô tả, chữ nút)
+        (SEC["hoc"], "book-open", "Python, AI, Computer Vision và Machine Vision, từ nền tảng đến chuyên sâu.", "Vào học"),
+        (SEC["projects"], "code-xml", "Dự án có mã nguồn: đo kích thước, đọc mã, phát hiện lỗi trên dây chuyền.", "Xem dự án"),
+        (SEC["lo-trinh"], "graduation-cap", "Lộ trình nghề nghiệp rõ ràng: biết mình ở đâu và cần học gì tiếp.", "Xem lộ trình"),
     ]
-    step_cards = "".join(f"""<a class="jcard" href="{section_url(sec)}">
-        <span class="jcard-art">{illu(root, art)}</span>
-        <span class="jcard-num">Bước {sec['step']}</span>
-        <span class="jcard-title">{e(sec['stepLabel'])}</span>
-        <span class="jcard-desc">{e(desc)}</span>
-      </a>""" for sec, art, desc in steps)
+    flow = "".join(f"""<li><a class="flow-card" href="{section_url(sec)}">
+          <span class="ico-tile">{icon(ic)}</span><span class="flow-n">0{sec['step']}</span>
+          <h3>{e(sec['stepLabel'])}</h3><p>{e(desc)}</p>
+          <span class="flow-link">{e(cta)}{icon("arrow-right")}</span></a></li>""" for sec, ic, desc, cta in flow_data)
 
-    arrow = '<i aria-hidden="true">→</i>'
-    chain = "".join(f"<span>{e(x)}</span>{arrow}" for x in flag["preview"]) + f'<span class="chain-goal">🎯 {e(flag["short"])}</span>'
-    banner = f"""<a class="path-banner" href="{path_url(flag)}">
-      <span class="path-banner-text">
-        <span class="feature-eyebrow">⭐ Lộ trình nổi bật</span>
-        <span class="path-banner-title">{e(flag['label'])}</span>
-        <span class="feature-chain">{chain}</span>
-        <span class="feature-meta">{len(flag['steps'])} chặng · {e(flag['duration'])} · {e(flag['pace'])}</span>
-        <span class="feature-cta">Xem lộ trình →</span>
-      </span>
-      <span class="path-banner-art">{illu(root, "artificial-intelligence")}</span>
-    </a>"""
+    phases = ""
+    for n, ph in enumerate(flag["phases"], 1):
+        ph_steps = [st for st in steps if st["phase"] == ph["slug"]]
+        phases += (f'<li><span class="pn">{n}</span><div><b>{e(ph["label"])}</b>'
+                   f'<small>{" · ".join(e(st["title"]) for st in ph_steps)}</small></div>'
+                   f'<span class="wk">{sum(st["weeks"] for st in ph_steps)} tuần</span></li>')
+    phases += f'<li class="goal-row"><span class="pn">🎯</span><div><b>{e(flag["goal"]["title"])}</b><small>{e(", ".join(flag["goal"]["roles"][:3]))}</small></div></li>'
 
-    chips = "".join(f'<a class="chip" href="{TOPIC_BY[r]["url"]}">{e(TOPIC_BY[r]["item"]["label"])}</a>'
-                    for r in NAV["popularTopics"])
+    tiles = "".join(
+        f'<a class="topic-tile" href="{TOPIC_BY[r]["url"]}"><span class="ico">{icon(TOPIC_ICON.get(r, "sparkles"))}</span>'
+        f'<span><b>{e(TOPIC_BY[r]["item"]["label"])}</b><small>{len(TOPIC_BY[r]["posts"])} bài viết</small></span></a>'
+        for r in NAV["popularTopics"])
 
-    tiles = [("kien-thuc", "reading-list"), ("tin-tuc-ai", "news"), ("ngoai-ngu", "conversation"), ("tai-nguyen", "filing-system")]
-    tile_html = "".join(f"""<a class="tile" href="{section_url(SEC[k])}">
-        <span class="tile-art">{illu(root, art)}</span>
-        <span class="tile-title">{e(SEC[k]['label'])}</span>
-        <span class="tile-count">{len(section_posts(SEC[k]))} bài viết</span>
-      </a>""" for k, art in tiles)
-
-    # 6 bài mới nhất, tối đa 2 bài mỗi mục để trang chủ không bị một mục chiếm hết
+    # 5 bài mới nhất, tối đa 2 bài mỗi mục để trang chủ không bị một mục chiếm hết
     picked, per_cat = [], {}
     for p in POSTS:
         if per_cat.get(p["category"], 0) < 2:
             picked.append(p)
             per_cat[p["category"]] = per_cat.get(p["category"], 0) + 1
-        if len(picked) == 6:
+        if len(picked) == 5:
             break
-    latest = "".join(post_card(root, p) for p in picked)
+    f0 = picked[0]
+    feature = f"""<a class="mag-feature" href="{post_url(f0)}">
+        <span class="mag-img"><img src="{img_url(f0)}" alt="{e(f0['title'])}" width="1200" height="675" loading="lazy" decoding="async"></span>
+        <span class="kicker">{e(f0['cat']['name'])}</span><h3>{e(f0['title'])}</h3><p>{e(f0['excerpt'])}</p>
+        <span class="meta"><span>{icon("calendar")}{fmt_date(f0['date'])}</span><span>{icon("clock")}{f0['minutes']} phút đọc</span></span></a>"""
+    items = "".join(f"""<a class="mag-item" href="{post_url(p)}"><span class="im"><img src="{img_url(p)}" alt="" width="1200" height="675" loading="lazy" decoding="async"></span>
+        <span><span class="kicker">{e(p['cat']['name'])}</span><b>{e(p['title'])}</b><small>{fmt_date(p['date'])} · {p['minutes']} phút đọc</small></span></a>"""
+                    for p in picked[1:])
 
-    page = head(root, SITE["name"], SITE["description"], "", "assets/images/og-default.jpg")
+    explore_data = [("kien-thuc", "library", "Giải thích khái niệm, công cụ và mẹo hay."),
+                    ("tin-tuc-ai", "newspaper", "Tin AI, mô hình mới và Robotics chọn lọc."),
+                    ("ngoai-ngu", "languages", "Lộ trình 700 TOEIC và HSK3 cho người đi làm."),
+                    ("tai-nguyen", "folder-open", "Cheat sheet, dataset, mã nguồn và sách hay.")]
+    explore = "".join(f"""<a class="ex-card" href="{section_url(SEC[k])}"><span class="ico-tile">{icon(ic)}</span>
+        <h3>{e(SEC[k]['label'])}</h3><p>{e(desc)}</p><span class="count">{len(section_posts(SEC[k]))} bài viết →</span></a>"""
+                      for k, ic, desc in explore_data)
+
+    stack = "".join(f"<li>{x}</li>" for x in ["Python", "OpenCV", "PyTorch", "YOLO", "ONNX Runtime", "C# .NET", "OPC UA"])
+
+    ld = ld_json(
+        {"@context": "https://schema.org", "@type": "WebSite", "name": SITE["name"], "url": SITE["domain"] + "/", "inLanguage": "vi",
+         "description": SITE["description"], "publisher": ORG,
+         "potentialAction": {"@type": "SearchAction", "target": {"@type": "EntryPoint", "urlTemplate": f"{SITE['domain']}/search.html?q={{search_term_string}}"},
+                             "query-input": "required name=search_term_string"}},
+        {"@context": "https://schema.org", **ORG})
+    page = head(root, SITE["name"], SITE["description"], "", "assets/images/og-default.jpg", extra=ld)
     page += header(root, active="home")
-    page += f"""<main id="main" class="home2">
-  <section class="hero2">
-    <div class="container hero2-inner">
-      <div class="hero2-text">
-        <p class="home-eyebrow">Miễn phí · Tiếng Việt · Thực chiến</p>
-        <h1>Học AI &amp; Computer Vision, <span>từ số 0 đến kỹ sư</span></h1>
-        <p class="lead">Học có lộ trình, làm dự án thật, sẵn sàng đi làm.</p>
-        <div class="home-cta">
-          <a class="btn" href="{section_url(SEC['hoc'])}">Bắt đầu học</a>
-          <a class="btn ghost" href="{path_url(flag)}">Xem lộ trình</a>
+    page += f"""<main id="main">
+  <section class="hx">
+    <div class="container hx-inner">
+      <div class="hx-copy">
+        <a class="hx-badge" href="{path_url(flag)}"><b>Mới</b>Lộ trình Vision Engineer {len(steps)} chặng →</a>
+        <h1>Học AI &amp; Computer Vision <span class="grad-text">từ số 0 đến kỹ sư</span></h1>
+        <p class="hx-sub">Bài học tiếng Việt dễ hiểu, dự án có mã nguồn và lộ trình rõ ràng để trở thành Vision Engineer. Hoàn toàn miễn phí.</p>
+        <div class="hx-cta">
+          <a class="btn lg" href="{section_url(SEC['hoc'])}">Bắt đầu học miễn phí{icon("arrow-right")}</a>
+          <a class="btn lg ghost-light" href="{path_url(flag)}">Xem lộ trình</a>
         </div>
-        <ul class="hero2-stats">
-          <li><b>{len(POSTS)}</b> bài viết</li>
-          <li><b>{n_topics}</b> chủ đề</li>
-          <li><b>100%</b> miễn phí</li>
+        <ul class="hx-stats">
+          <li><b>{len(POSTS)}+</b><span>bài viết</span></li>
+          <li><b>{len(TOPICS)}</b><span>chủ đề</span></li>
+          <li><b>{len(steps)}</b><span>chặng lộ trình</span></li>
+          <li><b>0đ</b><span>học phí</span></li>
         </ul>
       </div>
-      <div class="hero2-art">{illu(root, "programming", eager=True)}</div>
+      {vision_mock()}
     </div>
   </section>
 
-  <div class="container home">
-    <section aria-labelledby="steps-t">
-      <h2 class="home-h2 center" id="steps-t">Học → Thực hành → Trở thành kỹ sư</h2>
-      <div class="jgrid">{step_cards}</div>
-    </section>
+  <section class="stack" aria-label="Công cụ sẽ học">
+    <div class="container stack-inner"><p>Công cụ bạn sẽ thành thạo</p><ul>{stack}</ul></div>
+  </section>
 
-    {banner}
+  <section class="sec" aria-labelledby="flow-t">
+    <div class="container">
+      {sec_head("Cách học trên HọcFree", "Học → Thực hành → Trở thành kỹ sư", "Ba bước rõ ràng, đi từ kiến thức đến công việc thật.", center=True, hid="flow-t")}
+      <ol class="flow">{flow}</ol>
+    </div>
+  </section>
 
-    <section aria-labelledby="pop-t">
-      <h2 class="home-h2" id="pop-t">Chủ đề phổ biến</h2>
-      <div class="chips chips-lg">{chips}</div>
-    </section>
+  <section class="container" aria-labelledby="path-t">
+    <div class="showcase">
+      <div>
+        <p class="eyebrow">⭐ Lộ trình nổi bật</p>
+        <h2 id="path-t">{e(flag['label'])}</h2>
+        <p class="showcase-sub">{e(flag['tagline'])}. Từ Python đến triển khai hệ thống Vision trong nhà máy.</p>
+        <ul class="showcase-facts">
+          <li>{icon("layers")}{len(steps)} chặng</li><li>{icon("clock")}{e(flag['duration'])}</li>
+          <li>{icon("calendar")}{e(flag['pace'])}</li><li>{icon("shield-check")}Miễn phí</li>
+        </ul>
+        <a class="btn lg" href="{path_url(flag)}">Xem lộ trình chi tiết{icon("arrow-right")}</a>
+      </div>
+      <ol class="phase-list">{phases}</ol>
+    </div>
+  </section>
 
-    <section aria-labelledby="new-t">
-      <div class="home-head"><h2 class="home-h2" id="new-t">Bài viết mới</h2><a class="more" href="search.html">Xem tất cả →</a></div>
-      <div class="pcard-grid">{latest}</div>
-    </section>
+  <section class="sec" aria-labelledby="topic-t">
+    <div class="container">
+      {sec_head("Chủ đề", "Chủ đề được học nhiều nhất", more=("Tất cả chủ đề", section_url(SEC['hoc'])), hid="topic-t")}
+      <div class="topic-tiles">{tiles}</div>
+    </div>
+  </section>
 
-    <section aria-labelledby="explore-t">
-      <h2 class="home-h2" id="explore-t">Khám phá thêm</h2>
-      <div class="tile-grid">{tile_html}</div>
-    </section>
-  </div>
+  <section class="sec soft" aria-labelledby="new-t">
+    <div class="container">
+      {sec_head("Mới cập nhật", "Bài viết mới", more=("Xem tất cả bài viết", "search.html"), hid="new-t")}
+      <div class="mag">{feature}<div class="mag-list">{items}</div></div>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="ex-t">
+    <div class="container">
+      {sec_head("Khám phá", "Không chỉ có lập trình", "Kiến thức nền, tin tức, ngoại ngữ và tài nguyên để học nhanh hơn.", hid="ex-t")}
+      <div class="explore">{explore}</div>
+    </div>
+  </section>
+
+  <section class="container cta-wrap">
+    <div class="cta-band">
+      <div><h2>Sẵn sàng trở thành Vision Engineer?</h2><p>Bắt đầu từ chặng 1 ngay hôm nay. Miễn phí, không cần đăng ký.</p></div>
+      <a class="btn lg" href="{path_url(flag)}#step-{steps[0]['slug']}">Bắt đầu lộ trình{icon("arrow-right")}</a>
+    </div>
+  </section>
 </main>
 """
     page += footer(root)
@@ -644,20 +783,25 @@ def build_post(p):
       <a class="share-btn x" href="https://twitter.com/intent/tweet?url={share_url}" target="_blank" rel="noopener" aria-label="Chia sẻ X">{ICON['x']}</a>
       <button class="share-btn copy-link" data-url="{share_url}" aria-label="Sao chép liên kết">{ICON['link']}</button>
     </div>"""
-    ld = json.dumps({
-        "@context": "https://schema.org", "@type": "Article", "headline": p["title"],
-        "description": p["excerpt"], "image": f"{SITE['domain']}/{img_url(p)}",
-        "datePublished": p["date"], "author": {"@type": "Organization", "name": SITE["author"]},
-        "publisher": {"@type": "Organization", "name": SITE["name"]},
-        "mainEntityOfPage": share_url}, ensure_ascii=False)
-    extra = f'<script type="application/ld+json">{ld}</script>\n'
+    article_ld = {
+        "@context": "https://schema.org", "@type": "Article", "headline": p["title"], "description": p["excerpt"],
+        "image": [f"{SITE['domain']}/{og_img(p)}"], "datePublished": p["date"], "dateModified": p.get("updated", p["date"]),
+        "inLanguage": "vi", "articleSection": p["cat"]["name"], "keywords": ", ".join(p["tags"]),
+        "wordCount": len(strip_tags(p["body"]).split()),
+        "author": {"@type": "Organization", "name": SITE["author"], "url": f"{SITE['domain']}/gioi-thieu.html"},
+        "publisher": ORG, "mainEntityOfPage": {"@type": "WebPage", "@id": share_url}}
+    crumb_ld = breadcrumb_ld([(p["cat"]["name"], f"{p['category']}/"), (p["title"], None)])
+    og_extra = (f'<meta property="article:published_time" content="{p["date"]}">\n'
+                f'<meta property="article:section" content="{e(p["cat"]["name"])}">\n'
+                + "".join(f'<meta property="article:tag" content="{e(t)}">\n' for t in p["tags"]))
+    extra = og_extra + ld_json(article_ld, crumb_ld)
 
-    page = head(root, p["title"], p["excerpt"], url, img_url(p), og_type="article", extra=extra)
+    page = head(root, p["title"], p["excerpt"], url, og_img(p), og_type="article", extra=extra)
     page += header(root, active=p["cat"]["section"])
     page += f"""<main id="main">
   <div class="container layout article-layout">
     <article class="article">
-      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{root}index.html">Trang chủ</a><span>/</span><a href="{root}{p['category']}/index.html">{e(p['cat']['name'])}</a></nav>
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{link(root)}">Trang chủ</a><span>/</span><a href="{root}{p['category']}/">{e(p['cat']['name'])}</a></nav>
       <header class="article-head">
         {cat_pill(root, p)}
         <h1>{e(p['title'])}</h1>
@@ -668,7 +812,7 @@ def build_post(p):
         </div>
       </header>
       <figure class="article-cover">
-        <img src="{root}{img_url(p)}" alt="{e(p['title'])}" width="1200" height="675">
+        <img src="{root}{img_url(p)}" alt="{e(p['title'])}" width="1200" height="675" fetchpriority="high" decoding="async">
       </figure>
       {toc_html}
       <div class="prose">
@@ -705,12 +849,12 @@ def build_post(p):
 def build_search():
     root = ""
     page = head(root, "Tìm kiếm", "Tìm kiếm bài viết trên HọcFree.", "search.html", "assets/images/og-default.jpg",
-                extra='<meta name="robots" content="noindex">\n')
+                robots="noindex, follow")
     page += header(root)
     page += f"""<main id="main">
   <div class="page-head">
     <div class="container">
-      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{root}index.html">Trang chủ</a><span>/</span><span>Tìm kiếm</span></nav>
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{link(root)}">Trang chủ</a><span>/</span><span>Tìm kiếm</span></nav>
       <h1>Tìm kiếm</h1>
       <form class="search-form big" action="search.html" role="search">
         {ICON['search']}
@@ -743,7 +887,7 @@ def build_about():
     page += f"""<main id="main">
   <div class="container layout article-layout">
     <article class="article">
-      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{root}index.html">Trang chủ</a><span>/</span><span>Giới thiệu</span></nav>
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{link(root)}">Trang chủ</a><span>/</span><span>Giới thiệu</span></nav>
       <header class="article-head"><h1>Về HọcFree</h1>
       <p class="lead">Kiến thức là để chia sẻ. HọcFree ra đời với mong muốn ai cũng có thể tự học AI, lập trình, Computer Vision và ngoại ngữ mà không phải lo về chi phí.</p></header>
       <div class="prose">
@@ -771,7 +915,7 @@ def build_404():
     # Trang 404 được GitHub Pages trả về ở mọi đường dẫn, nên dùng đường dẫn tuyệt đối
     root = "/"
     page = head(root, "Không tìm thấy trang", "Trang bạn tìm không tồn tại.", "404.html", "assets/images/og-default.jpg",
-                extra='<meta name="robots" content="noindex">\n')
+                robots="noindex, follow")
     page += header(root)
     page += f"""<main id="main">
   <div class="container notfound">
@@ -797,7 +941,7 @@ def count_label(n):
 
 
 def page_head(root, crumbs, title, desc, kicker="", count=""):
-    trail = f'<a href="{root}index.html">Trang chủ</a>'
+    trail = f'<a href="{link(root)}">Trang chủ</a>'
     for label, href in crumbs:
         trail += f'<span>/</span><a href="{root}{href}">{e(label)}</a>' if href else f"<span>/</span><span>{e(label)}</span>"
     kick = f'<p class="page-kicker">{kicker}</p>' if kicker else ""
@@ -811,6 +955,26 @@ def page_head(root, crumbs, title, desc, kicker="", count=""):
       {cnt}
     </div>
   </div>"""
+
+
+def auto_desc(label, ps, prefix="", limit=160):
+    """Meta description riêng cho từng trang chủ đề: (mô tả) + số bài + tên vài bài tiêu biểu."""
+    if not ps:
+        return f"Chủ đề {label} trên HọcFree: nội dung đang được biên soạn, xem vị trí của chủ đề trong lộ trình học."
+    out = f"{prefix}{len(ps)} bài viết về {label}: "
+    for i, p in enumerate(ps):
+        add = ("" if i == 0 else "; ") + p["title"]
+        if len(out) + len(add) > limit - 1:
+            break
+        out += add
+    return out.rstrip("; :") + "."
+
+
+def collection_ld(name, desc, url, ps):
+    return {"@context": "https://schema.org", "@type": "CollectionPage", "name": name, "description": desc,
+            "url": f"{SITE['domain']}/{url}", "inLanguage": "vi", "isPartOf": {"@type": "WebSite", "name": SITE["name"], "url": SITE["domain"] + "/"},
+            "mainEntity": {"@type": "ItemList", "numberOfItems": len(ps), "itemListElement": [
+                {"@type": "ListItem", "position": i, "url": f"{SITE['domain']}/{post_url(p)}"} for i, p in enumerate(ps[:20], 1)]}}
 
 
 def step_kicker(sec):
@@ -832,7 +996,7 @@ def build_topic(t):
     else:
         paths = TOPIC_IN_PATH.get(t["ref"], [])
         go = (f'<a class="btn" href="{root}{path_url(paths[0][0])}#step-{paths[0][2]["slug"]}">Xem chặng này trong lộ trình</a>'
-              if paths else f'<a class="btn" href="{root}lo-trinh/index.html">Chọn lộ trình học</a>')
+              if paths else f'<a class="btn" href="{root}lo-trinh/">Chọn lộ trình học</a>')
         content = f"""<div class="empty-state">
         <h2>Nội dung đang được biên soạn</h2>
         <p>Chủ đề <strong>{e(label)}</strong> đã có chỗ trong chương trình học của HọcFree, bài học sẽ được cập nhật sớm.
@@ -853,8 +1017,11 @@ def build_topic(t):
                    if in_paths else "")
 
     head_html = page_head(root, crumbs, label, desc, step_kicker(sec), f"{len(ps)} bài viết" if ps else "Đang biên soạn")
-    page = head(root, label, desc, t["url"], "assets/images/og-default.jpg",
-                extra="" if ps else '<meta name="robots" content="noindex">\n')
+    meta_desc = auto_desc(label, ps, prefix=f'{item["desc"]}. ' if item.get("desc") else "")
+    ld = ld_json(collection_ld(f"{label} – {sec['label']}", meta_desc, t["url"], ps), breadcrumb_ld(
+        [(c, h) for c, h in crumbs[:-1] if h and "#" not in h] + [(label, None)]))
+    page = head(root, f"{label} – {sec['label']}", meta_desc, t["url"], og_img(ps[0]) if ps else "assets/images/og-default.jpg",
+                robots=None if ps else "noindex, follow", extra=ld)
     page += header(root, active=sec["key"])
     page += f"""<main id="main">
   {head_html}
@@ -915,7 +1082,8 @@ def build_hub(sec):
 
     head_html = page_head(root, [(sec["label"], None)], sec["label"], sec["description"], step_kicker(sec),
                           f"{len(topics)} chủ đề" + (f" · {len(ps)} bài viết" if ps else ""))
-    page = head(root, sec["label"], sec["description"], f"{sec['slug']}/", "assets/images/og-default.jpg")
+    ld = ld_json(collection_ld(sec["label"], sec["description"], f"{sec['slug']}/", ps), breadcrumb_ld([(sec["label"], None)]))
+    page = head(root, sec["label"], sec["description"], f"{sec['slug']}/", "assets/images/og-default.jpg", extra=ld)
     page += header(root, active=sec["key"])
     page += f"""<main id="main">
   {head_html}
@@ -940,7 +1108,8 @@ def build_paths_index():
         f'<article class="path-card" id="{p["slug"]}"><span class="badge-soon">Sắp ra mắt</span>'
         f'<h3>{e(p["label"])}</h3><p class="path-card-sub">{e(p["tagline"])}</p><p>{e(p["description"])}</p></article>'
         for p in PATHS if not p.get("steps"))
-    page = head(root, "Learning Paths", sec["description"], "lo-trinh/", "assets/images/og-default.jpg")
+    page = head(root, "Learning Paths – Lộ trình học", sec["description"], "lo-trinh/", "assets/images/og-default.jpg",
+                extra=ld_json(breadcrumb_ld([("Learning Paths", None)])))
     page += header(root, active="lo-trinh")
     page += f"""<main id="main">
   {page_head(root, [('Learning Paths', None)], 'Learning Paths', sec['description'], step_kicker(sec))}
@@ -1020,12 +1189,13 @@ def build_path(p):
     }, ensure_ascii=False)
 
     page = head(root, p["label"], p["description"], path_url(p), "assets/images/og-default.jpg",
-                extra=f'<script type="application/ld+json">{ld}</script>\n')
+                extra=f'<script type="application/ld+json">{ld}</script>\n'
+                + ld_json(breadcrumb_ld([("Learning Paths", "lo-trinh/"), (p["label"], None)])))
     page += header(root, active="lo-trinh")
     page += f"""<main id="main" class="path-page" data-path="{p['slug']}">
   <div class="page-head path-head">
     <div class="container">
-      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{root}index.html">Trang chủ</a><span>/</span><a href="{root}lo-trinh/index.html">Learning Paths</a><span>/</span><span>{e(p['short'])}</span></nav>
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{link(root)}">Trang chủ</a><span>/</span><a href="{root}lo-trinh/">Learning Paths</a><span>/</span><span>{e(p['short'])}</span></nav>
       <p class="page-kicker">⭐ Learning Path flagship</p>
       <h1>{e(p['label'])}</h1>
       <p class="path-tagline">{e(p['tagline'])}</p>
@@ -1084,13 +1254,13 @@ def build_path(p):
 def build_login():
     root = ""
     page = head(root, "Đăng nhập", "Tài khoản HọcFree.", "dang-nhap.html", "assets/images/og-default.jpg",
-                extra='<meta name="robots" content="noindex">\n')
+                robots="noindex, follow")
     page += header(root)
     page += f"""<main id="main">
   <div class="container notfound">
     <h1>Tài khoản HọcFree sắp ra mắt</h1>
     <p>Hiện tại mọi bài học đều mở miễn phí, không cần đăng nhập. Tiến độ Learning Path được lưu ngay trên trình duyệt của bạn.</p>
-    <a class="btn" href="{root}lo-trinh/index.html">Bắt đầu học</a>
+    <a class="btn" href="{root}lo-trinh/">Bắt đầu học</a>
   </div>
 </main>
 """
