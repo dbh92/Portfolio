@@ -1,78 +1,412 @@
-<p>Rất nhiều bài toán Machine Vision trong nhà máy, như đếm sản phẩm, kiểm tra có/không có linh kiện, đo diện tích, được giải quyết bằng một chuỗi xử lý cổ điển: <strong>làm mờ → phân ngưỡng → hình thái học → tìm contour → đo đặc trưng</strong>. Không cần AI, chạy cực nhanh và dễ giải thích với khách hàng.</p>
+<p>Bài "Lọc nhiễu và phát hiện cạnh" tìm <em>đường viền</em> của vật. Rất nhiều bài toán trong nhà máy lại cần <em>vùng</em> vật: đếm sản phẩm trên khay, kiểm tra có/không có linh kiện, đo diện tích, phân loại theo kích thước. Chuỗi xử lý cổ điển cho các bài toán đó là <strong>làm mịn → phân ngưỡng → tìm contour → lọc → đo</strong>. Không cần AI, chạy vài mili giây và dễ giải thích với khách hàng. Bài này dạy ba cách phân ngưỡng (cố định, Otsu, thích nghi), cách tìm và lọc contour, rồi đếm và đo vật theo pixel. Hai bước tinh chỉnh quan trọng được dành cho hai bài ngay sau: làm sạch mặt nạ ở bài "Morphology: erode, dilate, opening, closing", và các đặc trưng hình học như độ tròn, góc xoay ở bài "Đặc trưng contour và blob analysis".</p>
+<div class="tip"><strong>Chuẩn bị</strong>Dùng <code>opencv-python</code> và <code>numpy</code>. Ảnh mẫu là một khay đồng xu vẽ bằng OpenCV, kèm file "đáp án" ghi vị trí và bán kính thật của từng đồng xu, để bạn kiểm chứng kết quả đếm và đo bằng số.</div>
 
-<h2>Bước 1: làm mờ để giảm nhiễu</h2>
-<pre><code>import cv2
+<h2>1. Ảnh mẫu: khay đồng xu có đáp án</h2>
+<p>Khay chính có 7 đồng xu lớn (bán kính 28 px) và 5 đồng xu nhỏ (bán kính 20 px) màu sáng trên nền tối, không chạm nhau, cộng 6 hạt bụi nhỏ. Đèn chiếu lệch làm bên trái tối hơn bên phải, và có nhiễu cảm biến. Cùng lúc ta tạo thêm hai khay dùng cho mục 4 và bài tập 1.</p>
+<pre><code class="language-python">import json
+
+import cv2
 import numpy as np
 
-img = cv2.imread("khay-oc-vit.png")
-gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-blur = cv2.GaussianBlur(gray, (5, 5), 0)</code></pre>
-<p>Kernel càng lớn thì càng mịn nhưng biên vật càng nhòe. Với nhiễu dạng "muối tiêu", dùng <code>cv2.medianBlur(gray, 5)</code> hiệu quả hơn.</p>
 
-<h2>Bước 2: phân ngưỡng</h2>
-<p>Phân ngưỡng biến ảnh xám thành ảnh nhị phân: vật = trắng (255), nền = đen (0).</p>
-<pre><code># Ngưỡng cố định: dùng khi ánh sáng rất ổn định
-_, th = cv2.threshold(blur, 120, 255, cv2.THRESH_BINARY)
+def tao_khay(ten, seed=0, n_lon=7, n_nho=5, den_trai=0.6):
+    """Vẽ khay đồng xu, lưu ảnh và file đáp án JSON. den_trai: độ sáng mép trái so với mép phải."""
+    rng = np.random.default_rng(seed)
+    H, W = 360, 480
+    xu = []
+    while len(xu) &lt; n_lon + n_nho:                       # đặt ngẫu nhiên, không cho chạm nhau
+        r = 28 if len(xu) &lt; n_lon else 20
+        x, y = int(rng.integers(r + 10, W - r - 10)), int(rng.integers(r + 10, H - r - 10))
+        if all((x - a) ** 2 + (y - b) ** 2 &gt; (r + rr + 12) ** 2 for a, b, rr in xu):
+            xu.append((x, y, r))
+    anh = np.full((H, W), 50, np.uint8)
+    for x, y, r in xu:
+        cv2.circle(anh, (x, y), r, int(rng.integers(175, 205)), -1)
+    for _ in range(6):                                   # hạt bụi bán kính 2 px
+        cv2.circle(anh, (int(rng.integers(5, W - 5)), int(rng.integers(5, H - 5))), 2, 200, -1)
+    den = np.tile(np.linspace(den_trai, 1.0, W), (H, 1))  # đèn lệch: trái tối, phải sáng
+    anh = np.clip(anh * den + rng.normal(0, 6, (H, W)), 0, 255).astype(np.uint8)
+    cv2.imwrite(ten, anh)
+    with open(ten.replace(".png", ".json"), "w", encoding="utf-8") as f:
+        json.dump(xu, f)
+    return xu
 
-# Otsu: tự tìm ngưỡng tối ưu khi histogram có 2 đỉnh (vật và nền)
-t, th = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-print("Ngưỡng Otsu:", t)
 
-# Thích nghi: khi ánh sáng không đều trên ảnh
-th_ad = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                              cv2.THRESH_BINARY, 31, 5)</code></pre>
-<p>Nếu vật tối hơn nền, dùng <code>cv2.THRESH_BINARY_INV</code> để vật luôn là màu trắng. Thực tế, <strong>ánh sáng tốt quan trọng hơn thuật toán phân ngưỡng giỏi</strong>: một tấm đèn nền (backlight) biến bài toán khó thành dễ.</p>
+xu = tao_khay("khay_dong_xu.png")
+tao_khay("khay_toi.png", seed=0, den_trai=0.25)          # cùng vị trí, đèn lệch mạnh (mục 4)
+tao_khay("khay_5.png", seed=5, n_lon=6, n_nho=8)         # khay cho bài tập 1
+print("đáp án:", len(xu), "đồng xu |", sum(r == 28 for _, _, r in xu), "lớn,", sum(r == 20 for _, _, r in xu), "nhỏ")</code></pre>
+<pre><code class="language-text">đáp án: 12 đồng xu | 7 lớn, 5 nhỏ</code></pre>
 
-<h2>Bước 3: hình thái học (morphology)</h2>
-<pre><code>kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-clean = cv2.morphologyEx(th, cv2.MORPH_OPEN, kernel)     # xóa đốm nhiễu nhỏ
-clean = cv2.morphologyEx(clean, cv2.MORPH_CLOSE, kernel) # lấp lỗ nhỏ trong vật</code></pre>
+<h2>2. Phân ngưỡng cố định</h2>
+<p>Phân ngưỡng biến ảnh xám thành ảnh nhị phân (mặt nạ): điểm sáng hơn ngưỡng T thành 255 (trắng, là vật), còn lại thành 0 (đen, là nền). Quy ước <strong>vật trắng trên nền đen</strong> là bắt buộc cho các hàm contour và morphology của OpenCV.</p>
+<pre><code class="language-python">import cv2
 
-<h2>Bước 4: tìm contour và lọc theo diện tích</h2>
-<pre><code>contours, _ = cv2.findContours(clean, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-objects = []
-for c in contours:
-    area = cv2.contourArea(c)
-    if area &lt; 200:                  # bỏ nhiễu
-        continue
-    x, y, w, h = cv2.boundingRect(c)
-    M = cv2.moments(c)
-    cx, cy = int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"])
-    objects.append((area, cx, cy))
-    cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
-    cv2.circle(img, (cx, cy), 3, (0, 0, 255), -1)
-
-print("Số vật:", len(objects))</code></pre>
-<p><code>RETR_EXTERNAL</code> chỉ lấy đường bao ngoài cùng, phù hợp để đếm. Nếu cần lỗ bên trong (ví dụ kiểm tra vòng đệm có lỗ hay không) thì dùng <code>RETR_CCOMP</code> hoặc <code>RETR_TREE</code> và đọc mảng <code>hierarchy</code>.</p>
-
-<h2>Bước 5: đặc trưng để phân loại OK/NG</h2>
+g = cv2.imread("khay_dong_xu.png", cv2.IMREAD_GRAYSCALE)
+mo = cv2.GaussianBlur(g, (5, 5), 0)
+for T in (45, 55, 90, 120, 150):
+    _, mat_na = cv2.threshold(mo, T, 255, cv2.THRESH_BINARY)
+    cs, _ = cv2.findContours(mat_na, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    lon = [c for c in cs if cv2.contourArea(c) &gt; 300]
+    print(f"T={T:3d}: {len(cs):4d} contour, {len(lon):2d} contour có diện tích &gt; 300 px²")</code></pre>
+<pre><code class="language-text">T= 45:  315 contour, 10 contour có diện tích &gt; 300 px²
+T= 55:   18 contour, 12 contour có diện tích &gt; 300 px²
+T= 90:   17 contour, 12 contour có diện tích &gt; 300 px²
+T=120:   26 contour, 12 contour có diện tích &gt; 300 px²
+T=150:   56 contour,  3 contour có diện tích &gt; 300 px²</code></pre>
+<ul>
+  <li>T quá thấp (45): nền bên phải (mức khoảng 50) cộng nhiễu vượt ngưỡng, sinh ra hàng trăm contour giả, và các mảng nền dính vào nhau làm sai cả số contour lớn.</li>
+  <li>T quá cao (150): các đồng xu bên trái (bị tối đi) không còn vượt ngưỡng hoặc chỉ còn mảnh vụn, đếm thiếu.</li>
+  <li>Từ 55 đến 120 có một <strong>dải ngưỡng dùng được</strong> (luôn ra 12 contour lớn; số contour nhỏ là bụi, sẽ lọc ở mục 6). Dải này càng rộng thì hệ thống càng chịu được thay đổi ánh sáng. Khi cài đặt trạm, hãy ghi lại cả dải chứ không chỉ một giá trị, và chọn ngưỡng ở giữa dải.</li>
+</ul>
 <table>
-  <tr><th>Đặc trưng</th><th>Cách tính</th><th>Dùng để</th></tr>
-  <tr><td>Diện tích</td><td><code>cv2.contourArea(c)</code></td><td>Phát hiện vật thiếu, vỡ, dính chùm</td></tr>
-  <tr><td>Chu vi</td><td><code>cv2.arcLength(c, True)</code></td><td>Phát hiện mép răng cưa, ba via</td></tr>
-  <tr><td>Độ tròn</td><td><code>4π·A / P²</code></td><td>Phân biệt vật tròn và méo</td></tr>
-  <tr><td>Hình chữ nhật xoay</td><td><code>cv2.minAreaRect(c)</code></td><td>Đo dài/rộng, góc xoay</td></tr>
-  <tr><td>Độ đặc (solidity)</td><td><code>A / diện tích bao lồi</code></td><td>Phát hiện vết khuyết, mẻ</td></tr>
+  <tr><th>Kiểu</th><th>Kết quả</th><th>Dùng khi</th></tr>
+  <tr><td><code>THRESH_BINARY</code></td><td>&gt; T → 255, còn lại 0</td><td>Vật sáng trên nền tối</td></tr>
+  <tr><td><code>THRESH_BINARY_INV</code></td><td>&gt; T → 0, còn lại 255</td><td>Vật tối trên nền sáng (đèn nền/backlight, chữ in đen trên giấy)</td></tr>
+  <tr><td><code>THRESH_TRUNC</code>, <code>THRESH_TOZERO</code></td><td>Cắt hoặc xóa một phía, giữ mức xám phía còn lại</td><td>Ít dùng để tạo mặt nạ; dùng để hạn chế vùng quá sáng</td></tr>
 </table>
-<pre><code>import math
-for c in contours:
-    A = cv2.contourArea(c)
-    P = cv2.arcLength(c, True)
-    if A &lt; 200 or P == 0:
+<p>Hàm <code>cv2.threshold</code> trả về hai giá trị: ngưỡng đã dùng và ảnh kết quả. Với ngưỡng cố định, giá trị đầu chỉ là T bạn truyền vào; với Otsu, đó là ngưỡng mà thuật toán tự tìm.</p>
+
+<h2>3. Otsu: tự tìm ngưỡng</h2>
+<p>Khi histogram có hai đỉnh (nền và vật), <strong>Otsu</strong> thử mọi ngưỡng 0–255 và chọn ngưỡng làm <strong>phương sai giữa hai nhóm</strong> (between-class variance) lớn nhất, tức là hai nhóm "nền" và "vật" tách nhau rõ nhất. Tự cài đặt để thấy nó không có gì bí ẩn:</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+g = cv2.imread("khay_dong_xu.png", cv2.IMREAD_GRAYSCALE)
+mo = cv2.GaussianBlur(g, (5, 5), 0)
+
+p = np.bincount(mo.ravel(), minlength=256) / mo.size     # xác suất từng mức xám
+muc = np.arange(256)
+tot_nhat, T_tot = -1.0, 0
+for T in range(1, 256):
+    w0, w1 = p[:T].sum(), p[T:].sum()                     # tỉ lệ nhóm nền (&lt; T) và nhóm vật (&gt;= T)
+    if w0 == 0 or w1 == 0:
         continue
-    roundness = 4 * math.pi * A / (P * P)
-    hull_area = cv2.contourArea(cv2.convexHull(c))
-    solidity = A / hull_area if hull_area else 0
-    status = "OK" if 0.80 &lt; roundness and solidity &gt; 0.95 else "NG"</code></pre>
+    m0 = (muc[:T] * p[:T]).sum() / w0                     # độ sáng trung bình từng nhóm
+    m1 = (muc[T:] * p[T:]).sum() / w1
+    pv = w0 * w1 * (m0 - m1) ** 2                         # phương sai giữa hai nhóm
+    if pv &gt; tot_nhat:
+        tot_nhat, T_tot = pv, T
 
-<h2>Khi hai vật dính nhau</h2>
-<p>Hai vật chạm nhau sẽ thành một contour lớn, làm sai số đếm. Cách xử lý phổ biến: chia theo diện tích chuẩn (<code>round(area / area_1_vat)</code>) hoặc tách bằng <em>distance transform + watershed</em>. Tốt nhất vẫn là thiết kế cơ khí (rung, tách hàng) để vật không chồng lên nhau.</p>
+t_cv, mat_na = cv2.threshold(mo, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+print("Otsu tự viết: vật là mức &gt;=", T_tot, "| OpenCV: vật là mức &gt;", int(t_cv))
+cv2.imwrite("mat_na_otsu.png", mat_na)
+print("tỉ lệ điểm trắng:", f"{(mat_na &gt; 0).mean():.1%}")</code></pre>
+<pre><code class="language-text">Otsu tự viết: vật là mức &gt;= 91 | OpenCV: vật là mức &gt; 90
+tỉ lệ điểm trắng: 13.6%</code></pre>
+<p>Hai cách cho cùng một điểm cắt (OpenCV báo T với quy ước "lớn hơn T là vật", bản tự viết dùng "lớn hơn hoặc bằng T + 1"). Khi dùng Otsu, tham số ngưỡng truyền vào (ở đây 0) bị bỏ qua. Ghi lại ngưỡng Otsu trả về trong log là thói quen tốt: nếu nó trôi dần theo ngày, đèn hoặc camera đang có vấn đề.</p>
+<div class="warn"><strong>Khi nào Otsu thất bại?</strong>Otsu giả định histogram có hai nhóm rõ ràng. Nó cho kết quả kém khi: vật chiếm diện tích rất nhỏ (ví dụ dưới vài phần trăm ảnh, đỉnh của vật gần như không thấy trên histogram); ánh sáng không đều đến mức nền chỗ sáng sáng hơn vật chỗ tối; hoặc ảnh không có vật nào (Otsu vẫn "tìm" ra một ngưỡng và cắt nền làm đôi). Trường hợp cuối rất hay gặp khi khay trống: luôn kiểm tra thêm, ví dụ độ chênh giữa hai nhóm phải đủ lớn.</div>
 
-<h2>Bài tập</h2>
-<ol>
-  <li>Chụp ảnh 10 đồng xu trên nền giấy trắng, đếm số đồng xu.</li>
-  <li>Phân loại đồng xu theo diện tích thành 2 nhóm và tô 2 màu khác nhau.</li>
-  <li>Thử làm lại với ánh sáng lệch một bên: phân ngưỡng cố định, Otsu hay thích nghi cho kết quả tốt nhất?</li>
-</ol>
-<p>Muốn áp dụng vào bài toán thật? Xem dự án <a href="../projects/dem-san-pham-bang-tai-opencv.html">đếm sản phẩm trên băng tải</a>.</p>
+<h2>4. Ngưỡng thích nghi (adaptive threshold)</h2>
+<p>Ngưỡng thích nghi tính <strong>một ngưỡng riêng cho từng điểm ảnh</strong>: trung bình (hoặc trung bình có trọng số Gaussian) của vùng <code>blockSize × blockSize</code> quanh điểm đó, trừ đi hằng số <code>C</code>. Nhờ vậy nó chịu được ánh sáng thay đổi chậm trên ảnh. Thử trên khay <code>khay_toi.png</code> tạo ở mục 1: cùng vị trí đồng xu nhưng đèn lệch mạnh, mép trái chỉ còn 25% độ sáng.</p>
+<pre><code class="language-python">import cv2
+
+mo = cv2.GaussianBlur(cv2.imread("khay_toi.png", cv2.IMREAD_GRAYSCALE), (5, 5), 0)
+
+
+def thong_ke(mat_na):
+    n, _, stats, _ = cv2.connectedComponentsWithStats(mat_na, connectivity=8)
+    dt = sorted(int(a) for a in stats[1:, cv2.CC_STAT_AREA] if a &gt; 300)
+    return f"{len(dt):2d} đồng xu, diện tích {dt[0]}..{dt[-1]}" if dt else "0 đồng xu"
+
+
+t, m = cv2.threshold(mo, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+print(f"Otsu (T={t:.0f})       :", thong_ke(m))
+for bs in (31, 61, 151):
+    m = cv2.adaptiveThreshold(mo, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, bs, -10)
+    print(f"adaptive block={bs:3d} :", thong_ke(m))
+print("diện tích lý thuyết: nhỏ π·20² ≈ 1257, lớn π·28² ≈ 2463")</code></pre>
+<pre><code class="language-text">Otsu (T=75)       : 10 đồng xu, diện tích 1235..2543
+adaptive block= 31 : 12 đồng xu, diện tích 935..1793
+adaptive block= 61 : 12 đồng xu, diện tích 1243..2450
+adaptive block=151 : 12 đồng xu, diện tích 1304..2582
+diện tích lý thuyết: nhỏ π·20² ≈ 1257, lớn π·28² ≈ 2463</code></pre>
+<p>Đọc kết quả (diện tích ở đây là số pixel trắng của từng vùng):</p>
+<ul>
+  <li><strong>Otsu toàn cục</strong> mất 2 đồng xu ở mép trái: ở đó đồng xu đã tối gần bằng nền bên phải.</li>
+  <li><strong>block = 31</strong> (nhỏ hơn đường kính đồng xu lớn, 57 px): ở giữa đồng xu, cả cửa sổ nằm trong đồng xu nên trung bình bằng chính độ sáng đồng xu, điểm ảnh không vượt được "trung bình + 10" và bị đánh dấu là nền. Đồng xu bị <strong>rỗng ruột</strong>, diện tích nhỏ hẳn, không phân loại lớn/nhỏ được nữa.</li>
+  <li><strong>block = 61</strong> (lớn hơn đường kính vật một chút): đủ 12 đồng xu, diện tích sát lý thuyết.</li>
+  <li><strong>block = 151</strong>: cửa sổ chứa nhiều nền tối, ngưỡng hạ xuống, vật "phình" ra.</li>
+</ul>
+<p>Quy tắc chọn tham số:</p>
+<table>
+  <tr><th>Tham số</th><th>Quy tắc</th></tr>
+  <tr><td><code>blockSize</code> (lẻ, ≥ 3)</td><td>Lớn hơn kích thước vật cần tách (để cửa sổ luôn chứa cả vật lẫn nền), nhỏ hơn quy mô thay đổi của ánh sáng. Với chữ: vài lần độ dày nét chữ.</td></tr>
+  <tr><td><code>C</code></td><td>Lớn hơn biên độ nhiễu, để vùng phẳng không bị lốm đốm. Với <code>THRESH_BINARY</code> và vật sáng, C âm nghĩa là "sáng hơn trung bình |C| mức mới là vật".</td></tr>
+  <tr><td><code>MEAN_C</code> hay <code>GAUSSIAN_C</code></td><td>Gaussian ưu tiên điểm gần tâm, đường biên mượt hơn một chút; khác biệt thường nhỏ.</td></tr>
+</table>
+
+<h2>5. Văn bản chụp dưới đèn không đều</h2>
+<p>Ứng dụng kinh điển của ngưỡng thích nghi là tách chữ trên phiếu, nhãn chụp dưới đèn không đều, trước bước OCR (chặng 7). Ta vẽ phiếu kiểm tra với chữ đen trên giấy trắng, góc trái trên bị tối, và giữ lại mặt nạ chữ thật để chấm điểm bằng <strong>IoU</strong> (Intersection over Union: phần giao chia phần hợp giữa chữ tìm được và chữ thật; 1 là hoàn hảo):</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+H, W = 300, 480
+chu = np.zeros((H, W), np.uint8)                          # mặt nạ chữ thật (đáp án)
+dong = ["PHIEU KIEM TRA CHAT LUONG", "Ma lo: 25A-0917   Ca: 2", "So luong OK: 1198  NG: 12",
+        "Nguoi kiem: Tran Van B", "Ghi chu: den trai yeu, can thay"]
+for i, s in enumerate(dong):
+    cv2.putText(chu, s, (20, 50 + i * 50), cv2.FONT_HERSHEY_SIMPLEX, 0.75, 255, 2)
+giay = 215.0 - (chu &gt; 0) * 150.0                          # chữ 65 trên giấy 215
+yy, xx = np.mgrid[0:H, 0:W]
+den = 0.25 + 0.75 * np.clip((xx + 0.6 * yy) / (W * 0.9), 0, 1)   # góc trái trên tối
+rng = np.random.default_rng(2)
+anh = np.clip(giay * den + rng.normal(0, 4, (H, W)), 0, 255).astype(np.uint8)
+cv2.imwrite("van_ban.png", anh)
+cv2.imwrite("van_ban_dap_an.png", chu)
+
+
+def iou(mat_na):
+    a, b = mat_na &gt; 0, chu &gt; 0
+    return (a &amp; b).sum() / (a | b).sum()
+
+
+t, otsu = cv2.threshold(anh, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+thich_nghi = cv2.adaptiveThreshold(anh, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                   cv2.THRESH_BINARY_INV, 31, 20)
+print(f"Otsu (T={t:.0f}): IoU = {iou(otsu):.3f}, tỉ lệ ảnh bị coi là chữ {(otsu &gt; 0).mean():.0%}")
+print(f"Adaptive 31/20: IoU = {iou(thich_nghi):.3f}, tỉ lệ ảnh bị coi là chữ {(thich_nghi &gt; 0).mean():.0%}")
+print(f"Thực tế chữ chiếm {(chu &gt; 0).mean():.0%} ảnh")</code></pre>
+<pre><code class="language-text">Otsu (T=147): IoU = 0.215, tỉ lệ ảnh bị coi là chữ 38%
+Adaptive 31/20: IoU = 0.993, tỉ lệ ảnh bị coi là chữ 8%
+Thực tế chữ chiếm 8% ảnh</code></pre>
+<p>Otsu toàn cục coi cả góc tối là "chữ" (IoU rất thấp); ngưỡng thích nghi khôi phục gần như hoàn hảo. Ở đây dùng <code>THRESH_BINARY_INV</code> vì chữ tối trên nền sáng, và <code>C = 20</code> dương nghĩa là "tối hơn trung bình vùng 20 mức mới là chữ". Bài tập 2 sẽ khảo sát ảnh hưởng của <code>blockSize</code> và <code>C</code>.</p>
+
+<h2>6. Tìm contour và lọc theo diện tích</h2>
+<p><strong>Contour</strong> là đường bao của một vùng trắng liên thông trong mặt nạ, lưu dưới dạng mảng điểm. Từ OpenCV 4 (và cả OpenCV 5), <code>cv2.findContours</code> trả về <strong>hai</strong> giá trị <code>(contours, hierarchy)</code>; OpenCV 3 trả về ba giá trị. Đây là lý do nhiều code cũ trên mạng báo lỗi "too many values to unpack".</p>
+<pre><code class="language-python">import cv2
+
+mat_na = cv2.imread("mat_na_otsu.png", cv2.IMREAD_GRAYSCALE)
+cs, h = cv2.findContours(mat_na, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+cs_full, _ = cv2.findContours(mat_na, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+print("số contour:", len(cs), "| shape contour đầu:", cs[0].shape, "| hierarchy:", h.shape)
+print("số điểm lưu (SIMPLE / NONE):", sum(len(c) for c in cs), "/", sum(len(c) for c in cs_full))
+
+dien_tich = sorted(cv2.contourArea(c) for c in cs)
+print("6 diện tích nhỏ nhất:", [round(a, 1) for a in dien_tich[:6]])
+vat = [c for c in cs if cv2.contourArea(c) &gt;= 300]
+print("sau khi lọc diện tích &gt;= 300:", len(vat), "vật")</code></pre>
+<pre><code class="language-text">số contour: 17 | shape contour đầu: (5, 1, 2) | hierarchy: (1, 17, 4)
+số điểm lưu (SIMPLE / NONE): 884 / 1703
+6 diện tích nhỏ nhất: [4.0, 4.0, 5.0, 8.0, 11.5, 1152.0]
+sau khi lọc diện tích &gt;= 300: 12 vật</code></pre>
+<ul>
+  <li><strong><code>RETR_EXTERNAL</code></strong> chỉ lấy đường bao ngoài cùng, đúng thứ cần để đếm vật. Các chế độ khác (<code>RETR_CCOMP</code>, <code>RETR_TREE</code>) và mảng <code>hierarchy</code> dùng để tìm lỗ bên trong vật, được dạy kỹ ở bài "Đặc trưng contour và blob analysis".</li>
+  <li><strong><code>CHAIN_APPROX_SIMPLE</code></strong> chỉ lưu các điểm đầu mút của đoạn thẳng ngang, dọc, chéo, tiết kiệm bộ nhớ mà diện tích, khung bao không đổi. Dùng <code>CHAIN_APPROX_NONE</code> khi cần mọi điểm biên (ví dụ fitting đường tròn).</li>
+  <li><strong>Lọc theo diện tích</strong> loại bụi và nhiễu. Ngưỡng diện tích chọn ở khoảng giữa "nhiễu lớn nhất" và "vật nhỏ nhất hợp lệ". Ở đây bụi chỉ dưới 12 px², đồng xu nhỏ nhất khoảng 1150 px², nên 300 cách xa cả hai.</li>
+  <li><code>contourArea</code> của contour 1 điểm hoặc 1 đường thẳng bằng 0. Đừng chia cho diện tích mà không kiểm tra.</li>
+</ul>
+<div class="tip"><strong>Khi lọc diện tích chưa đủ</strong>Lọc diện tích chỉ loại được nhiễu tách rời. Khi nhiễu dính vào vật, vật có lỗ thủng, hay đường biên lởm chởm, bạn cần làm sạch mặt nạ trước khi tìm contour: đó là nội dung bài "Morphology: erode, dilate, opening, closing" ngay sau bài này.</div>
+
+<h2>7. Đếm và đo kích thước theo pixel</h2>
+<p>Với mỗi contour hợp lệ, ta đo các đại lượng cơ bản và so với đáp án:</p>
+<table>
+  <tr><th>Đại lượng</th><th>Hàm</th><th>Ghi chú</th></tr>
+  <tr><td>Diện tích</td><td><code>cv2.contourArea(c)</code></td><td>Diện tích đa giác qua tâm các pixel biên, hơi nhỏ hơn số pixel</td></tr>
+  <tr><td>Tâm</td><td><code>M = cv2.moments(c)</code>; <code>M["m10"]/M["m00"]</code></td><td>Trọng tâm, có phần thập phân</td></tr>
+  <tr><td>Khung bao</td><td><code>cv2.boundingRect(c)</code></td><td><code>x, y, w, h</code> theo trục ảnh</td></tr>
+  <tr><td>Đường tròn bao nhỏ nhất</td><td><code>cv2.minEnclosingCircle(c)</code></td><td>Tâm và bán kính, hợp với vật tròn</td></tr>
+  <tr><td>Đường kính tương đương</td><td><code>sqrt(4·A/π)</code></td><td>Đường kính của hình tròn có cùng diện tích, dùng được cho vật méo</td></tr>
+</table>
+<pre><code class="language-python">import json
+import math
+
+import cv2
+import numpy as np
+
+MM_PER_PX = 0.4                                          # tỉ lệ giả định, từ hiệu chuẩn (chặng 8)
+g = cv2.imread("khay_dong_xu.png", cv2.IMREAD_GRAYSCALE)
+_, mat_na = cv2.threshold(cv2.GaussianBlur(g, (5, 5), 0), 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+cs, _ = cv2.findContours(mat_na, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+cs = [c for c in cs if cv2.contourArea(c) &gt;= 300]
+cs.sort(key=lambda c: cv2.boundingRect(c)[0])            # trái sang phải
+dap_an = json.load(open("khay_dong_xu.json", encoding="utf-8"))
+
+print(" #   tâm (x, y)     A(px²)  D_tđ(px)  r_bao  D(mm)  loại | r thật")
+for i, c in enumerate(cs, 1):
+    A = cv2.contourArea(c)
+    M = cv2.moments(c)
+    cx, cy = M["m10"] / M["m00"], M["m01"] / M["m00"]
+    d_td = math.sqrt(4 * A / math.pi)
+    (_, _), r_bao = cv2.minEnclosingCircle(c)
+    loai = "lớn" if A &gt; 1800 else "nhỏ"                   # ngưỡng giữa ~1250 và ~2450
+    r_that = min(dap_an, key=lambda t: (t[0] - cx) ** 2 + (t[1] - cy) ** 2)[2]
+    print(f"{i:2d}  ({cx:5.1f},{cy:6.1f})  {A:6.0f}  {d_td:8.1f}  {r_bao:5.1f}  {d_td * MM_PER_PX:5.1f}  {loai:4s} | {r_that}")
+so_lon = sum(cv2.contourArea(c) &gt; 1800 for c in cs)
+print(f"Tổng: {len(cs)} đồng xu ({so_lon} lớn, {len(cs) - so_lon} nhỏ)")</code></pre>
+<pre><code class="language-text">#   tâm (x, y)     A(px²)  D_tđ(px)  r_bao  D(mm)  loại | r thật
+ 1  ( 39.1, 192.0)    1152      38.3   19.7   15.3  nhỏ  | 20
+ 2  ( 68.1,  42.0)    2315      54.3   27.7   21.7  lớn  | 28
+ 3  (108.1, 268.0)    2335      54.5   27.8   21.8  lớn  | 28
+ 4  (162.0,  49.0)    2367      54.9   27.9   22.0  lớn  | 28
+ 5  (195.0, 287.0)    1196      39.0   20.0   15.6  nhỏ  | 20
+ 6  (241.0, 210.0)    2370      54.9   27.9   22.0  lớn  | 28
+ 7  (244.0, 114.0)    2370      54.9   27.9   22.0  lớn  | 28
+ 8  (300.1, 297.0)    2376      55.0   28.1   22.0  lớn  | 28
+ 9  (311.0,  30.0)    1201      39.1   20.1   15.6  nhỏ  | 20
+10  (381.0, 218.0)    2414      55.4   28.3   22.2  lớn  | 28
+11  (385.1,  82.0)    1244      39.8   20.6   15.9  nhỏ  | 20
+12  (437.1, 247.8)    1255      40.0   22.0   16.0  nhỏ  | 20
+Tổng: 12 đồng xu (7 lớn, 5 nhỏ)</code></pre>
+<p>Nhận xét quan trọng khi đo theo pixel:</p>
+<ul>
+  <li><strong>Đếm đúng 12</strong>, phân loại đúng 7 lớn và 5 nhỏ, khớp đáp án. Ngưỡng phân loại 1800 px² nằm giữa hai nhóm, cách mỗi nhóm hàng trăm px², nên có biên an toàn lớn.</li>
+  <li>Đồng xu vẽ với bán kính 28 có đường kính thật trên lưới pixel là 57 px (2r + 1). Đường kính tương đương và bán kính đường tròn bao hơi khác nhau và hơi khác đáp án: biên bị làm mịn, đèn lệch làm đồng xu bên trái "co" lại nhẹ khi phân ngưỡng. Sai số cỡ 1 px là bình thường cho phương pháp phân ngưỡng; độ chính xác dưới pixel cần các kỹ thuật đo cạnh ở chặng 7.</li>
+  <li>Đồng số 12 có <code>r_bao</code> = 22,0 trong khi đường kính tương đương chỉ 40,0 px: một hạt bụi dính sát mép đồng xu tạo một chỗ lồi nhỏ, đủ kéo đường tròn bao ra 2 px nhưng gần như không đổi diện tích. Đại lượng dựa trên <strong>diện tích</strong> bền với nhiễu hơn đại lượng dựa trên <strong>điểm cực biên</strong> (khung bao, đường tròn bao).</li>
+  <li>Đổi sang mm chỉ là nhân với tỉ lệ <code>MM_PER_PX</code>, nhưng tỉ lệ đó phải đến từ hiệu chuẩn (chặng 8, bài quy đổi pixel sang mm), không phải đoán. Diện tích đổi bằng <code>MM_PER_PX²</code>.</li>
+  <li>Thứ tự contour OpenCV trả về <strong>không theo trái sang phải</strong>; ở đây tự sắp xếp theo <code>x</code> của khung bao. Cách sắp xếp theo hàng rồi cột cho khay nhiều hàng có ở bài "Đặc trưng contour và blob analysis".</li>
+</ul>
+
+<h2>8. Gom thành hàm và lưu ảnh minh chứng</h2>
+<p>Trong dự án, gom các bước thành một hàm có tham số rõ ràng, trả về danh sách kết quả có cấu trúc (như bài tổ chức pipeline ở chặng 2), và luôn lưu một <strong>ảnh minh chứng</strong> để người vận hành kiểm tra:</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+
+def dem_vat(gray, dien_tich_min=300, nguong=None, vat_toi=False, k_blur=5):
+    """Trả về (danh sách vật, mặt nạ). nguong=None: dùng Otsu. vat_toi=True: vật tối trên nền sáng."""
+    mo = cv2.GaussianBlur(gray, (k_blur, k_blur), 0) if k_blur &gt; 1 else gray
+    kieu = cv2.THRESH_BINARY_INV if vat_toi else cv2.THRESH_BINARY
+    if nguong is None:
+        t, mat_na = cv2.threshold(mo, 0, 255, kieu + cv2.THRESH_OTSU)
+    else:
+        t, mat_na = cv2.threshold(mo, nguong, 255, kieu)
+    cs, _ = cv2.findContours(mat_na, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    ds = []
+    for c in cs:
+        A = cv2.contourArea(c)
+        if A &lt; dien_tich_min:
+            continue
+        M = cv2.moments(c)
+        ds.append({"tam": (round(M["m10"] / M["m00"], 1), round(M["m01"] / M["m00"], 1)),
+                   "dien_tich": round(A), "khung": cv2.boundingRect(c), "contour": c})
+    ds.sort(key=lambda v: v["khung"][0])
+    return ds, mat_na, t
+
+
+def ve_minh_chung(gray, ds, nguong_lon=1800):
+    ve = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+    for i, v in enumerate(ds, 1):
+        mau = (0, 200, 0) if v["dien_tich"] &gt; nguong_lon else (255, 128, 0)
+        cv2.drawContours(ve, [v["contour"]], -1, mau, 2)
+        x, y = int(v["tam"][0]), int(v["tam"][1])
+        cv2.putText(ve, str(i), (x - 6, y + 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+    cv2.putText(ve, f"Tong: {len(ds)}", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+    return ve
+
+
+g = cv2.imread("khay_dong_xu.png", cv2.IMREAD_GRAYSCALE)
+ds, mat_na, t = dem_vat(g)
+cv2.imwrite("minh_chung_dem_xu.png", ve_minh_chung(g, ds))
+print(f"ngưỡng Otsu {t:.0f}, đếm được {len(ds)} vật, đã lưu minh_chung_dem_xu.png")</code></pre>
+<pre><code class="language-text">ngưỡng Otsu 90, đếm được 12 vật, đã lưu minh_chung_dem_xu.png</code></pre>
+<p>Ảnh minh chứng tô xanh lá đồng xu lớn, xanh dương đồng xu nhỏ, đánh số theo thứ tự trái sang phải giống bảng in ra. Khi khách hàng hỏi "tại sao khay này báo thiếu", bạn mở ảnh này thay vì giải thích bằng lời. Hàm trả về cả ngưỡng đã dùng để ghi log.</p>
+
+<h2>9. Lỗi thường gặp</h2>
+<table>
+  <tr><th>Hiện tượng</th><th>Nguyên nhân</th><th>Cách sửa</th></tr>
+  <tr><td>Đếm ra 1 vật bằng cả khung hình</td><td>Vật tối trên nền sáng mà dùng <code>THRESH_BINARY</code>: nền thành vật</td><td><code>THRESH_BINARY_INV</code></td></tr>
+  <tr><td>Hàng trăm vật giả</td><td>Nhiễu, bụi, ngưỡng quá sát nền</td><td>Lọc nhiễu trước, lọc diện tích, morphology (bài sau)</td></tr>
+  <tr><td>Thiếu vật ở một phía ảnh</td><td>Ánh sáng không đều với ngưỡng toàn cục</td><td>Sửa đèn; hoặc adaptive threshold với blockSize lớn hơn vật</td></tr>
+  <tr><td>Vật rỗng ruột, diện tích nhỏ bất thường</td><td>blockSize của adaptive nhỏ hơn vật</td><td>Tăng blockSize</td></tr>
+  <tr><td>Hai vật đếm thành một</td><td>Vật chạm nhau</td><td>Tách bằng watershed (bài "Watershed: tách các vật dính nhau") hoặc tách cơ khí</td></tr>
+  <tr><td>Khay trống vẫn đếm ra vật</td><td>Otsu luôn chia ảnh làm hai nhóm</td><td>Kiểm tra độ chênh hai nhóm, hoặc dùng ngưỡng cố định khi đèn ổn định</td></tr>
+  <tr><td>"too many values to unpack"</td><td>Code viết cho OpenCV 3</td><td><code>cs, h = cv2.findContours(...)</code></td></tr>
+</table>
+<div class="tip"><strong>Ánh sáng trước, thuật toán sau</strong>Một tấm đèn nền (backlight) đặt dưới vật biến bài toán đếm thành ảnh đen trắng gần như hoàn hảo: ngưỡng cố định chạy ổn định cả năm. Chặng 6 (chiếu sáng) bàn kỹ điều này. Adaptive threshold là công cụ cứu vãn khi không thể sửa đèn, không phải lựa chọn đầu tiên.</div>
+
+<h2>10. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Đếm số đồng xu trong khay <code>khay_5.png</code> (tạo ở mục 1 với <code>seed=5</code>, 6 đồng lớn, 8 đồng nhỏ) và in diện tích từng đồng. So số đếm với file đáp án JSON.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import json
+
+import cv2
+
+g = cv2.imread("khay_5.png", cv2.IMREAD_GRAYSCALE)
+_, m = cv2.threshold(cv2.GaussianBlur(g, (5, 5), 0), 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+cs, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+cs = sorted([c for c in cs if cv2.contourArea(c) &gt;= 300], key=lambda c: cv2.boundingRect(c)[0])
+for i, c in enumerate(cs, 1):
+    print(f"đồng {i:2d}: diện tích {cv2.contourArea(c):6.0f} px²")
+dap_an = json.load(open("khay_5.json", encoding="utf-8"))
+print("đếm được:", len(cs), "| đáp án:", len(dap_an), "|", "ĐÚNG" if len(cs) == len(dap_an) else "SAI")</code></pre>
+<pre><code class="language-text">đồng  1: diện tích   1154 px²
+đồng  2: diện tích   2318 px²
+đồng  3: diện tích   1156 px²
+đồng  4: diện tích   1139 px²
+đồng  5: diện tích   1156 px²
+đồng  6: diện tích   1151 px²
+đồng  7: diện tích   2364 px²
+đồng  8: diện tích   2369 px²
+đồng  9: diện tích   2371 px²
+đồng 10: diện tích   2386 px²
+đồng 11: diện tích   1230 px²
+đồng 12: diện tích   1256 px²
+đồng 13: diện tích   2441 px²
+đồng 14: diện tích   1264 px²
+đếm được: 14 | đáp án: 14 | ĐÚNG</code></pre>
+<p>Diện tích tách thành hai nhóm rõ rệt (quanh 1250 và quanh 2450). Với ảnh của bạn, chỉ cần đổi tên file trong <code>cv2.imread</code>. Nếu bạn chụp đồng xu thật, đặt chúng trên nền tối, không chạm nhau, đèn chiếu từ trên xuống đều.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Dùng adaptive threshold cho ảnh văn bản chụp dưới đèn không đều (<code>van_ban.png</code>, mục 5). Thử <code>blockSize</code> = 7, 15, 31, 61 và <code>C</code> = 5, 10, 20, in IoU. Giải thích vì sao C = 5 luôn kém.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import cv2
+
+anh = cv2.imread("van_ban.png", cv2.IMREAD_GRAYSCALE)
+chu = cv2.imread("van_ban_dap_an.png", cv2.IMREAD_GRAYSCALE) &gt; 0
+print("block |  C=5   C=10  C=20")
+for bs in (7, 15, 31, 61):
+    hang = []
+    for C in (5, 10, 20):
+        m = cv2.adaptiveThreshold(anh, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, bs, C) &gt; 0
+        hang.append((m &amp; chu).sum() / (m | chu).sum())
+    print(f"{bs:5d} | " + "  ".join(f"{v:.3f}" for v in hang))</code></pre>
+<pre><code class="language-text">block |  C=5   C=10  C=20
+    7 | 0.432  0.794  0.551
+   15 | 0.450  0.917  0.889
+   31 | 0.480  0.933  0.993
+   61 | 0.557  0.951  1.000</code></pre>
+<ul>
+  <li><strong>C = 5</strong> nhỏ hơn biên độ nhiễu (độ lệch chuẩn 4, dao động ± 8–12 mức là thường): trên giấy trắng phẳng, rất nhiều điểm tối hơn trung bình 5 mức chỉ vì nhiễu, nên giấy bị lốm đốm "chữ". Quy tắc: C lớn hơn khoảng 2–3 lần độ lệch chuẩn nhiễu.</li>
+  <li><strong>blockSize = 7</strong> chỉ hơn độ dày nét chữ (khoảng 2–3 px) một chút: ở giữa các nét đậm, cửa sổ gần như toàn chữ, chữ bị rỗng. Từ 31 trở lên, kết quả gần hoàn hảo với C đủ lớn.</li>
+  <li>C quá lớn sẽ làm mất chữ ở vùng tối, nơi chữ chỉ tối hơn giấy khoảng 37 mức. Hãy luôn kiểm tra ở vùng tối nhất của ảnh.</li>
+</ul>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Trạm đếm đai ốc dùng đèn nền: đai ốc hiện lên thành hình lục giác <strong>đen</strong> trên nền <strong>trắng</strong>. Tạo ảnh có 9 lục giác đen (bán kính 22 px) trên nền 230 và đếm chúng. Thử cả hai kiểu <code>THRESH_BINARY</code> và <code>THRESH_BINARY_INV</code>.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+anh = np.full((300, 400), 230, np.uint8)
+goc = np.deg2rad(np.arange(0, 360, 60))
+for i in range(9):
+    cx, cy = 70 + (i % 3) * 130, 60 + (i // 3) * 90
+    pts = np.stack([cx + 22 * np.cos(goc), cy + 22 * np.sin(goc)], axis=1).astype(np.int32)
+    cv2.fillPoly(anh, [pts], 25)
+anh = np.clip(anh + np.random.default_rng(0).normal(0, 5, anh.shape), 0, 255).astype(np.uint8)
+
+mo = cv2.GaussianBlur(anh, (5, 5), 0)
+for ten, kieu in [("THRESH_BINARY    ", cv2.THRESH_BINARY), ("THRESH_BINARY_INV", cv2.THRESH_BINARY_INV)]:
+    _, m = cv2.threshold(mo, 0, 255, kieu + cv2.THRESH_OTSU)
+    cs, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    dt = [round(cv2.contourArea(c)) for c in cs if cv2.contourArea(c) &gt;= 300]
+    print(f"{ten}: {len(dt)} vật, diện tích {sorted(set(dt))}")</code></pre>
+<pre><code class="language-text">THRESH_BINARY    : 1 vật, diện tích [119301]
+THRESH_BINARY_INV: 9 vật, diện tích [1285, 1300]</code></pre>
+<p>Không đảo, cả nền trắng thành một "vật" khổng lồ (các lục giác là lỗ bên trong nó, <code>RETR_EXTERNAL</code> bỏ qua). Với <code>THRESH_BINARY_INV</code> (tham số <code>vat_toi=True</code> của hàm <code>dem_vat</code> ở mục 8), đếm đúng 9. Diện tích lý thuyết của lục giác đều bán kính 22 là (3√3/2)·22² ≈ 1257 px²; số đo 1285–1300 px² lớn hơn khoảng 2–3% vì <code>fillPoly</code> tô cả các pixel nằm trên đường biên. Chênh lệch kiểu này là lý do dung sai luôn được lấy từ mẫu thật đo bằng chính chương trình, không lấy từ công thức.</p>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Phân ngưỡng tạo mặt nạ vật trắng nền đen; vật tối dùng <code>THRESH_BINARY_INV</code>.</li>
+  <li>Ngưỡng cố định khi đèn ổn định (chọn giữa dải dùng được); Otsu tự tìm ngưỡng khi histogram có hai đỉnh; adaptive khi ánh sáng không đều, với blockSize lớn hơn vật và C lớn hơn nhiễu.</li>
+  <li><code>findContours</code> (OpenCV 4/5) trả về 2 giá trị; <code>RETR_EXTERNAL</code> để đếm; lọc contour theo diện tích để bỏ bụi, nhiễu.</li>
+  <li>Đo theo pixel: diện tích, tâm, khung bao, đường tròn bao, đường kính tương đương; đổi sang mm bằng tỉ lệ từ hiệu chuẩn.</li>
+  <li>Luôn kiểm chứng với đáp án (ảnh mẫu, mẫu chuẩn) và lưu ảnh minh chứng.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Morphology: erode, dilate, opening, closing</strong>, bộ công cụ làm sạch mặt nạ khi nhiễu dính vào vật và vật có lỗ thủng.</p>

@@ -1,51 +1,458 @@
-<p>Sản phẩm trên băng tải hiếm khi nằm đúng vị trí và góc. Trước khi kiểm tra, ta thường <strong>căn chỉnh ảnh</strong>: xoay thẳng, dịch về vị trí chuẩn, hoặc "nắn" ảnh chụp nghiêng về góc nhìn thẳng. Đó là các phép biến đổi hình học.</p>
+<p>Sản phẩm trên băng tải hiếm khi nằm đúng vị trí và đúng góc, còn camera đôi khi buộc phải nhìn nghiêng vì vướng cơ cấu máy. Trước khi đọc nhãn, so mẫu hay đo, ta thường <strong>chuẩn hóa hình học</strong>: xoay vật về thẳng, cắt đúng vùng cần xem, hoặc "nắn" ảnh chụp nghiêng về góc nhìn thẳng. Bài này dùng góc xoay đo được ở bài "Đặc trưng contour và blob analysis" để căn thẳng vật, dùng biến đổi phối cảnh (homography) để nắn một tờ A4 chụp nghiêng về đúng tỉ lệ 210×297 mm, và quan trọng nhất là biến đổi <strong>tọa độ điểm</strong> qua lại giữa các hệ tọa độ mà không cần biến đổi cả ảnh. Bài trước, "Watershed: tách các vật dính nhau", cho bạn từng vật riêng lẻ; bài này cho bạn từng vật <em>đã căn thẳng</em>.</p>
+<div class="tip"><strong>Chuẩn bị</strong>Dùng <code>opencv-python</code> và <code>numpy</code>. Phép xoay ảnh cơ bản (<code>getRotationMatrix2D</code>, <code>warpAffine</code>, mở rộng khung để không cắt góc) đã có ở bài "ROI, resize, xoay, lật và ghép ảnh" của chặng 2; bài này đi tiếp từ đó. Ảnh mẫu được tạo bằng chính các phép biến đổi với tham số biết trước, nên kết quả nắn có thể kiểm chứng bằng số.</div>
 
-<h2>Biến đổi affine: dịch, xoay, co giãn</h2>
-<pre><code>import cv2
+<h2>1. Ma trận biến đổi: điểm đi đâu?</h2>
+<p>Mọi phép biến đổi hình học trong OpenCV đều là một ma trận cho biết điểm <code>(x, y)</code> của ảnh nguồn đi tới đâu. Phép <strong>affine</strong> dùng ma trận 2×3:</p>
+<p><code>x' = a·x + b·y + tx</code>, <code>y' = c·x + d·y + ty</code></p>
+<p>Viết điểm dưới dạng <code>(x, y, 1)</code> (tọa độ thuần nhất) thì phép biến đổi chỉ là một phép nhân ma trận. Kiểm chứng với ma trận xoay:</p>
+<pre><code class="language-python">import cv2
 import numpy as np
 
-img = cv2.imread("nhan-lech.png")
-h, w = img.shape[:2]
+M = cv2.getRotationMatrix2D(center=(100, 100), angle=90, scale=1.0)
+print(np.round(M, 3))
 
-M = cv2.getRotationMatrix2D(center=(w / 2, h / 2), angle=12.5, scale=1.0)
-rotated = cv2.warpAffine(img, M, (w, h), flags=cv2.INTER_LINEAR,
-                         borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0))
+p = np.array([150, 100, 1.0])                    # điểm nằm bên phải tâm 50 px
+print("nhân tay      :", np.round(M @ p, 1))
+print("cv2.transform :", np.round(cv2.transform(np.float32([[[150, 100]]]), M)[0, 0], 1))</code></pre>
+<pre><code class="language-text">[[  0.   1.  -0.]
+ [ -1.   0. 200.]]
+nhân tay      : [100.  50.]
+cv2.transform : [100.  50.]</code></pre>
+<p>Điểm bên phải tâm, sau khi "xoay 90°", nằm <strong>phía trên</strong> tâm (y nhỏ hơn). Vì trục y của ảnh hướng xuống, góc dương trong <code>getRotationMatrix2D</code> nghĩa là xoay <strong>ngược chiều kim đồng hồ khi nhìn trên màn hình</strong>. Ngược lại, góc đo từ <code>atan2(dy, dx)</code> trên ảnh (như hàm <code>khung_xoay</code> của bài Đặc trưng contour) dương nghĩa là <strong>theo chiều kim đồng hồ</strong>. Nhầm hai quy ước này là lỗi phổ biến nhất của bài này.</p>
+<table>
+  <tr><th>Phép biến đổi</th><th>Giữ nguyên</th><th>Bậc tự do</th><th>Số cặp điểm cần</th><th>Hàm OpenCV</th></tr>
+  <tr><td>Tịnh tiến + xoay (rigid)</td><td>Khoảng cách, góc</td><td>3</td><td>2</td><td><code>getRotationMatrix2D</code> (scale = 1)</td></tr>
+  <tr><td>Similarity (+ tỉ lệ đều)</td><td>Góc, tỉ lệ hình dạng</td><td>4</td><td>2</td><td><code>estimateAffinePartial2D</code></td></tr>
+  <tr><td>Affine</td><td>Đường thẳng song song</td><td>6</td><td>3</td><td><code>getAffineTransform</code>, <code>estimateAffine2D</code></td></tr>
+  <tr><td>Phối cảnh (homography)</td><td>Chỉ giữ đường thẳng</td><td>8</td><td>4</td><td><code>getPerspectiveTransform</code>, <code>findHomography</code></td></tr>
+</table>
+<p>Các hàm <code>get…</code> nhận đúng số điểm tối thiểu và cho nghiệm chính xác qua các điểm đó; các hàm <code>estimate…</code>/<code>findHomography</code> nhận nhiều điểm hơn, giải bình phương tối thiểu và có thể loại điểm sai bằng RANSAC. Trong sản xuất, nếu có nhiều điểm tham chiếu thì dùng nhóm thứ hai để sai số trung bình hóa.</p>
 
-T = np.float32([[1, 0, 40], [0, 1, -15]])      # dịch 40 px sang phải, 15 px lên trên
-shifted = cv2.warpAffine(img, T, (w, h))</code></pre>
-<p>Ma trận affine 2×3 giữ nguyên tính song song của các đường thẳng. Ba cặp điểm tương ứng là đủ để xác định nó: <code>cv2.getAffineTransform(src3, dst3)</code>.</p>
+<h2>2. Căn thẳng vật theo góc xoay</h2>
+<p>Bài toán: một nhãn 160×60 px (có ô vuông đen đánh dấu ở đầu trái và dòng chữ "SN 2041") nằm xoay một góc bất kỳ trên băng tải. Ta muốn cắt ra một ảnh nhãn <strong>nằm ngang, đúng chiều</strong>, kích thước cố định, để bước OCR hoặc so mẫu phía sau luôn nhận cùng một bố cục.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
 
-<h2>Căn thẳng sản phẩm theo contour</h2>
-<pre><code>gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-_, th = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-cnts, _ = cv2.findContours(th, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-c = max(cnts, key=cv2.contourArea)
-(cx, cy), (rw, rh), angle = cv2.minAreaRect(c)
+nhan = np.full((60, 160), 220, np.uint8)
+cv2.rectangle(nhan, (8, 23), (21, 36), 30, -1)                    # ô đánh dấu đầu trái
+cv2.putText(nhan, "SN 2041", (35, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.8, 40, 2)
+cv2.imwrite("nhan_chuan.png", nhan)
 
-M = cv2.getRotationMatrix2D((cx, cy), angle, 1.0)
-aligned = cv2.warpAffine(img, M, (w, h))</code></pre>
-<p>Quy ước góc của <code>minAreaRect</code> đã thay đổi giữa các phiên bản OpenCV. Hãy vẽ kết quả ra để kiểm tra chiều xoay trước khi dùng trong sản xuất.</p>
 
-<h2>Biến đổi phối cảnh (homography)</h2>
-<p>Khi camera nhìn nghiêng, hình chữ nhật trên vật thành hình thang. Biến đổi phối cảnh dùng 4 cặp điểm để "nắn" về góc nhìn thẳng:</p>
-<pre><code>src = np.float32([[112, 85], [538, 70], [565, 410], [95, 430]])   # 4 góc tấm nhãn trên ảnh
-W, H = 400, 300                                                    # kích thước muốn có
-dst = np.float32([[0, 0], [W, 0], [W, H], [0, H]])
+def dat_nhan(goc, tam=(300, 220), seed=0):
+    """Đặt nhãn xoay 'goc' độ theo chiều kim đồng hồ (trên màn hình) lên nền băng tải."""
+    rng = np.random.default_rng(seed)
+    nen = np.clip(60 + rng.normal(0, 5, (440, 600)), 0, 255).astype(np.uint8)
+    M = cv2.getRotationMatrix2D((80, 30), -goc, 1.0)               # góc âm = chiều kim đồng hồ
+    M[:, 2] += (tam[0] - 80, tam[1] - 30)                          # dời tâm nhãn tới vị trí 'tam'
+    return cv2.warpAffine(nhan, M, (600, 440), dst=nen, borderMode=cv2.BORDER_TRANSPARENT)
 
-P = cv2.getPerspectiveTransform(src, dst)
-flat = cv2.warpPerspective(img, P, (W, H))</code></pre>
-<p>Ứng dụng: đọc nhãn, đồng hồ, màn hình thiết bị chụp từ góc nghiêng; đưa ảnh về hệ tọa độ mặt phẳng để đo (xem bài <a href="../kien-thuc/homography-do-tren-mat-phang.html">homography đo trên mặt phẳng</a>).</p>
 
-<h2>Biến đổi tọa độ điểm</h2>
-<p>Thường bạn không cần biến đổi cả ảnh, chỉ cần biến đổi các điểm đo được:</p>
-<pre><code>pts = np.float32([[[200, 150]], [[300, 220]]])
-pts_flat = cv2.perspectiveTransform(pts, P)      # với homography
-pts_rot = cv2.transform(pts, M)                  # với ma trận affine 2x3</code></pre>
-<p>Biến đổi điểm nhanh hơn rất nhiều và tránh sai số nội suy khi warp ảnh.</p>
+for goc in (23, 160, -70):
+    cv2.imwrite(f"nhan_xoay_{goc}.png", dat_nhan(goc))
+print("Đã tạo 3 ảnh nhãn xoay 23°, 160°, -70°")</code></pre>
+<pre><code class="language-text">Đã tạo 3 ảnh nhãn xoay 23°, 160°, -70°</code></pre>
+<p>Quy trình căn thẳng gồm bốn bước: tìm contour nhãn, đo tâm, kích thước và góc cạnh dài bằng <code>minAreaRect</code> (dùng cách tính góc an toàn của bài Đặc trưng contour), tạo ma trận xoay quanh tâm nhãn rồi <strong>cộng thêm phần tịnh tiến</strong> để tâm nhãn rơi đúng giữa ảnh kết quả. Nhờ vậy một lần <code>warpAffine</code> vừa xoay vừa cắt, không cần xoay cả ảnh rồi mới cắt.</p>
+<pre><code class="language-python">import math
 
-<h2>Lưu ý chất lượng</h2>
+import cv2
+import numpy as np
+
+
+def khung_xoay(c):
+    """(tâm, dài, rộng, góc cạnh dài trong [0, 180)), góc dương = chiều kim đồng hồ trên ảnh."""
+    rect = cv2.minAreaRect(c)
+    p = cv2.boxPoints(rect)
+    c1, c2 = p[1] - p[0], p[2] - p[1]
+    canh_dai = c1 if np.linalg.norm(c1) &gt;= np.linalg.norm(c2) else c2
+    return rect[0], max(rect[1]), min(rect[1]), math.degrees(math.atan2(canh_dai[1], canh_dai[0])) % 180
+
+
+def can_thang(anh):
+    """Trả về (ảnh nhãn đã căn thẳng, ma trận M, góc đo được, đã lật 180° hay chưa)."""
+    _, m = cv2.threshold(anh, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    cs, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    c = max(cs, key=cv2.contourArea)
+    (cx, cy), dai, rong, goc = khung_xoay(c)
+    w, h = int(round(dai)), int(round(rong))
+    M = cv2.getRotationMatrix2D((cx, cy), goc, 1.0)               # xoay ngược lại 'goc' độ
+    M[:, 2] += (w / 2 - cx, h / 2 - cy)                            # đưa tâm nhãn về giữa ảnh ra
+    thang = cv2.warpAffine(anh, M, (w, h), flags=cv2.INTER_LINEAR)
+    lat = thang[:, : w // 5].mean() &gt; thang[:, -w // 5:].mean()    # ô đen phải nằm bên trái
+    if lat:
+        thang = cv2.rotate(thang, cv2.ROTATE_180)
+    return thang, M, goc, lat
+
+
+chuan = cv2.imread("nhan_chuan.png", cv2.IMREAD_GRAYSCALE)
+for goc in (23, 160, -70):
+    anh = cv2.imread(f"nhan_xoay_{goc}.png", cv2.IMREAD_GRAYSCALE)
+    thang, M, goc_do, lat = can_thang(anh)
+    sai = np.abs(cv2.resize(thang, (160, 60)).astype(int) - chuan).mean()
+    print(f"xoay {goc:4d}° -&gt; góc cạnh dài {goc_do:5.1f}°, cỡ {thang.shape[1]}x{thang.shape[0]}, "
+          f"lật 180°: {lat!s:5s}, lệch so với nhãn chuẩn {sai:.1f} mức xám")
+    cv2.imwrite(f"nhan_thang_{goc}.png", thang)
+    np.save(f"M_nhan_{goc}.npy", M)                                # lưu ma trận để vẽ ngược (bài tập 2)</code></pre>
+<pre><code class="language-text">xoay   23° -&gt; góc cạnh dài  23.0°, cỡ 160x60, lật 180°: False, lệch so với nhãn chuẩn 7.0 mức xám
+xoay  160° -&gt; góc cạnh dài 160.0°, cỡ 160x60, lật 180°: False, lệch so với nhãn chuẩn 7.1 mức xám
+xoay  -70° -&gt; góc cạnh dài 110.0°, cỡ 160x60, lật 180°: True , lệch so với nhãn chuẩn 6.8 mức xám</code></pre>
+<p>Những điểm cần hiểu:</p>
 <ul>
-  <li>Mỗi lần warp đều nội suy, làm ảnh mềm đi. Tránh warp nhiều lần liên tiếp; gộp các ma trận lại thành một.</li>
-  <li><code>INTER_NEAREST</code> cho mặt nạ nhị phân, <code>INTER_LINEAR</code> hoặc <code>INTER_CUBIC</code> cho ảnh thường.</li>
-  <li>Đo kích thước nên làm trên tọa độ điểm đã biến đổi, không đo trên ảnh đã warp.</li>
+  <li><code>minAreaRect</code> chỉ cho hướng của cạnh dài, tức góc <strong>trong khoảng 0–180°</strong>. Nhãn xoay −70° (ngược chiều kim đồng hồ 70°) cho góc cạnh dài 110°, và sau khi xoay ngược 110° nhãn nằm ngang nhưng <strong>lộn ngược</strong>. Phải có một dấu hiệu bất đối xứng (ô đen, logo, lỗ định vị) để phân biệt hai chiều; ở đây ta so độ sáng trung bình hai đầu nhãn.</li>
+  <li>Sai lệch còn lại (khoảng 7 mức xám trung bình) đến từ nội suy và từ việc <code>minAreaRect</code> có thể lệch một pixel. Với OCR hay so mẫu, như vậy là đủ tốt.</li>
+  <li>Với vật gần vuông hoặc tròn, góc của <code>minAreaRect</code> vô nghĩa (bài Đặc trưng contour); khi đó cần template matching hoặc shape matching (chặng 7) để tìm góc.</li>
 </ul>
+
+<h2>3. Affine từ 3 điểm tham chiếu</h2>
+<p>Khi vật hoặc đồ gá có các điểm tham chiếu (lỗ định vị, dấu fiducial trên bo mạch), ta lấy ma trận trực tiếp từ các cặp điểm "vị trí trên ảnh → vị trí chuẩn". Ví dụ: ba lỗ định vị có tọa độ chuẩn (theo bản vẽ, đơn vị px của ảnh mẫu) và tọa độ tìm được trên ảnh hiện tại:</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+chuan = np.float32([[50, 50], [350, 50], [50, 250]])            # vị trí lỗ trên ảnh mẫu chuẩn
+tim_thay = np.float32([[112.4, 80.9], [401.1, 162.2], [57.9, 273.4]])   # vị trí đo được hôm nay
+
+A = cv2.getAffineTransform(tim_thay, chuan)                     # ảnh hiện tại -&gt; hệ chuẩn
+print(np.round(A, 4))
+goc = np.degrees(np.arctan2(A[1, 0], A[0, 0]))
+ti_le = np.hypot(A[0, 0], A[1, 0])
+print(f"vật bị xoay khoảng {-goc:.1f}° (chiều kim đồng hồ), tỉ lệ {ti_le:.3f}")
+
+# Điểm thứ 4 (ví dụ vị trí một linh kiện) đo trên ảnh hôm nay, đổi về hệ chuẩn:
+print("linh kiện trong hệ chuẩn:", np.round(cv2.transform(np.float32([[[250.0, 200.0]]]), A)[0, 0], 1))</code></pre>
+<pre><code class="language-text">[[  0.9624   0.2725 -80.2181]
+ [ -0.271    0.9622   2.6121]]
+vật bị xoay khoảng 15.7° (chiều kim đồng hồ), tỉ lệ 1.000
+linh kiện trong hệ chuẩn: [214.9 127.3]</code></pre>
+<p>Từ ma trận ta đọc được góc xoay và tỉ lệ, và quan trọng hơn: mọi điểm đo được trên ảnh hôm nay đều có thể đổi về hệ tọa độ của bản vẽ để so với dung sai. Đây là nền tảng của "căn chỉnh theo fiducial" trong kiểm tra bo mạch và của việc gửi tọa độ cho robot (chặng 9).</p>
+
+<h2>4. Biến đổi phối cảnh: nắn tờ A4 chụp nghiêng</h2>
+<p>Khi camera nhìn nghiêng một mặt phẳng, hình chữ nhật thành tứ giác bất kỳ: các cạnh song song không còn song song, nên affine không đủ. Phép <strong>phối cảnh</strong> (homography) dùng ma trận 3×3, xác định từ 4 cặp điểm. Ta tạo một "tờ A4" phẳng với tỉ lệ 2 px/mm (420×594 px), có lưới 10 mm và hai chấm tròn đánh dấu ở vị trí biết trước (30, 40) mm và (180, 257) mm, rồi "chụp" nó nghiêng trên mặt bàn.</p>
+<pre><code class="language-python">import json
+
+import cv2
+import numpy as np
+
+K = 2                                                             # px/mm của ảnh A4 phẳng
+W, H = 210 * K, 297 * K
+giay = np.full((H, W), 235, np.uint8)
+for x in range(0, 211, 10):
+    cv2.line(giay, (x * K, 0), (x * K, H - 1), 200, 1)            # lưới 10 mm
+for y in range(0, 298, 10):
+    cv2.line(giay, (0, y * K), (W - 1, y * K), 200, 1)
+CHAM_MM = [(30, 40), (180, 257)]
+for x, y in CHAM_MM:
+    cv2.circle(giay, (x * K, y * K), 5 * K, 30, -1)               # chấm đường kính 10 mm
+cv2.putText(giay, "A4 210x297", (40 * K, 150 * K), cv2.FONT_HERSHEY_SIMPLEX, 1.2, 60, 3)
+
+
+def chup_nghieng(giay, goc_tren_anh, ten, seed=0):
+    """Đặt 4 góc tờ giấy (tl, tr, br, bl) vào vị trí 'goc_tren_anh' của ảnh camera 640×480."""
+    Hm = cv2.getPerspectiveTransform(np.float32([[0, 0], [W, 0], [W, H], [0, H]]),
+                                     np.float32(goc_tren_anh))
+    rng = np.random.default_rng(seed)
+    nen = np.clip(70 + rng.normal(0, 8, (480, 640)), 0, 255).astype(np.uint8)   # mặt bàn tối
+    cam = cv2.warpPerspective(giay, Hm, (640, 480), dst=nen, borderMode=cv2.BORDER_TRANSPARENT)
+    cam = np.clip(cam + rng.normal(0, 3, cam.shape), 0, 255).astype(np.uint8)
+    cv2.imwrite(ten, cam)
+
+
+chup_nghieng(giay, [[180, 70], [470, 110], [520, 440], [110, 400]], "a4_nghieng.png")
+chup_nghieng(giay, [[560, 120], [520, 420], [90, 390], [120, 60]], "a4_ngang.png", seed=1)   # cho bài tập 1
+with open("a4_dap_an.json", "w") as f:
+    json.dump({"K": K, "cham_mm": CHAM_MM}, f)
+print("Đã tạo a4_nghieng.png và a4_ngang.png (640x480)")</code></pre>
+<pre><code class="language-text">Đã tạo a4_nghieng.png và a4_ngang.png (640x480)</code></pre>
+<p>Quy trình nắn: phân ngưỡng (giấy sáng trên bàn tối), lấy contour lớn nhất, xấp xỉ thành đa giác 4 đỉnh bằng <code>approxPolyDP</code>, <strong>sắp xếp 4 góc</strong> theo thứ tự trên-trái, trên-phải, dưới-phải, dưới-trái, rồi ánh xạ chúng về hình chữ nhật 210×297 mm.</p>
+<pre><code class="language-python">import json
+
+import cv2
+import numpy as np
+
+
+def sap_xep_goc(pts):
+    """4 điểm bất kỳ -&gt; [trên-trái, trên-phải, dưới-phải, dưới-trái]."""
+    pts = np.float32(pts).reshape(4, 2)
+    s, d = pts.sum(axis=1), pts[:, 1] - pts[:, 0]                 # x+y và y-x
+    return np.float32([pts[s.argmin()], pts[d.argmin()], pts[s.argmax()], pts[d.argmax()]])
+
+
+def tim_4_goc(gray):
+    _, m = cv2.threshold(cv2.GaussianBlur(gray, (5, 5), 0), 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    cs, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    c = max(cs, key=cv2.contourArea)
+    xap_xi = cv2.approxPolyDP(c, 0.02 * cv2.arcLength(c, True), True)
+    if len(xap_xi) != 4:
+        raise ValueError(f"không tìm được tứ giác, có {len(xap_xi)} đỉnh")
+    return sap_xep_goc(xap_xi), c
+
+
+def nan_a4(gray, goc, K=2):
+    tl, tr, br, bl = goc
+    if np.linalg.norm(tr - tl) &gt; np.linalg.norm(bl - tl):          # cạnh trên dài hơn cạnh trái: giấy nằm ngang
+        goc = np.float32([bl, tl, tr, br])                         # xoay thứ tự để cạnh dài thành chiều cao
+    dich = np.float32([[0, 0], [210 * K, 0], [210 * K, 297 * K], [0, 297 * K]])
+    P = cv2.getPerspectiveTransform(goc, dich)
+    return cv2.warpPerspective(gray, P, (210 * K, 297 * K)), P
+
+
+def tim_cham_mm(phang, K=2):
+    """Tâm các chấm đen (đường kính 10 mm) trên ảnh đã nắn, đơn vị mm."""
+    _, m = cv2.threshold(phang, 100, 255, cv2.THRESH_BINARY_INV)
+    m = cv2.morphologyEx(m, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
+    n, _, st, tam = cv2.connectedComponentsWithStats(m)
+    return sorted((round(float(tam[i][0]) / K, 2), round(float(tam[i][1]) / K, 2))
+                  for i in range(1, n) if 200 &lt; st[i, cv2.CC_STAT_AREA] &lt; 600)
+
+
+def tinh_chinh_goc(contour, goc4, le=0.1):
+    """Fitting đường thẳng cho 4 cạnh (bỏ 10% hai đầu mỗi cạnh) rồi lấy giao điểm làm góc mới."""
+    pts = contour.reshape(-1, 2).astype(np.float32)
+    duong = []
+    for i in range(4):
+        p, q = goc4[i], goc4[(i + 1) % 4]
+        dai = np.linalg.norm(q - p)
+        u = (q - p) / dai
+        rel = pts - p
+        t = rel @ u                                                # vị trí dọc cạnh
+        cach = np.abs(rel[:, 0] * u[1] - rel[:, 1] * u[0])          # khoảng cách tới cạnh
+        chon = pts[(cach &lt; 3) &amp; (t &gt; le * dai) &amp; (t &lt; (1 - le) * dai)]
+        vx, vy, x0, y0 = cv2.fitLine(chon, cv2.DIST_L2, 0, 0.01, 0.01).ravel()
+        duong.append((np.array([x0, y0]), np.array([vx, vy])))
+    moi = []
+    for i in range(4):                                             # góc i = giao của cạnh (i-1) và cạnh i
+        (p1, d1), (p2, d2) = duong[i - 1], duong[i]
+        t = np.linalg.solve(np.array([d1, -d2]).T, p2 - p1)
+        moi.append(p1 + t[0] * d1)
+    return np.float32(moi)
+
+
+cam = cv2.imread("a4_nghieng.png", cv2.IMREAD_GRAYSCALE)
+goc, contour = tim_4_goc(cam)
+print("4 góc tìm được:", goc.tolist())
+phang, P = nan_a4(cam, goc)
+cv2.imwrite("a4_da_nan.png", phang)
+print("ảnh đã nắn:", phang.shape[1], "x", phang.shape[0], "px = 210 x 297 mm")
+print("chấm đo được (mm):", tim_cham_mm(phang), "| đáp án:", json.load(open("a4_dap_an.json"))["cham_mm"])
+
+# Phiên bản chính xác hơn: góc từ fitting cạnh (giải thích ngay dưới đây)
+goc_tc = tinh_chinh_goc(contour, goc)
+print("góc tinh chỉnh:", [[round(float(v), 2) for v in p] for p in goc_tc])
+phang, P = nan_a4(cam, goc_tc)
+print("chấm đo được, góc tinh chỉnh (mm):", tim_cham_mm(phang))
+P_mm = cv2.getPerspectiveTransform(goc_tc, np.float32([[0, 0], [210, 0], [210, 297], [0, 297]]))
+np.save("H_camera_to_mm.npy", P_mm)                               # pixel camera -&gt; mm, dùng ở mục 5</code></pre>
+<pre><code class="language-text">4 góc tìm được: [[180.0, 71.0], [469.0, 111.0], [518.0, 439.0], [111.0, 399.0]]
+ảnh đã nắn: 420 x 594 px = 210 x 297 mm
+chấm đo được (mm): [(30.01, 38.93), (180.85, 257.2)] | đáp án: [[30, 40], [180, 257]]
+góc tinh chỉnh: [[180.15, 70.36], [469.23, 110.25], [518.88, 439.02], [110.33, 399.15]]
+chấm đo được, góc tinh chỉnh (mm): [(29.98, 39.74), (180.46, 257.44)]</code></pre>
+<ul>
+  <li><strong>Sắp xếp góc</strong>: góc trên-trái có <code>x + y</code> nhỏ nhất, dưới-phải lớn nhất; trên-phải có <code>y − x</code> nhỏ nhất, dưới-trái lớn nhất. Cách này đúng khi tờ giấy nghiêng dưới khoảng 45°; nếu nghiêng hơn, sắp theo góc quanh trọng tâm. Thứ tự sai sẽ cho ảnh bị lật hoặc xoắn.</li>
+  <li><strong>Hướng giấy</strong>: hàm <code>nan_a4</code> kiểm tra cạnh nào dài hơn để luôn đưa cạnh 297 mm thành chiều cao, kể cả khi tờ giấy nằm ngang trong ảnh (bài tập 1).</li>
+  <li><strong>Sai số khoảng 1 mm</strong>: trên ảnh camera, tờ giấy chỉ khoảng 1,3–1,5 px/mm, và đỉnh của <code>approxPolyDP</code> là một điểm contour nguyên, có thể lệch 1 px so với góc thật. Lệch 1 px ở góc thành lệch gần 1 mm sau khi nắn.</li>
+</ul>
+<h3>Tăng độ chính xác: tính góc từ đường thẳng fitting</h3>
+<p>Phần cuối của khối code trên dùng hàm <code>tinh_chinh_goc</code>: thay vì tin vào 4 đỉnh, ta dùng <strong>hàng trăm điểm</strong> contour dọc mỗi cạnh (bỏ 10% ở hai đầu, nơi cạnh bo tròn), fitting một đường thẳng cho mỗi cạnh bằng <code>cv2.fitLine</code>, rồi lấy giao điểm của hai cạnh kề nhau làm góc. Sai số của từng điểm được trung bình hóa, nên góc có độ chính xác dưới pixel, gần với đáp án (180, 70), (470, 110), (520, 440), (110, 400) hơn, và sai số vị trí chấm giảm xuống khoảng nửa milimét. Phần còn lại đến từ việc biên giấy sau phân ngưỡng không trùng hoàn toàn với biên thật (nhiễu, làm mịn). Đây cũng là ý tưởng của các công cụ đo cạnh subpixel ở chặng 7.</p>
+<p>Dòng cuối lưu ma trận homography "pixel camera → mm trên giấy" vào file. Trong trạm thật, bước tìm 4 góc và tính ma trận làm <strong>một lần khi cài đặt</strong> (hoặc khi hiệu chuẩn lại); lúc chạy chỉ cần nạp ma trận và biến đổi điểm, như mục 5.</p>
+<div class="warn"><strong>Phối cảnh không sửa được méo ống kính</strong>Homography giả định ống kính "lý tưởng" (đường thẳng trên vật vẫn thẳng trên ảnh). Ống kính thật có méo (đường thẳng thành cong, nhất là ở mép ảnh), và homography chỉ đúng cho <strong>một mặt phẳng</strong>: vật có chiều cao sẽ bị nắn sai. Để đo chính xác, phải hiệu chuẩn và khử méo ống kính trước (chặng 8, bài hiệu chuẩn camera và bài homography đo trên mặt phẳng).</div>
+
+<h2>5. Biến đổi tọa độ điểm thay vì cả ảnh</h2>
+<p>Thường bạn không cần ảnh đã nắn, chỉ cần <strong>tọa độ</strong> của vài điểm đo được (tâm lỗ, góc linh kiện, vết lỗi). Biến đổi điểm nhanh hơn rất nhiều so với biến đổi cả ảnh, và không có sai số nội suy.</p>
+<table>
+  <tr><th>Ma trận</th><th>Biến đổi điểm</th><th>Ma trận ngược</th></tr>
+  <tr><td>Affine 2×3</td><td><code>cv2.transform(pts, M)</code></td><td><code>cv2.invertAffineTransform(M)</code></td></tr>
+  <tr><td>Homography 3×3</td><td><code>cv2.perspectiveTransform(pts, P)</code></td><td><code>np.linalg.inv(P)</code></td></tr>
+</table>
+<p>Cả hai hàm yêu cầu mảng điểm <strong>float32 hoặc float64 có shape (N, 1, 2)</strong>; truyền (N, 2) là lỗi hay gặp. Ví dụ: đổi trực tiếp tâm hai chấm đo trên ảnh camera nghiêng sang mm trên tờ giấy, rồi làm chiều ngược lại để vẽ một "vết lỗi" ở vị trí (100, 200) mm lên ảnh camera:</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+cam = cv2.imread("a4_nghieng.png", cv2.IMREAD_GRAYSCALE)
+P_mm = np.load("H_camera_to_mm.npy")                                # pixel camera -&gt; mm, lưu ở mục 4
+
+# Tìm chấm đen trực tiếp trên ảnh camera (không nắn ảnh): điểm tối nằm bên trong tờ giấy
+_, giay = cv2.threshold(cv2.GaussianBlur(cam, (5, 5), 0), 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+cs, _ = cv2.findContours(giay, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+vung = np.zeros_like(cam)
+cv2.drawContours(vung, [max(cs, key=cv2.contourArea)], -1, 255, -1)    # tô kín vùng tờ giấy
+vung = cv2.erode(vung, np.ones((9, 9), np.uint8))                      # bỏ dải sát mép giấy
+_, toi = cv2.threshold(cam, 100, 255, cv2.THRESH_BINARY_INV)
+n, _, st, tam = cv2.connectedComponentsWithStats(cv2.bitwise_and(toi, vung))
+# chấm tròn đặc: lấp đầy &gt; 70% khung bao (chữ cái chỉ khoảng 40-60%)
+tam_px = np.float32([tam[i] for i in range(1, n)
+                     if st[i, cv2.CC_STAT_AREA] / (st[i, cv2.CC_STAT_WIDTH] * st[i, cv2.CC_STAT_HEIGHT]) &gt; 0.7
+                     and st[i, cv2.CC_STAT_AREA] &gt; 50]).reshape(-1, 1, 2)
+print("tâm chấm trên ảnh camera (px):", np.round(tam_px.reshape(-1, 2).astype(float), 1).tolist())
+print("đổi sang mm trên giấy        :", np.round(cv2.perspectiveTransform(tam_px, P_mm).reshape(-1, 2).astype(float), 1).tolist())
+
+# Chiều ngược: vết lỗi tại (100, 200) mm -&gt; vị trí trên ảnh camera để vẽ khung báo lỗi
+loi_mm = np.float32([[[100, 200]]])
+loi_px = cv2.perspectiveTransform(loi_mm, np.linalg.inv(P_mm))[0, 0]
+print("vết lỗi (100, 200) mm nằm ở pixel:", np.round(loi_px.astype(float), 1).tolist())</code></pre>
+<pre><code class="language-text">tâm chấm trên ảnh camera (px): [[217.7, 108.5], [457.8, 375.3]]
+đổi sang mm trên giấy        : [[30.0, 39.7], [180.5, 257.5]]
+vết lỗi (100, 200) mm nằm ở pixel: [314.2, 284.9]</code></pre>
+<p>Lưu ý chấm tròn trên giấy, khi chụp nghiêng, thành hình elip và <strong>trọng tâm của elip trên ảnh không trùng chính xác với ảnh của tâm hình tròn</strong> (phối cảnh co giãn không đều). Với chấm nhỏ, chênh lệch rất nhỏ; với vật lớn, hãy đo trên ảnh đã nắn hoặc đo các điểm biên rồi mới biến đổi. Cách làm chung trong đo lường: tìm các điểm đặc trưng trên ảnh gốc (chính xác nhất, không nội suy), biến đổi <strong>điểm</strong> sang hệ mm, rồi mới tính khoảng cách.</p>
+
+<h2>6. Chất lượng khi biến đổi ảnh</h2>
+<p>Khi buộc phải biến đổi cả ảnh, chú ý nội suy và số lần biến đổi:</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+anh = cv2.imread("nhan_chuan.png", cv2.IMREAD_GRAYSCALE)
+anh = cv2.copyMakeBorder(anh, 50, 50, 50, 50, cv2.BORDER_CONSTANT, value=60)
+h, w = anh.shape
+tam = (w / 2, h / 2)
+
+# Xoay 10 lần, mỗi lần 36°, so với không xoay (tổng 360°)
+nhieu_lan = anh.copy()
+for _ in range(10):
+    nhieu_lan = cv2.warpAffine(nhieu_lan, cv2.getRotationMatrix2D(tam, 36, 1.0), (w, h), borderValue=60)
+print("xoay 10 lần x 36°: lệch trung bình", round(float(np.abs(nhieu_lan.astype(int) - anh).mean()), 2))
+
+# Gộp ma trận: viết dạng 3x3 rồi nhân, chỉ warp một lần
+M3 = np.eye(3)
+for _ in range(10):
+    M3 = np.vstack([cv2.getRotationMatrix2D(tam, 36, 1.0), [0, 0, 1]]) @ M3
+mot_lan = cv2.warpAffine(anh, M3[:2], (w, h), borderValue=60)
+print("gộp 10 ma trận, warp 1 lần: lệch trung bình", round(float(np.abs(mot_lan.astype(int) - anh).mean()), 2))
+
+# Mặt nạ nhị phân: nội suy tuyến tính sinh ra giá trị trung gian
+mat_na = (anh &lt; 100).astype(np.uint8) * 255
+M = cv2.getRotationMatrix2D(tam, 17, 1.0)
+print("số mức xám của mặt nạ sau xoay: LINEAR",
+      len(np.unique(cv2.warpAffine(mat_na, M, (w, h), flags=cv2.INTER_LINEAR))),
+      "| NEAREST", len(np.unique(cv2.warpAffine(mat_na, M, (w, h), flags=cv2.INTER_NEAREST))))</code></pre>
+<pre><code class="language-text">xoay 10 lần x 36°: lệch trung bình 3.97
+gộp 10 ma trận, warp 1 lần: lệch trung bình 0.0
+số mức xám của mặt nạ sau xoay: LINEAR 255 | NEAREST 2</code></pre>
+<ul>
+  <li>Mỗi lần warp là một lần nội suy làm ảnh mềm đi; xoay 10 lần làm ảnh lệch rõ rệt so với gốc, trong khi gộp ma trận rồi warp một lần (tổng 360°) gần như không đổi. Quy tắc: <strong>gộp các phép biến đổi thành một ma trận</strong> (nhân ma trận 3×3), chỉ warp một lần từ ảnh gốc.</li>
+  <li>Mặt nạ nhị phân sau <code>INTER_LINEAR</code> có hàng trăm mức xám trung gian ở biên; dùng <code>INTER_NEAREST</code> để mặt nạ vẫn chỉ có 0 và 255 (hoặc phân ngưỡng lại sau khi warp).</li>
+  <li>Ảnh thường: <code>INTER_LINEAR</code> là mặc định hợp lý; <code>INTER_CUBIC</code> sắc hơn khi phóng to; <code>INTER_AREA</code> khi thu nhỏ.</li>
+</ul>
+
+<h2>7. Lỗi thường gặp</h2>
+<table>
+  <tr><th>Lỗi</th><th>Hậu quả</th><th>Cách đúng</th></tr>
+  <tr><td>Nhầm chiều góc giữa <code>atan2</code> trên ảnh và <code>getRotationMatrix2D</code></td><td>Vật bị xoay lệch gấp đôi thay vì thẳng</td><td>Nhớ: y hướng xuống; vẽ kết quả ra kiểm tra với 2–3 góc khác nhau</td></tr>
+  <tr><td>Bỏ qua mơ hồ 180°</td><td>Nhãn lộn ngược, OCR đọc sai</td><td>Dùng dấu hiệu bất đối xứng để quyết định lật</td></tr>
+  <tr><td>Thứ tự 4 góc sai</td><td>Ảnh nắn bị lật, xoắn</td><td>Sắp xếp góc trước khi gọi <code>getPerspectiveTransform</code></td></tr>
+  <tr><td>Truyền điểm shape (N, 2) hoặc kiểu int</td><td>Lỗi assertion của OpenCV</td><td><code>np.float32(pts).reshape(-1, 1, 2)</code></td></tr>
+  <tr><td>Warp nhiều lần liên tiếp</td><td>Ảnh mờ dần</td><td>Gộp ma trận, warp một lần</td></tr>
+  <tr><td>Đo kích thước trên ảnh đã warp ở độ phân giải thấp</td><td>Mất độ chính xác</td><td>Đo điểm trên ảnh gốc, biến đổi điểm</td></tr>
+  <tr><td>Dùng homography cho vật có chiều cao</td><td>Mặt trên vật bị nắn sai tỉ lệ</td><td>Homography chỉ đúng cho một mặt phẳng</td></tr>
+</table>
+
+<h2>8. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Nắn ảnh <code>a4_ngang.png</code> (tờ A4 chụp nghiêng, nằm ngang trong ảnh, tạo ở mục 4) về hình chữ nhật đúng tỉ lệ 210×297 (2 px/mm), kiểm tra tỉ lệ và vị trí hai chấm. Nếu bạn có camera, hãy chụp một tờ A4 thật đặt nghiêng trên bàn tối màu và chạy cùng chương trình.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+
+def sap_xep_goc(pts):
+    pts = np.float32(pts).reshape(4, 2)
+    s, d = pts.sum(axis=1), pts[:, 1] - pts[:, 0]
+    return np.float32([pts[s.argmin()], pts[d.argmin()], pts[s.argmax()], pts[d.argmax()]])
+
+
+def tinh_chinh_goc(contour, goc4, le=0.1):
+    pts = contour.reshape(-1, 2).astype(np.float32)
+    duong = []
+    for i in range(4):
+        p, q = goc4[i], goc4[(i + 1) % 4]
+        dai = np.linalg.norm(q - p)
+        u = (q - p) / dai
+        rel = pts - p
+        t = rel @ u
+        cach = np.abs(rel[:, 0] * u[1] - rel[:, 1] * u[0])
+        chon = pts[(cach &lt; 3) &amp; (t &gt; le * dai) &amp; (t &lt; (1 - le) * dai)]
+        vx, vy, x0, y0 = cv2.fitLine(chon, cv2.DIST_L2, 0, 0.01, 0.01).ravel()
+        duong.append((np.array([x0, y0]), np.array([vx, vy])))
+    moi = []
+    for i in range(4):
+        (p1, d1), (p2, d2) = duong[i - 1], duong[i]
+        t = np.linalg.solve(np.array([d1, -d2]).T, p2 - p1)
+        moi.append(p1 + t[0] * d1)
+    return np.float32(moi)
+
+
+def nan_a4_tu_anh(gray, K=2):
+    """Ảnh camera có một tờ A4 sáng trên nền tối -&gt; ảnh A4 phẳng 210K x 297K px."""
+    _, m = cv2.threshold(cv2.GaussianBlur(gray, (5, 5), 0), 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    cs, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    c = max(cs, key=cv2.contourArea)
+    xx = cv2.approxPolyDP(c, 0.02 * cv2.arcLength(c, True), True)
+    if len(xx) != 4:
+        raise ValueError(f"không tìm được tờ giấy (đa giác {len(xx)} đỉnh)")
+    tl, tr, br, bl = tinh_chinh_goc(c, sap_xep_goc(xx))
+    if np.linalg.norm(tr - tl) &gt; np.linalg.norm(bl - tl):          # giấy nằm ngang
+        tl, tr, br, bl = bl, tl, tr, br
+    dich = np.float32([[0, 0], [210 * K, 0], [210 * K, 297 * K], [0, 297 * K]])
+    P = cv2.getPerspectiveTransform(np.float32([tl, tr, br, bl]), dich)
+    return cv2.warpPerspective(gray, P, (210 * K, 297 * K))
+
+
+cam = cv2.imread("a4_ngang.png", cv2.IMREAD_GRAYSCALE)
+phang = nan_a4_tu_anh(cam)
+cv2.imwrite("a4_ngang_da_nan.png", phang)
+print("kích thước:", phang.shape[1], "x", phang.shape[0], "| tỉ lệ cao/rộng:", round(phang.shape[0] / phang.shape[1], 4),
+      "(297/210 =", round(297 / 210, 4), ")")
+_, m = cv2.threshold(phang, 100, 255, cv2.THRESH_BINARY_INV)
+m = cv2.morphologyEx(m, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
+n, _, st, tam = cv2.connectedComponentsWithStats(m)
+print("chấm (mm):", sorted((round(float(tam[i][0]) / 2, 2), round(float(tam[i][1]) / 2, 2))
+                          for i in range(1, n) if 200 &lt; st[i, cv2.CC_STAT_AREA] &lt; 600))</code></pre>
+<pre><code class="language-text">kích thước: 420 x 594 | tỉ lệ cao/rộng: 1.4143 (297/210 = 1.4143 )
+chấm (mm): [(29.51, 39.54), (180.02, 257.07)]</code></pre>
+<p>Đáp án là một chương trình hoàn chỉnh, chạy độc lập với ảnh của bạn. Tờ giấy nằm ngang trong ảnh, nên cạnh trên (theo thứ tự đã sắp xếp) dài hơn cạnh trái; chương trình xoay thứ tự góc để cạnh dài thành chiều cao 297 mm. Tỉ lệ cao/rộng đúng bằng 297/210, hai chấm rơi vào vị trí (30, 40) và (180, 257) mm với sai lệch dưới 0,5 mm, nghĩa là ảnh không bị lật. Nếu chấm xuất hiện ở (180, 257) và (30, 40) bị đảo vai, tức là tờ giấy bị nắn ngược 180°: với giấy thật không có dấu, bạn cần một dấu hiệu (logo, dòng chữ) để quyết định chiều, giống mơ hồ 180° ở mục 2. Khi chạy với ảnh thật: chụp trên nền tối để phân ngưỡng dễ, và tránh bóng đổ cắt ngang mép giấy.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Trên ảnh <code>nhan_xoay_23.png</code>, ô đen đánh dấu của nhãn chuẩn có tâm ở (14,5; 29,5) trong hệ tọa độ nhãn đã căn thẳng. Không tìm ô đen trên ảnh gốc, hãy tính vị trí của nó trên ảnh gốc bằng ma trận ngược, rồi kiểm tra bằng cách đọc độ sáng tại đó.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+anh = cv2.imread("nhan_xoay_23.png", cv2.IMREAD_GRAYSCALE)
+M = np.load("M_nhan_23.npy")                           # ma trận căn thẳng đã lưu ở mục 2 (nhãn này không bị lật)
+M_nguoc = cv2.invertAffineTransform(M)                 # hệ nhãn thẳng -&gt; ảnh gốc
+o_den = cv2.transform(np.float32([[[14.5, 29.5]]]), M_nguoc)[0, 0]
+x, y = int(round(o_den[0])), int(round(o_den[1]))
+print("ô đen trên ảnh gốc:", [round(float(v), 1) for v in o_den], "| độ sáng tại đó:", int(anh[y, x]),
+      "| độ sáng nhãn quanh đó:", int(np.median(anh[y - 20:y + 21, x - 20:x + 21])))</code></pre>
+<pre><code class="language-text">ô đen trên ảnh gốc: [239.7, 193.3] | độ sáng tại đó: 30 | độ sáng nhãn quanh đó: 220</code></pre>
+<p>Độ sáng tại điểm tính được rất thấp (ô đen), trong khi phần lớn vùng quanh đó là nhãn sáng: phép biến đổi ngược chính xác. Nếu <code>lat</code> là True, phải biến đổi điểm qua phép lật 180° trước: <code>(w − 1 − x, h − 1 − y)</code>. Kỹ thuật này dùng để vẽ kết quả kiểm tra (tìm trên ảnh đã căn thẳng) lên ảnh gốc cho người vận hành xem.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Camera nhìn nghiêng một khay phẳng. Bốn góc khay (kích thước 300×200 mm) nằm ở các pixel (102, 88), (538, 64), (590, 410), (60, 432). Một lỗ khoan được phát hiện ở pixel (330, 250). Tính tọa độ lỗ theo mm trên khay mà không biến đổi ảnh.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+goc_px = np.float32([[102, 88], [538, 64], [590, 410], [60, 432]])
+goc_mm = np.float32([[0, 0], [300, 0], [300, 200], [0, 200]])
+P = cv2.getPerspectiveTransform(goc_px, goc_mm)
+lo = cv2.perspectiveTransform(np.float32([[[330, 250]]]), P)[0, 0]
+print("lỗ khoan tại (mm):", [round(float(v), 1) for v in lo])
+kiem_tra = cv2.perspectiveTransform(goc_px.reshape(-1, 1, 2), P).reshape(-1, 2)
+print("kiểm tra 4 góc -&gt; mm:", np.round(kiem_tra.astype(float), 3).tolist())</code></pre>
+<pre><code class="language-text">lỗ khoan tại (mm): [156.1, 110.8]
+kiểm tra 4 góc -&gt; mm: [[0.0, 0.0], [300.0, 0.0], [300.0, 200.0], [0.0, 200.0]]</code></pre>
+<p>Kiểm tra lại bằng chính 4 góc là thói quen tốt: chúng phải về đúng (0, 0), (300, 0), (300, 200), (0, 200). Lưu ý pixel (330, 250) nằm gần trung bình cộng của 4 góc trên ảnh (322,5; 248,5), nhưng lỗ không nằm ở giữa khay (150, 100) mm: phối cảnh làm phần khay xa camera bị thu nhỏ trên ảnh, nên "giữa ảnh" không phải "giữa vật". Độ chính xác thực tế phụ thuộc độ chính xác 4 góc và méo ống kính (chặng 8).</p>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Affine 2×3 (3 cặp điểm) giữ song song; phối cảnh 3×3 (4 cặp điểm) nắn mặt phẳng nhìn nghiêng. Dùng <code>estimate…</code>/<code>findHomography</code> khi có nhiều điểm.</li>
+  <li>Góc dương của <code>getRotationMatrix2D</code> là ngược chiều kim đồng hồ trên màn hình; góc đo bằng <code>atan2</code> trên ảnh dương là theo chiều kim đồng hồ.</li>
+  <li>Căn thẳng vật: góc cạnh dài từ <code>minAreaRect</code>, xoay quanh tâm vật kèm tịnh tiến để cắt luôn; giải quyết mơ hồ 180° bằng dấu hiệu bất đối xứng.</li>
+  <li>Nắn A4: phân ngưỡng, contour lớn nhất, 4 góc, sắp xếp, <code>getPerspectiveTransform</code>; fitting cạnh cho góc chính xác dưới pixel.</li>
+  <li>Biến đổi <strong>điểm</strong> (<code>transform</code>, <code>perspectiveTransform</code>, shape (N, 1, 2)) thay vì cả ảnh khi chỉ cần tọa độ; ma trận ngược để vẽ ngược lên ảnh gốc.</li>
+  <li>Gộp ma trận, warp một lần; mặt nạ dùng <code>INTER_NEAREST</code>; homography không sửa méo ống kính.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Dự án chặng 3: đếm sản phẩm trên băng tải</strong>, nơi bạn ghép phân ngưỡng, morphology, contour và theo dõi vật qua các khung hình thành một ứng dụng hoàn chỉnh.</p>
