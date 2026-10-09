@@ -987,7 +987,7 @@ def build_path(p):
             learn = "".join(f"<li>{e(x)}</li>" for x in st["learn"])
             cards += f"""<li class="step" id="step-{st['slug']}" data-step="{st['slug']}">
           <span class="step-marker" aria-hidden="true">{n}</span>
-          <div class="jcard">
+          <div class="step-card">
             <div class="step-head">
               <h3><span class="sr-only">Chặng {n}: </span>{e(st['title'])}</h3>
               <span class="step-here">Bạn đang ở đây</span>
