@@ -1,0 +1,176 @@
+<p>Một trạm kiểm tra thường chạy nhiều mã sản phẩm. Mỗi mã cần thông số riêng: thời gian phơi sáng, chế độ đèn, vùng ROI, kích thước danh nghĩa và dung sai. Bộ thông số đó gọi là <strong>recipe</strong>. Nếu ghi cứng trong code, mỗi lần đổi mã hàng lại phải biên dịch và cài lại phần mềm. Cách làm chuẩn là lưu recipe ra file JSON và nạp khi chuyển mã. Bài này dùng <strong>System.Text.Json</strong>, thư viện JSON có sẵn trong .NET, không cần cài thêm gói nào.</p>
+
+<p>Nếu bạn mới học C#, hãy đọc trước <a href="csharp-co-ban-cho-ky-su-tu-dong-hoa.html">C# cơ bản cho kỹ sư tự động hóa</a>. Code trong bài đã chạy thử với .NET 8 (dùng <code>required</code>, chuỗi thô <code>"""</code> của C# 11 và tùy chọn <code>UnmappedMemberHandling</code> có từ .NET 8).</p>
+
+<h2>1. Mô hình hóa recipe bằng lớp C#</h2>
+<p>Tạo dự án: <code>dotnet new console -n Recipe</code>. Đặt các kiểu dữ liệu ở <strong>cuối</strong> file <code>Program.cs</code> (sau các câu lệnh chính):</p>
+<pre><code>public enum CheDoDen { Tat, Lien, Strobe }
+
+public record Roi(int X, int Y, int W, int H);
+
+public record DungSai(double DanhNghia, double CongTru)
+{
+    private const double Eps = 1e-9;   // nhỏ hơn rất nhiều so với độ phân giải đo
+    public bool Dat(double giaTri) =&gt; Math.Abs(giaTri - DanhNghia) &lt;= CongTru + Eps;
+}
+
+public class CaiDatCamera
+{
+    public int PhoiSangUs { get; set; } = 1000;
+    public double Gain { get; set; } = 0;
+}
+
+public class Recipe
+{
+    public int PhienBan { get; set; } = 1;
+    public required string MaSanPham { get; set; }
+    public CaiDatCamera Camera { get; set; } = new();
+    public CheDoDen CheDoDen { get; set; } = CheDoDen.Lien;
+    public required Roi Roi { get; set; }
+    public required DungSai KichThuocMm { get; set; }
+}</code></pre>
+<p>Vài điểm thiết kế đáng chú ý:</p>
+<ul>
+  <li><strong><code>required</code></strong>: những trường không có giá trị mặc định hợp lý (mã sản phẩm, ROI, dung sai) bắt buộc phải có trong file. Thiếu là báo lỗi ngay khi nạp, không để máy chạy với ROI rỗng.</li>
+  <li><strong>Giá trị mặc định</strong> cho các trường "an toàn" (phơi sáng 1000 µs, gain 0). File cũ thiếu trường mới vẫn nạp được.</li>
+  <li><strong><code>PhienBan</code></strong>: số phiên bản định dạng. Sau này đổi cấu trúc, bạn biết file nào cần chuyển đổi.</li>
+  <li><strong><code>record</code></strong> cho dữ liệu nhỏ, bất biến như ROI và dung sai. System.Text.Json tự dùng constructor của record khi đọc.</li>
+</ul>
+
+<h2>2. Tùy chọn serializer</h2>
+<p>Đặt ở <strong>đầu</strong> <code>Program.cs</code>:</p>
+<pre><code>using System.Text.Json;
+using System.Text.Json.Serialization;
+
+var tuyChon = new JsonSerializerOptions
+{
+    WriteIndented = true,
+    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    Converters = { new JsonStringEnumConverter() }
+};</code></pre>
+<table>
+  <tr><th>Tùy chọn</th><th>Tác dụng</th></tr>
+  <tr><td><code>WriteIndented</code></td><td>Xuống dòng, thụt lề cho người đọc (mặc định JSON viết liền một dòng)</td></tr>
+  <tr><td><code>PropertyNamingPolicy = CamelCase</code></td><td><code>MaSanPham</code> thành <code>maSanPham</code>, đúng thói quen đặt tên trong JSON</td></tr>
+  <tr><td><code>JsonStringEnumConverter</code></td><td>Ghi enum dạng chữ <code>"Strobe"</code> thay vì số <code>2</code>. Người vận hành đọc được, và thêm giá trị enum mới không làm lệch nghĩa file cũ</td></tr>
+</table>
+<div class="tip"><strong>Tạo JsonSerializerOptions một lần rồi dùng lại</strong>Đối tượng tùy chọn lưu bộ nhớ đệm thông tin kiểu. Tạo mới cho mỗi lần đọc/ghi làm chậm chương trình. Hãy giữ một biến dùng chung.</div>
+
+<h2>3. Lưu và nạp recipe</h2>
+<pre><code>// 1. Tạo recipe và lưu ra file
+var recipe = new Recipe
+{
+    MaSanPham = "SP-001",
+    Camera = new CaiDatCamera { PhoiSangUs = 1200, Gain = 2.0 },
+    CheDoDen = CheDoDen.Strobe,
+    Roi = new Roi(120, 80, 400, 300),
+    KichThuocMm = new DungSai(25.00, 0.05)
+};
+string json = JsonSerializer.Serialize(recipe, tuyChon);
+File.WriteAllText("SP-001.json", json);
+Console.WriteLine(json);
+
+// 2. Nạp lại và dùng
+var napLai = JsonSerializer.Deserialize&lt;Recipe&gt;(File.ReadAllText("SP-001.json"), tuyChon)!;
+Console.WriteLine($"Nạp {napLai.MaSanPham}: phơi sáng {napLai.Camera.PhoiSangUs} µs, đèn {napLai.CheDoDen}");
+Console.WriteLine($"25.03 mm -&gt; {(napLai.KichThuocMm.Dat(25.03) ? "OK" : "NG")}");
+Console.WriteLine($"25.06 mm -&gt; {(napLai.KichThuocMm.Dat(25.06) ? "OK" : "NG")}");</code></pre>
+<p>Kết quả <code>dotnet run</code>:</p>
+<pre><code class="language-text">{
+  "phienBan": 1,
+  "maSanPham": "SP-001",
+  "camera": {
+    "phoiSangUs": 1200,
+    "gain": 2
+  },
+  "cheDoDen": "Strobe",
+  "roi": {
+    "x": 120,
+    "y": 80,
+    "w": 400,
+    "h": 300
+  },
+  "kichThuocMm": {
+    "danhNghia": 25,
+    "congTru": 0.05
+  }
+}
+Nạp SP-001: phơi sáng 1200 µs, đèn Strobe
+25.03 mm -&gt; OK
+25.06 mm -&gt; NG</code></pre>
+<p>Lưu ý <code>2.0</code> được ghi thành <code>2</code> và <code>25.00</code> thành <code>25</code>: JSON không phân biệt số nguyên và số thực, đọc lại vào <code>double</code> vẫn đúng.</p>
+
+<h2>4. Bắt lỗi recipe thiếu trường</h2>
+<p>Người vận hành sửa tay file và xóa nhầm ROI. Nhờ <code>required</code>, lỗi được phát hiện ngay lúc nạp:</p>
+<pre><code>// 3. File thiếu trường bắt buộc
+string thieu = """{ "maSanPham": "SP-002", "cheDoDen": "Lien" }""";
+try
+{
+    JsonSerializer.Deserialize&lt;Recipe&gt;(thieu, tuyChon);
+}
+catch (JsonException ex)
+{
+    Console.WriteLine($"Lỗi recipe: {ex.Message}");
+}</code></pre>
+<pre><code class="language-text">Lỗi recipe: JSON deserialization for type 'Recipe' was missing required properties, including the following: roi, kichThuocMm</code></pre>
+<p>Trong phần mềm thật, khi gặp lỗi này hãy <strong>giữ nguyên recipe đang chạy</strong>, hiện thông báo rõ tên file và tên trường thiếu, và không cho chuyển mã. Chạy tiếp với thông số rỗng nguy hiểm hơn nhiều so với dừng máy.</p>
+
+<h2>5. Bẫy số thực ở đúng biên dung sai</h2>
+<p>Bạn có để ý hằng số <code>Eps</code> trong <code>DungSai</code>? Hãy xem điều gì xảy ra ở đúng biên 25,05 mm:</p>
+<pre><code>// 4. Bẫy số thực ở đúng biên dung sai
+Console.WriteLine($"25.05 - 25.00 = {25.05 - 25.00:R}");
+Console.WriteLine($"25.05 mm -&gt; {(napLai.KichThuocMm.Dat(25.05) ? "OK" : "NG")}");</code></pre>
+<pre><code class="language-text">25.05 - 25.00 = 0.05000000000000071
+25.05 mm -&gt; OK</code></pre>
+<p>Số 25,05 không biểu diễn chính xác được ở dạng nhị phân, nên hiệu số lớn hơn 0,05 một chút xíu. Nếu viết <code>&lt;= CongTru</code> không có <code>Eps</code>, sản phẩm đúng biên dung sai bị đánh <strong>NG</strong> (chúng tôi đã chạy thử để kiểm chứng). Cộng thêm một sai số rất nhỏ như <code>1e-9</code> mm, nhỏ hơn rất nhiều độ phân giải của bất kỳ hệ đo quang học nào, giải quyết vấn đề. Một cách khác là làm tròn kết quả đo về số chữ số có nghĩa trước khi so sánh.</p>
+
+<h2>6. Chế độ đọc "chặt" cho file sửa tay</h2>
+<p>File recipe hay được sửa tay, nên ta muốn: cho phép chú thích <code>//</code>, chấp nhận dấu phẩy thừa ở cuối, nhưng <strong>báo lỗi khi gặp tên trường lạ</strong> (thường là do gõ sai). Mặc định System.Text.Json lặng lẽ bỏ qua trường lạ, nên một lỗi gõ <code>phoiSang</code> thay vì <code>phoiSangUs</code> sẽ khiến máy âm thầm chạy với giá trị mặc định.</p>
+<pre><code>// 5. Chấp nhận chú thích, dấu phẩy thừa; từ chối trường lạ (gõ sai tên)
+var tuyChonChat = new JsonSerializerOptions(tuyChon)
+{
+    ReadCommentHandling = JsonCommentHandling.Skip,
+    AllowTrailingCommas = true,
+    UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
+};
+string goSai = """
+{
+  // recipe sản phẩm SP-003
+  "maSanPham": "SP-003",
+  "roi": { "x": 0, "y": 0, "w": 100, "h": 100 },
+  "kichThuocMm": { "danhNghia": 12.5, "congTru": 0.02 },
+  "phoiSang": 800,
+}
+""";
+try
+{
+    JsonSerializer.Deserialize&lt;Recipe&gt;(goSai, tuyChonChat);
+}
+catch (JsonException ex)
+{
+    Console.WriteLine($"Lỗi recipe: {ex.Message}");
+}</code></pre>
+<pre><code class="language-text">Lỗi recipe: The JSON property 'phoiSang' could not be mapped to any .NET member contained in type 'Recipe'.</code></pre>
+<p><code>new JsonSerializerOptions(tuyChon)</code> sao chép toàn bộ tùy chọn cũ (camelCase, enum dạng chữ) rồi bổ sung thêm. Chú thích và dấu phẩy thừa được chấp nhận; chỉ trường gõ sai bị bắt.</p>
+
+<h2>7. Ghi file an toàn</h2>
+<p>Nếu mất điện đúng lúc đang ghi, file recipe có thể bị cắt nửa chừng. Cách phổ biến: ghi ra file tạm rồi thay thế:</p>
+<pre><code>static void LuuAnToan(string duongDan, string noiDung)
+{
+    string tam = duongDan + ".tmp";
+    File.WriteAllText(tam, noiDung);
+    File.Move(tam, duongDan, overwrite: true);   // thay thế file cũ sau khi ghi xong
+}</code></pre>
+<p>Kết hợp thêm: lưu bản sao có ngày giờ mỗi lần sửa (ví dụ <code>SP-001_20261010_0830.json</code>) để truy vết ai đổi gì, rất có ích khi nghiệm thu và khi khách hàng hỏi "hôm đó máy chạy thông số nào".</p>
+
+<h2>Tổng kết quy tắc recipe</h2>
+<ol>
+  <li>Mỗi mã sản phẩm một file JSON, có trường <code>phienBan</code>.</li>
+  <li>Trường quan trọng dùng <code>required</code>; trường phụ có giá trị mặc định an toàn.</li>
+  <li>Enum ghi dạng chữ; từ chối trường lạ khi nạp file sửa tay.</li>
+  <li>Nạp lỗi thì giữ recipe cũ và báo rõ; không bao giờ chạy với thông số rỗng.</li>
+  <li>So sánh dung sai số thực có sai số nhỏ <code>Eps</code>.</li>
+</ol>
+<p>Ý tưởng tương tự trong Python có ở bài <a href="opencv-5-to-chuc-pipeline-xu-ly.html">tổ chức pipeline bằng dataclass và cấu hình JSON</a>. Recipe này có thể dùng ngay trong ứng dụng <a href="winforms-hien-thi-camera-opencvsharp.html">WinForms hiển thị camera với OpenCvSharp</a>.</p>
+
+<p class="note">Nguồn tham khảo: <a href="https://learn.microsoft.com/dotnet/standard/serialization/system-text-json/customize-properties" rel="noopener" target="_blank">Microsoft Learn: tùy biến tên thuộc tính và enum</a>, <a href="https://learn.microsoft.com/dotnet/standard/serialization/system-text-json/required-properties" rel="noopener" target="_blank">Microsoft Learn: required properties</a>, <a href="https://learn.microsoft.com/dotnet/standard/serialization/system-text-json/missing-members" rel="noopener" target="_blank">Microsoft Learn: xử lý trường không khớp</a>.</p>

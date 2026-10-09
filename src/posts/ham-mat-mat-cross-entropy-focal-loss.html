@@ -1,0 +1,122 @@
+<p>Mạng nơ-ron học bằng cách giảm dần một con số gọi là <strong>loss</strong> (hàm mất mát). Chọn sai loss, mô hình vẫn "học" rất chăm chỉ nhưng học sai điều bạn cần. Trong bài toán kiểm tra lỗi, sai lầm kinh điển là: dữ liệu có 95% ảnh OK, mô hình học được cách luôn trả lời OK, loss rất thấp, còn ảnh NG thì lọt hết. Bài này giải thích <strong>softmax</strong>, <strong>cross-entropy</strong>, và hai cách xử lý dữ liệu mất cân bằng: <strong>trọng số lớp</strong> và <strong>focal loss</strong>.</p>
+<p>Nên đọc trước: <a href="pytorch-co-ban-tensor-autograd.html">PyTorch cơ bản: tensor, autograd</a> và <a href="hoi-quy-tuyen-tinh-gradient-descent-numpy.html">gradient descent từ đầu với NumPy</a>.</p>
+
+<h2>1. Softmax: biến điểm số thành xác suất</h2>
+<p>Lớp cuối của mạng phân loại xuất ra các con số thô gọi là <strong>logits</strong>, mỗi lớp một số, có thể âm hoặc dương tùy ý. Softmax biến chúng thành xác suất: lấy <code>exp</code> từng số rồi chia cho tổng.</p>
+<pre><code class="language-python">import numpy as np
+
+
+def softmax(z):
+    z = z - z.max()                  # trừ max để tránh tràn số exp
+    e = np.exp(z)
+    return e / e.sum()
+
+
+logits = np.array([2.0, 0.5, -1.0])  # đầu ra thô của mạng: OK, trầy xước, móp
+p = softmax(logits)
+print("xác suất:", p.round(3), "tổng =", p.sum().round(3))
+
+for nhan in range(3):
+    print(f"nhãn đúng = {nhan}: loss = {-np.log(p[nhan]):.3f}")</code></pre>
+<pre><code class="language-text">xác suất: [0.786 0.175 0.039] tổng = 1.0
+nhãn đúng = 0: loss = 0.241
+nhãn đúng = 1: loss = 1.741
+nhãn đúng = 2: loss = 3.241</code></pre>
+<p>Dòng <code>z - z.max()</code> không làm thay đổi kết quả (softmax không đổi khi cộng cùng một hằng số vào mọi logit) nhưng tránh được <code>exp(1000)</code> tràn số.</p>
+
+<h2>2. Cross-entropy: phạt theo xác suất của nhãn đúng</h2>
+<p>Cross-entropy cho một mẫu rất đơn giản: <strong>loss = −log(xác suất mô hình gán cho nhãn đúng)</strong>. Ở ví dụ trên, nếu ảnh thật sự là OK (nhãn 0), mô hình gán 78,6% nên loss nhỏ (0,241). Nếu ảnh thật sự bị móp (nhãn 2), mô hình chỉ gán 3,9% nên bị phạt nặng (3,241).</p>
+<p>Trong PyTorch, <code>nn.CrossEntropyLoss</code> nhận thẳng <strong>logits</strong>, tự tính softmax và log bên trong:</p>
+<pre><code class="language-python">import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+logits_t = torch.tensor([[2.0, 0.5, -1.0]])
+nhan_t = torch.tensor([1])                       # nhãn đúng: trầy xước
+print(f"nn.CrossEntropyLoss: {nn.CrossEntropyLoss()(logits_t, nhan_t).item():.3f}")</code></pre>
+<pre><code class="language-text">nn.CrossEntropyLoss: 1.741</code></pre>
+<p>Khớp với kết quả tự tính 1,741.</p>
+<div class="warn"><strong>Lỗi rất hay gặp: softmax hai lần</strong>Đừng thêm <code>nn.Softmax</code> ở cuối mô hình rồi đưa vào <code>nn.CrossEntropyLoss</code>. Hàm loss đã tự làm softmax; áp thêm một lần nữa khiến gradient yếu đi và mô hình học rất chậm. Chỉ dùng <code>torch.softmax</code> khi suy luận, để đọc xác suất.</div>
+
+<h3>Vì sao dùng log?</h3>
+<p>Hãy xem loss tăng thế nào khi mô hình càng sai:</p>
+<pre><code class="language-python">for p_dung in [0.9, 0.6, 0.3, 0.05]:
+    print(f"p_dung = {p_dung:4}: loss = {-np.log(p_dung):.3f}")</code></pre>
+<pre><code class="language-text">p_dung =  0.9: loss = 0.105
+p_dung =  0.6: loss = 0.511
+p_dung =  0.3: loss = 1.204
+p_dung = 0.05: loss = 2.996</code></pre>
+<p>Đoán đúng với 90% chắc chắn gần như không bị phạt; tự tin sai (chỉ 5% cho nhãn đúng) bị phạt gấp gần 30 lần. Loss tiến tới vô cùng khi xác suất nhãn đúng tiến về 0, nên mô hình bị "ép" không được tự tin sai.</p>
+
+<h2>3. Vấn đề dữ liệu mất cân bằng</h2>
+<p>Dữ liệu nhà máy thường có rất ít ảnh NG. Hãy xem một "mô hình lười" luôn tự tin trả lời OK trên 950 ảnh OK và 50 ảnh NG:</p>
+<pre><code class="language-python"># 1000 mẫu: 950 OK (nhãn 0), 50 NG (nhãn 1)
+nhan = torch.cat([torch.zeros(950, dtype=torch.long), torch.ones(50, dtype=torch.long)])
+# Mô hình "lười": luôn tự tin rằng mọi thứ đều OK
+logits_luoi = torch.tensor([[3.0, -3.0]]).repeat(1000, 1)
+
+ce = nn.CrossEntropyLoss()
+print(f"loss trung bình: {ce(logits_luoi, nhan).item():.3f}")
+print(f"loss trên mẫu OK: {ce(logits_luoi[:950], nhan[:950]).item():.3f}")
+print(f"loss trên mẫu NG: {ce(logits_luoi[950:], nhan[950:]).item():.3f}")</code></pre>
+<pre><code class="language-text">loss trung bình: 0.302
+loss trên mẫu OK: 0.002
+loss trên mẫu NG: 6.002</code></pre>
+<p>Mỗi ảnh NG bị phạt rất nặng (6,0), nhưng vì chỉ chiếm 5% nên loss trung bình vẫn thấp (0,30). Mô hình thật trong quá trình huấn luyện dễ mắc kẹt ở trạng thái này: accuracy 95%, loss nhỏ, nhưng không phát hiện được lỗi nào.</p>
+
+<h2>4. Cách 1: trọng số lớp (class weight)</h2>
+<p>Ý tưởng: mỗi mẫu NG được tính nặng hơn. Công thức phổ biến (giống <code>class_weight="balanced"</code> trong scikit-learn): <code>trọng số = tổng số mẫu / (số lớp × số mẫu của lớp)</code>.</p>
+<pre><code class="language-python">so_mau = torch.tensor([950.0, 50.0])
+trong_so = so_mau.sum() / (2 * so_mau)           # cùng công thức "balanced" của scikit-learn
+print("trọng số lớp:", trong_so)
+
+ce_w = nn.CrossEntropyLoss(weight=trong_so)
+print(f"loss có trọng số: {ce_w(logits_luoi, nhan).item():.3f}")</code></pre>
+<pre><code class="language-text">trọng số lớp: tensor([ 0.5263, 10.0000])
+loss có trọng số: 3.002</code></pre>
+<p>Lúc này 50 ảnh NG có tổng trọng số (50 × 10 = 500) bằng 950 ảnh OK (950 × 0,526 ≈ 500). Loss của mô hình lười tăng từ 0,30 lên 3,0, đủ để buộc mô hình phải học nhận ra NG. Lưu ý: khi có <code>weight</code>, PyTorch chia cho <strong>tổng trọng số</strong> chứ không chia cho số mẫu.</p>
+<p>Một cách tương đương là <strong>lấy mẫu lại</strong> (oversampling): dùng <code>torch.utils.data.WeightedRandomSampler</code> để ảnh NG xuất hiện thường xuyên hơn trong mỗi epoch. Hai cách cho hiệu quả tương tự; đừng dùng cả hai cùng lúc với trọng số đầy đủ, vì sẽ bù quá tay.</p>
+
+<h2>5. Cách 2: focal loss</h2>
+<p>Focal loss được giới thiệu trong bài báo RetinaNet (Lin và cộng sự, 2017) cho object detection, nơi số vùng nền áp đảo số vùng có vật. Ý tưởng: nhân cross-entropy với hệ số <code>(1 − p_t)^γ</code>, trong đó <code>p_t</code> là xác suất của nhãn đúng.</p>
+<ul>
+  <li>Mẫu <strong>dễ</strong> (mô hình đã chắc, <code>p_t</code> gần 1): hệ số gần 0, gần như không đóng góp vào loss.</li>
+  <li>Mẫu <strong>khó</strong> (mô hình phân vân hoặc sai): hệ số lớn, giữ lại phần lớn loss.</li>
+</ul>
+<p>Với γ = 0, focal loss chính là cross-entropy. PyTorch không có sẵn focal loss nhiều lớp trong <code>torch.nn</code>, nhưng tự viết rất ngắn:</p>
+<pre><code class="language-python">def focal_loss(logits, nhan, gamma=2.0, alpha=None):
+    """Focal loss nhiều lớp: (1 - p_t)^gamma * cross-entropy."""
+    log_p = F.log_softmax(logits, dim=1)
+    log_pt = log_p.gather(1, nhan.unsqueeze(1)).squeeze(1)   # log xác suất của nhãn đúng
+    pt = log_pt.exp()
+    loss = -((1 - pt) ** gamma) * log_pt
+    if alpha is not None:                                   # trọng số theo lớp (tùy chọn)
+        loss = alpha[nhan] * loss
+    return loss.mean()
+
+
+de = torch.tensor([[4.0, -4.0]])     # mẫu dễ: OK, mô hình rất chắc (p_t ≈ 0.9997)
+kho = torch.tensor([[0.2, 0.0]])     # mẫu khó: OK nhưng mô hình phân vân (p_t ≈ 0.55)
+nhan_ok = torch.tensor([0])
+for ten, lg in [("dễ", de), ("khó", kho)]:
+    ce_v = F.cross_entropy(lg, nhan_ok).item()
+    fl_v = focal_loss(lg, nhan_ok).item()
+    print(f"mẫu {ten:3}: CE = {ce_v:.2e}  focal = {fl_v:.2e}  giảm {ce_v / fl_v:.0f} lần")</code></pre>
+<pre><code class="language-text">mẫu dễ : CE = 3.35e-04  focal = 3.77e-11  giảm 8892837 lần
+mẫu khó: CE = 5.98e-01  focal = 1.21e-01  giảm 5 lần</code></pre>
+<p>Mẫu dễ bị giảm hàng triệu lần, mẫu khó chỉ giảm 5 lần. Hàng nghìn ảnh OK "dễ" không còn lấn át gradient; mô hình dồn sức vào các ảnh khó, thường chính là ảnh NG và ảnh OK trông giống NG.</p>
+<p>Với bài toán nhị phân dùng sigmoid (một đầu ra), torchvision có sẵn <code>torchvision.ops.sigmoid_focal_loss</code> với mặc định <code>alpha=0.25</code>, <code>gamma=2</code>, đúng cấu hình dùng trong RetinaNet.</p>
+
+<h2>Chọn loss nào?</h2>
+<table>
+  <tr><th>Tình huống</th><th>Gợi ý</th></tr>
+  <tr><td>Dữ liệu tương đối cân bằng</td><td><code>nn.CrossEntropyLoss</code> thông thường</td></tr>
+  <tr><td>Mất cân bằng vừa phải (ví dụ 1:5 đến 1:20)</td><td>Cross-entropy + <code>weight</code>, hoặc <code>WeightedRandomSampler</code></td></tr>
+  <tr><td>Mất cân bằng nặng, nhiều mẫu dễ (detection, segmentation vết lỗi nhỏ)</td><td>Focal loss, bắt đầu với γ = 2</td></tr>
+  <tr><td>Gần như không có ảnh NG</td><td>Chuyển sang <a href="../projects/phat-hien-loi-be-mat-anomaly-detection.html">anomaly detection</a>, chỉ học từ ảnh OK</td></tr>
+</table>
+<div class="tip"><strong>Loss không thay thế được ngưỡng quyết định</strong>Dù dùng loss nào, bước cuối vẫn là chọn ngưỡng xác suất NG phù hợp với chi phí lọt lỗi và chi phí loại nhầm của nhà máy. Xem <a href="industrial-vision-3-tieu-chi-ok-ng-escape-overkill.html">tiêu chí OK/NG, escape và overkill</a>.</div>
+
+<p>Luôn theo dõi <strong>recall và precision của lớp NG</strong> trên tập validation, đừng chỉ nhìn loss và accuracy. Loss giảm đều không có nghĩa là mô hình đã bắt được lỗi.</p>
+
+<p class="note">Nguồn tham khảo: <a href="https://arxiv.org/abs/1708.02002" rel="noopener" target="_blank">Lin và cộng sự, Focal Loss for Dense Object Detection (arXiv:1708.02002)</a>, <a href="https://docs.pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html" rel="noopener" target="_blank">PyTorch: CrossEntropyLoss</a>, <a href="https://docs.pytorch.org/vision/main/generated/torchvision.ops.sigmoid_focal_loss.html" rel="noopener" target="_blank">torchvision.ops.sigmoid_focal_loss</a>.</p>

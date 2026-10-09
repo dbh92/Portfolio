@@ -1,0 +1,107 @@
+<p>Kiểm tra bo mạch có đủ linh kiện, nắp chai có đủ chi tiết, nhãn in có bị dính mực thừa... Rất nhiều bài toán kiểm tra trong nhà máy có chung một ý tưởng: <strong>so sánh ảnh sản phẩm với một ảnh mẫu chuẩn</strong> (golden template), chỗ nào khác biệt là lỗi. Nghe đơn giản: lấy hai ảnh trừ nhau. Nhưng nếu chỉ trừ thẳng, bạn sẽ thấy "lỗi" ở khắp các cạnh. Bài này đi qua ba bước để phương pháp chạy được ngoài thực tế: <strong>căn chỉnh</strong>, <strong>dải dung sai</strong>, và <strong>phân tích vùng khác biệt</strong>.</p>
+<p>Code chạy với OpenCV-Python (đã thử với bản 5.0; các hàm dùng trong bài đều có ở OpenCV 4.x) và NumPy. Ảnh được tạo bằng code nên bạn chạy được ngay.</p>
+
+<h2>1. Tạo ảnh mẫu và ảnh kiểm tra</h2>
+<p>Ảnh mẫu là một "bo mạch" có 6 linh kiện và 2 đường mạch. Ảnh kiểm tra mô phỏng tình huống thật: sản phẩm đặt <strong>lệch 2,4 px và 1,6 px, xoay 0,3°</strong> trên đồ gá, có nhiễu cảm biến, và có hai lỗi: thiếu một linh kiện, thừa một giọt thiếc.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+
+def ve_bo_mach():
+    """Ảnh 'bo mạch' 300x400: nền xanh đậm, 6 linh kiện, 2 đường mạch."""
+    anh = np.full((300, 400), 60, np.uint8)
+    for x in range(40, 360, 110):
+        cv2.rectangle(anh, (x, 50), (x + 50, 90), 200, -1)    # hàng trên
+        cv2.rectangle(anh, (x, 200), (x + 50, 240), 200, -1)  # hàng dưới
+    cv2.line(anh, (20, 150), (380, 150), 140, 3)
+    cv2.line(anh, (200, 20), (200, 280), 140, 3)
+    return anh
+
+
+rng = np.random.default_rng(0)
+mau = ve_bo_mach()                                     # ảnh mẫu (golden)
+
+# Ảnh kiểm tra: sản phẩm lệch (2.4, 1.6) px và xoay 0.3 độ so với ảnh mẫu
+M_lech = cv2.getRotationMatrix2D((200, 150), 0.3, 1.0)
+M_lech[:, 2] += (2.4, 1.6)
+kiem = cv2.warpAffine(mau, M_lech, (400, 300), borderMode=cv2.BORDER_REPLICATE)
+cv2.rectangle(kiem, (150, 199), (204, 245), 60, -1)    # lỗi 1: thiếu linh kiện
+cv2.circle(kiem, (300, 120), 6, 230, -1)               # lỗi 2: giọt thiếc thừa
+kiem = cv2.add(kiem, rng.integers(0, 12, kiem.shape, dtype=np.uint8))  # nhiễu cảm biến
+print(mau.shape, kiem.shape)</code></pre>
+<pre><code class="language-text">(300, 400) (300, 400)</code></pre>
+
+<h2>2. Cách ngây thơ: trừ thẳng hai ảnh</h2>
+<p><code>cv2.absdiff</code> tính trị tuyệt đối hiệu từng pixel (không bị tràn số như phép trừ <code>uint8</code> thông thường). Sau đó phân ngưỡng và đếm vùng bằng <code>connectedComponentsWithStats</code> (xem <a href="xu-ly-anh-5-dac-trung-contour-blob.html">blob analysis</a>):</p>
+<pre><code class="language-python">def dem_vung_loi(mat_na, dien_tich_min=30):
+    n, nhan, stats, tam = cv2.connectedComponentsWithStats(mat_na)
+    vung = [(tuple(stats[i, :4]), int(stats[i, cv2.CC_STAT_AREA]))
+            for i in range(1, n) if stats[i, cv2.CC_STAT_AREA] &gt;= dien_tich_min]
+    return vung
+
+
+hieu = cv2.absdiff(kiem, mau)
+_, mat_na = cv2.threshold(hieu, 40, 255, cv2.THRESH_BINARY)
+vung = dem_vung_loi(mat_na)
+print("Trừ thẳng: số vùng lỗi =", len(vung))</code></pre>
+<pre><code class="language-text">Trừ thẳng: số vùng lỗi = 7</code></pre>
+<p>Chỉ có 2 lỗi thật nhưng phương pháp báo 7 vùng. Do sản phẩm lệch vài pixel, mọi cạnh linh kiện đều tạo ra một dải khác biệt. Trên dây chuyền, đây là tỉ lệ loại nhầm (overkill) rất cao.</p>
+
+<h2>3. Căn chỉnh ảnh trước khi so sánh</h2>
+<p>Bước bắt buộc của golden template là đưa ảnh kiểm tra về đúng vị trí ảnh mẫu. Với sản phẩm chỉ bị dời (tịnh tiến), <code>cv2.phaseCorrelate</code> đo độ lệch với độ chính xác dưới pixel bằng biến đổi Fourier:</p>
+<pre><code class="language-python">(dx, dy), do_tin_cay = cv2.phaseCorrelate(mau.astype(np.float32), kiem.astype(np.float32))
+print(f"Độ lệch đo được: dx = {dx:.2f}, dy = {dy:.2f}")
+
+M = np.float32([[1, 0, -dx], [0, 1, -dy]])                 # dời ảnh kiểm tra về vị trí ảnh mẫu
+kiem_can = cv2.warpAffine(kiem, M, (kiem.shape[1], kiem.shape[0]), borderMode=cv2.BORDER_REPLICATE)
+
+hieu = cv2.absdiff(kiem_can, mau)
+_, mat_na = cv2.threshold(hieu, 40, 255, cv2.THRESH_BINARY)
+print("Sau căn chỉnh: số vùng lỗi =", len(dem_vung_loi(mat_na)))</code></pre>
+<pre><code class="language-text">Độ lệch đo được: dx = 2.31, dy = 1.70
+Sau căn chỉnh: số vùng lỗi = 9</code></pre>
+<p>Độ lệch đo được (2,31; 1,70) gần với độ dời thật (2,4; 1,6). Phần chênh nhỏ đến từ góc xoay 0,3°: <code>phaseCorrelate</code> chỉ ước lượng tịnh tiến. Kết quả là sau căn chỉnh vẫn còn 9 vùng: ở xa tâm xoay, cạnh linh kiện vẫn lệch khoảng 1 px, tạo ra các dải mảnh dọc theo cạnh.</p>
+<p>Khi sản phẩm xoay đáng kể, hãy dùng định vị có góc: <a href="do-luong-3-feature-va-shape-matching.html">feature matching hoặc shape matching</a> để tìm ma trận affine, rồi <code>cv2.warpAffine</code>. Nhưng dù căn chỉnh tốt đến đâu, sai số dưới 1 px vẫn luôn còn. Đó là lý do cần bước tiếp theo.</p>
+
+<h2>4. Dải dung sai: cho phép lệch nhỏ ở cạnh</h2>
+<p>Thay vì so với đúng một ảnh mẫu, ta tạo hai ảnh giới hạn từ ảnh mẫu:</p>
+<ul>
+  <li><strong>Ảnh max</strong> = <code>dilate</code> ảnh mẫu: tại mỗi pixel, lấy giá trị sáng nhất trong vùng lân cận 3×3. Đây là mức sáng tối đa được phép.</li>
+  <li><strong>Ảnh min</strong> = <code>erode</code> ảnh mẫu: mức tối nhất được phép.</li>
+</ul>
+<p>Ở vùng phẳng, min và max gần bằng nhau nên kiểm tra rất chặt. Ở cạnh, dải cho phép rộng ra, đủ để hấp thụ sai số căn chỉnh khoảng 1 px. Pixel bị coi là lỗi khi <strong>sáng hơn max</strong> (vật thừa) hoặc <strong>tối hơn min</strong> (vật thiếu) quá một ngưỡng:</p>
+<pre><code class="language-python">k = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+mau_max = cv2.dilate(mau, k)                 # sáng nhất cho phép tại mỗi pixel
+mau_min = cv2.erode(mau, k)                  # tối nhất cho phép tại mỗi pixel
+nguong = 40
+
+sang_hon = cv2.subtract(kiem_can, mau_max)   # vượt trên dải cho phép (vật thừa)
+toi_hon = cv2.subtract(mau_min, kiem_can)    # thấp hơn dải cho phép (vật thiếu)
+mat_na = cv2.threshold(cv2.max(sang_hon, toi_hon), nguong, 255, cv2.THRESH_BINARY)[1]
+mat_na = cv2.morphologyEx(mat_na, cv2.MORPH_OPEN, k)   # bỏ đốm nhiễu lẻ
+
+for (x, y, w, h), s in dem_vung_loi(mat_na):
+    loai = "thừa" if sang_hon[y:y + h, x:x + w].max() &gt; nguong else "thiếu"
+    print(f"Lỗi {loai}: x={x}, y={y}, w={w}, h={h}, diện tích={s}")</code></pre>
+<pre><code class="language-text">Lỗi thừa: x=292, y=113, w=12, h=12, diện tích=128
+Lỗi thiếu: x=151, y=197, w=51, h=47, diện tích=2013</code></pre>
+<p>Chỉ còn đúng 2 lỗi thật, kèm vị trí, kích thước và loại. <code>cv2.subtract</code> với ảnh <code>uint8</code> tự cắt giá trị âm về 0, nên <code>sang_hon</code> chỉ chứa phần vượt trên và <code>toi_hon</code> chỉ chứa phần thấp hơn dải cho phép. Bước <code>MORPH_OPEN</code> (xem <a href="xu-ly-anh-4-morphology.html">morphology</a>) xóa các đốm nhiễu lẻ 1–2 pixel.</p>
+<div class="tip"><strong>Kích thước kernel = sai số căn chỉnh chấp nhận được</strong>Kernel 3×3 cho phép lệch khoảng 1 px. Kernel lớn hơn chịu được lệch nhiều hơn nhưng sẽ bỏ sót lỗi nhỏ nằm sát cạnh. Hãy đo sai số căn chỉnh thực tế trên vài chục sản phẩm OK trước, rồi chọn kernel nhỏ nhất đủ dùng.</div>
+
+<h2>5. Đưa vào sản xuất</h2>
+<table>
+  <tr><th>Vấn đề</th><th>Cách xử lý</th></tr>
+  <tr><td>Độ sáng thay đổi theo ca, theo tuổi đèn</td><td>Chuẩn hóa độ sáng trước khi so sánh (cân bằng theo vùng tham chiếu), hoặc dùng ảnh mẫu trung bình. Kiểm soát ánh sáng ngay từ phần cứng vẫn là cách tốt nhất.</td></tr>
+  <tr><td>Sản phẩm OK cũng khác nhau tự nhiên (vân bề mặt, màu nhựa)</td><td>Tạo ảnh mẫu từ <strong>nhiều</strong> ảnh OK: ảnh trung bình và độ lệch chuẩn theo từng pixel, ngưỡng tại mỗi pixel = k × độ lệch chuẩn (kỹ thuật "variation model").</td></tr>
+  <tr><td>Vùng không cần kiểm tra (chữ in ngày tháng, số seri)</td><td>Dùng mặt nạ (mask) loại vùng đó khỏi phép so sánh.</td></tr>
+  <tr><td>Lỗi rất nhỏ, độ tương phản thấp</td><td>Giảm ngưỡng trong vùng quan trọng, dùng nhiều ROI với ngưỡng khác nhau.</td></tr>
+  <tr><td>Biến dạng phức tạp (vật mềm, cong vênh)</td><td>Golden template không phù hợp; cân nhắc <a href="../projects/phat-hien-loi-be-mat-anomaly-detection.html">anomaly detection bằng deep learning</a>.</td></tr>
+</table>
+<p>Golden template là lựa chọn rất tốt khi sản phẩm <strong>giống hệt nhau</strong> (bo mạch, nhãn in, chi tiết dập) và đồ gá giữ vị trí ổn định: nhanh, dễ giải thích, không cần dữ liệu lỗi để huấn luyện. Xem thêm so sánh trong bài <a href="../kien-thuc/rule-based-hay-deep-learning-kiem-tra-loi.html">rule-based hay deep learning</a>.</p>
+
+<div class="ex">
+<h3>Bài tập</h3>
+<p>Tăng góc xoay trong <code>M_lech</code> lên 1,5° và chạy lại. Dải dung sai 3×3 còn đủ không? Thử hai cách: (a) tăng kernel lên 5×5; (b) giữ kernel 3×3 nhưng căn chỉnh bằng ORB + <code>cv2.estimateAffinePartial2D</code>. Cách nào vẫn phát hiện được giọt thiếc và ít báo nhầm hơn?</p>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.opencv.org/4.x/d7/df3/group__imgproc__motion.html" rel="noopener" target="_blank">OpenCV: phaseCorrelate (Motion Analysis)</a>, <a href="https://docs.opencv.org/4.x/d2/de8/group__core__array.html" rel="noopener" target="_blank">OpenCV: absdiff, subtract (Operations on arrays)</a>, <a href="https://docs.opencv.org/4.x/d3/dc0/group__imgproc__shape.html" rel="noopener" target="_blank">OpenCV: connectedComponentsWithStats</a>.</p>

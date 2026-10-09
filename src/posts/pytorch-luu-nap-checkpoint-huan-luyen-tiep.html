@@ -1,0 +1,140 @@
+<p>Huấn luyện một mô hình ảnh công nghiệp có thể mất vài giờ đến vài ngày. Mất điện, máy tự khởi động lại để cập nhật, hết phiên Colab... và bạn phải chạy lại từ đầu, nếu không lưu <strong>checkpoint</strong> đúng cách. Bài này hướng dẫn lưu và nạp checkpoint trong PyTorch sao cho huấn luyện tiếp cho ra <strong>đúng</strong> kết quả như chưa từng bị gián đoạn, cùng những lỗi phổ biến khi dùng <code>torch.load</code> từ PyTorch 2.6.</p>
+<p>Nếu chưa quen <code>state_dict</code> và vòng lặp huấn luyện, hãy đọc <a href="pytorch-co-ban-tensor-autograd.html">PyTorch cơ bản: tensor, autograd và vòng lặp huấn luyện</a>. Code trong bài chạy trên CPU với PyTorch 2.x.</p>
+
+<h2>Checkpoint cần chứa những gì?</h2>
+<table>
+  <tr><th>Thành phần</th><th>Vì sao cần</th></tr>
+  <tr><td><code>model.state_dict()</code></td><td>Trọng số mô hình</td></tr>
+  <tr><td><code>optimizer.state_dict()</code></td><td>Trạng thái bộ tối ưu: vận tốc momentum (SGD), trung bình động của gradient (Adam). Thiếu nó, bước cập nhật đầu tiên sau khi nạp sẽ khác hẳn</td></tr>
+  <tr><td><code>scheduler.state_dict()</code></td><td>Learning rate đang ở mức nào trong lịch giảm</td></tr>
+  <tr><td><code>epoch</code>, điểm tốt nhất</td><td>Biết chạy tiếp từ đâu, khi nào lưu <code>best.pt</code></td></tr>
+</table>
+<p>Một checkpoint chỉ dùng để <strong>suy luận</strong> thì chỉ cần trọng số. Còn checkpoint để <strong>huấn luyện tiếp</strong> phải có đủ cả bốn.</p>
+
+<h2>Chuẩn bị: một bài toán nhỏ, có thể lặp lại</h2>
+<p>Để kiểm chứng "huấn luyện tiếp cho kết quả y hệt", ta dùng dữ liệu cố định, khởi tạo trọng số cố định và thứ tự batch cố định:</p>
+<pre><code class="language-python">import torch
+import torch.nn as nn
+
+torch.manual_seed(0)
+X = torch.randn(256, 8)
+y = (X[:, 0] + X[:, 1] &gt; 0).long()            # bài toán OK/NG giả lập
+
+
+def tao_mo_hinh():
+    torch.manual_seed(1)                       # khởi tạo trọng số giống nhau mỗi lần
+    mh = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2))
+    toi_uu = torch.optim.SGD(mh.parameters(), lr=0.1, momentum=0.9)
+    lich = torch.optim.lr_scheduler.StepLR(toi_uu, step_size=3, gamma=0.5)
+    return mh, toi_uu, lich
+
+
+def mot_epoch(mh, toi_uu, lich):
+    mh.train()
+    for i in range(0, len(X), 64):             # 4 batch, thứ tự cố định
+        toi_uu.zero_grad()
+        loss = nn.functional.cross_entropy(mh(X[i:i + 64]), y[i:i + 64])
+        loss.backward()
+        toi_uu.step()
+    lich.step()
+    return loss.item()</code></pre>
+<p><code>StepLR(step_size=3, gamma=0.5)</code> giảm learning rate một nửa sau mỗi 3 epoch: 0,1 → 0,05 → 0,025.</p>
+
+<h2>Hàm lưu và nạp</h2>
+<pre><code class="language-python">def luu_checkpoint(duong_dan, mh, toi_uu, lich, epoch, loss_tot_nhat):
+    torch.save({
+        "epoch": epoch,
+        "model": mh.state_dict(),
+        "optimizer": toi_uu.state_dict(),
+        "scheduler": lich.state_dict(),
+        "loss_tot_nhat": loss_tot_nhat,
+    }, duong_dan)
+
+
+def nap_checkpoint(duong_dan, mh, toi_uu, lich):
+    ck = torch.load(duong_dan, map_location="cpu")    # weights_only=True là mặc định từ PyTorch 2.6
+    mh.load_state_dict(ck["model"])
+    toi_uu.load_state_dict(ck["optimizer"])
+    lich.load_state_dict(ck["scheduler"])
+    return ck["epoch"] + 1, ck["loss_tot_nhat"]       # epoch bắt đầu chạy tiếp</code></pre>
+<p><code>map_location="cpu"</code> cho phép nạp checkpoint lưu trên máy có GPU vào máy chỉ có CPU (ví dụ máy tính công nghiệp tại trạm). Nếu huấn luyện tiếp trên GPU, hãy <code>mh.to("cuda")</code> <strong>trước</strong> khi tạo optimizer, rồi mới nạp state.</p>
+
+<h2>Kiểm chứng: gián đoạn rồi chạy tiếp có giống chạy liền?</h2>
+<pre><code class="language-python"># Chạy A: huấn luyện liền 6 epoch
+mh, toi_uu, lich = tao_mo_hinh()
+for epoch in range(6):
+    loss = mot_epoch(mh, toi_uu, lich)
+print(f"A (liền mạch)   : loss cuối = {loss:.6f}, lr = {lich.get_last_lr()[0]}")
+
+# Chạy B: 3 epoch, lưu checkpoint, "mất điện"
+mh, toi_uu, lich = tao_mo_hinh()
+for epoch in range(3):
+    loss = mot_epoch(mh, toi_uu, lich)
+luu_checkpoint("last.pt", mh, toi_uu, lich, epoch, loss)
+del mh, toi_uu, lich
+
+# ... khởi động lại máy, tạo đối tượng mới và nạp checkpoint
+mh, toi_uu, lich = tao_mo_hinh()
+bat_dau, _ = nap_checkpoint("last.pt", mh, toi_uu, lich)
+for epoch in range(bat_dau, 6):
+    loss = mot_epoch(mh, toi_uu, lich)
+print(f"B (có gián đoạn): loss cuối = {loss:.6f}, lr = {lich.get_last_lr()[0]}")</code></pre>
+<pre><code class="language-text">A (liền mạch)   : loss cuối = 0.192472, lr = 0.025
+B (có gián đoạn): loss cuối = 0.192472, lr = 0.025</code></pre>
+<p>Hai kết quả trùng nhau đến chữ số thứ sáu. Checkpoint đã lưu đầy đủ trạng thái.</p>
+
+<h3>Điều gì xảy ra nếu chỉ lưu trọng số?</h3>
+<pre><code class="language-python"># Chạy C: SAI, chỉ lưu trọng số mô hình, quên optimizer và scheduler
+mh, toi_uu, lich = tao_mo_hinh()
+for epoch in range(3):
+    mot_epoch(mh, toi_uu, lich)
+torch.save(mh.state_dict(), "chi_trong_so.pt")
+
+mh, toi_uu, lich = tao_mo_hinh()
+mh.load_state_dict(torch.load("chi_trong_so.pt"))
+for epoch in range(3, 6):
+    loss = mot_epoch(mh, toi_uu, lich)
+print(f"C (thiếu optimizer): loss cuối = {loss:.6f}, lr = {lich.get_last_lr()[0]}")</code></pre>
+<pre><code class="language-text">C (thiếu optimizer): loss cuối = 0.177919, lr = 0.05</code></pre>
+<p>Kết quả đã khác: learning rate quay về lịch ban đầu (0,1 rồi giảm còn 0,05 thay vì 0,025) và vận tốc momentum bị mất. Ở ví dụ nhỏ này loss tình cờ thấp hơn, nhưng đó không phải điều đáng mừng: quá trình huấn luyện đã khác với cấu hình bạn thiết kế, không lặp lại được, và với mô hình lớn dùng Adam, learning rate bị "reset" lên cao có thể phá hỏng trọng số đã học tốt.</p>
+
+<h2>torch.load và weights_only</h2>
+<p>Từ PyTorch 2.6, <code>torch.load</code> mặc định <code>weights_only=True</code>: chỉ cho phép nạp tensor, số, chuỗi, list, dict và một số kiểu an toàn. Lý do: file <code>.pt</code> dùng định dạng pickle, và một file pickle độc hại có thể chạy mã tùy ý khi nạp. Checkpoint như trên (dict gồm state_dict, số nguyên, số thực) nạp bình thường. Nhưng một lỗi rất hay gặp là vô tình lưu kiểu NumPy:</p>
+<pre><code class="language-python">import numpy as np
+
+torch.save({"model": mh.state_dict(), "nguong": np.float64(0.42)}, "co_numpy.pt")
+try:
+    torch.load("co_numpy.pt")
+except Exception as ex:
+    print(type(ex).__name__, "-", str(ex).split(".")[0])
+
+torch.save({"model": mh.state_dict(), "nguong": float(np.float64(0.42))}, "sach.pt")
+print("nạp được:", torch.load("sach.pt")["nguong"])</code></pre>
+<pre><code class="language-text">UnpicklingError - Weights only load failed
+nạp được: 0.42</code></pre>
+<p>Các giá trị như ngưỡng, F1, độ chính xác tính bằng NumPy hoặc scikit-learn thường là <code>np.float64</code>. Hãy chuyển sang <code>float()</code> trước khi lưu. Với checkpoint cũ <strong>do chính bạn tạo</strong>, có thể dùng <code>torch.load(..., weights_only=False)</code>; tuyệt đối không làm vậy với file tải từ nguồn lạ. Nếu cần giữ <code>weights_only=True</code> mà vẫn có kiểu riêng, PyTorch cho phép khai báo kiểu an toàn bằng <code>torch.serialization.add_safe_globals</code>.</p>
+<div class="warn"><strong>Tránh lưu cả đối tượng mô hình</strong><code>torch.save(model, "m.pt")</code> lưu cả lớp Python bằng pickle. File đó phụ thuộc vào đúng cấu trúc thư mục và tên lớp lúc lưu; đổi tên file code là không nạp được, và không nạp được với <code>weights_only=True</code>. Luôn lưu <code>state_dict()</code>.</div>
+
+<h2>Quy trình lưu trong thực tế</h2>
+<ol>
+  <li><strong><code>last.pt</code></strong>: ghi đè sau mỗi epoch, để chạy tiếp khi bị gián đoạn.</li>
+  <li><strong><code>best.pt</code></strong>: chỉ lưu khi chỉ số validation (ví dụ F1 lớp NG) tốt hơn mức tốt nhất trước đó.</li>
+  <li><strong>Ghi an toàn</strong>: lưu ra <code>last.pt.tmp</code> rồi <code>os.replace</code> sang <code>last.pt</code>, tránh file hỏng nếu mất điện giữa lúc ghi.</li>
+  <li><strong>Lưu kèm cấu hình</strong>: kích thước ảnh đầu vào, tên các lớp, phiên bản dữ liệu, dưới dạng dict thuần (chuỗi, số). Sau 3 tháng, bạn sẽ cảm ơn chính mình.</li>
+  <li><strong>Dùng DataLoader có xáo trộn</strong>: để huấn luyện tiếp lặp lại hoàn toàn, lưu thêm trạng thái bộ sinh số ngẫu nhiên (<code>torch.get_rng_state()</code>). Trong thực tế, lặp lại xấp xỉ thường là đủ; quan trọng nhất là đúng optimizer và learning rate.</li>
+</ol>
+<pre><code class="language-python">import os
+
+
+def luu_an_toan(du_lieu, duong_dan):
+    tam = duong_dan + ".tmp"
+    torch.save(du_lieu, tam)
+    os.replace(tam, duong_dan)       # thay thế nguyên tử trên cùng ổ đĩa</code></pre>
+<p>Khi mô hình đã xong, bước tiếp theo để triển khai là xuất sang ONNX và tăng tốc, xem <a href="toi-uu-toc-do-suy-luan-onnx-tensorrt-openvino.html">tăng tốc suy luận: ONNX Runtime, OpenVINO, TensorRT</a>. Thư viện như Ultralytics đã tự lưu <code>last.pt</code> và <code>best.pt</code> và có tùy chọn <code>resume</code>; hiểu cơ chế bên dưới giúp bạn xử lý khi có sự cố.</p>
+
+<div class="ex">
+<h3>Bài tập</h3>
+<p>Đổi <code>SGD</code> thành <code>torch.optim.AdamW(mh.parameters(), lr=1e-3)</code> và chạy lại thí nghiệm A, B, C. In thêm <code>toi_uu.state_dict()["state"][0].keys()</code> để xem Adam lưu những gì cho mỗi tham số (gợi ý: <code>step</code>, <code>exp_avg</code>, <code>exp_avg_sq</code>).</p>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.pytorch.org/docs/stable/notes/serialization.html" rel="noopener" target="_blank">PyTorch: Serialization semantics (weights_only)</a>, <a href="https://docs.pytorch.org/tutorials/beginner/saving_loading_models.html" rel="noopener" target="_blank">PyTorch Tutorials: Saving and loading models</a>.</p>

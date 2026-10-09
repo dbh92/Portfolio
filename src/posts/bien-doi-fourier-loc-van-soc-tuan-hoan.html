@@ -1,0 +1,110 @@
+<p>Kiểm tra lỗi trên bề mặt vải, lưới lọc, tấm kim loại phay xước đều, màn hình LCD... có một khó khăn chung: bề mặt có <strong>hoa văn lặp lại</strong> rất rõ, còn vết lỗi lại mờ. Phân ngưỡng hay phát hiện cạnh thông thường sẽ bắt toàn bộ hoa văn thay vì lỗi. Công cụ kinh điển cho tình huống này là <strong>biến đổi Fourier (FFT)</strong>: chuyển ảnh sang miền tần số, nơi hoa văn tuần hoàn chỉ là vài điểm sáng, xóa các điểm đó đi, rồi chuyển ngược lại. Hoa văn biến mất, lỗi hiện ra.</p>
+<p>Bài dùng NumPy (<code>np.fft</code>) và OpenCV. Nên đọc trước: <a href="numpy-anh-la-mang-so.html">ảnh là mảng số</a> và <a href="loc-anh-phat-hien-canh-sobel-canny.html">lọc ảnh và phát hiện cạnh</a>.</p>
+
+<h2>Miền tần số: hiểu trong một phút</h2>
+<p>Mọi ảnh đều có thể viết thành tổng của rất nhiều "sóng" sáng tối với chu kỳ và hướng khác nhau. FFT cho biết mỗi sóng đóng góp bao nhiêu:</p>
+<ul>
+  <li><strong>Tâm phổ</strong> (sau <code>fftshift</code>): tần số thấp, tức độ sáng trung bình và các thay đổi chậm.</li>
+  <li><strong>Xa tâm</strong>: tần số cao, tức chi tiết nhỏ, cạnh sắc, nhiễu.</li>
+  <li><strong>Hoa văn lặp đều</strong>: tập trung thành các đỉnh sáng, nằm đối xứng qua tâm. Khoảng cách từ tâm cho biết chu kỳ: với ảnh rộng W pixel, đỉnh cách tâm k điểm theo phương ngang ứng với chu kỳ W/k pixel.</li>
+  <li><strong>Vết lỗi đơn lẻ</strong>: không lặp lại, nên năng lượng của nó trải mỏng ra nhiều tần số, không tạo đỉnh.</li>
+</ul>
+<p>Chính sự khác biệt này cho phép tách hoa văn khỏi lỗi.</p>
+
+<h2>1. Ảnh thử: vân sọc và một vết bẩn mờ</h2>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+H, W = 256, 256
+yy, xx = np.mgrid[0:H, 0:W]
+
+# Bề mặt vải/lưới: vân sọc tuần hoàn chu kỳ 8 px theo phương ngang
+anh = 128 + 40 * np.sin(2 * np.pi * xx / 8)
+# Lỗi: một vết bẩn tối, mờ, kích thước khoảng 12 px
+anh -= 35 * np.exp(-((xx - 170) ** 2 + (yy - 90) ** 2) / (2 * 6 ** 2))
+anh = np.clip(anh + np.random.default_rng(0).normal(0, 3, anh.shape), 0, 255).astype(np.uint8)
+
+_, nhi_phan = cv2.threshold(anh, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+print("Phân ngưỡng thẳng: tỉ lệ pixel bị coi là tối =", round(np.count_nonzero(nhi_phan) / nhi_phan.size, 2))</code></pre>
+<pre><code class="language-text">Phân ngưỡng thẳng: tỉ lệ pixel bị coi là tối = 0.38</code></pre>
+<p>Phân ngưỡng Otsu coi 38% ảnh là "tối", tức là bắt toàn bộ các vạch tối của vân sọc. Vết bẩn chìm hoàn toàn trong hoa văn.</p>
+
+<h2>2. Xem phổ và tìm đỉnh tần số</h2>
+<pre><code class="language-python">F = np.fft.fftshift(np.fft.fft2(anh.astype(np.float32)))
+pho = np.log1p(np.abs(F))                       # phổ biên độ, thang log để dễ nhìn
+tam_y, tam_x = H // 2, W // 2
+
+# Tìm các đỉnh nổi bật, bỏ qua vùng tần số thấp quanh tâm
+pho_tim = pho.copy()
+cv2.circle(pho_tim, (tam_x, tam_y), 10, 0, -1)
+for _ in range(2):
+    y, x = np.unravel_index(np.argmax(pho_tim), pho_tim.shape)
+    print(f"Đỉnh tại (x={x}, y={y}): lệch tâm ({x - tam_x}, {y - tam_y}) -&gt; chu kỳ {W / abs(x - tam_x):.0f} px")
+    cv2.circle(pho_tim, (int(x), int(y)), 5, 0, -1)</code></pre>
+<pre><code class="language-text">Đỉnh tại (x=96, y=128): lệch tâm (-32, 0) -&gt; chu kỳ 8 px
+Đỉnh tại (x=160, y=128): lệch tâm (32, 0) -&gt; chu kỳ 8 px</code></pre>
+<p>Hai đỉnh đối xứng cách tâm 32 điểm theo phương ngang: 256/32 = 8 px, đúng chu kỳ vân sọc ta tạo. Trong thực tế, bạn có thể hiển thị <code>pho</code> (chuẩn hóa về 0–255) để nhìn tận mắt các đỉnh, rồi xác định vị trí một lần trên ảnh mẫu OK. Vì hoa văn sản phẩm cố định, vị trí đỉnh cũng cố định từ ảnh này sang ảnh khác.</p>
+<div class="tip"><strong>Vì sao phải che vùng tâm?</strong>Tâm phổ luôn là điểm sáng nhất (độ sáng trung bình của ảnh). Che một vòng nhỏ quanh tâm trước khi tìm đỉnh để không chọn nhầm nó.</div>
+
+<h2>3. Lọc chặn dải (notch filter)</h2>
+<p>Tạo mặt nạ bằng 1 ở mọi nơi, bằng 0 tại các đỉnh, nhân với phổ rồi biến đổi ngược. Bờ mặt nạ được làm mềm bằng Gaussian: cắt đột ngột trong miền tần số gây ra gợn vòng (ringing) trong ảnh kết quả.</p>
+<pre><code class="language-python">def loc_chan_dai(F, cac_dinh, ban_kinh=4):
+    """Notch filter: xóa (làm mềm) vùng quanh các đỉnh tần số."""
+    mat_na = np.ones(F.shape, np.float32)
+    for (x, y) in cac_dinh:
+        cv2.circle(mat_na, (x, y), ban_kinh, 0, -1)
+    mat_na = cv2.GaussianBlur(mat_na, (9, 9), 0)        # bờ mềm, tránh gợn vòng (ringing)
+    return F * mat_na
+
+
+F_loc = loc_chan_dai(F, [(tam_x - 32, tam_y), (tam_x + 32, tam_y)])
+anh_loc = np.real(np.fft.ifft2(np.fft.ifftshift(F_loc)))
+print(f"Độ lệch chuẩn: trước lọc {anh.std():.1f}, sau lọc {anh_loc.std():.1f}")</code></pre>
+<pre><code class="language-text">Độ lệch chuẩn: trước lọc 28.5, sau lọc 3.7</code></pre>
+<p>Độ lệch chuẩn của ảnh giảm từ 28,5 xuống 3,7: gần như toàn bộ biến thiên của vân sọc đã bị loại, chỉ còn lại nhiễu cảm biến và vết bẩn. Lưu ý phải xóa <strong>cả hai</strong> đỉnh đối xứng; phổ của ảnh thực luôn đối xứng qua tâm, xóa một bên sẽ làm ảnh kết quả có phần ảo khác 0.</p>
+
+<h2>4. Phát hiện vết lỗi trên ảnh đã lọc</h2>
+<p>Ảnh đã sạch hoa văn nên chỉ cần so mỗi pixel với độ sáng nền cục bộ (ước lượng bằng Gaussian blur rất rộng) là đủ:</p>
+<pre><code class="language-python">nen = cv2.GaussianBlur(anh_loc, (0, 0), 25)             # độ sáng nền thay đổi chậm
+chenh = nen - anh_loc                                    # dương ở chỗ tối hơn nền
+mat_na = (chenh &gt; 15).astype(np.uint8) * 255
+n, _, stats, tam = cv2.connectedComponentsWithStats(mat_na)
+for i in range(1, n):
+    if stats[i, cv2.CC_STAT_AREA] &gt;= 20:
+        print(f"Vết lỗi tại ({tam[i][0]:.0f}, {tam[i][1]:.0f}), diện tích {stats[i, cv2.CC_STAT_AREA]} px")</code></pre>
+<pre><code class="language-text">Vết lỗi tại (170, 90), diện tích 165 px</code></pre>
+<p>Đúng vị trí (170, 90) của vết bẩn ta tạo. Để thấy tác dụng của bước lọc, chạy cùng cách dò trên ảnh <strong>chưa lọc</strong>:</p>
+<pre><code class="language-python"># So sánh: cùng cách dò nhưng trên ảnh CHƯA lọc
+chenh_goc = cv2.GaussianBlur(anh.astype(np.float32), (0, 0), 25) - anh
+n_goc = cv2.connectedComponents((chenh_goc &gt; 15).astype(np.uint8))[0] - 1
+print("Ảnh chưa lọc: số vùng 'lỗi' =", n_goc)</code></pre>
+<pre><code class="language-text">Ảnh chưa lọc: số vùng 'lỗi' = 32</code></pre>
+<p>Không lọc, mỗi vạch tối của vân sọc đều thành một "lỗi": 32 vạch trên ảnh rộng 256 px chu kỳ 8 px. Thuật toán vô dụng.</p>
+
+<h2>Ứng dụng khác của FFT trong Machine Vision</h2>
+<table>
+  <tr><th>Ứng dụng</th><th>Cách dùng</th></tr>
+  <tr><td>Nhiễu sọc do điện (nhiễu đường dây, dây cáp camera chạy cạnh biến tần)</td><td>Notch filter như trên. Nhưng hãy sửa tận gốc: đi lại dây, nối đất, dùng cáp chống nhiễu</td></tr>
+  <tr><td>Đo chu kỳ, bước lưới, mật độ sợi vải</td><td>Vị trí đỉnh phổ cho chu kỳ trung bình chính xác hơn đo từng vạch</td></tr>
+  <tr><td>Đo độ lệch giữa hai ảnh</td><td><code>cv2.phaseCorrelate</code>, dùng trong bài <a href="so-sanh-anh-mau-golden-template-opencv.html">so sánh với ảnh mẫu</a></td></tr>
+  <tr><td>Đánh giá ảnh có nét không (lấy nét tự động)</td><td>Ảnh nét có nhiều năng lượng ở tần số cao hơn ảnh mờ</td></tr>
+  <tr><td>Template matching ảnh lớn</td><td>OpenCV dùng DFT bên trong <code>matchTemplate</code> khi mẫu đủ lớn để tăng tốc</td></tr>
+</table>
+
+<h2>Lưu ý khi dùng với ảnh thật</h2>
+<ul>
+  <li><strong>Hiệu ứng biên</strong>: FFT coi ảnh như lặp lại vô hạn, nên mép trái và mép phải "nối" vào nhau tạo một vạch giả trong phổ. Nhân ảnh với cửa sổ (ví dụ <code>cv2.createHanningWindow</code>) trước FFT khi cần phân tích phổ chính xác.</li>
+  <li><strong>Hoa văn không đều</strong> (vải co giãn, lưới cong): đỉnh phổ bị nhòe, cần notch rộng hơn, hoặc chia ảnh thành từng ô nhỏ để xử lý.</li>
+  <li><strong>Lỗi cũng tuần hoàn</strong> (ví dụ một sợi bị đứt chạy suốt chiều dài vải): lỗi có thể nằm trong chính tần số bạn xóa. Kiểm tra kỹ trên ảnh lỗi thật trước khi triển khai.</li>
+  <li><strong>Tốc độ</strong>: FFT nhanh nhất khi kích thước ảnh là tích của các số nhỏ (2, 3, 5). <code>cv2.getOptimalDFTSize</code> cho biết kích thước nên đệm thêm.</li>
+</ul>
+
+<div class="ex">
+<h3>Bài tập</h3>
+<p>Thêm vân sọc thứ hai theo phương dọc, chu kỳ 16 px: <code>anh += 20 * np.sin(2 * np.pi * yy / 16)</code> (trước bước <code>clip</code>). Dự đoán vị trí hai đỉnh mới trong phổ, sửa vòng lặp tìm đỉnh để tìm 4 đỉnh, rồi lọc cả hai hoa văn.</p>
+<details><summary>Đáp án dự đoán</summary>
+<p>Chu kỳ 16 px trên ảnh cao 256 px ứng với 256/16 = 16 điểm cách tâm theo phương dọc: đỉnh tại (x=128, y=112) và (x=128, y=144).</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.opencv.org/4.x/de/dbc/tutorial_py_fourier_transform.html" rel="noopener" target="_blank">OpenCV-Python Tutorials: Fourier Transform</a>, <a href="https://numpy.org/doc/stable/reference/routines.fft.html" rel="noopener" target="_blank">NumPy: Discrete Fourier Transform (numpy.fft)</a>.</p>

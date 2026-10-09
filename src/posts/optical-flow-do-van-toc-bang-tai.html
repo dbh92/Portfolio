@@ -1,0 +1,104 @@
+<p>Làm sao biết băng tải đang chạy nhanh hay chậm mà không gắn encoder? Làm sao phát hiện một vật đang trượt trên máng, hay một cánh tay robot chuyển động bất thường? Câu trả lời là <strong>optical flow</strong> (dòng quang học): ước lượng mỗi điểm trong ảnh đã di chuyển bao nhiêu pixel giữa hai khung hình liên tiếp. Bài này giới thiệu hai thuật toán có sẵn trong OpenCV, <strong>Lucas-Kanade</strong> (thưa, theo dõi một số điểm) và <strong>Farneback</strong> (dày, tính cho mọi pixel), và áp dụng vào bài toán đo vận tốc băng tải.</p>
+<p>Code chạy với OpenCV-Python và NumPy, dùng ảnh tạo bằng code với độ dịch chuyển biết trước để bạn kiểm chứng kết quả.</p>
+
+<h2>Giả định nền tảng của optical flow</h2>
+<ol>
+  <li><strong>Độ sáng không đổi</strong>: một điểm trên vật giữ nguyên độ sáng khi di chuyển giữa hai khung.</li>
+  <li><strong>Chuyển động nhỏ</strong>: mỗi điểm chỉ dời vài pixel giữa hai khung (kim tự tháp ảnh giúp nới lỏng điều này).</li>
+  <li><strong>Lân cận chuyển động giống nhau</strong>: các pixel gần nhau di chuyển gần như cùng một vectơ.</li>
+</ol>
+<p>Hệ quả quan trọng: vùng <strong>không có vân</strong> (một mảng màu đồng nhất) thì không đo được chuyển động, vì không có gì để "bám". Bề mặt băng tải cao su, vải, gỗ thường có đủ vân nhỏ để optical flow hoạt động tốt.</p>
+
+<h2>1. Tạo hai khung hình</h2>
+<p>Ta tạo một dải bề mặt có vân ngẫu nhiên rồi cắt hai khung hình lệch nhau đúng 4 px, giống băng tải chạy sang phải giữa hai lần chụp:</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+rng = np.random.default_rng(0)
+# Bề mặt băng tải có vân ngẫu nhiên (lớn hơn khung hình để có thể "trượt")
+be_mat = cv2.GaussianBlur(rng.integers(0, 256, (240, 600), dtype=np.uint8), (0, 0), 2)
+be_mat = cv2.normalize(be_mat, None, 0, 255, cv2.NORM_MINMAX)
+
+khung_1 = be_mat[:, 100:420].copy()          # khung hình 240x320
+khung_2 = be_mat[:, 96:416].copy()           # băng tải chạy sang phải 4 px giữa 2 khung
+print(khung_1.shape, khung_2.shape)</code></pre>
+<pre><code class="language-text">(240, 320) (240, 320)</code></pre>
+
+<h2>2. Lucas-Kanade: theo dõi các điểm đặc trưng</h2>
+<p>Bước 1: chọn những điểm "dễ theo dõi" (góc, chỗ có vân hai chiều) bằng <code>goodFeaturesToTrack</code>. Bước 2: <code>calcOpticalFlowPyrLK</code> tìm vị trí mới của từng điểm ở khung sau.</p>
+<pre><code class="language-python">diem = cv2.goodFeaturesToTrack(khung_1, maxCorners=200, qualityLevel=0.01, minDistance=8)
+diem_moi, trang_thai, _ = cv2.calcOpticalFlowPyrLK(khung_1, khung_2, diem, None,
+                                                   winSize=(21, 21), maxLevel=3)
+tot = trang_thai.ravel() == 1
+dich = (diem_moi[tot] - diem[tot]).reshape(-1, 2)
+print(f"Lucas-Kanade: {tot.sum()}/{len(diem)} điểm theo dõi được")
+print(f"  dịch chuyển trung vị: dx = {np.median(dich[:, 0]):.2f}, dy = {np.median(dich[:, 1]):.2f} px")</code></pre>
+<pre><code class="language-text">Lucas-Kanade: 200/200 điểm theo dõi được
+  dịch chuyển trung vị: dx = 4.00, dy = -0.00 px</code></pre>
+<p>Đúng 4 px theo phương ngang (giá trị −0,00 chỉ là số âm rất nhỏ, làm tròn về 0). Các tham số chính:</p>
+<table>
+  <tr><th>Tham số</th><th>Ý nghĩa</th></tr>
+  <tr><td><code>winSize</code></td><td>Cửa sổ quanh mỗi điểm dùng để so khớp. Lớn hơn thì ổn định hơn với nhiễu nhưng kém chính xác ở chỗ chuyển động không đồng nhất</td></tr>
+  <tr><td><code>maxLevel</code></td><td>Số tầng kim tự tháp. Mỗi tầng giảm nửa kích thước ảnh, nên với 3 tầng bắt được chuyển động lớn hơn nhiều so với cửa sổ</td></tr>
+  <tr><td><code>trang_thai</code> (status)</td><td>1 nếu tìm thấy điểm ở khung sau. Luôn lọc các điểm có status 0</td></tr>
+</table>
+<div class="tip"><strong>Dùng trung vị, không dùng trung bình</strong>Trên dây chuyền thật, sẽ có điểm bị theo dõi sai (phản xạ, vật đi qua che khuất). Trung vị gần như không bị ảnh hưởng bởi vài điểm sai, trung bình thì có.</div>
+
+<h2>3. Farneback: dòng quang học dày</h2>
+<p>Farneback tính vectơ chuyển động cho <strong>mọi pixel</strong>. Kết quả là mảng (cao, rộng, 2): kênh 0 là dx, kênh 1 là dy.</p>
+<pre><code class="language-python">dong = cv2.calcOpticalFlowFarneback(khung_1, khung_2, None, pyr_scale=0.5, levels=3,
+                                    winsize=15, iterations=3, poly_n=5, poly_sigma=1.2, flags=0)
+print("Farneback: kích thước trường dòng =", dong.shape)
+vung_giua = dong[20:-20, 20:-20]                      # bỏ mép, nơi thiếu thông tin
+print(f"  dịch chuyển trung vị: dx = {np.median(vung_giua[..., 0]):.2f}, dy = {np.median(vung_giua[..., 1]):.2f} px")</code></pre>
+<pre><code class="language-text">Farneback: kích thước trường dòng = (240, 320, 2)
+  dịch chuyển trung vị: dx = 4.00, dy = -0.00 px</code></pre>
+<p>Ý nghĩa các tham số theo tài liệu OpenCV: <code>pyr_scale=0.5</code> là kim tự tháp cổ điển (mỗi tầng nhỏ đi một nửa), <code>levels</code> là số tầng kể cả ảnh gốc, <code>winsize</code> là cửa sổ lấy trung bình (lớn thì chống nhiễu tốt và bắt chuyển động nhanh tốt hơn nhưng trường dòng mờ hơn), <code>poly_n</code> và <code>poly_sigma</code> điều khiển việc xấp xỉ đa thức quanh mỗi pixel. Mép ảnh bị bỏ khi tính trung vị vì ở đó có phần nội dung mới đi vào khung hình, không có tương ứng ở khung trước.</p>
+
+<h2>4. Quy đổi ra vận tốc thật</h2>
+<p>Có dịch chuyển theo pixel, chỉ cần thêm hai thông số: tỉ lệ mm/pixel (từ <a href="calib-1-quy-doi-pixel-sang-mm.html">quy đổi pixel sang mm</a>) và tốc độ khung hình.</p>
+<pre><code class="language-python">MM_MOI_PX = 0.25        # từ hiệu chuẩn: 1 px = 0,25 mm trên mặt băng tải
+FPS = 60                # tốc độ khung hình camera
+
+dx_px = float(np.median(dich[:, 0]))
+van_toc = dx_px * MM_MOI_PX * FPS / 1000          # m/s
+print(f"Vận tốc băng tải ≈ {van_toc:.3f} m/s ({van_toc * 60:.1f} m/phút)")</code></pre>
+<pre><code class="language-text">Vận tốc băng tải ≈ 0.060 m/s (3.6 m/phút)</code></pre>
+<p>4 px × 0,25 mm × 60 khung/giây = 60 mm/s. Trong ứng dụng thật, hãy lấy thời điểm chụp (timestamp) từ camera thay vì giả định FPS cố định, vì camera công nghiệp có thể rớt khung hoặc chạy theo trigger không đều (xem <a href="industrial-vision-1-trigger-encoder-cycle-time.html">trigger, encoder và cycle time</a>).</p>
+
+<h2>5. Phát hiện vùng đang chuyển động</h2>
+<p>Trường dòng dày cũng cho biết <strong>vùng nào</strong> đang chuyển động. Ví dụ: băng tải đứng yên, một hộp trượt xuống 5 px:</p>
+<pre><code class="language-python"># Khung 3: băng tải đứng yên, nhưng có một hộp di chuyển xuống dưới 5 px
+khung_3 = khung_1.copy()
+hop = khung_1[60:120, 140:200].copy()
+cv2.rectangle(khung_1, (140, 60), (199, 119), 255, 2)          # viền hộp ở khung 1
+khung_3[65:125, 140:200] = hop
+cv2.rectangle(khung_3, (140, 65), (199, 124), 255, 2)          # hộp ở khung 3, thấp hơn 5 px
+
+dong = cv2.calcOpticalFlowFarneback(khung_1, khung_3, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+do_lon = np.linalg.norm(dong, axis=2)
+mat_na = (do_lon &gt; 2).astype(np.uint8)
+x, y, w, h = cv2.boundingRect(mat_na)
+print(f"Vùng chuyển động: x={x}, y={y}, w={w}, h={h}")
+print(f"  dịch chuyển trung vị trong vùng: dy = {np.median(dong[..., 1][mat_na == 1]):.1f} px")</code></pre>
+<pre><code class="language-text">Vùng chuyển động: x=133, y=49, w=74, h=82
+  dịch chuyển trung vị trong vùng: dy = 5.0 px</code></pre>
+<p>Thuật toán tìm đúng hộp và đo đúng dịch chuyển 5 px. Khung bao (74×82) rộng hơn hộp thật (60×65) vì Farneback lấy trung bình trong cửa sổ, nên chuyển động "lan" ra vài pixel quanh biên vật. Nếu cần đường biên chính xác, hãy dùng optical flow để định vị sơ bộ rồi phân đoạn vật bằng phương pháp khác.</p>
+
+<h2>Optical flow trong nhà máy: khi nào nên dùng?</h2>
+<table>
+  <tr><th>Bài toán</th><th>Gợi ý</th></tr>
+  <tr><td>Đo vận tốc băng tải, phát hiện trượt, kẹt</td><td>Lucas-Kanade trên một ROI mặt băng tải, lấy trung vị. Nhanh, chạy tốt trên CPU</td></tr>
+  <tr><td>Phát hiện vật rơi, chuyển động bất thường trong vùng an toàn</td><td>Farneback trên ảnh thu nhỏ, ngưỡng độ lớn vectơ</td></tr>
+  <tr><td>Ổn định ảnh khi camera rung</td><td>Lucas-Kanade + <code>cv2.estimateAffinePartial2D</code> để tìm chuyển động của cả khung hình</td></tr>
+  <tr><td>Đếm, theo dõi từng sản phẩm</td><td>Thường đơn giản hơn với phát hiện + theo dõi, như dự án <a href="../projects/dem-san-pham-bang-tai-opencv.html">đếm sản phẩm trên băng tải</a></td></tr>
+  <tr><td>Cần độ chính xác vị trí tuyệt đối cao</td><td>Encoder vẫn là chuẩn mực; optical flow phù hợp để giám sát hoặc khi không lắp được encoder</td></tr>
+</table>
+<div class="warn"><strong>Những thứ phá vỡ optical flow</strong>Ánh sáng nhấp nháy (đèn không đồng bộ với camera), bề mặt bóng phản xạ, motion blur do thời gian phơi sáng quá dài, và bề mặt không có vân. Hãy giải quyết từ phần cứng trước: đèn ổn định, thời gian phơi sáng ngắn (xem <a href="../kien-thuc/den-strobe-dong-bo-trigger-camera.html">đèn strobe và đồng bộ trigger</a>).</div>
+
+<div class="ex">
+<h3>Bài tập</h3>
+<p>Thêm nhiễu Gauss (độ lệch chuẩn 10) vào <code>khung_2</code> và một độ lệch dọc 1 px (dùng <code>be_mat[1:, 96:416]</code> và cắt <code>khung_1</code> tương ứng cho cùng kích thước). Lucas-Kanade với <code>winSize=(21, 21)</code> và <code>(7, 7)</code> cho kết quả trung vị khác nhau thế nào? Thử thêm độ dịch 30 px với <code>maxLevel=0</code> và <code>maxLevel=3</code>.</p>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.opencv.org/4.x/d4/dee/tutorial_optical_flow.html" rel="noopener" target="_blank">OpenCV Tutorials: Optical Flow</a>, <a href="https://docs.opencv.org/4.x/dc/d6b/group__video__track.html" rel="noopener" target="_blank">OpenCV: calcOpticalFlowPyrLK, calcOpticalFlowFarneback</a>.</p>

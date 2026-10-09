@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="vi" data-root="../">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kiểm thử hàm xử lý ảnh với pytest: bắt lỗi trước khi lên máy</title>
+<meta name="description" content="Dùng fixture, parametrize, pytest.raises và pytest.approx để khóa chặt các hàm cắt ROI, đếm pixel, đánh giá OK/NG, bắt lỗi ngưỡng trước khi lên máy trạm.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://hocfree.vn/hoc/pytest-kiem-thu-ham-xu-ly-anh.html">
+<meta property="og:site_name" content="HọcFree">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Kiểm thử hàm xử lý ảnh với pytest: bắt lỗi trước khi lên máy">
+<meta property="og:description" content="Dùng fixture, parametrize, pytest.raises và pytest.approx để khóa chặt các hàm cắt ROI, đếm pixel, đánh giá OK/NG, bắt lỗi ngưỡng trước khi lên máy trạm.">
+<meta property="og:url" content="https://hocfree.vn/hoc/pytest-kiem-thu-ham-xu-ly-anh.html">
+<meta property="og:image" content="https://hocfree.vn/assets/images/posts/pytest-kiem-thu-ham-xu-ly-anh.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="Kiểm thử hàm xử lý ảnh với pytest: bắt lỗi trước khi lên máy">
+<meta property="og:locale" content="vi_VN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Kiểm thử hàm xử lý ảnh với pytest: bắt lỗi trước khi lên máy">
+<meta name="twitter:description" content="Dùng fixture, parametrize, pytest.raises và pytest.approx để khóa chặt các hàm cắt ROI, đếm pixel, đánh giá OK/NG, bắt lỗi ngưỡng trước khi lên máy trạm.">
+<meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/pytest-kiem-thu-ham-xu-ly-anh.jpg">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/fonts.css?v=20261009">
+<link rel="stylesheet" href="../assets/css/style.css?v=20261009">
+<script>try{var t=localStorage.getItem('hf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
+<meta property="article:published_time" content="2026-10-10">
+<meta property="article:section" content="Học AI &amp; Lập trình">
+<meta property="article:tag" content="Python">
+<meta property="article:tag" content="Lập trình">
+<meta property="article:tag" content="Machine Vision">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "Kiểm thử hàm xử lý ảnh với pytest: bắt lỗi trước khi lên máy", "description": "Dùng fixture, parametrize, pytest.raises và pytest.approx để khóa chặt các hàm cắt ROI, đếm pixel, đánh giá OK/NG, bắt lỗi ngưỡng trước khi lên máy trạm.", "image": ["https://hocfree.vn/assets/images/posts/pytest-kiem-thu-ham-xu-ly-anh.jpg"], "datePublished": "2026-10-10", "dateModified": "2026-10-10", "inLanguage": "vi", "articleSection": "Học AI & Lập trình", "keywords": "Python, Lập trình, Machine Vision", "wordCount": 1316, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/hoc/pytest-kiem-thu-ham-xu-ly-anh.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Học AI & Lập trình", "item": "https://hocfree.vn/hoc/"}, {"@type": "ListItem", "position": 3, "name": "Kiểm thử hàm xử lý ảnh với pytest: bắt lỗi trước khi lên máy"}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div class="progress" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="container wide header-top">
+    <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="nav-scrim" hidden></div>
+    <a class="logo" href="../" aria-label="HọcFree – Trang chủ"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+    <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
+    <div class="header-actions">
+      <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="login-link" href="../dang-nhap.html">Đăng nhập</a>
+      <a class="btn start-btn" href="../lo-trinh/">Bắt đầu học</a>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="container wide">
+      <nav class="site-nav" id="site-nav" aria-label="Menu chính">
+        <div class="drawer-head">
+          <a class="logo" href="../" tabindex="-1"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+          <button class="icon-btn nav-close" aria-label="Đóng menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <button type="button" class="drawer-search search-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Tìm bài học, chủ đề…</span></button>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="../">Trang chủ</a></li><li class="nav-item has-panel is-mega"><button type="button" class="nav-link nav-trigger is-active" aria-expanded="false" aria-controls="nav-panel-hoc" aria-current="true">Học AI &amp; Lập trình<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel mega" id="nav-panel-hoc">
+  <div class="container wide mega-inner">
+    <div class="mega-groups"><div class="mega-group"><a class="mega-group-title" href="../hoc/#programming">Programming</a><ul><li><a href="../hoc/python.html">Python</a></li><li><a href="../hoc/csharp.html">C#</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#ai-machine-learning">AI &amp; Machine Learning</a><ul><li><a href="../hoc/machine-learning.html">Machine Learning</a></li><li><a href="../hoc/deep-learning.html">Deep Learning</a></li><li><a href="../hoc/pytorch.html">PyTorch</a></li><li><a href="../hoc/generative-ai.html">Generative AI</a></li><li><a href="../hoc/llm-ai-agents.html">LLM / AI Agents</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#computer-vision">Computer Vision</a><ul><li><a href="../hoc/opencv.html">OpenCV</a></li><li><a href="../hoc/image-processing.html">Image Processing</a></li><li><a href="../hoc/computer-vision.html">Computer Vision</a></li><li><a href="../hoc/ocr.html">OCR</a></li><li><a href="../hoc/object-detection.html">Object Detection</a></li><li><a href="../hoc/segmentation.html">Segmentation</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#vision-engineering">Vision Engineering</a><ul><li><a href="../hoc/machine-vision.html">Machine Vision</a></li><li><a href="../hoc/ai-vision.html">AI Vision</a></li><li><a href="../hoc/industrial-vision.html">Industrial Vision</a></li><li><a href="../hoc/camera-lens.html">Camera &amp; Lens</a></li><li><a href="../hoc/lighting.html">Lighting</a></li><li><a href="../hoc/calibration.html">Calibration</a></li><li><a href="../hoc/plc-robot-mes.html">PLC / Robot / MES</a></li><li><a href="../hoc/vision-deployment.html">Vision Deployment</a></li></ul></div></div>
+    <a class="feature-card" href="../lo-trinh/vision-engineer.html">
+  <span class="feature-eyebrow">⭐ Learning Path nổi bật</span>
+  <span class="feature-title">Trở thành Vision Engineer</span>
+  <span class="feature-sub">Machine Vision + AI Vision + Industrial Automation</span>
+  <span class="feature-desc">Lộ trình thực chiến từ Python, OpenCV và Machine Vision đến Deep Learning, AI Vision, Camera, PLC, Robot và triển khai hệ thống Vision trong nhà máy.</span>
+  <span class="feature-chain" aria-label="Các chặng chính"><span>Python</span><i aria-hidden="true">→</i><span>OpenCV</span><i aria-hidden="true">→</i><span>Machine Vision</span><i aria-hidden="true">→</i><span>AI Vision</span><i aria-hidden="true">→</i><span class="chain-goal">🎯 Vision Engineer</span></span>
+  <span class="feature-meta">14 chặng · 5 giai đoạn · ~12 tháng</span>
+  <span class="feature-cta">Xem lộ trình →</span>
+</a>
+  </div>
+  <div class="mega-foot"><div class="container wide mega-foot-inner"><ol class="journey compact" aria-label="Học, thực hành, trở thành kỹ sư"><li><a href="../hoc/" aria-current="step"><span class="journey-n">1</span><span class="journey-t"><b>Học</b><small>Học AI &amp; Lập trình</small></span></a></li><li><a href="../projects/"><span class="journey-n">2</span><span class="journey-t"><b>Thực hành</b><small>Projects</small></span></a></li><li><a href="../lo-trinh/"><span class="journey-n">3</span><span class="journey-t"><b>Trở thành kỹ sư</b><small>Learning Paths</small></span></a></li></ol><a class="panel-all" href="../hoc/">Xem tất cả Học AI &amp; Lập trình →</a></div></div>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-projects">Projects<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-projects">
+  <p class="panel-kicker"><span>Bước 2 · Thực hành</span>Áp dụng vào dự án thật</p>
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../projects/ai-projects.html"><span class="drop-label">AI Projects</span><span class="drop-desc">Ứng dụng ML và LLM, từ ý tưởng đến bản demo</span></a></li><li><a class="drop-link" href="../projects/computer-vision-projects.html"><span class="drop-label">Computer Vision Projects</span><span class="drop-desc">Phát hiện, nhận dạng và theo dõi đối tượng</span></a></li><li><a class="drop-link" href="../projects/industrial-vision-projects.html"><span class="drop-label">Industrial Vision Projects</span><span class="drop-desc">Đo kích thước, kiểm tra lỗi, đọc mã trên dây chuyền</span></a></li></ul></div></div>
+  <a class="panel-all" href="../projects/">Xem tất cả Projects →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-lo-trinh">Learning Paths<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-lo-trinh">
+  <p class="panel-kicker"><span>Bước 3 · Trở thành kỹ sư</span>Định hướng nghề nghiệp</p>
+  <ul class="drop-list"><li><a class="drop-link is-flagship" href="../lo-trinh/vision-engineer.html"><span class="drop-label">⭐ Trở thành Vision Engineer</span><span class="drop-desc">Machine Vision + AI Vision + Industrial Automation · 14 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/#python-developer"><span class="drop-label">Python Developer<span class="badge-soon">Sắp ra mắt</span></span><span class="drop-desc">Python, công cụ, tự động hóa</span></a></li></ul>
+  <a class="panel-all" href="../lo-trinh/">Xem tất cả lộ trình →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-kien-thuc">Kiến thức<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-kien-thuc">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Lĩnh vực</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/programming.html"><span class="drop-label">Programming</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-machine-learning.html"><span class="drop-label">AI / Machine Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/deep-learning.html"><span class="drop-label">Deep Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/machine-vision.html"><span class="drop-label">Machine Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-vision.html"><span class="drop-label">AI Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/industrial-automation.html"><span class="drop-label">Industrial Automation</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Công cụ &amp; mẹo</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/tools-frameworks.html"><span class="drop-label">Tools &amp; Frameworks</span></a></li><li><a class="drop-link" href="../kien-thuc/tips-tricks.html"><span class="drop-label">Tips &amp; Tricks</span></a></li></ul></div></div>
+  <a class="panel-all" href="../kien-thuc/">Xem tất cả Kiến thức →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tin-tuc-ai">Tin tức AI<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tin-tuc-ai">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tin-tuc-ai/ai-news.html"><span class="drop-label">AI News</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-models.html"><span class="drop-label">AI Models</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/technology.html"><span class="drop-label">Technology</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/robotics.html"><span class="drop-label">Robotics</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-industry.html"><span class="drop-label">AI Industry</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tin-tuc-ai/">Xem tất cả Tin tức AI →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-ngoai-ngu">Ngoại ngữ<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-ngoai-ngu">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/english.html"><span class="drop-label">English</span><span class="drop-desc">Lộ trình 700 TOEIC, phương pháp học, giáo trình HF-700TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chinese.html"><span class="drop-label">Chinese</span><span class="drop-desc">Lộ trình HSK3, phương pháp học, giáo trình HF-HSK3</span></a></li></ul></div></div>
+  <a class="panel-all" href="../ngoai-ngu/">Xem tất cả Ngoại ngữ →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tai-nguyen">Tài nguyên<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tai-nguyen">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tai-nguyen/source-code.html"><span class="drop-label">Source Code</span><span class="drop-desc">Mã nguồn mẫu đi kèm bài học</span></a></li><li><a class="drop-link" href="../tai-nguyen/dataset.html"><span class="drop-label">Dataset</span><span class="drop-desc">Bộ dữ liệu ảnh để luyện tập</span></a></li><li><a class="drop-link" href="../tai-nguyen/cheat-sheets.html"><span class="drop-label">Cheat Sheets</span><span class="drop-desc">Tóm tắt nhanh trong một trang</span></a></li><li><a class="drop-link" href="../tai-nguyen/documentation.html"><span class="drop-label">Documentation</span><span class="drop-desc">Tài liệu tra cứu thư viện, API</span></a></li><li><a class="drop-link" href="../tai-nguyen/ebook.html"><span class="drop-label">Ebook / Tài liệu</span><span class="drop-desc">Sách và tài liệu tham khảo</span></a></li><li><a class="drop-link" href="../tai-nguyen/ai-tools.html"><span class="drop-label">AI Tools</span><span class="drop-desc">Công cụ AI hữu ích cho việc học</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tai-nguyen/">Xem tất cả Tài nguyên →</a>
+</div></li></ul>
+        <div class="drawer-foot">
+          <a class="btn ghost" href="../dang-nhap.html">Đăng nhập</a>
+          <a class="btn" href="../lo-trinh/">Bắt đầu học</a>
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+<div class="search-dialog" hidden>
+  <div class="search-scrim"></div>
+  <div class="search-box" role="dialog" aria-modal="true" aria-label="Tìm kiếm">
+    <form class="search-form" action="../search.html" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" placeholder="Tìm bài học, chủ đề, bài viết…" autocomplete="off" aria-label="Từ khóa tìm kiếm" aria-controls="search-suggest">
+      <button type="button" class="icon-btn search-close" aria-label="Đóng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </form>
+    <div class="search-suggest" id="search-suggest" aria-live="polite">
+      <div class="search-empty">
+        <p class="search-group-title">Chủ đề phổ biến</p>
+        <div class="chips"><a class="chip" href="../hoc/python.html">Python</a><a class="chip" href="../hoc/opencv.html">OpenCV</a><a class="chip" href="../hoc/machine-vision.html">Machine Vision</a><a class="chip" href="../hoc/deep-learning.html">Deep Learning</a><a class="chip" href="../hoc/ai-vision.html">AI Vision</a><a class="chip" href="../hoc/object-detection.html">Object Detection</a><a class="chip" href="../hoc/pytorch.html">PyTorch</a><a class="chip" href="../ngoai-ngu/english.html">English</a></div>
+        <p class="search-group-title">Lộ trình nổi bật</p>
+        <a class="search-item" href="../lo-trinh/vision-engineer.html"><span class="search-ico" aria-hidden="true">⭐</span><span>Trở thành Vision Engineer<small>Learning Path · Machine Vision + AI Vision + Industrial Automation</small></span></a>
+      </div>
+    </div>
+    <div class="search-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> chọn</span><span><kbd>Enter</kbd> mở</span><span><kbd>Esc</kbd> đóng</span></div>
+  </div>
+</div>
+<main id="main">
+  <div class="container layout article-layout">
+    <article class="article">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../hoc/">Học AI &amp; Lập trình</a></nav>
+      <header class="article-head">
+        <a class="pill cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+        <h1>Kiểm thử hàm xử lý ảnh với pytest: bắt lỗi trước khi lên máy</h1>
+        <p class="lead">Dùng fixture, parametrize, pytest.raises và pytest.approx để khóa chặt các hàm cắt ROI, đếm pixel, đánh giá OK/NG, bắt lỗi ngưỡng trước khi lên máy trạm.</p>
+        <div class="article-meta">
+          <span class="avatar" aria-hidden="true">HF</span>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-10">10/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+        </div>
+      </header>
+      <figure class="article-cover">
+        <img src="../assets/images/posts/pytest-kiem-thu-ham-xu-ly-anh.webp" alt="Kiểm thử hàm xử lý ảnh với pytest: bắt lỗi trước khi lên máy" width="1200" height="675" fetchpriority="high" decoding="async">
+      </figure>
+      
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol><li><a href="#vi-sao-ky-su-vision-can-viet-test">Vì sao kỹ sư Vision cần viết test?</a></li><li><a href="#cai-dat">Cài đặt</a></li><li><a href="#code-can-kiem-thu">Code cần kiểm thử</a></li><li><a href="#viet-test-dau-tien">Viết test đầu tiên</a></li><li><a href="#chay-test">Chạy test</a></li><li><a href="#khi-test-bat-duoc-loi">Khi test bắt được lỗi</a></li><li><a href="#cac-lenh-hay-dung">Các lệnh hay dùng</a></li><li><a href="#nen-test-gi-trong-code-xu-ly-anh">Nên test gì trong code xử lý ảnh?</a></li><li><a href="#to-chuc-thu-muc-goi-y">Tổ chức thư mục gợi ý</a></li></ol></details>
+      <div class="prose">
+<p>Bạn vừa sửa một ngưỡng trong hàm đánh giá OK/NG, chạy thử vài ảnh thấy ổn, đẩy lên máy trạm. Hai ngày sau, ca đêm báo máy loại nhầm hàng loạt sản phẩm đúng ở mức ranh giới. Lỗi này hoàn toàn có thể bắt được trong vài giây nếu có <strong>kiểm thử tự động</strong>. Bài này hướng dẫn dùng <strong>pytest</strong>, công cụ kiểm thử phổ biến nhất của Python, để bảo vệ các hàm xử lý ảnh của bạn.</p>
+
+<h2 id="vi-sao-ky-su-vision-can-viet-test">Vì sao kỹ sư Vision cần viết test?</h2>
+<ul>
+  <li><strong>Code thay đổi liên tục</strong>: đổi ngưỡng, thêm điều kiện, tối ưu tốc độ. Mỗi lần sửa đều có thể làm hỏng thứ đang chạy đúng.</li>
+  <li><strong>Lỗi ở ranh giới rất khó thấy bằng mắt</strong>: <code>&lt;</code> hay <code>&lt;=</code>, ROI sát biên ảnh, ảnh màu thay vì ảnh xám.</li>
+  <li><strong>Test là tài liệu sống</strong>: đọc test là biết hàm được dùng thế nào và kỳ vọng ra sao.</li>
+</ul>
+<p>Mục tiêu không phải viết thật nhiều test, mà là khóa chặt những hành vi quan trọng: kích thước đầu ra, cách xử lý dữ liệu sai, và các giá trị ngưỡng.</p>
+
+<h2 id="cai-dat">Cài đặt</h2>
+<pre><code class="language-bash">pip install pytest numpy</code></pre>
+<p>Quy ước của pytest rất đơn giản: file tên bắt đầu bằng <code>test_</code>, hàm test tên bắt đầu bằng <code>test_</code>, bên trong dùng câu lệnh <code>assert</code> bình thường của Python. Không cần kế thừa lớp nào.</p>
+
+<h2 id="code-can-kiem-thu">Code cần kiểm thử</h2>
+<p>Tạo file <code>xu_ly.py</code> chứa ba hàm nhỏ thường gặp trong một trạm kiểm tra: cắt ROI, tính tỉ lệ pixel tối (vết bẩn, vết cháy) và đánh giá OK/NG.</p>
+<pre><code class="language-python">import numpy as np
+
+
+def cat_roi(anh, roi):
+    """Cắt ROI (x, y, w, h); báo lỗi nếu ROI nằm ngoài ảnh."""
+    x, y, w, h = roi
+    cao, rong = anh.shape[:2]
+    x1, y1 = max(0, x), max(0, y)
+    x2, y2 = min(rong, x + w), min(cao, y + h)
+    if x1 &gt;= x2 or y1 &gt;= y2:
+        raise ValueError(f"ROI {roi} nằm ngoài ảnh {rong}x{cao}")
+    return anh[y1:y2, x1:x2]
+
+
+def ti_le_pixel_toi(anh_xam, nguong=50):
+    """Tỉ lệ (0..1) số pixel tối hơn ngưỡng."""
+    if anh_xam.ndim != 2:
+        raise ValueError("Cần ảnh xám 2 chiều")
+    return float(np.count_nonzero(anh_xam &lt; nguong)) / anh_xam.size
+
+
+def danh_gia(ti_le_toi, gioi_han=0.02):
+    """OK nếu vết tối chiếm không quá giới hạn."""
+    return "OK" if ti_le_toi &lt;= gioi_han else "NG"</code></pre>
+<p>Hàm <code>cat_roi</code> giống bài <a href="opencv-3-roi-resize-xoay-lat.html">cắt ROI, resize, xoay, lật</a>. Ở đây ta không cần OpenCV: ảnh chỉ là mảng NumPy (xem <a href="numpy-anh-la-mang-so.html">ảnh là mảng số</a>), nên có thể tự tạo ảnh thử trong test mà không cần file ảnh thật.</p>
+
+<h2 id="viet-test-dau-tien">Viết test đầu tiên</h2>
+<p>Tạo file <code>test_xu_ly.py</code> cùng thư mục:</p>
+<pre><code class="language-python">import numpy as np
+import pytest
+
+from xu_ly import cat_roi, danh_gia, ti_le_pixel_toi
+
+
+@pytest.fixture
+def anh_trang():
+    """Ảnh xám 100x200 toàn màu sáng (200)."""
+    return np.full((100, 200), 200, np.uint8)
+
+
+def test_cat_roi_dung_kich_thuoc(anh_trang):
+    vung = cat_roi(anh_trang, (10, 20, 50, 30))
+    assert vung.shape == (30, 50)          # (cao, rộng)
+
+
+def test_cat_roi_bi_cat_o_bien(anh_trang):
+    vung = cat_roi(anh_trang, (180, 90, 50, 50))
+    assert vung.shape == (10, 20)
+
+
+def test_cat_roi_ngoai_anh_bao_loi(anh_trang):
+    with pytest.raises(ValueError, match="nằm ngoài ảnh"):
+        cat_roi(anh_trang, (500, 500, 10, 10))
+
+
+def test_anh_sach_khong_co_pixel_toi(anh_trang):
+    assert ti_le_pixel_toi(anh_trang) == 0.0
+
+
+def test_vet_toi_100_pixel(anh_trang):
+    anh_trang[0:10, 0:10] = 0              # vết tối 10x10 = 100 pixel
+    assert ti_le_pixel_toi(anh_trang) == pytest.approx(100 / 20000)
+
+
+def test_anh_mau_bi_tu_choi():
+    anh_mau = np.zeros((10, 10, 3), np.uint8)
+    with pytest.raises(ValueError):
+        ti_le_pixel_toi(anh_mau)
+
+
+@pytest.mark.parametrize(
+    "ti_le, ket_qua",
+    [(0.0, "OK"), (0.02, "OK"), (0.0201, "NG"), (0.5, "NG")],
+)
+def test_danh_gia_theo_nguong(ti_le, ket_qua):
+    assert danh_gia(ti_le) == ket_qua</code></pre>
+<p>Ba công cụ quan trọng nhất của pytest đều có mặt ở đây:</p>
+<table>
+  <tr><th>Công cụ</th><th>Tác dụng</th><th>Trong ví dụ</th></tr>
+  <tr><td><code>@pytest.fixture</code></td><td>Tạo dữ liệu dùng chung; mỗi test nhận một bản <strong>mới</strong></td><td><code>anh_trang</code></td></tr>
+  <tr><td><code>pytest.raises</code></td><td>Khẳng định hàm phải báo lỗi (có thể kiểm tra cả nội dung thông báo)</td><td>ROI ngoài ảnh, ảnh màu</td></tr>
+  <tr><td><code>@pytest.mark.parametrize</code></td><td>Chạy một test với nhiều bộ dữ liệu</td><td>4 mức tỉ lệ quanh ngưỡng</td></tr>
+  <tr><td><code>pytest.approx</code></td><td>So sánh số thực có sai số làm tròn</td><td>Tỉ lệ 0,005</td></tr>
+</table>
+<div class="tip"><strong>Fixture tạo bản mới cho từng test</strong>Test <code>test_vet_toi_100_pixel</code> vẽ vết đen lên <code>anh_trang</code>. Vì fixture được gọi lại cho mỗi test, các test khác vẫn nhận ảnh sạch. Nếu bạn dùng một biến toàn cục thay cho fixture, thứ tự chạy test sẽ ảnh hưởng kết quả, một loại lỗi rất khó tìm.</div>
+
+<h2 id="chay-test">Chạy test</h2>
+<pre><code class="language-bash">pytest -v</code></pre>
+<pre><code class="language-text">test_xu_ly.py::test_cat_roi_dung_kich_thuoc PASSED                       [ 10%]
+test_xu_ly.py::test_cat_roi_bi_cat_o_bien PASSED                         [ 20%]
+test_xu_ly.py::test_cat_roi_ngoai_anh_bao_loi PASSED                     [ 30%]
+test_xu_ly.py::test_anh_sach_khong_co_pixel_toi PASSED                   [ 40%]
+test_xu_ly.py::test_vet_toi_100_pixel PASSED                             [ 50%]
+test_xu_ly.py::test_anh_mau_bi_tu_choi PASSED                            [ 60%]
+test_xu_ly.py::test_danh_gia_theo_nguong[0.0-OK] PASSED                  [ 70%]
+test_xu_ly.py::test_danh_gia_theo_nguong[0.02-OK] PASSED                 [ 80%]
+test_xu_ly.py::test_danh_gia_theo_nguong[0.0201-NG] PASSED               [ 90%]
+test_xu_ly.py::test_danh_gia_theo_nguong[0.5-NG] PASSED                  [100%]
+============================== 10 passed in 0.05s ==============================</code></pre>
+<p>7 hàm test nhưng có 10 kết quả, vì test dùng <code>parametrize</code> được tách thành 4 lần chạy, mỗi lần có tên riêng như <code>[0.02-OK]</code>. Thời gian chạy trên máy bạn sẽ khác một chút.</p>
+
+<h2 id="khi-test-bat-duoc-loi">Khi test bắt được lỗi</h2>
+<p>Giả sử một đồng nghiệp "tối ưu" hàm đánh giá và vô tình đổi <code>&lt;=</code> thành <code>&lt;</code>:</p>
+<pre><code class="language-python">def danh_gia(ti_le_toi, gioi_han=0.02):
+    return "OK" if ti_le_toi &lt; gioi_han else "NG"     # lỗi: đổi &lt;= thành &lt;</code></pre>
+<p>Chạy <code>pytest -q</code>, kết quả (rút gọn phần cuối):</p>
+<pre><code class="language-text">    def test_danh_gia_theo_nguong(ti_le, ket_qua):
+&gt;       assert danh_gia(ti_le) == ket_qua
+E       AssertionError: assert 'NG' == 'OK'
+E
+E         - OK
+E         + NG
+
+test_xu_ly.py:48: AssertionError
+=========================== short test summary info ============================
+FAILED test_xu_ly.py::test_danh_gia_theo_nguong[0.02-OK] - AssertionError: as...
+1 failed, 9 passed in 0.07s</code></pre>
+<p>pytest chỉ rõ: đúng ở mức <strong>0,02</strong>, hàm trả về NG trong khi quy định là OK. Đây chính là lỗi "loại nhầm hàng ở ranh giới" ở đầu bài, bị chặn trước khi lên máy trạm.</p>
+
+<h2 id="cac-lenh-hay-dung">Các lệnh hay dùng</h2>
+<table>
+  <tr><th>Lệnh</th><th>Ý nghĩa</th></tr>
+  <tr><td><code>pytest -q</code></td><td>Kết quả gọn</td></tr>
+  <tr><td><code>pytest -v</code></td><td>Liệt kê từng test</td></tr>
+  <tr><td><code>pytest -k roi</code></td><td>Chỉ chạy test có chữ "roi" trong tên</td></tr>
+  <tr><td><code>pytest -x</code></td><td>Dừng ngay ở test lỗi đầu tiên</td></tr>
+  <tr><td><code>pytest --lf</code></td><td>Chỉ chạy lại các test lỗi ở lần trước</td></tr>
+</table>
+
+<h2 id="nen-test-gi-trong-code-xu-ly-anh">Nên test gì trong code xử lý ảnh?</h2>
+<ol>
+  <li><strong>Hình dạng và kiểu dữ liệu đầu ra</strong>: <code>shape</code>, <code>dtype</code>. Rất nhiều lỗi đến từ nhầm (cao, rộng) với (rộng, cao).</li>
+  <li><strong>Ảnh tổng hợp có đáp án biết trước</strong>: vẽ một hình tròn đặc bán kính 20 rồi kiểm tra số pixel trắng xấp xỉ π·20² ≈ 1257. Lưu ý <code>cv2.contourArea</code> đo theo đường viền nên cho số nhỏ hơn (khoảng 1200), vì vậy hãy ghi rõ test đo theo cách nào. Không cần ảnh thật.</li>
+  <li><strong>Đầu vào sai</strong>: ảnh rỗng, ảnh màu khi cần ảnh xám, ROI ngoài biên. Hàm nên báo lỗi rõ ràng thay vì trả kết quả vô nghĩa.</li>
+  <li><strong>Giá trị ngưỡng</strong>: đúng tại ngưỡng, ngay trên và ngay dưới ngưỡng.</li>
+  <li><strong>Ảnh hồi quy (regression)</strong>: giữ vài ảnh thật từng gây lỗi trong thư mục <code>tests/data/</code> kèm kết quả mong đợi. Mỗi lần sửa thuật toán, chạy lại để chắc không "sửa chỗ này hỏng chỗ kia".</li>
+</ol>
+<div class="warn"><strong>Đừng so sánh số thực bằng ==</strong>Kết quả như độ tròn, góc, kích thước mm gần như luôn có sai số làm tròn. Dùng <code>pytest.approx(gia_tri, abs=0.01)</code> hoặc <code>rel=1e-3</code> tùy độ chính xác bạn cần.</div>
+
+<h2 id="to-chuc-thu-muc-goi-y">Tổ chức thư mục gợi ý</h2>
+<pre><code class="language-text">du_an/
+├── tram_kiem_tra/
+│   ├── __init__.py
+│   └── xu_ly.py
+├── tests/
+│   ├── data/            # ảnh hồi quy nhỏ
+│   └── test_xu_ly.py
+└── pyproject.toml</code></pre>
+<p>Kết hợp với <a href="../kien-thuc/git-cho-du-an-ai-vision.html">Git</a>: tập thói quen chạy <code>pytest</code> trước mỗi lần commit. Khi dự án lớn hơn, bạn có thể cho máy chủ CI (ví dụ GitHub Actions) tự chạy test mỗi lần đẩy code.</p>
+
+<div class="ex">
+<h3 id="bai-tap">Bài tập</h3>
+<p>Viết hàm <code>dem_vat(anh_nhi_phan)</code> đếm số vùng trắng (dùng <code>cv2.connectedComponents</code>, nhớ trừ nền). Viết test: ảnh đen trả về 0; ảnh có 3 hình vuông tách rời trả về 3; hai hình vuông chạm nhau trả về 1.</p>
+<details><summary>Gợi ý</summary>
+<p>Tạo ảnh bằng <code>np.zeros((100, 100), np.uint8)</code> rồi gán <code>anh[10:20, 10:20] = 255</code>. <code>cv2.connectedComponents</code> trả về <code>(so_nhan, nhan)</code>, trong đó nhãn 0 là nền nên số vật là <code>so_nhan - 1</code>.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.pytest.org/en/stable/how-to/assert.html" rel="noopener" target="_blank">pytest: assert và pytest.raises</a>, <a href="https://docs.pytest.org/en/stable/how-to/parametrize.html" rel="noopener" target="_blank">pytest: parametrize</a>, <a href="https://docs.pytest.org/en/stable/how-to/fixtures.html" rel="noopener" target="_blank">pytest: fixtures</a>.</p>
+
+      </div>
+      
+      <footer class="article-foot">
+        <div class="tags"><a class="tag" href="../search.html?q=Python">#Python</a><a class="tag" href="../search.html?q=Lập trình">#Lập trình</a><a class="tag" href="../search.html?q=Machine Vision">#Machine Vision</a></div>
+        <div class="share">
+      <span>Chia sẻ:</span>
+      <a class="share-btn fb" href="https://www.facebook.com/sharer/sharer.php?u=https://hocfree.vn/hoc/pytest-kiem-thu-ham-xu-ly-anh.html" target="_blank" rel="noopener" aria-label="Chia sẻ Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8z"/></svg></a>
+      <a class="share-btn x" href="https://twitter.com/intent/tweet?url=https://hocfree.vn/hoc/pytest-kiem-thu-ham-xu-ly-anh.html" target="_blank" rel="noopener" aria-label="Chia sẻ X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+      <button class="share-btn copy-link" data-url="https://hocfree.vn/hoc/pytest-kiem-thu-ham-xu-ly-anh.html" aria-label="Sao chép liên kết"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+    </div>
+      </footer>
+      <div class="author-box">
+        <span class="avatar lg" aria-hidden="true">HF</span>
+        <div>
+          <strong>Ban biên tập HọcFree</strong>
+          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và ngoại ngữ, hoàn toàn miễn phí.</p>
+        </div>
+      </div>
+      <nav class="pager" aria-label="Bài trước/sau"><a class="prev" href="../hoc/csharp-system-text-json-luu-recipe.html"><span>← Bài trước</span>C#: lưu và nạp recipe trạm vision bằng System.Text.Json</a><span></span></nav>
+    </article>
+    <aside class="sidebar">
+  <section class="widget"><h2 class="widget-title">Đọc nhiều nhất</h2><ol class="popular"><li><a href="../hoc/yolo26-object-detection-nhap-mon.html"><span class="num">1</span><span class="t">Object Detection với YOLO26: huấn luyện mô hình đầu tiên</span></a></li><li><a href="../kien-thuc/chon-camera-ong-kinh-machine-vision.html"><span class="num">2</span><span class="t">Cách chọn camera và ống kính cho hệ thống Machine Vision</span></a></li><li><a href="../projects/phat-hien-loi-be-mat-anomaly-detection.html"><span class="num">3</span><span class="t">Dự án: phát hiện lỗi bề mặt bằng Anomaly Detection (PatchCore)</span></a></li><li><a href="../hoc/opencv-co-ban-anh-video-camera.html"><span class="num">4</span><span class="t">OpenCV cơ bản: đọc, hiển thị, ghi ảnh, video và camera</span></a></li><li><a href="../kien-thuc/7-kieu-chieu-sang-machine-vision.html"><span class="num">5</span><span class="t">7 kiểu chiếu sáng trong Machine Vision và khi nào dùng</span></a></li></ol></section>
+  <section class="widget">
+    <h2 class="widget-title">Chuyên mục</h2>
+    <ul class="cat-list"><li><a href="../hoc/"><span>Học AI &amp; Lập trình</span><span class="count">144 bài</span></a></li><li><a href="../projects/"><span>Projects</span><span class="count">15 bài</span></a></li><li><a href="../kien-thuc/"><span>Kiến thức</span><span class="count">115 bài</span></a></li><li><a href="../tin-tuc-ai/"><span>Tin tức AI</span><span class="count">16 bài</span></a></li><li><a href="../ngoai-ngu/"><span>Ngoại ngữ</span><span class="count">6 bài</span></a></li><li><a href="../tai-nguyen/"><span>Tài nguyên</span><span class="count">34 bài</span></a></li></ul>
+  </section>
+  <section class="widget widget-about">
+    <h2 class="widget-title">Về HọcFree</h2>
+    <p>Nơi học <strong>miễn phí</strong> AI, lập trình, Computer Vision và ngoại ngữ dành cho người Việt. Không quảng cáo, không thu phí.</p>
+    <a class="btn" href="../gioi-thieu.html">Tìm hiểu thêm</a>
+  </section>
+  <section class="widget"><h2 class="widget-title">Thẻ</h2><div class="tags"><a class="tag" href="../search.html?q=.NET">.NET</a><a class="tag" href="../search.html?q=AI Agents">AI Agents</a><a class="tag" href="../search.html?q=AI Industry">AI Industry</a><a class="tag" href="../search.html?q=AI Models">AI Models</a><a class="tag" href="../search.html?q=AI News">AI News</a><a class="tag" href="../search.html?q=AI Project">AI Project</a><a class="tag" href="../search.html?q=AI Tools">AI Tools</a><a class="tag" href="../search.html?q=AI Vision">AI Vision</a><a class="tag" href="../search.html?q=AI/ML">AI/ML</a><a class="tag" href="../search.html?q=C#">C#</a><a class="tag" href="../search.html?q=Calibration">Calibration</a><a class="tag" href="../search.html?q=Camera">Camera</a><a class="tag" href="../search.html?q=Cheat Sheet">Cheat Sheet</a><a class="tag" href="../search.html?q=Chiếu sáng">Chiếu sáng</a><a class="tag" href="../search.html?q=Computer Vision">Computer Vision</a><a class="tag" href="../search.html?q=CV News">CV News</a><a class="tag" href="../search.html?q=CV Project">CV Project</a><a class="tag" href="../search.html?q=Công cụ">Công cụ</a><a class="tag" href="../search.html?q=Dataset">Dataset</a><a class="tag" href="../search.html?q=Deep Learning">Deep Learning</a><a class="tag" href="../search.html?q=Deployment">Deployment</a><a class="tag" href="../search.html?q=Documentation">Documentation</a><a class="tag" href="../search.html?q=Ebook">Ebook</a><a class="tag" href="../search.html?q=Generative AI">Generative AI</a><a class="tag" href="../search.html?q=Git">Git</a><a class="tag" href="../search.html?q=HSK">HSK</a><a class="tag" href="../search.html?q=Image Processing">Image Processing</a><a class="tag" href="../search.html?q=Industrial Automation">Industrial Automation</a><a class="tag" href="../search.html?q=Industrial Project">Industrial Project</a><a class="tag" href="../search.html?q=Industrial Vision">Industrial Vision</a><a class="tag" href="../search.html?q=Kinh nghiệm">Kinh nghiệm</a><a class="tag" href="../search.html?q=Lens">Lens</a><a class="tag" href="../search.html?q=Lighting">Lighting</a><a class="tag" href="../search.html?q=LLM">LLM</a><a class="tag" href="../search.html?q=Lập trình">Lập trình</a><a class="tag" href="../search.html?q=Machine Learning">Machine Learning</a><a class="tag" href="../search.html?q=Machine Vision">Machine Vision</a><a class="tag" href="../search.html?q=MES">MES</a><a class="tag" href="../search.html?q=NumPy">NumPy</a><a class="tag" href="../search.html?q=Object Detection">Object Detection</a><a class="tag" href="../search.html?q=OCR">OCR</a><a class="tag" href="../search.html?q=OpenCV">OpenCV</a><a class="tag" href="../search.html?q=PLC">PLC</a><a class="tag" href="../search.html?q=Python">Python</a><a class="tag" href="../search.html?q=PyTorch">PyTorch</a><a class="tag" href="../search.html?q=Robot">Robot</a><a class="tag" href="../search.html?q=Robotics">Robotics</a><a class="tag" href="../search.html?q=Segmentation">Segmentation</a><a class="tag" href="../search.html?q=Source Code">Source Code</a><a class="tag" href="../search.html?q=Technology">Technology</a><a class="tag" href="../search.html?q=Tips">Tips</a><a class="tag" href="../search.html?q=Tiếng Anh">Tiếng Anh</a><a class="tag" href="../search.html?q=Tiếng Trung">Tiếng Trung</a><a class="tag" href="../search.html?q=TOEIC">TOEIC</a><a class="tag" href="../search.html?q=Tự học">Tự học</a><a class="tag" href="../search.html?q=VS Code">VS Code</a><a class="tag" href="../search.html?q=YOLO">YOLO</a><a class="tag" href="../search.html?q=Đo lường">Đo lường</a></div></section>
+</aside>
+  </div>
+  <section class="band">
+    <div class="container">
+      <div class="section-title"><h2>Có thể bạn quan tâm</h2></div>
+      <div class="card-grid"><article class="card">
+  <a class="thumb" href="../hoc/csharp-system-text-json-luu-recipe.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/csharp-system-text-json-luu-recipe.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/csharp-system-text-json-luu-recipe.html">C#: lưu và nạp recipe trạm vision bằng System.Text.Json</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-10">10/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/cross-validation-pipeline-gridsearchcv.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/cross-validation-pipeline-gridsearchcv.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/cross-validation-pipeline-gridsearchcv.html">Cross-validation, Pipeline, GridSearchCV: đánh giá mô hình trung thực</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-10">10/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/ham-mat-mat-cross-entropy-focal-loss.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/ham-mat-mat-cross-entropy-focal-loss.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/ham-mat-mat-cross-entropy-focal-loss.html">Hàm mất mát cho phân loại: cross-entropy, class weight, focal loss</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-10">10/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article></div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <a class="logo" href="../"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+      <p>HọcFree.vn – nền tảng học miễn phí về AI, lập trình, Computer Vision, Machine Vision, tin tức AI và ngoại ngữ dành cho người Việt.</p>
+    </div>
+    <div><h3>Học &amp; thực hành</h3><ul><li><a href="../hoc/">Học AI &amp; Lập trình</a></li><li><a href="../projects/">Projects</a></li><li><a href="../lo-trinh/">Learning Paths</a></li></ul></div>
+    <div><h3>Khám phá</h3><ul><li><a href="../kien-thuc/">Kiến thức</a></li><li><a href="../tin-tuc-ai/">Tin tức AI</a></li><li><a href="../ngoai-ngu/">Ngoại ngữ</a></li><li><a href="../tai-nguyen/">Tài nguyên</a></li></ul></div>
+    <div><h3>Bài mới</h3><ul><li><a href="../hoc/pytest-kiem-thu-ham-xu-ly-anh.html">Kiểm thử hàm xử lý ảnh với pytest: bắt lỗi trước khi lên máy</a></li><li><a href="../hoc/csharp-system-text-json-luu-recipe.html">C#: lưu và nạp recipe trạm vision bằng System.Text.Json</a></li><li><a href="../hoc/cross-validation-pipeline-gridsearchcv.html">Cross-validation, Pipeline, GridSearchCV: đánh giá mô hình trung thực</a></li><li><a href="../hoc/ham-mat-mat-cross-entropy-focal-loss.html">Hàm mất mát cho phân loại: cross-entropy, class weight, focal loss</a></li></ul></div>
+    <div>
+      <h3>HọcFree</h3>
+      <ul>
+        <li><a href="../gioi-thieu.html">Giới thiệu</a></li>
+        <li><a href="../search.html">Tìm kiếm</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">© 2026 HọcFree.vn · Kiến thức là để chia sẻ.</div>
+  </div>
+</footer>
+<button class="to-top" aria-label="Lên đầu trang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<script src="../assets/js/search-data.js?v=20261009" defer></script>
+<script src="../assets/js/main.js?v=20261009" defer></script>
+</body>
+</html>

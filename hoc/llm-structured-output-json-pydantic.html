@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="vi" data-root="../">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Buộc LLM trả JSON đúng schema: kiểm tra bằng Pydantic và thử lại</title>
+<meta name="description" content="Định nghĩa schema bằng Pydantic, bắt câu trả lời sai định dạng của LLM, gửi lỗi lại để mô hình tự sửa và giới hạn số lần thử. Code chạy được không cần khóa API.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://hocfree.vn/hoc/llm-structured-output-json-pydantic.html">
+<meta property="og:site_name" content="HọcFree">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Buộc LLM trả JSON đúng schema: kiểm tra bằng Pydantic và thử lại">
+<meta property="og:description" content="Định nghĩa schema bằng Pydantic, bắt câu trả lời sai định dạng của LLM, gửi lỗi lại để mô hình tự sửa và giới hạn số lần thử. Code chạy được không cần khóa API.">
+<meta property="og:url" content="https://hocfree.vn/hoc/llm-structured-output-json-pydantic.html">
+<meta property="og:image" content="https://hocfree.vn/assets/images/posts/llm-structured-output-json-pydantic.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="Buộc LLM trả JSON đúng schema: kiểm tra bằng Pydantic và thử lại">
+<meta property="og:locale" content="vi_VN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Buộc LLM trả JSON đúng schema: kiểm tra bằng Pydantic và thử lại">
+<meta name="twitter:description" content="Định nghĩa schema bằng Pydantic, bắt câu trả lời sai định dạng của LLM, gửi lỗi lại để mô hình tự sửa và giới hạn số lần thử. Code chạy được không cần khóa API.">
+<meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/llm-structured-output-json-pydantic.jpg">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/fonts.css?v=20261009">
+<link rel="stylesheet" href="../assets/css/style.css?v=20261009">
+<script>try{var t=localStorage.getItem('hf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
+<meta property="article:published_time" content="2026-10-10">
+<meta property="article:section" content="Học AI &amp; Lập trình">
+<meta property="article:tag" content="LLM">
+<meta property="article:tag" content="AI Agents">
+<meta property="article:tag" content="Python">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "Buộc LLM trả JSON đúng schema: kiểm tra bằng Pydantic và thử lại", "description": "Định nghĩa schema bằng Pydantic, bắt câu trả lời sai định dạng của LLM, gửi lỗi lại để mô hình tự sửa và giới hạn số lần thử. Code chạy được không cần khóa API.", "image": ["https://hocfree.vn/assets/images/posts/llm-structured-output-json-pydantic.jpg"], "datePublished": "2026-10-10", "dateModified": "2026-10-10", "inLanguage": "vi", "articleSection": "Học AI & Lập trình", "keywords": "LLM, AI Agents, Python", "wordCount": 1315, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/hoc/llm-structured-output-json-pydantic.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Học AI & Lập trình", "item": "https://hocfree.vn/hoc/"}, {"@type": "ListItem", "position": 3, "name": "Buộc LLM trả JSON đúng schema: kiểm tra bằng Pydantic và thử lại"}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div class="progress" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="container wide header-top">
+    <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="nav-scrim" hidden></div>
+    <a class="logo" href="../" aria-label="HọcFree – Trang chủ"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+    <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
+    <div class="header-actions">
+      <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="login-link" href="../dang-nhap.html">Đăng nhập</a>
+      <a class="btn start-btn" href="../lo-trinh/">Bắt đầu học</a>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="container wide">
+      <nav class="site-nav" id="site-nav" aria-label="Menu chính">
+        <div class="drawer-head">
+          <a class="logo" href="../" tabindex="-1"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+          <button class="icon-btn nav-close" aria-label="Đóng menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <button type="button" class="drawer-search search-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Tìm bài học, chủ đề…</span></button>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="../">Trang chủ</a></li><li class="nav-item has-panel is-mega"><button type="button" class="nav-link nav-trigger is-active" aria-expanded="false" aria-controls="nav-panel-hoc" aria-current="true">Học AI &amp; Lập trình<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel mega" id="nav-panel-hoc">
+  <div class="container wide mega-inner">
+    <div class="mega-groups"><div class="mega-group"><a class="mega-group-title" href="../hoc/#programming">Programming</a><ul><li><a href="../hoc/python.html">Python</a></li><li><a href="../hoc/csharp.html">C#</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#ai-machine-learning">AI &amp; Machine Learning</a><ul><li><a href="../hoc/machine-learning.html">Machine Learning</a></li><li><a href="../hoc/deep-learning.html">Deep Learning</a></li><li><a href="../hoc/pytorch.html">PyTorch</a></li><li><a href="../hoc/generative-ai.html">Generative AI</a></li><li><a href="../hoc/llm-ai-agents.html">LLM / AI Agents</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#computer-vision">Computer Vision</a><ul><li><a href="../hoc/opencv.html">OpenCV</a></li><li><a href="../hoc/image-processing.html">Image Processing</a></li><li><a href="../hoc/computer-vision.html">Computer Vision</a></li><li><a href="../hoc/ocr.html">OCR</a></li><li><a href="../hoc/object-detection.html">Object Detection</a></li><li><a href="../hoc/segmentation.html">Segmentation</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#vision-engineering">Vision Engineering</a><ul><li><a href="../hoc/machine-vision.html">Machine Vision</a></li><li><a href="../hoc/ai-vision.html">AI Vision</a></li><li><a href="../hoc/industrial-vision.html">Industrial Vision</a></li><li><a href="../hoc/camera-lens.html">Camera &amp; Lens</a></li><li><a href="../hoc/lighting.html">Lighting</a></li><li><a href="../hoc/calibration.html">Calibration</a></li><li><a href="../hoc/plc-robot-mes.html">PLC / Robot / MES</a></li><li><a href="../hoc/vision-deployment.html">Vision Deployment</a></li></ul></div></div>
+    <a class="feature-card" href="../lo-trinh/vision-engineer.html">
+  <span class="feature-eyebrow">⭐ Learning Path nổi bật</span>
+  <span class="feature-title">Trở thành Vision Engineer</span>
+  <span class="feature-sub">Machine Vision + AI Vision + Industrial Automation</span>
+  <span class="feature-desc">Lộ trình thực chiến từ Python, OpenCV và Machine Vision đến Deep Learning, AI Vision, Camera, PLC, Robot và triển khai hệ thống Vision trong nhà máy.</span>
+  <span class="feature-chain" aria-label="Các chặng chính"><span>Python</span><i aria-hidden="true">→</i><span>OpenCV</span><i aria-hidden="true">→</i><span>Machine Vision</span><i aria-hidden="true">→</i><span>AI Vision</span><i aria-hidden="true">→</i><span class="chain-goal">🎯 Vision Engineer</span></span>
+  <span class="feature-meta">14 chặng · 5 giai đoạn · ~12 tháng</span>
+  <span class="feature-cta">Xem lộ trình →</span>
+</a>
+  </div>
+  <div class="mega-foot"><div class="container wide mega-foot-inner"><ol class="journey compact" aria-label="Học, thực hành, trở thành kỹ sư"><li><a href="../hoc/" aria-current="step"><span class="journey-n">1</span><span class="journey-t"><b>Học</b><small>Học AI &amp; Lập trình</small></span></a></li><li><a href="../projects/"><span class="journey-n">2</span><span class="journey-t"><b>Thực hành</b><small>Projects</small></span></a></li><li><a href="../lo-trinh/"><span class="journey-n">3</span><span class="journey-t"><b>Trở thành kỹ sư</b><small>Learning Paths</small></span></a></li></ol><a class="panel-all" href="../hoc/">Xem tất cả Học AI &amp; Lập trình →</a></div></div>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-projects">Projects<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-projects">
+  <p class="panel-kicker"><span>Bước 2 · Thực hành</span>Áp dụng vào dự án thật</p>
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../projects/ai-projects.html"><span class="drop-label">AI Projects</span><span class="drop-desc">Ứng dụng ML và LLM, từ ý tưởng đến bản demo</span></a></li><li><a class="drop-link" href="../projects/computer-vision-projects.html"><span class="drop-label">Computer Vision Projects</span><span class="drop-desc">Phát hiện, nhận dạng và theo dõi đối tượng</span></a></li><li><a class="drop-link" href="../projects/industrial-vision-projects.html"><span class="drop-label">Industrial Vision Projects</span><span class="drop-desc">Đo kích thước, kiểm tra lỗi, đọc mã trên dây chuyền</span></a></li></ul></div></div>
+  <a class="panel-all" href="../projects/">Xem tất cả Projects →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-lo-trinh">Learning Paths<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-lo-trinh">
+  <p class="panel-kicker"><span>Bước 3 · Trở thành kỹ sư</span>Định hướng nghề nghiệp</p>
+  <ul class="drop-list"><li><a class="drop-link is-flagship" href="../lo-trinh/vision-engineer.html"><span class="drop-label">⭐ Trở thành Vision Engineer</span><span class="drop-desc">Machine Vision + AI Vision + Industrial Automation · 14 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/#python-developer"><span class="drop-label">Python Developer<span class="badge-soon">Sắp ra mắt</span></span><span class="drop-desc">Python, công cụ, tự động hóa</span></a></li></ul>
+  <a class="panel-all" href="../lo-trinh/">Xem tất cả lộ trình →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-kien-thuc">Kiến thức<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-kien-thuc">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Lĩnh vực</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/programming.html"><span class="drop-label">Programming</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-machine-learning.html"><span class="drop-label">AI / Machine Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/deep-learning.html"><span class="drop-label">Deep Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/machine-vision.html"><span class="drop-label">Machine Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-vision.html"><span class="drop-label">AI Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/industrial-automation.html"><span class="drop-label">Industrial Automation</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Công cụ &amp; mẹo</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/tools-frameworks.html"><span class="drop-label">Tools &amp; Frameworks</span></a></li><li><a class="drop-link" href="../kien-thuc/tips-tricks.html"><span class="drop-label">Tips &amp; Tricks</span></a></li></ul></div></div>
+  <a class="panel-all" href="../kien-thuc/">Xem tất cả Kiến thức →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tin-tuc-ai">Tin tức AI<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tin-tuc-ai">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tin-tuc-ai/ai-news.html"><span class="drop-label">AI News</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-models.html"><span class="drop-label">AI Models</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/technology.html"><span class="drop-label">Technology</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/robotics.html"><span class="drop-label">Robotics</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-industry.html"><span class="drop-label">AI Industry</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tin-tuc-ai/">Xem tất cả Tin tức AI →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-ngoai-ngu">Ngoại ngữ<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-ngoai-ngu">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/english.html"><span class="drop-label">English</span><span class="drop-desc">Lộ trình 700 TOEIC, phương pháp học, giáo trình HF-700TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chinese.html"><span class="drop-label">Chinese</span><span class="drop-desc">Lộ trình HSK3, phương pháp học, giáo trình HF-HSK3</span></a></li></ul></div></div>
+  <a class="panel-all" href="../ngoai-ngu/">Xem tất cả Ngoại ngữ →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tai-nguyen">Tài nguyên<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tai-nguyen">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tai-nguyen/source-code.html"><span class="drop-label">Source Code</span><span class="drop-desc">Mã nguồn mẫu đi kèm bài học</span></a></li><li><a class="drop-link" href="../tai-nguyen/dataset.html"><span class="drop-label">Dataset</span><span class="drop-desc">Bộ dữ liệu ảnh để luyện tập</span></a></li><li><a class="drop-link" href="../tai-nguyen/cheat-sheets.html"><span class="drop-label">Cheat Sheets</span><span class="drop-desc">Tóm tắt nhanh trong một trang</span></a></li><li><a class="drop-link" href="../tai-nguyen/documentation.html"><span class="drop-label">Documentation</span><span class="drop-desc">Tài liệu tra cứu thư viện, API</span></a></li><li><a class="drop-link" href="../tai-nguyen/ebook.html"><span class="drop-label">Ebook / Tài liệu</span><span class="drop-desc">Sách và tài liệu tham khảo</span></a></li><li><a class="drop-link" href="../tai-nguyen/ai-tools.html"><span class="drop-label">AI Tools</span><span class="drop-desc">Công cụ AI hữu ích cho việc học</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tai-nguyen/">Xem tất cả Tài nguyên →</a>
+</div></li></ul>
+        <div class="drawer-foot">
+          <a class="btn ghost" href="../dang-nhap.html">Đăng nhập</a>
+          <a class="btn" href="../lo-trinh/">Bắt đầu học</a>
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+<div class="search-dialog" hidden>
+  <div class="search-scrim"></div>
+  <div class="search-box" role="dialog" aria-modal="true" aria-label="Tìm kiếm">
+    <form class="search-form" action="../search.html" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" placeholder="Tìm bài học, chủ đề, bài viết…" autocomplete="off" aria-label="Từ khóa tìm kiếm" aria-controls="search-suggest">
+      <button type="button" class="icon-btn search-close" aria-label="Đóng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </form>
+    <div class="search-suggest" id="search-suggest" aria-live="polite">
+      <div class="search-empty">
+        <p class="search-group-title">Chủ đề phổ biến</p>
+        <div class="chips"><a class="chip" href="../hoc/python.html">Python</a><a class="chip" href="../hoc/opencv.html">OpenCV</a><a class="chip" href="../hoc/machine-vision.html">Machine Vision</a><a class="chip" href="../hoc/deep-learning.html">Deep Learning</a><a class="chip" href="../hoc/ai-vision.html">AI Vision</a><a class="chip" href="../hoc/object-detection.html">Object Detection</a><a class="chip" href="../hoc/pytorch.html">PyTorch</a><a class="chip" href="../ngoai-ngu/english.html">English</a></div>
+        <p class="search-group-title">Lộ trình nổi bật</p>
+        <a class="search-item" href="../lo-trinh/vision-engineer.html"><span class="search-ico" aria-hidden="true">⭐</span><span>Trở thành Vision Engineer<small>Learning Path · Machine Vision + AI Vision + Industrial Automation</small></span></a>
+      </div>
+    </div>
+    <div class="search-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> chọn</span><span><kbd>Enter</kbd> mở</span><span><kbd>Esc</kbd> đóng</span></div>
+  </div>
+</div>
+<main id="main">
+  <div class="container layout article-layout">
+    <article class="article">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../hoc/">Học AI &amp; Lập trình</a></nav>
+      <header class="article-head">
+        <a class="pill cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+        <h1>Buộc LLM trả JSON đúng schema: kiểm tra bằng Pydantic và thử lại</h1>
+        <p class="lead">Định nghĩa schema bằng Pydantic, bắt câu trả lời sai định dạng của LLM, gửi lỗi lại để mô hình tự sửa và giới hạn số lần thử. Code chạy được không cần khóa API.</p>
+        <div class="article-meta">
+          <span class="avatar" aria-hidden="true">HF</span>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-10">10/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+        </div>
+      </header>
+      <figure class="article-cover">
+        <img src="../assets/images/posts/llm-structured-output-json-pydantic.webp" alt="Buộc LLM trả JSON đúng schema: kiểm tra bằng Pydantic và thử lại" width="1200" height="675" fetchpriority="high" decoding="async">
+      </figure>
+      
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol class="toc-plain"><li><a href="#1-dinh-nghia-schema-bang-pydantic">1. Định nghĩa schema bằng Pydantic</a></li><li><a href="#2-kiem-tra-cau-tra-loi-hop-le">2. Kiểm tra câu trả lời hợp lệ</a></li><li><a href="#3-bat-cau-tra-loi-sai">3. Bắt câu trả lời sai</a></li><li><a href="#4-vong-lap-kiem-tra-bao-loi-thu-lai">4. Vòng lặp: kiểm tra, báo lỗi, thử lại</a></li><li><a href="#5-structured-output-phia-nha-cung-cap">5. Structured output phía nhà cung cấp</a></li><li><a href="#ap-dung-vao-du-an">Áp dụng vào dự án</a></li></ol></details>
+      <div class="prose">
+<p>Bạn muốn LLM đọc ghi chú tự do của công nhân vận hành ("Trạm 3 đèn chớp tắt, ảnh tối, máy loại nhầm, dừng chuyền khoảng 25 phút") rồi tạo phiếu sự cố để ghi vào cơ sở dữ liệu. Phần mềm cần <strong>dữ liệu có cấu trúc</strong>: mã máy đúng định dạng, loại sự cố nằm trong danh mục, số phút là số nguyên không âm. Nhưng LLM là mô hình sinh văn bản: thỉnh thoảng nó thêm lời dẫn, bọc JSON trong khối markdown, viết "có" thay vì <code>true</code>, hoặc bịa ra một loại sự cố không có trong danh mục.</p>
+<p>Bài này hướng dẫn cách làm chắc chắn: <strong>định nghĩa schema bằng Pydantic</strong>, đưa schema cho mô hình, <strong>kiểm tra mọi câu trả lời</strong>, và nếu sai thì gửi lỗi lại để mô hình tự sửa. Đây là kỹ thuật nền tảng cho mọi <a href="../kien-thuc/ai-agent-la-gi.html">AI agent</a> gọi công cụ. Code chạy với Pydantic 2.x, không cần khóa API: phần gọi LLM được giả lập để bạn chạy thử ngay.</p>
+
+<h2 id="1-dinh-nghia-schema-bang-pydantic">1. Định nghĩa schema bằng Pydantic</h2>
+<pre><code class="language-python">import json
+from enum import Enum
+from typing import Literal
+
+from pydantic import BaseModel, Field, ValidationError
+
+
+class MucDo(str, Enum):
+    thap = "thap"
+    trung_binh = "trung_binh"
+    cao = "cao"
+
+
+class PhieuSuCo(BaseModel):
+    """Phiếu sự cố trích xuất từ ghi chú của công nhân vận hành."""
+    may: str = Field(description="Mã máy, ví dụ 'CAM-03'", pattern=r"^[A-Z]+-\d{2}$")
+    loai: Literal["camera", "den", "plc", "phan_mem", "co_khi", "khac"]
+    muc_do: MucDo
+    dung_may: bool = Field(description="Dây chuyền có phải dừng không")
+    thoi_gian_dung_phut: int = Field(ge=0, le=24 * 60)
+    tom_tat: str = Field(max_length=200)
+
+
+print(json.dumps(PhieuSuCo.model_json_schema()["properties"]["thoi_gian_dung_phut"], ensure_ascii=False))</code></pre>
+<pre><code class="language-text">{"maximum": 1440, "minimum": 0, "title": "Thoi Gian Dung Phut", "type": "integer"}</code></pre>
+<p>Mỗi ràng buộc trong lớp Python trở thành một quy tắc trong JSON Schema, định dạng chuẩn mà hầu hết API LLM hiểu:</p>
+<table>
+  <tr><th>Khai báo Python</th><th>Ý nghĩa</th></tr>
+  <tr><td><code>Literal[...]</code>, <code>Enum</code></td><td>Chỉ được chọn trong danh mục cố định, chặn mô hình "bịa" loại mới</td></tr>
+  <tr><td><code>pattern=r"^[A-Z]+-\d{2}$"</code></td><td>Mã máy phải đúng dạng như <code>CAM-03</code></td></tr>
+  <tr><td><code>ge=0, le=1440</code></td><td>Số phút trong khoảng 0 đến 24 giờ</td></tr>
+  <tr><td><code>max_length=200</code></td><td>Giới hạn độ dài tóm tắt</td></tr>
+  <tr><td><code>description=...</code></td><td>Được đưa vào schema, giúp mô hình hiểu ý nghĩa trường</td></tr>
+</table>
+
+<h2 id="2-kiem-tra-cau-tra-loi-hop-le">2. Kiểm tra câu trả lời hợp lệ</h2>
+<pre><code class="language-python">tra_loi_tot = """{"may": "CAM-03", "loai": "den", "muc_do": "cao", "dung_may": true,
+"thoi_gian_dung_phut": 25, "tom_tat": "Đèn vòng trạm 3 nhấp nháy, ảnh tối, loại nhầm nhiều."}"""
+
+phieu = PhieuSuCo.model_validate_json(tra_loi_tot)
+print(phieu.may, phieu.muc_do.value, phieu.thoi_gian_dung_phut)</code></pre>
+<pre><code class="language-text">CAM-03 cao 25</code></pre>
+<p><code>model_validate_json</code> vừa phân tích JSON vừa kiểm tra mọi ràng buộc. Kết quả là đối tượng Python có kiểu rõ ràng: <code>phieu.thoi_gian_dung_phut</code> chắc chắn là <code>int</code>, không phải chuỗi <code>"25"</code>.</p>
+
+<h2 id="3-bat-cau-tra-loi-sai">3. Bắt câu trả lời sai</h2>
+<p>Đây là kiểu câu trả lời rất hay gặp: có lời dẫn, có khối markdown, và nhiều giá trị sai định dạng.</p>
+<pre><code class="language-python">tra_loi_loi = ('Đây là phiếu sự cố:\n```json\n'
+               '{"may": "cam 3", "loai": "đèn", "muc_do": "cao", "dung_may": "có", '
+               '"thoi_gian_dung_phut": -5, "tom_tat": "Đèn hỏng"}\n```')
+
+
+def tach_json(van_ban):
+    """Lấy đoạn từ dấu { đầu tiên tới dấu } cuối cùng (LLM hay thêm lời dẫn, khối ```)."""
+    dau, cuoi = van_ban.find("{"), van_ban.rfind("}")
+    if dau == -1 or cuoi == -1:
+        raise ValueError("Không tìm thấy JSON")
+    return van_ban[dau:cuoi + 1]
+
+
+try:
+    PhieuSuCo.model_validate_json(tach_json(tra_loi_loi))
+except ValidationError as ex:
+    print(f"{ex.error_count()} lỗi")
+    for loi in ex.errors():
+        print(" -", ".".join(map(str, loi["loc"])), ":", loi["msg"])</code></pre>
+<pre><code class="language-text">4 lỗi
+ - may : String should match pattern '^[A-Z]+-\d{2}$'
+ - loai : Input should be 'camera', 'den', 'plc', 'phan_mem', 'co_khi' or 'khac'
+ - dung_may : Input should be a valid boolean, unable to interpret input
+ - thoi_gian_dung_phut : Input should be greater than or equal to 0</code></pre>
+<p>Pydantic liệt kê <strong>tất cả</strong> lỗi cùng lúc, chỉ rõ trường nào và sai thế nào. Danh sách lỗi này vừa để ghi log, vừa là nội dung hoàn hảo để gửi lại cho LLM tự sửa.</p>
+<div class="warn"><strong>Đừng "tự sửa hộ" bằng đoán mò</strong>Viết code đổi "cam 3" thành "CAM-03", "có" thành <code>true</code> có vẻ tiện, nhưng mỗi quy tắc đoán là một chỗ có thể sai âm thầm. Với dữ liệu đi vào hệ thống sản xuất (MES, phiếu bảo trì), hãy từ chối rõ ràng và yêu cầu làm lại, hoặc chuyển cho người kiểm tra.</div>
+
+<h2 id="4-vong-lap-kiem-tra-bao-loi-thu-lai">4. Vòng lặp: kiểm tra, báo lỗi, thử lại</h2>
+<pre><code class="language-python">def goi_llm(messages):
+    """Giả lập: lần 1 trả lời sai, lần 2 (sau khi được báo lỗi) trả lời đúng.
+    Trong dự án thật, thay bằng lời gọi API của nhà cung cấp LLM bạn dùng."""
+    return tra_loi_loi if len(messages) == 2 else tra_loi_tot
+
+
+def trich_xuat(ghi_chu, so_lan_thu=3):
+    messages = [
+        {"role": "system", "content": "Chỉ trả lời bằng JSON đúng schema sau:\n"
+                                      + json.dumps(PhieuSuCo.model_json_schema(), ensure_ascii=False)},
+        {"role": "user", "content": ghi_chu},
+    ]
+    for lan in range(1, so_lan_thu + 1):
+        tra_loi = goi_llm(messages)
+        try:
+            return PhieuSuCo.model_validate_json(tach_json(tra_loi))
+        except (ValidationError, ValueError) as ex:
+            print(f"Lần {lan}: không hợp lệ, gửi lỗi lại cho mô hình")
+            messages += [
+                {"role": "assistant", "content": tra_loi},
+                {"role": "user", "content": f"JSON chưa hợp lệ:\n{ex}\nHãy sửa và chỉ trả JSON."},
+            ]
+    raise RuntimeError("LLM không trả được JSON hợp lệ, chuyển cho người xử lý")
+
+
+phieu = trich_xuat("Trạm 3 đèn chớp tắt, ảnh tối, máy loại nhầm, dừng chuyền khoảng 25 phút.")
+print("Lần 2: hợp lệ -&gt;", phieu.model_dump(mode="json"))</code></pre>
+<pre><code class="language-text">Lần 1: không hợp lệ, gửi lỗi lại cho mô hình
+Lần 2: hợp lệ -&gt; {'may': 'CAM-03', 'loai': 'den', 'muc_do': 'cao', 'dung_may': True, 'thoi_gian_dung_phut': 25, 'tom_tat': 'Đèn vòng trạm 3 nhấp nháy, ảnh tối, loại nhầm nhiều.'}</code></pre>
+<p>Những điểm quan trọng trong vòng lặp:</p>
+<ul>
+  <li><strong>Schema nằm trong system prompt</strong>, nên mô hình biết chính xác cần trả về gì.</li>
+  <li><strong>Gửi lại cả câu trả lời sai và thông báo lỗi</strong>: mô hình thấy mình đã viết gì và sai ở đâu, thường sửa được ngay ở lần 2.</li>
+  <li><strong>Giới hạn số lần thử</strong> (ở đây 3): không để chương trình lặp vô hạn và tốn chi phí API. Hết lượt thì chuyển cho người.</li>
+  <li><strong>Đầu ra cuối cùng luôn hợp lệ</strong>: phần còn lại của phần mềm không bao giờ phải xử lý JSON hỏng.</li>
+</ul>
+
+<h2 id="5-structured-output-phia-nha-cung-cap">5. Structured output phía nhà cung cấp</h2>
+<p>Nhiều API LLM hiện nay có chế độ <strong>structured output</strong> (hoặc "JSON mode", "response schema"): bạn truyền JSON Schema vào tham số của API, và máy chủ ràng buộc quá trình sinh để câu trả lời khớp schema. Tên tham số và mức hỗ trợ (ví dụ có hỗ trợ <code>pattern</code> hay không) khác nhau giữa các nhà cung cấp, nên hãy đọc tài liệu của dịch vụ bạn dùng.</p>
+<p>Ngay cả khi dùng chế độ này, <strong>vẫn giữ bước kiểm tra Pydantic</strong>:</p>
+<ol>
+  <li>Một số ràng buộc (khoảng giá trị, regex, độ dài) có thể không được nhà cung cấp áp dụng đầy đủ.</li>
+  <li>JSON đúng schema chưa chắc đúng <strong>ý nghĩa</strong>: mô hình vẫn có thể ghi 25 phút trong khi ghi chú nói 2 tiếng. Thêm kiểm tra nghiệp vụ, ví dụ <code>dung_may</code> là <code>false</code> thì <code>thoi_gian_dung_phut</code> phải bằng 0 (Pydantic hỗ trợ bằng <code>@model_validator</code>).</li>
+  <li>Bạn có thể đổi nhà cung cấp mà không phải sửa phần còn lại của phần mềm.</li>
+</ol>
+
+<h2 id="ap-dung-vao-du-an">Áp dụng vào dự án</h2>
+<p>Mẫu "schema + kiểm tra + thử lại" dùng được cho rất nhiều việc của kỹ sư nhà máy: trích thông số từ datasheet camera, chuyển báo cáo ca thành bảng số liệu (như dự án <a href="../projects/tro-ly-viet-bao-cao-ca-san-xuat-llm.html">trợ lý soạn báo cáo ca sản xuất</a>), hay chuẩn hóa tham số khi agent gọi công cụ (như dự án <a href="../projects/agent-tra-cuu-tai-lieu-tao-phieu-sua-chua.html">agent tạo phiếu sửa chữa</a>). Kết hợp với <a href="../kien-thuc/prompt-engineering-cho-ky-su.html">prompt engineering</a>: đưa thêm 1–2 ví dụ đầu vào/đầu ra mẫu vào prompt sẽ giảm đáng kể số lần phải thử lại.</p>
+
+<div class="ex">
+<h3 id="bai-tap">Bài tập</h3>
+<p>Thêm vào <code>PhieuSuCo</code> một <code>@model_validator(mode="after")</code> báo lỗi khi <code>dung_may</code> là <code>False</code> nhưng <code>thoi_gian_dung_phut</code> lớn hơn 0. Viết một câu trả lời giả lập vi phạm quy tắc này và kiểm tra rằng vòng lặp <code>trich_xuat</code> bắt được nó.</p>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.pydantic.dev/latest/concepts/json_schema/" rel="noopener" target="_blank">Pydantic: JSON Schema</a>, <a href="https://docs.pydantic.dev/latest/concepts/json/" rel="noopener" target="_blank">Pydantic: JSON parsing (model_validate_json)</a>, <a href="https://docs.pydantic.dev/latest/errors/validation_errors/" rel="noopener" target="_blank">Pydantic: Validation errors</a>.</p>
+
+      </div>
+      
+      <footer class="article-foot">
+        <div class="tags"><a class="tag" href="../search.html?q=LLM">#LLM</a><a class="tag" href="../search.html?q=AI Agents">#AI Agents</a><a class="tag" href="../search.html?q=Python">#Python</a></div>
+        <div class="share">
+      <span>Chia sẻ:</span>
+      <a class="share-btn fb" href="https://www.facebook.com/sharer/sharer.php?u=https://hocfree.vn/hoc/llm-structured-output-json-pydantic.html" target="_blank" rel="noopener" aria-label="Chia sẻ Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8z"/></svg></a>
+      <a class="share-btn x" href="https://twitter.com/intent/tweet?url=https://hocfree.vn/hoc/llm-structured-output-json-pydantic.html" target="_blank" rel="noopener" aria-label="Chia sẻ X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+      <button class="share-btn copy-link" data-url="https://hocfree.vn/hoc/llm-structured-output-json-pydantic.html" aria-label="Sao chép liên kết"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+    </div>
+      </footer>
+      <div class="author-box">
+        <span class="avatar lg" aria-hidden="true">HF</span>
+        <div>
+          <strong>Ban biên tập HọcFree</strong>
+          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và ngoại ngữ, hoàn toàn miễn phí.</p>
+        </div>
+      </div>
+      <nav class="pager" aria-label="Bài trước/sau"><a class="prev" href="../hoc/so-sanh-anh-mau-golden-template-opencv.html"><span>← Bài trước</span>So sánh với ảnh mẫu (golden template) bằng OpenCV: tìm thiếu, thừa</a><a class="next" href="../hoc/diffusion-model-hoat-dong-the-nao-numpy.html"><span>Bài tiếp →</span>Diffusion model hoạt động thế nào? Tự cài đặt DDPM bằng NumPy</a></nav>
+    </article>
+    <aside class="sidebar">
+  <section class="widget"><h2 class="widget-title">Đọc nhiều nhất</h2><ol class="popular"><li><a href="../hoc/yolo26-object-detection-nhap-mon.html"><span class="num">1</span><span class="t">Object Detection với YOLO26: huấn luyện mô hình đầu tiên</span></a></li><li><a href="../kien-thuc/chon-camera-ong-kinh-machine-vision.html"><span class="num">2</span><span class="t">Cách chọn camera và ống kính cho hệ thống Machine Vision</span></a></li><li><a href="../projects/phat-hien-loi-be-mat-anomaly-detection.html"><span class="num">3</span><span class="t">Dự án: phát hiện lỗi bề mặt bằng Anomaly Detection (PatchCore)</span></a></li><li><a href="../hoc/opencv-co-ban-anh-video-camera.html"><span class="num">4</span><span class="t">OpenCV cơ bản: đọc, hiển thị, ghi ảnh, video và camera</span></a></li><li><a href="../kien-thuc/7-kieu-chieu-sang-machine-vision.html"><span class="num">5</span><span class="t">7 kiểu chiếu sáng trong Machine Vision và khi nào dùng</span></a></li></ol></section>
+  <section class="widget">
+    <h2 class="widget-title">Chuyên mục</h2>
+    <ul class="cat-list"><li><a href="../hoc/"><span>Học AI &amp; Lập trình</span><span class="count">144 bài</span></a></li><li><a href="../projects/"><span>Projects</span><span class="count">15 bài</span></a></li><li><a href="../kien-thuc/"><span>Kiến thức</span><span class="count">115 bài</span></a></li><li><a href="../tin-tuc-ai/"><span>Tin tức AI</span><span class="count">16 bài</span></a></li><li><a href="../ngoai-ngu/"><span>Ngoại ngữ</span><span class="count">6 bài</span></a></li><li><a href="../tai-nguyen/"><span>Tài nguyên</span><span class="count">34 bài</span></a></li></ul>
+  </section>
+  <section class="widget widget-about">
+    <h2 class="widget-title">Về HọcFree</h2>
+    <p>Nơi học <strong>miễn phí</strong> AI, lập trình, Computer Vision và ngoại ngữ dành cho người Việt. Không quảng cáo, không thu phí.</p>
+    <a class="btn" href="../gioi-thieu.html">Tìm hiểu thêm</a>
+  </section>
+  <section class="widget"><h2 class="widget-title">Thẻ</h2><div class="tags"><a class="tag" href="../search.html?q=.NET">.NET</a><a class="tag" href="../search.html?q=AI Agents">AI Agents</a><a class="tag" href="../search.html?q=AI Industry">AI Industry</a><a class="tag" href="../search.html?q=AI Models">AI Models</a><a class="tag" href="../search.html?q=AI News">AI News</a><a class="tag" href="../search.html?q=AI Project">AI Project</a><a class="tag" href="../search.html?q=AI Tools">AI Tools</a><a class="tag" href="../search.html?q=AI Vision">AI Vision</a><a class="tag" href="../search.html?q=AI/ML">AI/ML</a><a class="tag" href="../search.html?q=C#">C#</a><a class="tag" href="../search.html?q=Calibration">Calibration</a><a class="tag" href="../search.html?q=Camera">Camera</a><a class="tag" href="../search.html?q=Cheat Sheet">Cheat Sheet</a><a class="tag" href="../search.html?q=Chiếu sáng">Chiếu sáng</a><a class="tag" href="../search.html?q=Computer Vision">Computer Vision</a><a class="tag" href="../search.html?q=CV News">CV News</a><a class="tag" href="../search.html?q=CV Project">CV Project</a><a class="tag" href="../search.html?q=Công cụ">Công cụ</a><a class="tag" href="../search.html?q=Dataset">Dataset</a><a class="tag" href="../search.html?q=Deep Learning">Deep Learning</a><a class="tag" href="../search.html?q=Deployment">Deployment</a><a class="tag" href="../search.html?q=Documentation">Documentation</a><a class="tag" href="../search.html?q=Ebook">Ebook</a><a class="tag" href="../search.html?q=Generative AI">Generative AI</a><a class="tag" href="../search.html?q=Git">Git</a><a class="tag" href="../search.html?q=HSK">HSK</a><a class="tag" href="../search.html?q=Image Processing">Image Processing</a><a class="tag" href="../search.html?q=Industrial Automation">Industrial Automation</a><a class="tag" href="../search.html?q=Industrial Project">Industrial Project</a><a class="tag" href="../search.html?q=Industrial Vision">Industrial Vision</a><a class="tag" href="../search.html?q=Kinh nghiệm">Kinh nghiệm</a><a class="tag" href="../search.html?q=Lens">Lens</a><a class="tag" href="../search.html?q=Lighting">Lighting</a><a class="tag" href="../search.html?q=LLM">LLM</a><a class="tag" href="../search.html?q=Lập trình">Lập trình</a><a class="tag" href="../search.html?q=Machine Learning">Machine Learning</a><a class="tag" href="../search.html?q=Machine Vision">Machine Vision</a><a class="tag" href="../search.html?q=MES">MES</a><a class="tag" href="../search.html?q=NumPy">NumPy</a><a class="tag" href="../search.html?q=Object Detection">Object Detection</a><a class="tag" href="../search.html?q=OCR">OCR</a><a class="tag" href="../search.html?q=OpenCV">OpenCV</a><a class="tag" href="../search.html?q=PLC">PLC</a><a class="tag" href="../search.html?q=Python">Python</a><a class="tag" href="../search.html?q=PyTorch">PyTorch</a><a class="tag" href="../search.html?q=Robot">Robot</a><a class="tag" href="../search.html?q=Robotics">Robotics</a><a class="tag" href="../search.html?q=Segmentation">Segmentation</a><a class="tag" href="../search.html?q=Source Code">Source Code</a><a class="tag" href="../search.html?q=Technology">Technology</a><a class="tag" href="../search.html?q=Tips">Tips</a><a class="tag" href="../search.html?q=Tiếng Anh">Tiếng Anh</a><a class="tag" href="../search.html?q=Tiếng Trung">Tiếng Trung</a><a class="tag" href="../search.html?q=TOEIC">TOEIC</a><a class="tag" href="../search.html?q=Tự học">Tự học</a><a class="tag" href="../search.html?q=VS Code">VS Code</a><a class="tag" href="../search.html?q=YOLO">YOLO</a><a class="tag" href="../search.html?q=Đo lường">Đo lường</a></div></section>
+</aside>
+  </div>
+  <section class="band">
+    <div class="container">
+      <div class="section-title"><h2>Có thể bạn quan tâm</h2></div>
+      <div class="card-grid"><article class="card">
+  <a class="thumb" href="../hoc/pytest-kiem-thu-ham-xu-ly-anh.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/pytest-kiem-thu-ham-xu-ly-anh.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/pytest-kiem-thu-ham-xu-ly-anh.html">Kiểm thử hàm xử lý ảnh với pytest: bắt lỗi trước khi lên máy</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-10">10/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/csharp-system-text-json-luu-recipe.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/csharp-system-text-json-luu-recipe.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/csharp-system-text-json-luu-recipe.html">C#: lưu và nạp recipe trạm vision bằng System.Text.Json</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-10">10/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/cross-validation-pipeline-gridsearchcv.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/cross-validation-pipeline-gridsearchcv.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/cross-validation-pipeline-gridsearchcv.html">Cross-validation, Pipeline, GridSearchCV: đánh giá mô hình trung thực</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-10">10/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+</article></div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <a class="logo" href="../"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+      <p>HọcFree.vn – nền tảng học miễn phí về AI, lập trình, Computer Vision, Machine Vision, tin tức AI và ngoại ngữ dành cho người Việt.</p>
+    </div>
+    <div><h3>Học &amp; thực hành</h3><ul><li><a href="../hoc/">Học AI &amp; Lập trình</a></li><li><a href="../projects/">Projects</a></li><li><a href="../lo-trinh/">Learning Paths</a></li></ul></div>
+    <div><h3>Khám phá</h3><ul><li><a href="../kien-thuc/">Kiến thức</a></li><li><a href="../tin-tuc-ai/">Tin tức AI</a></li><li><a href="../ngoai-ngu/">Ngoại ngữ</a></li><li><a href="../tai-nguyen/">Tài nguyên</a></li></ul></div>
+    <div><h3>Bài mới</h3><ul><li><a href="../hoc/pytest-kiem-thu-ham-xu-ly-anh.html">Kiểm thử hàm xử lý ảnh với pytest: bắt lỗi trước khi lên máy</a></li><li><a href="../hoc/csharp-system-text-json-luu-recipe.html">C#: lưu và nạp recipe trạm vision bằng System.Text.Json</a></li><li><a href="../hoc/cross-validation-pipeline-gridsearchcv.html">Cross-validation, Pipeline, GridSearchCV: đánh giá mô hình trung thực</a></li><li><a href="../hoc/ham-mat-mat-cross-entropy-focal-loss.html">Hàm mất mát cho phân loại: cross-entropy, class weight, focal loss</a></li></ul></div>
+    <div>
+      <h3>HọcFree</h3>
+      <ul>
+        <li><a href="../gioi-thieu.html">Giới thiệu</a></li>
+        <li><a href="../search.html">Tìm kiếm</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">© 2026 HọcFree.vn · Kiến thức là để chia sẻ.</div>
+  </div>
+</footer>
+<button class="to-top" aria-label="Lên đầu trang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<script src="../assets/js/search-data.js?v=20261009" defer></script>
+<script src="../assets/js/main.js?v=20261009" defer></script>
+</body>
+</html>
