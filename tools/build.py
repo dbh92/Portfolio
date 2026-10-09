@@ -480,59 +480,117 @@ def section_title(text, link=None, root=""):
 
 
 # ---------------------------------------------------------------- trang chủ
+ILLU = "assets/images/illustrations/"  # minh họa unDraw (undraw.co, dùng miễn phí), xem README
+
+
+def illu(root, name, cls="", eager=False):
+    return (f'<img class="{cls}" src="{root}{ILLU}{name}.svg" alt="" width="1000" height="560"'
+            f'{"" if eager else " loading=\"lazy\""} decoding="async">')
+
+
+def post_card(root, p):
+    return (f'<a class="pcard" href="{root}{post_url(p)}">'
+            f'<img src="{root}{img_url(p)}" alt="" width="1200" height="675" loading="lazy" decoding="async">'
+            f'<span class="pcard-cat">{e(p["cat"]["name"])}</span>'
+            f'<span class="pcard-title">{e(p["title"])}</span></a>')
+
+
 def build_home():
+    """Trang chủ: ít chữ, nhiều hình. Mỗi khối một ý, mỗi thẻ một dòng mô tả."""
     root = ""
     flag = next(p for p in PATHS if p.get("flagship"))
-    explore = ""
-    for sec in SECTIONS:
-        if not sec.get("groups") or sec.get("layout") == "mega":
-            continue
-        chips = "".join(f'<a class="chip" href="{t["url"]}">{e(t["item"]["label"])}</a>'
-                        for t in TOPICS if t["sec"] is sec)
-        kick = f'<span class="explore-step">Bước {sec["step"]} · {e(sec["stepLabel"])}</span>' if sec.get("step") else ""
-        explore += f"""<section class="explore-card">
-      {kick}
-      <h3><a href="{section_url(sec)}">{e(sec['label'])}</a></h3>
-      <p>{e(sec['description'])}</p>
-      <div class="chips">{chips}</div>
-    </section>"""
-    latest = ""
-    if POSTS:
-        latest = section_title("Bài viết mới nhất") + f'<div class="post-list">{"".join(post_row(root, p) for p in POSTS[:8])}</div>'
-    hoc = SEC["hoc"]
+    n_topics = len(TOPICS)
+
+    steps = [  # (mục, minh họa, mô tả ngắn)
+        (SEC["hoc"], "studying", "Python, AI, Computer Vision, Machine Vision"),
+        (SEC["projects"], "coding", "Dự án có mã nguồn, làm theo từng bước"),
+        (SEC["lo-trinh"], "qa-engineers", "Lộ trình nghề nghiệp rõ ràng"),
+    ]
+    step_cards = "".join(f"""<a class="jcard" href="{section_url(sec)}">
+        <span class="jcard-art">{illu(root, art)}</span>
+        <span class="jcard-num">Bước {sec['step']}</span>
+        <span class="jcard-title">{e(sec['stepLabel'])}</span>
+        <span class="jcard-desc">{e(desc)}</span>
+      </a>""" for sec, art, desc in steps)
+
+    arrow = '<i aria-hidden="true">→</i>'
+    chain = "".join(f"<span>{e(x)}</span>{arrow}" for x in flag["preview"]) + f'<span class="chain-goal">🎯 {e(flag["short"])}</span>'
+    banner = f"""<a class="path-banner" href="{path_url(flag)}">
+      <span class="path-banner-text">
+        <span class="feature-eyebrow">⭐ Lộ trình nổi bật</span>
+        <span class="path-banner-title">{e(flag['label'])}</span>
+        <span class="feature-chain">{chain}</span>
+        <span class="feature-meta">{len(flag['steps'])} chặng · {e(flag['duration'])} · {e(flag['pace'])}</span>
+        <span class="feature-cta">Xem lộ trình →</span>
+      </span>
+      <span class="path-banner-art">{illu(root, "artificial-intelligence")}</span>
+    </a>"""
+
+    chips = "".join(f'<a class="chip" href="{TOPIC_BY[r]["url"]}">{e(TOPIC_BY[r]["item"]["label"])}</a>'
+                    for r in NAV["popularTopics"])
+
+    tiles = [("kien-thuc", "reading-list"), ("tin-tuc-ai", "news"), ("ngoai-ngu", "conversation"), ("tai-nguyen", "filing-system")]
+    tile_html = "".join(f"""<a class="tile" href="{section_url(SEC[k])}">
+        <span class="tile-art">{illu(root, art)}</span>
+        <span class="tile-title">{e(SEC[k]['label'])}</span>
+        <span class="tile-count">{len(section_posts(SEC[k]))} bài viết</span>
+      </a>""" for k, art in tiles)
+
+    # 6 bài mới nhất, tối đa 2 bài mỗi mục để trang chủ không bị một mục chiếm hết
+    picked, per_cat = [], {}
+    for p in POSTS:
+        if per_cat.get(p["category"], 0) < 2:
+            picked.append(p)
+            per_cat[p["category"]] = per_cat.get(p["category"], 0) + 1
+        if len(picked) == 6:
+            break
+    latest = "".join(post_card(root, p) for p in picked)
 
     page = head(root, SITE["name"], SITE["description"], "", "assets/images/og-default.jpg")
     page += header(root, active="home")
-    page += f"""<main id="main">
-  <section class="home-hero">
-    <div class="container home-hero-inner">
-      <div class="home-hero-text">
+    page += f"""<main id="main" class="home2">
+  <section class="hero2">
+    <div class="container hero2-inner">
+      <div class="hero2-text">
         <p class="home-eyebrow">Miễn phí · Tiếng Việt · Thực chiến</p>
-        <h1>Học AI, lập trình và Computer Vision, từ nền tảng đến kỹ sư</h1>
-        <p class="lead">HọcFree giúp bạn học có lộ trình: nắm kiến thức, làm dự án thực tế và định hướng nghề nghiệp, đặc biệt là <strong>Vision Engineer</strong>.</p>
+        <h1>Học AI &amp; Computer Vision, <span>từ số 0 đến kỹ sư</span></h1>
+        <p class="lead">Học có lộ trình, làm dự án thật, sẵn sàng đi làm.</p>
         <div class="home-cta">
-          <a class="btn" href="lo-trinh/index.html">Bắt đầu học</a>
-          <button type="button" class="btn ghost search-open">{ICON['search']}Tìm chủ đề</button>
+          <a class="btn" href="{section_url(SEC['hoc'])}">Bắt đầu học</a>
+          <a class="btn ghost" href="{path_url(flag)}">Xem lộ trình</a>
         </div>
+        <ul class="hero2-stats">
+          <li><b>{len(POSTS)}</b> bài viết</li>
+          <li><b>{n_topics}</b> chủ đề</li>
+          <li><b>100%</b> miễn phí</li>
+        </ul>
       </div>
-      {feature_card(root, flag)}
+      <div class="hero2-art">{illu(root, "programming", eager=True)}</div>
     </div>
   </section>
 
   <div class="container home">
-    <section aria-labelledby="journey-t">
-      <h2 class="home-h2" id="journey-t">Học → Thực hành → Trở thành kỹ sư</h2>
-      {journey(root)}
+    <section aria-labelledby="steps-t">
+      <h2 class="home-h2 center" id="steps-t">Học → Thực hành → Trở thành kỹ sư</h2>
+      <div class="jgrid">{step_cards}</div>
     </section>
-    <section>
-      {section_title(hoc['label'], section_url(hoc))}
-      {topic_overview(root, hoc)}
+
+    {banner}
+
+    <section aria-labelledby="pop-t">
+      <h2 class="home-h2" id="pop-t">Chủ đề phổ biến</h2>
+      <div class="chips chips-lg">{chips}</div>
     </section>
+
+    <section aria-labelledby="new-t">
+      <div class="home-head"><h2 class="home-h2" id="new-t">Bài viết mới</h2><a class="more" href="search.html">Xem tất cả →</a></div>
+      <div class="pcard-grid">{latest}</div>
+    </section>
+
     <section aria-labelledby="explore-t">
       <h2 class="home-h2" id="explore-t">Khám phá thêm</h2>
-      <div class="explore-grid">{explore}</div>
+      <div class="tile-grid">{tile_html}</div>
     </section>
-    {latest}
   </div>
 </main>
 """

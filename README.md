@@ -13,6 +13,7 @@ assets/css/style.css       Giao diện (sáng/tối, responsive)
 assets/js/main.js          Tìm kiếm, menu mobile, copy code, dark mode…
 assets/js/search-data.js   Chỉ mục tìm kiếm (tự sinh)
 assets/images/posts/       Ảnh đại diện bài viết (1200x675)
+assets/images/illustrations/ Minh họa trang chủ (SVG từ unDraw, undraw.co)
 src/posts.json             Thông tin website, danh sách bài viết, bài "đọc nhiều"
 src/posts/<slug>.html      Nội dung từng bài (tạo thư mục khi viết bài đầu tiên)
 src/nav.json               Menu chính: mục → nhóm → chủ đề
@@ -90,3 +91,10 @@ Cloudflare → `hocfree.vn` → **DNS → Records** (thêm ở Mắt Bão sẽ k
 | CNAME | www  | dbh92.github.io  | DNS only  |
 
 Sau khi DNS cập nhật: GitHub repo → Settings → Pages → Custom domain `hocfree.vn` → bật **Enforce HTTPS**.
+
+## Hình minh họa
+
+Minh họa trên trang chủ (`assets/images/illustrations/`) lấy từ [unDraw](https://undraw.co) của Katerina Limpitsouni,
+qua gói npm `react-undraw-illustrations` (MIT), đổi màu chủ đạo sang cam `#f04e23` của HọcFree.
+Giấy phép unDraw cho phép dùng miễn phí cho dự án cá nhân và thương mại, không bắt buộc ghi nguồn.
+Muốn đổi hình: thay file SVG cùng tên, hoặc sửa tên file trong `build_home()` của `tools/build.py`.
