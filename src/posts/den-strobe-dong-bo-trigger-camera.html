@@ -1,41 +1,424 @@
-<p>Khi sản phẩm chạy nhanh trên băng tải, ảnh dễ bị nhòe. Tăng tốc độ màn trập thì ảnh tối. Giải pháp chuyên nghiệp là <strong>đèn chớp (strobe)</strong>: một xung sáng rất mạnh và rất ngắn, đồng bộ chính xác với thời điểm camera phơi sáng.</p>
+<p>Bài trước, "Trigger, encoder và cycle time", bảo đảm camera chụp <em>đúng lúc</em> sản phẩm đi qua. Nhưng chụp đúng lúc chưa đủ: nếu sản phẩm vẫn đang chạy trong lúc cảm biến ảnh đang thu sáng, ảnh bị <strong>nhòe chuyển động</strong> (motion blur): cạnh bị kéo dài, vết xước mảnh mờ đi rồi biến mất, phép đo lệch. Giảm thời gian phơi sáng thì ảnh tối; tăng gain thì ảnh nhiễu. Giải pháp chuyên nghiệp là <strong>đèn chớp (strobe)</strong>: một xung sáng rất mạnh và rất ngắn, đồng bộ bằng phần cứng với cửa sổ phơi sáng của camera. Bài này dạy bạn tính thời gian chiếu sáng tối đa bằng con số, mô phỏng nhòe trên ảnh tổng hợp, hiểu overdrive và giới hạn nhiệt của LED, nối dây và đặt thời gian cho chuỗi cảm biến → camera → đèn, và cấu hình trigger theo tên tính năng chuẩn GenICam. Bài sau, "Tiêu chí OK/NG, escape và overkill", sẽ dùng chính những ảnh sắc nét này để ra quyết định.</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Tính được thời gian chiếu sáng tối đa từ tốc độ băng tải, kích thước pixel trên vật và độ nhòe cho phép; giải thích vì sao trong trạm che tối thì độ dài xung đèn (không phải thời gian phơi sáng) quyết định độ nhòe; kiểm tra được độ rộng xung và chu kỳ làm việc (duty cycle) của đèn overdrive; đặt được TriggerMode, TriggerSource, TriggerActivation, TriggerDelay, ExposureTime, LineSelector/LineSource cho một trạm thật.</div>
 
-<h2>Vì sao cần đèn chớp?</h2>
+<h2>1. Nhòe chuyển động: công thức và con số</h2>
+<p>Trong thời gian cảm biến thu ánh sáng của vật, vật đi được một quãng <code>v · t</code>. Chia quãng đó cho kích thước một pixel trên vật (mm/pixel, đã tính ở chặng 4 hoặc sẽ tính chi tiết ở chặng 6) ta có độ nhòe tính bằng pixel:</p>
+<pre><code class="language-text">nhòe (pixel) = v · t / p
+
+v : tốc độ vật (mm/s)
+t : thời gian chiếu sáng HIỆU DỤNG (s): thời gian cảm biến thực sự nhận ánh sáng của vật
+p : kích thước một pixel trên vật (mm/pixel)
+
+→ t_max = nhòe_cho_phép · p / v</code></pre>
+<p>Ngưỡng nhòe cho phép là quy tắc kinh nghiệm, không phải định luật: <strong>bài đo kích thước</strong> thường giữ nhòe ≤ 0,5 pixel (cạnh phải sắc để đo subpixel ổn định), <strong>bài phát hiện lỗi</strong> chấp nhận ≤ 1 pixel, bài đọc mã hoặc kiểm tra có/không đôi khi chịu được 1–2 pixel. Chữ "hiệu dụng" rất quan trọng và sẽ được giải thích ở mục 3: khi dùng đèn chớp trong trạm che tối, <code>t</code> là độ dài xung sáng, không phải thời gian phơi sáng cài trên camera.</p>
+<pre><code class="language-python">def t_max_us(v_mm_s, p_mm, nhoe_px):
+    """Thời gian chiếu sáng hiệu dụng tối đa (µs) để nhòe không vượt nhoe_px."""
+    return nhoe_px * p_mm / v_mm_s * 1e6
+
+
+def nhoe(v_mm_s, p_mm, t_us):
+    """Độ nhòe (pixel) khi chiếu sáng t_us micro giây."""
+    return v_mm_s * t_us * 1e-6 / p_mm
+
+
+print("Bài thực hành: băng tải 0,5 m/s, 0,1 mm/pixel, nhòe dưới 1 pixel")
+print(f"  t_max = 1 × 0,1 / 500 = {t_max_us(500, 0.1, 1.0):.0f} µs (đo lường, 0,5 px: {t_max_us(500, 0.1, 0.5):.0f} µs)")
+print()
+print("v (m/s) | p (mm/px) | t_max 1 px (µs) | t_max 0,5 px (µs) | nhòe nếu phơi 2 ms (px)")
+for v, p in ((0.2, 0.026), (0.5, 0.1), (1.0, 0.05), (1.2, 0.1), (2.0, 0.05), (3.0, 0.2)):
+    print(f"{v:7.1f} | {p:9.3f} | {t_max_us(v * 1000, p, 1):15.1f} | {t_max_us(v * 1000, p, 0.5):17.1f} |"
+          f" {nhoe(v * 1000, p, 2000):23.1f}")</code></pre>
+<pre><code class="language-text">Bài thực hành: băng tải 0,5 m/s, 0,1 mm/pixel, nhòe dưới 1 pixel
+  t_max = 1 × 0,1 / 500 = 200 µs (đo lường, 0,5 px: 100 µs)
+
+v (m/s) | p (mm/px) | t_max 1 px (µs) | t_max 0,5 px (µs) | nhòe nếu phơi 2 ms (px)
+    0.2 |     0.026 |           130.0 |              65.0 |                    15.4
+    0.5 |     0.100 |           200.0 |             100.0 |                    10.0
+    1.0 |     0.050 |            50.0 |              25.0 |                    40.0
+    1.2 |     0.100 |            83.3 |              41.7 |                    24.0
+    2.0 |     0.050 |            25.0 |              12.5 |                    80.0
+    3.0 |     0.200 |            66.7 |              33.3 |                    30.0</code></pre>
+<p>Cột cuối là lý do bài này tồn tại: thời gian phơi sáng 2 ms, rất bình thường khi bạn thử ở bàn với đèn liên tục, cho nhòe 10–80 pixel trên băng tải. Hai điều cần nhớ:</p>
 <ul>
-  <li><strong>"Đóng băng" chuyển động</strong>: thời gian chiếu sáng ngắn (vài chục micro giây) quyết định độ nhòe, kể cả khi màn trập mở lâu hơn.</li>
-  <li><strong>Cường độ cao hơn</strong>: LED chạy chế độ xung có thể được cấp dòng cao hơn chế độ sáng liên tục (overdrive) trong thời gian ngắn, cho ánh sáng mạnh hơn nhiều lần.</li>
-  <li><strong>Tuổi thọ đèn dài hơn, ít tỏa nhiệt</strong>: đèn chỉ sáng trong một phần nhỏ thời gian.</li>
-  <li><strong>Lấn át ánh sáng môi trường</strong>: xung sáng mạnh làm ánh sáng nhà xưởng gần như không đáng kể.</li>
+  <li><strong>Pixel càng nhỏ trên vật thì phơi sáng càng phải ngắn</strong>. Tăng độ phân giải để thấy lỗi nhỏ hơn mà giữ nguyên tốc độ băng tải thì thời gian chiếu sáng giảm theo cùng tỉ lệ, và đèn phải mạnh hơn theo cùng tỉ lệ.</li>
+  <li>Chỉ thành phần vận tốc <strong>song song với mặt cảm biến</strong> gây nhòe kiểu này. Rung của giá camera cũng gây nhòe: giá rung 5 mm/s với p = 0,02 mm và t = 1 ms cho 0,25 pixel, đủ làm hỏng phép đo subpixel. Giá camera cứng là một phần của "chống nhòe".</li>
 </ul>
 
-<h2>Chuỗi tín hiệu đồng bộ</h2>
+<h2>2. Mô phỏng nhòe trên ảnh tổng hợp</h2>
+<p>Công thức nói "nhòe 2 pixel", nhưng 2 pixel nhòe làm gì với ảnh? Ta mô phỏng một cảnh đơn giản: nền sáng, một cạnh sáng/tối (đặc trưng để đo) và một vết xước tối rộng 0,15 mm (3 pixel ở 0,05 mm/pixel). Cảnh được vẽ ở độ phân giải gấp 8 lần, cho vật trượt đều theo phương ngang trong thời gian chiếu sáng (lấy trung bình các vị trí), rồi gộp về pixel cảm biến. Ta đo hai con số: <strong>độ rộng cạnh 10–90%</strong> (cạnh càng rộng thì đo càng kém lặp lại) và <strong>độ sâu vết xước</strong> (độ tương phản còn lại, quyết định phân ngưỡng có bắt được lỗi không).</p>
+<pre><code class="language-python">import numpy as np
+import cv2
+
+S = 8                    # siêu lấy mẫu: mỗi pixel cảm biến = 8 × 8 "pixel con"
+H, W = 40, 160           # kích thước ảnh cảm biến (pixel)
+NEN, TOI, XUOC = 200.0, 40.0, 90.0
+
+
+def chup(nhoe_px):
+    """Ảnh cảm biến khi vật trượt nhoe_px pixel theo phương ngang trong thời gian chiếu sáng."""
+    hi = np.full((H * S, W * S), NEN, np.float32)
+    hi[:, int(100.3 * S):] = TOI                         # cạnh sáng/tối tại x = 100,3 px
+    hi[:, int(40.5 * S):int(40.5 * S) + 3 * S] = XUOC    # vết xước rộng 3 px (0,15 mm)
+    k = max(1, round(nhoe_px * S))
+    hi = cv2.filter2D(hi, -1, np.ones((1, k), np.float32) / k, borderType=cv2.BORDER_REPLICATE)
+    img = cv2.resize(hi, (W, H), interpolation=cv2.INTER_AREA)   # mỗi pixel = trung bình 8 × 8
+    return cv2.GaussianBlur(img, (0, 0), 0.5)                    # ống kính + cảm biến vốn hơi mềm
+
+
+def do_rong_canh(hang):
+    """Khoảng cách (pixel) giữa hai điểm 90% và 10% của cạnh sáng → tối, nội suy tuyến tính."""
+    def vi_tri(muc):
+        for x in range(80, 130):
+            if hang[x] &gt;= muc &gt; hang[x + 1]:
+                return x + (hang[x] - muc) / (hang[x] - hang[x + 1])
+    return vi_tri(TOI + 0.1 * (NEN - TOI)) - vi_tri(TOI + 0.9 * (NEN - TOI))
+
+
+sau_goc = NEN - chup(0)[H // 2, 20:70].min()
+print("nhòe (px) | cạnh 10–90% (px) | độ sâu vết xước (mức xám) | còn lại")
+anh = []
+for n in (0, 0.5, 1, 2, 4, 8):
+    img = chup(n)
+    hang = img[H // 2]
+    sau = NEN - hang[20:70].min()
+    print(f"{n:9.1f} | {do_rong_canh(hang):16.2f} | {sau:25.1f} | {sau / sau_goc:6.0%}")
+    anh.append(cv2.resize(img, (W * 3, H * 3), interpolation=cv2.INTER_NEAREST))
+cv2.imwrite("nhoe_mo_phong.png", np.vstack(anh).astype(np.uint8))
+print("Đã lưu nhoe_mo_phong.png (6 ảnh từ trên xuống: nhòe 0; 0,5; 1; 2; 4; 8 px)")</code></pre>
+<pre><code class="language-text">nhòe (px) | cạnh 10–90% (px) | độ sâu vết xước (mức xám) | còn lại
+      0.0 |             1.70 |                     104.1 |   100%
+      0.5 |             1.75 |                     104.8 |   101%
+      1.0 |             1.77 |                     104.8 |   101%
+      2.0 |             2.28 |                      99.5 |    96%
+      4.0 |             3.51 |                      77.2 |    74%
+      8.0 |             6.50 |                      41.2 |    40%
+Đã lưu nhoe_mo_phong.png (6 ảnh từ trên xuống: nhòe 0; 0,5; 1; 2; 4; 8 px)</code></pre>
+<p>Đọc bảng:</p>
+<ul>
+  <li><strong>Đến 0,5–1 pixel</strong>, ảnh gần như không đổi: cạnh chỉ rộng thêm vài phần trăm pixel, vết xước giữ nguyên độ tương phản (sai khác 1% là do vị trí lấy mẫu). Đó là lý do có ngưỡng 0,5 px cho đo lường và 1 px cho phát hiện lỗi.</li>
+  <li><strong>Từ 2 pixel</strong>, cạnh rộng rõ rệt (1,7 → 2,3 pixel); ở 4 pixel cạnh đã gấp đôi và vết xước mất một phần tư độ sâu. Vì nhòe chỉ xảy ra theo phương chuyển động, một hình tròn sẽ bị đo thành hình bầu dục: kích thước theo phương băng tải bị sai còn phương vuông góc thì không, một kiểu lỗi đo rất khó nhận ra nếu chỉ nhìn ảnh.</li>
+  <li><strong>Ở 8 pixel</strong>, cạnh rộng gần 4 lần và vết xước chỉ còn khoảng 40% độ sâu ban đầu, gần mức nhiễu và mức thay đổi bề mặt bình thường: ngưỡng cũ không còn bắt được, hạ ngưỡng thì báo nhầm. Nhòe trực tiếp tạo ra escape và overkill.</li>
+</ul>
+<p>Mở file <code>nhoe_mo_phong.png</code> để nhìn tận mắt. Bạn có thể đổi <code>XUOC</code>, độ rộng vết xước hoặc thêm nhiễu để thử với lỗi của sản phẩm mình.</p>
+
+<h2>3. Ánh sáng: vì sao phơi sáng ngắn cần đèn chớp</h2>
+<p>Lượng ánh sáng cảm biến nhận tỉ lệ với <strong>cường độ × thời gian</strong>. Giảm thời gian từ 2 ms xuống 50 µs (40 lần) mà muốn giữ nguyên độ sáng ảnh thì cường độ phải tăng 40 lần. Tăng gain chỉ khuếch đại tín hiệu điện sau khi đã thu, nên nhiễu cũng được khuếch đại theo; gain là phương án cuối, không phải giải pháp. Có ba cách thật sự đưa thêm ánh sáng vào cảm biến: đèn mạnh hơn (hoặc đặt gần hơn, kiểu đèn hiệu suất cao hơn), mở khẩu độ (đánh đổi độ sâu trường ảnh, xem bài "Độ sâu trường ảnh, khẩu độ, lấy nét" ở chặng 6), và <strong>chạy LED ở chế độ xung với dòng cao hơn định mức</strong> (overdrive, mục 4).</p>
+<p>Lợi ích thứ hai của đèn chớp ít được nói tới nhưng rất quan trọng trong nhà xưởng: <strong>lấn át ánh sáng môi trường</strong>. Khi trạm không che kín, ánh sáng xưởng (cửa sổ, đèn trần) vẫn rơi vào cảm biến trong <em>toàn bộ</em> thời gian phơi sáng, còn đèn chớp chỉ đóng góp trong độ dài xung. Tính thử: ở bàn thử, đèn liên tục cho mức xám 160 với phơi sáng 2 ms; ánh sáng xưởng một mình (tắt đèn trạm) cho mức xám 30 cũng ở 2 ms. Đèn chớp overdrive được chỉnh để một xung 40 µs cho mức xám 150.</p>
+<pre><code class="language-python">import math
+
+T_REF, XAM_DEN, XAM_XUONG = 2000.0, 160.0, 30.0     # µs; mức xám với đèn liên tục / ánh sáng xưởng ở 2 ms
+
+print("A. Giữ đèn liên tục, chỉ rút ngắn phơi sáng:")
+for t in (500, 200, 100, 40):
+    k = T_REF / t
+    print(f"   t = {t:4d} µs → mức xám {XAM_DEN / k:5.1f}; cần ánh sáng mạnh gấp {k:3.0f} lần,"
+          f" hoặc gain +{20 * math.log10(k):4.1f} dB (nhiễu tăng theo)")
+
+print("B. Đèn chớp: xung 40 µs cho mức xám 150; ánh sáng xưởng rơi vào suốt thời gian phơi sáng:")
+for E in (40, 60, 200, 1000, 5000):
+    xuong = XAM_XUONG * E / T_REF
+    print(f"   phơi sáng {E:4d} µs: tín hiệu đèn 150, ánh sáng xưởng {xuong:5.1f}"
+          f" → tỉ lệ đèn/xưởng {150 / xuong:6.1f} lần")</code></pre>
+<pre><code class="language-text">A. Giữ đèn liên tục, chỉ rút ngắn phơi sáng:
+   t =  500 µs → mức xám  40.0; cần ánh sáng mạnh gấp   4 lần, hoặc gain +12.0 dB (nhiễu tăng theo)
+   t =  200 µs → mức xám  16.0; cần ánh sáng mạnh gấp  10 lần, hoặc gain +20.0 dB (nhiễu tăng theo)
+   t =  100 µs → mức xám   8.0; cần ánh sáng mạnh gấp  20 lần, hoặc gain +26.0 dB (nhiễu tăng theo)
+   t =   40 µs → mức xám   3.2; cần ánh sáng mạnh gấp  50 lần, hoặc gain +34.0 dB (nhiễu tăng theo)
+B. Đèn chớp: xung 40 µs cho mức xám 150; ánh sáng xưởng rơi vào suốt thời gian phơi sáng:
+   phơi sáng   40 µs: tín hiệu đèn 150, ánh sáng xưởng   0.6 → tỉ lệ đèn/xưởng  250.0 lần
+   phơi sáng   60 µs: tín hiệu đèn 150, ánh sáng xưởng   0.9 → tỉ lệ đèn/xưởng  166.7 lần
+   phơi sáng  200 µs: tín hiệu đèn 150, ánh sáng xưởng   3.0 → tỉ lệ đèn/xưởng   50.0 lần
+   phơi sáng 1000 µs: tín hiệu đèn 150, ánh sáng xưởng  15.0 → tỉ lệ đèn/xưởng   10.0 lần
+   phơi sáng 5000 µs: tín hiệu đèn 150, ánh sáng xưởng  75.0 → tỉ lệ đèn/xưởng    2.0 lần</code></pre>
+<p>Phần B cho quy tắc cài đặt quan trọng nhất của bài: <strong>thời gian phơi sáng chỉ nên dài hơn độ dài xung một khoảng vừa đủ</strong> để chứa trọn xung (mục 5). Phơi sáng 5 ms "cho chắc" làm ánh sáng xưởng đóng góp 75 mức xám, ngang một nửa tín hiệu của đèn: ảnh đổi theo giờ nắng, và phần ánh sáng xưởng này <em>không</em> được đóng băng, nên vật chạy qua để lại vệt mờ chồng lên ảnh sắc của đèn chớp. Ngược lại, khi trạm được che kín hoàn toàn, chỉ xung đèn tạo ảnh và <code>t</code> trong công thức nhòe là độ dài xung.</p>
+<table>
+  <tr><th>Tình huống</th><th>Cái gì quyết định độ nhòe</th><th>Cài đặt nên dùng</th></tr>
+  <tr><td>Đèn liên tục</td><td>Thời gian phơi sáng (ExposureTime)</td><td>ExposureTime ≤ t_max; đèn đủ mạnh hoặc chấp nhận gain</td></tr>
+  <tr><td>Đèn chớp, trạm che kín</td><td>Độ dài xung đèn</td><td>Xung ≤ t_max; ExposureTime = xung + độ trễ + dự phòng</td></tr>
+  <tr><td>Đèn chớp, trạm hở</td><td>Xung đèn, cộng một ảnh mờ của ánh sáng xưởng trong suốt ExposureTime</td><td>ExposureTime càng sát xung càng tốt; thêm che chắn, kính lọc bandpass đúng màu đèn</td></tr>
+  <tr><td>Xung dài hơn phơi sáng</td><td>Thời gian phơi sáng</td><td>Lãng phí: đèn nóng thêm mà không thêm ánh sáng vào ảnh. Tránh</td></tr>
+</table>
+
+<h2>4. Overdrive, chu kỳ làm việc và giới hạn nhiệt của LED</h2>
+<p>LED bị giới hạn chủ yếu bởi <strong>nhiệt</strong> ở mối nối bán dẫn (junction). Ở chế độ sáng liên tục, nhiệt sinh ra liên tục nên dòng phải giữ ở mức định mức. Ở chế độ xung rất ngắn và thưa, mối nối không kịp nóng lên nhiều trong một xung và có thời gian nguội giữa hai xung; vì vậy nhà sản xuất cho phép cấp dòng <strong>cao hơn định mức nhiều lần trong thời gian ngắn</strong>. Đó là overdrive. Các nguyên tắc chung:</p>
+<ul>
+  <li>Mỗi mức overdrive có <strong>độ rộng xung tối đa</strong> và <strong>chu kỳ làm việc tối đa</strong> (duty cycle = độ rộng xung × tần số chớp). Dòng càng cao thì hai giới hạn này càng chặt. Con số cụ thể chỉ có trong datasheet của đèn và bộ điều khiển; không có "con số chung" cho mọi đèn.</li>
+  <li><strong>Ánh sáng không tăng tuyến tính theo dòng</strong>: ở dòng cao hiệu suất LED giảm, nên gấp 5 lần dòng thường cho ít hơn 5 lần ánh sáng. Đo thực tế độ sáng ảnh, đừng nhân theo dòng.</li>
+  <li>Dùng <strong>bộ điều khiển đèn chuyên dụng</strong> (điều khiển dòng, có chế độ xung, có bảo vệ). Đèn có bộ overdrive tích hợp thường tự giới hạn xung và duty; đèn thường cắm trực tiếp vào nguồn 24 V qua relay thì không có bảo vệ nào.</li>
+  <li>Vượt giới hạn không làm đèn hỏng ngay: LED suy giảm độ sáng nhanh hơn, màu lệch, rồi chết sớm. Ảnh tối dần qua vài tháng là triệu chứng điển hình.</li>
+</ul>
+<p>Kiểm tra một cấu hình chỉ cần vài phép nhân. Các giới hạn dưới đây là <strong>giả định để minh họa</strong>; khi làm thật, thay bằng số trong datasheet của đèn bạn dùng:</p>
+<pre><code class="language-python"># Giới hạn GIẢ ĐỊNH của một đèn ở mức overdrive đang dùng (thay bằng số trong datasheet thật)
+XUNG_MAX_US = 200.0          # độ rộng xung tối đa ở mức dòng này
+DUTY_MAX = 0.01              # chu kỳ làm việc tối đa: 1%
+
+CA = [  # (tên, tần số chớp Hz, độ rộng xung µs)
+    ("Chai 10 sp/s, xung 40 µs", 10, 40),
+    ("Linh kiện 50 sp/s, xung 150 µs", 50, 150),
+    ("Linh kiện 100 sp/s, xung 150 µs", 100, 150),
+    ("Line scan 20 kHz, xung 20 µs", 20_000, 20),
+]
+print("trường hợp                        | duty   | xung    | kết luận")
+for ten, f, xung in CA:
+    duty = f * xung * 1e-6
+    loi = []
+    if xung &gt; XUNG_MAX_US:
+        loi.append("xung quá dài")
+    if duty &gt; DUTY_MAX:
+        loi.append(f"duty vượt {DUTY_MAX:.0%}")
+    print(f"{ten:33s} | {duty:6.2%} | {xung:4.0f} µs | {'ĐẠT' if not loi else 'KHÔNG ĐẠT: ' + ', '.join(loi)}")</code></pre>
+<pre><code class="language-text">trường hợp                        | duty   | xung    | kết luận
+Chai 10 sp/s, xung 40 µs          |  0.04% |   40 µs | ĐẠT
+Linh kiện 50 sp/s, xung 150 µs    |  0.75% |  150 µs | ĐẠT
+Linh kiện 100 sp/s, xung 150 µs   |  1.50% |  150 µs | KHÔNG ĐẠT: duty vượt 1%
+Line scan 20 kHz, xung 20 µs      | 40.00% |   20 µs | KHÔNG ĐẠT: duty vượt 1%</code></pre>
+<ul>
+  <li>Với trạm kiểm tra sản phẩm rời, duty thường rất nhỏ (dưới 1%), overdrive phát huy tối đa.</li>
+  <li>Khi tốc độ tăng gấp đôi (100 sp/s), cùng xung 150 µs đã vượt giới hạn duty: phải rút ngắn xung (ảnh tối hơn), giảm mức overdrive, hoặc dùng đèn mạnh hơn.</li>
+  <li><strong>Camera line scan</strong> chụp hàng chục nghìn dòng mỗi giây, duty lên 40%: overdrive không còn ý nghĩa. Line scan dùng đèn dải (line light) cường độ rất cao chạy liên tục, thường có tản nhiệt chủ động. Bạn sẽ gặp lại line scan ở bài đầu chặng 6, "Global/rolling shutter, area/line scan".</li>
+</ul>
+
+<h2>5. Chuỗi tín hiệu, nối dây và thời gian</h2>
+<p>Có hai cách nối phổ biến. Cách thứ nhất (khuyên dùng cho đa số trạm): <strong>camera làm chủ</strong>, đèn đi theo camera.</p>
+<pre><code class="language-text">Cảm biến quang ──(24 V, PNP hoặc NPN)──▶ Ngõ vào cách ly quang của camera (ví dụ Line0)
+                                           │ TriggerSource = Line0, TriggerActivation = RisingEdge
+                                           ▼
+                                  Camera bắt đầu phơi sáng (sau TriggerDelay + độ trễ nội bộ vài µs)
+                                           │ LineSource = ExposureActive trên ngõ ra (ví dụ Line1)
+                                           ▼
+                               Ngõ vào trigger của bộ điều khiển đèn ──▶ Xung dòng ──▶ Đèn LED
+
+Thời gian (không theo tỉ lệ):
+Trigger      ─┐▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+Phơi sáng    ▁▁▁▁┌──────────────────────┐▁▁▁▁▁▁▁▁▁   (ExposureTime, ví dụ 60 µs)
+Ngõ ra cam.  ▁▁▁▁▁▁┌────────────────────┐▁▁▁▁▁▁▁▁   (trễ vài µs do mạch cách ly quang)
+Xung đèn     ▁▁▁▁▁▁▁▁▁┌─────────────┐▁▁▁▁▁▁▁▁▁▁▁   (bộ điều khiển trễ thêm vài µs, độ rộng 40 µs)
+                      └─ phải nằm TRỌN trong cửa sổ phơi sáng ─┘</code></pre>
+<p>Cách thứ hai: <strong>bộ điều khiển đèn (hoặc PLC/card thời gian thực) làm chủ</strong>, nhận tín hiệu cảm biến rồi phát đồng thời trigger cho camera và xung cho đèn, mỗi đường có độ trễ cài riêng. Cách này hữu ích khi một trigger cần nhiều camera và nhiều đèn chớp lần lượt (ví dụ chụp hai lần với hai kiểu đèn), nhưng phải tự đo và bù độ trễ của camera.</p>
+<p>Ở cả hai cách, nguyên tắc là: <strong>toàn bộ xung đèn phải nằm trong cửa sổ phơi sáng</strong>, với dự phòng cho độ trễ và dao động của mạch cách ly quang và bộ điều khiển (thường cỡ vài µs đến vài chục µs, đo bằng máy hiện sóng). Mô phỏng dưới đây cho thấy chuyện gì xảy ra nếu đặt ExposureTime đúng bằng độ rộng xung. Các độ trễ là <strong>giả định</strong>:</p>
+<pre><code class="language-python">import numpy as np
+
+rng = np.random.default_rng(1)
+N = 100_000                        # số lần chụp mô phỏng
+XUNG = 40.0                        # µs, độ rộng xung đèn
+# Độ trễ từ lúc bắt đầu phơi sáng tới lúc đèn thật sự sáng (GIẢ ĐỊNH, đo bằng máy hiện sóng khi làm thật):
+tre = (rng.uniform(2, 6, N)        # ngõ ra cách ly quang của camera
+       + rng.uniform(1, 3, N))     # bộ điều khiển đèn
+
+print("ExposureTime | ánh sáng thu được (TB) | thấp nhất | dao động độ sáng (max-min)")
+for E in (40, 45, 50, 60):
+    thu = np.clip(E - tre, 0, XUNG) / XUNG          # phần xung nằm trong cửa sổ phơi sáng
+    print(f"{E:9.0f} µs | {thu.mean():22.1%} | {thu.min():9.1%} | {thu.max() - thu.min():12.1%}")
+print(f"Độ trễ lớn nhất trong mô phỏng: {tre.max():.1f} µs → ExposureTime ≥ {XUNG + tre.max():.0f} µs + dự phòng")</code></pre>
+<pre><code class="language-text">ExposureTime | ánh sáng thu được (TB) | thấp nhất | dao động độ sáng (max-min)
+       40 µs |                  85.0% |     77.5% |        14.9%
+       45 µs |                  97.1% |     90.0% |        10.0%
+       50 µs |                 100.0% |    100.0% |         0.0%
+       60 µs |                 100.0% |    100.0% |         0.0%
+Độ trễ lớn nhất trong mô phỏng: 9.0 µs → ExposureTime ≥ 49 µs + dự phòng</code></pre>
+<p>Đặt ExposureTime = 40 µs đúng bằng xung: ảnh mất trung bình 15% ánh sáng, tệ hơn là độ sáng <strong>dao động khoảng 15% giữa các ảnh</strong> vì độ trễ dao động. Ngưỡng phân đoạn cố định sẽ lúc đúng lúc sai, và bạn sẽ mất nhiều ngày tìm lỗi trong thuật toán. 50 µs vừa đủ trong mô phỏng nhưng không còn dự phòng nếu độ trễ thật lớn hơn giả định; đặt 60 µs (xung + độ trễ lớn nhất + dự phòng khoảng 10 µs) thì mọi ảnh nhận trọn xung. Một số camera còn có bộ hẹn giờ (Timer) để phát xung ra với độ trễ và độ rộng tự chọn; khi đó độ rộng xung do camera quyết định thay vì bộ điều khiển đèn.</p>
+<div class="warn"><strong>Đèn chớp với camera rolling shutter</strong>Camera rolling shutter phơi sáng từng hàng lệch nhau một chút. Một xung ngắn chỉ rơi vào những hàng đang phơi sáng lúc đó, phần còn lại của ảnh tối. Muốn dùng đèn chớp, thời gian phơi sáng phải đủ dài để <em>mọi</em> hàng cùng đang phơi sáng khi đèn chớp, và trạm phải che tối. Với vật chuyển động trên băng tải, hãy chọn camera global shutter (bài "Global/rolling shutter, area/line scan").</div>
+<p>Vài lưu ý nối dây:</p>
+<ul>
+  <li><strong>PNP hay NPN</strong>: cảm biến PNP cấp +24 V khi có vật, NPN kéo xuống 0 V. Ngõ vào cách ly quang của camera phải được nối đúng kiểu (xem sơ đồ chân của camera). Nối sai thì không bao giờ có trigger, hoặc trigger đảo cạnh.</li>
+  <li><strong>Mức điện áp ngõ ra camera</strong>: ngõ ra cách ly quang thường cần điện trở kéo lên và nguồn ngoài; ngõ vào bộ điều khiển đèn có thể nhận 5 V hoặc 24 V. Kiểm tra cả hai datasheet trước khi cấp điện.</li>
+  <li><strong>Cáp</strong>: dùng cáp chống nhiễu cho trigger, không đi chung máng với cáp động cơ hoặc biến tần. Cáp từ bộ điều khiển tới đèn mang dòng xung lớn: giữ ngắn theo khuyến cáo của hãng, vì cáp dài làm sườn xung chậm đi.</li>
+  <li><strong>Trigger dội (bounce)</strong>: cảm biến cơ khí hoặc vật có lỗ có thể tạo nhiều cạnh lên. Dùng bộ lọc chống dội của ngõ vào camera (tên tùy hãng, ví dụ LineDebouncerTime) và kiểm tra bộ đếm trigger so với số sản phẩm như ở bài trước.</li>
+</ul>
+
+<h2>6. Trigger delay: bù vị trí cảm biến</h2>
+<p>Lý tưởng nhất, cảm biến quang đặt sao cho sản phẩm cắt tia đúng lúc nó nằm giữa khung hình. Khi cơ khí không cho phép, ta đặt cảm biến lệch một đoạn <code>d</code> phía trước rồi dùng <strong>TriggerDelay</strong> (đơn vị µs theo chuẩn GenICam SFNC) để chờ sản phẩm đi nốt đoạn đó: <code>TriggerDelay = d / v</code>. Vấn đề: delay tính theo <em>thời gian</em>, nên khi tốc độ thay đổi, vị trí chụp thay đổi theo.</p>
+<pre><code class="language-python">V_DANH_DINH = 500.0                          # mm/s, tốc độ khi cài TriggerDelay
+for d in (5, 20, 100):                       # mm: cảm biến đặt trước tâm khung hình
+    delay_us = d / V_DANH_DINH * 1e6
+    print(f"d = {d:3d} mm → TriggerDelay = {delay_us:8.0f} µs; sản phẩm lệch khỏi tâm khi tốc độ thay đổi:")
+    for v in (400, 450, 550, 600):
+        lech = d - v * delay_us * 1e-6       # &gt; 0: chụp sớm, sản phẩm chưa tới tâm
+        print(f"      v = {v} mm/s: lệch {lech:+6.1f} mm")
+# Dao động thời gian đáp ứng của cảm biến cũng thành dao động vị trí
+for jitter_us in (50, 500):
+    print(f"Cảm biến dao động {jitter_us} µs ở 500 mm/s → vị trí dao động {V_DANH_DINH * jitter_us * 1e-6:.3f} mm")</code></pre>
+<pre><code class="language-text">d =   5 mm → TriggerDelay =    10000 µs; sản phẩm lệch khỏi tâm khi tốc độ thay đổi:
+      v = 400 mm/s: lệch   +1.0 mm
+      v = 450 mm/s: lệch   +0.5 mm
+      v = 550 mm/s: lệch   -0.5 mm
+      v = 600 mm/s: lệch   -1.0 mm
+d =  20 mm → TriggerDelay =    40000 µs; sản phẩm lệch khỏi tâm khi tốc độ thay đổi:
+      v = 400 mm/s: lệch   +4.0 mm
+      v = 450 mm/s: lệch   +2.0 mm
+      v = 550 mm/s: lệch   -2.0 mm
+      v = 600 mm/s: lệch   -4.0 mm
+d = 100 mm → TriggerDelay =   200000 µs; sản phẩm lệch khỏi tâm khi tốc độ thay đổi:
+      v = 400 mm/s: lệch  +20.0 mm
+      v = 450 mm/s: lệch  +10.0 mm
+      v = 550 mm/s: lệch  -10.0 mm
+      v = 600 mm/s: lệch  -20.0 mm
+Cảm biến dao động 50 µs ở 500 mm/s → vị trí dao động 0.025 mm
+Cảm biến dao động 500 µs ở 500 mm/s → vị trí dao động 0.250 mm</code></pre>
+<p>Cảm biến đặt xa 100 mm thì tốc độ đổi 10% làm sản phẩm lệch 10 mm, có thể ra khỏi FOV. Quy tắc: đặt cảm biến <strong>càng gần tâm khung hình càng tốt</strong> và để TriggerDelay nhỏ; nếu bắt buộc đặt xa trên băng tải đổi tốc độ, dùng delay theo xung encoder (một số camera và bộ điều khiển hỗ trợ, hoặc PLC đếm encoder rồi phát trigger) như đã học ở bài trước. Chọn cảm biến có thời gian đáp ứng nhanh và ổn định (dao động thời gian nhân với tốc độ là dao động vị trí).</p>
+
+<h2>7. Cấu hình trigger trên camera theo GenICam</h2>
+<p>Hầu hết camera công nghiệp GigE Vision và USB3 Vision mô tả tính năng theo chuẩn <strong>GenICam</strong>; tên tính năng được thống nhất trong <strong>SFNC</strong> (Standard Features Naming Convention). Nhờ vậy cấu hình dưới đây gần như giống nhau trên phần mềm của mọi hãng (pylon Viewer, Spinnaker, MVS, eBUS…), chỉ khác tên đường I/O (Line0, Line1, Line2…) theo sơ đồ chân của từng model. Một số dòng camera đời cũ dùng tên riêng (ví dụ thêm hậu tố như <code>ExposureTimeAbs</code>), nên luôn đối chiếu tài liệu của model.</p>
+<table>
+  <tr><th>Tính năng (SFNC)</th><th>Giá trị ví dụ</th><th>Ý nghĩa</th></tr>
+  <tr><td>TriggerSelector</td><td>FrameStart</td><td>Chọn sự kiện cần cấu hình: bắt đầu một khung hình (các lệnh Trigger* bên dưới áp dụng cho nó)</td></tr>
+  <tr><td>TriggerMode</td><td>On</td><td>Off = chụp tự do (free-run); On = chỉ chụp khi có trigger</td></tr>
+  <tr><td>TriggerSource</td><td>Line0</td><td>Nguồn trigger: đường I/O vật lý, Software, hoặc nguồn khác (Counter, Timer, encoder tùy model)</td></tr>
+  <tr><td>TriggerActivation</td><td>RisingEdge</td><td>Cạnh lên hay cạnh xuống (FallingEdge), tùy cảm biến PNP/NPN và logic sáng/tối</td></tr>
+  <tr><td>TriggerDelay</td><td>0–vài nghìn (µs)</td><td>Chờ sau trigger rồi mới phơi sáng (mục 6)</td></tr>
+  <tr><td>ExposureMode</td><td>Timed</td><td>Thời gian phơi sáng do ExposureTime quyết định (còn có chế độ theo độ rộng xung trigger)</td></tr>
+  <tr><td>ExposureTime</td><td>60 (µs)</td><td>Thời gian phơi sáng; với đèn chớp = xung + độ trễ + dự phòng</td></tr>
+  <tr><td>LineSelector</td><td>Line1</td><td>Chọn đường I/O cần cấu hình tiếp theo</td></tr>
+  <tr><td>LineMode</td><td>Output</td><td>Đường này là ngõ ra (với đường hai chiều GPIO)</td></tr>
+  <tr><td>LineSource</td><td>ExposureActive</td><td>Tín hiệu xuất ra: mức tích cực suốt thời gian phơi sáng. Có thể chọn Timer0Active nếu dùng bộ hẹn giờ để tự tạo xung</td></tr>
+  <tr><td>LineInverter</td><td>False/True</td><td>Đảo mức ngõ ra nếu bộ điều khiển đèn cần mức thấp tích cực</td></tr>
+</table>
+<p>Trước khi đưa cấu hình xuống camera, nên kiểm tra các ràng buộc bằng số. Đoạn code dưới đây dùng một từ điển thay cho camera thật để bạn chạy được ở bất cứ đâu; mục đích là luyện thói quen <strong>tính và kiểm tra trước khi cài</strong>:</p>
+<pre><code class="language-python"># Cấu hình đề xuất cho một trạm: băng tải 0,5 m/s, 0,1 mm/px, trạm che kín, đèn chớp do camera kích
+v_mm_s, p_mm, nhoe_cho_phep = 500.0, 0.1, 1.0
+xung_us = 150.0                    # độ rộng xung đặt trên bộ điều khiển đèn
+tre_max_us = 10.0                  # trễ ngõ ra + bộ điều khiển (đo bằng máy hiện sóng)
+du_phong_us = 10.0
+d_cam_bien_mm = 4.0                # cảm biến đặt trước tâm khung hình 4 mm
+chu_ky_ms = 100.0                  # 10 sản phẩm/giây
+fps_max = 40.0                     # tốc độ khung tối đa của camera ở ROI đang dùng (datasheet)
+
+cau_hinh = {
+    "TriggerSelector": "FrameStart",
+    "TriggerMode": "On",
+    "TriggerSource": "Line0",
+    "TriggerActivation": "RisingEdge",
+    "TriggerDelay": round(d_cam_bien_mm / v_mm_s * 1e6),          # µs
+    "ExposureMode": "Timed",
+    "ExposureTime": xung_us + tre_max_us + du_phong_us,            # µs
+    "LineSelector": "Line1",
+    "LineMode": "Output",
+    "LineSource": "ExposureActive",
+}
+for ten, gia_tri in cau_hinh.items():
+    print(f"{ten:18s} = {gia_tri}")
+
+kiem_tra = {
+    "nhòe do xung ≤ cho phép": v_mm_s * xung_us * 1e-6 / p_mm &lt;= nhoe_cho_phep,
+    "xung nằm trọn trong phơi sáng": cau_hinh["ExposureTime"] &gt;= xung_us + tre_max_us,
+    "camera kịp nhịp (1/fps_max &lt; chu kỳ)": 1000 / fps_max &lt; chu_ky_ms,
+    "delay + phơi sáng &lt; chu kỳ": (cau_hinh["TriggerDelay"] + cau_hinh["ExposureTime"]) / 1000 &lt; chu_ky_ms,
+}
+print(f"Nhòe dự kiến: {v_mm_s * xung_us * 1e-6 / p_mm:.2f} px")
+for dieu_kien, dat in kiem_tra.items():
+    print(f"[{'ĐẠT' if dat else 'LỖI'}] {dieu_kien}")</code></pre>
+<pre><code class="language-text">TriggerSelector    = FrameStart
+TriggerMode        = On
+TriggerSource      = Line0
+TriggerActivation  = RisingEdge
+TriggerDelay       = 8000
+ExposureMode       = Timed
+ExposureTime       = 170.0
+LineSelector       = Line1
+LineMode           = Output
+LineSource         = ExposureActive
+Nhòe dự kiến: 0.75 px
+[ĐẠT] nhòe do xung ≤ cho phép
+[ĐẠT] xung nằm trọn trong phơi sáng
+[ĐẠT] camera kịp nhịp (1/fps_max &lt; chu kỳ)
+[ĐẠT] delay + phơi sáng &lt; chu kỳ</code></pre>
+<p>Trên camera thật, các dòng trên được gán qua SDK của hãng. Ví dụ với pypylon (SDK Python của Basler), cú pháp có dạng như sau; các SDK khác (Spinnaker, Harvesters, MVS…) có cách gọi tương đương với cùng tên tính năng:</p>
+<pre><code class="language-python"># (minh họa) cần camera thật và pypylon; tên đường I/O tùy model
+from pypylon import pylon
+
+cam = pylon.InstantCamera(pylon.TlFactory.GetInstance().CreateFirstDevice())
+cam.Open()
+cam.TriggerSelector.Value = "FrameStart"
+cam.TriggerMode.Value = "On"
+cam.TriggerSource.Value = "Line1"
+cam.TriggerActivation.Value = "RisingEdge"
+cam.TriggerDelay.Value = 8000.0          # µs
+cam.ExposureTime.Value = 170.0           # µs
+cam.LineSelector.Value = "Line2"
+cam.LineMode.Value = "Output"            # chỉ cần với đường GPIO hai chiều
+cam.LineSource.Value = "ExposureActive"
+cam.StartGrabbing(pylon.GrabStrategy_OneByOne)
+kq = cam.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
+print(kq.GrabSucceeded(), kq.Array.shape)
+kq.Release()
+cam.Close()</code></pre>
+
+<h2>8. Kiểm chứng tại hiện trường</h2>
 <ol>
-  <li><strong>Cảm biến quang</strong> (hoặc PLC, encoder) phát hiện sản phẩm đến vị trí → gửi xung trigger tới camera.</li>
-  <li><strong>Camera</strong> nhận trigger, bắt đầu phơi sáng, đồng thời xuất tín hiệu <em>exposure active</em> hoặc <em>strobe out</em> qua ngõ ra số.</li>
-  <li><strong>Bộ điều khiển đèn</strong> nhận tín hiệu từ camera, phát xung sáng đúng trong cửa sổ phơi sáng.</li>
+  <li><strong>Máy hiện sóng hai kênh</strong>: kênh 1 đo ngõ ra ExposureActive của camera, kênh 2 đo tín hiệu trigger vào đèn (hoặc một photodiode đặt trước đèn để thấy ánh sáng thật). Xác nhận xung sáng nằm trọn trong cửa sổ phơi sáng, đo độ trễ lớn nhất qua vài trăm lần.</li>
+  <li><strong>Không có máy hiện sóng</strong>: che tối trạm, đặt ExposureTime dài (ví dụ 1000 µs) và ghi độ sáng trung bình của một ROI. Giảm dần ExposureTime: chừng nào xung còn nằm trọn trong cửa sổ, độ sáng không đổi; tới khi độ sáng bắt đầu giảm, bạn đã tìm được mép cửa sổ. Đặt ExposureTime lớn hơn giá trị đó khoảng 10–20 µs.</li>
+  <li><strong>Chạy thử ở tốc độ thật</strong> với vật có cạnh sắc hoặc thước vạch: đo độ rộng cạnh theo phương băng tải và phương vuông góc. Hai giá trị gần bằng nhau nghĩa là nhòe không đáng kể.</li>
+  <li><strong>Ghi bộ đếm</strong>: số trigger, số ảnh, số xung đèn phải khớp nhau sau mỗi ca.</li>
 </ol>
-<p>Thứ tự này đảm bảo đèn luôn sáng khi camera đang "mở mắt", không phụ thuộc độ trễ phần mềm.</p>
 
-<h2>Tính toán thời gian</h2>
-<pre><code>Tốc độ băng tải:          1,2 m/s = 1200 mm/s
-Kích thước pixel trên vật: 0,1 mm
-Nhòe cho phép:             0,5 pixel = 0,05 mm
-Thời gian chiếu sáng tối đa = 0,05 / 1200 ≈ 42 µs</code></pre>
-<p>Với 42 µs, đèn liên tục thông thường gần như chắc chắn không đủ sáng; cần đèn chớp overdrive.</p>
-
-<h2>Cài đặt camera</h2>
+<h2>9. An toàn và độ tin cậy</h2>
 <ul>
-  <li>Trigger mode: <strong>On</strong>, nguồn trigger: ngõ vào phần cứng (Line 0/1...).</li>
-  <li>Trigger activation: cạnh lên hoặc cạnh xuống theo cảm biến.</li>
-  <li><strong>Trigger delay</strong>: bù khoảng cách giữa cảm biến và tâm khung hình.</li>
-  <li>Ngõ ra: chọn tín hiệu <em>exposure active</em> để điều khiển đèn.</li>
+  <li><strong>Chớp sáng gây khó chịu và nguy hiểm</strong>: đèn chớp cường độ cao ở tần số vài Hz đến vài chục Hz gây mỏi mắt, chói, và có thể kích hoạt cơn động kinh ở người nhạy cảm với ánh sáng nhấp nháy. Che chắn trạm, hoặc dùng đèn hồng ngoại (IR) kèm kính lọc khi camera đủ nhạy ở bước sóng đó.</li>
+  <li><strong>Overdrive đúng thông số nhà sản xuất</strong>: kiểm tra độ rộng xung và duty ở tốc độ <em>tối đa</em> của dây chuyền, không phải tốc độ ngày nghiệm thu.</li>
+  <li><strong>Giám sát độ sáng</strong>: lưu độ sáng trung bình của một vùng nền cố định trong mỗi ảnh. Độ sáng giảm dần theo tuần là dấu hiệu LED suy giảm hoặc bộ điều khiển có vấn đề, cảnh báo trước khi tỉ lệ lỗi tăng.</li>
+  <li><strong>Đèn tản nhiệt</strong>: không bọc kín đèn trong hộp không thoáng; nhiệt độ cao làm giảm cả độ sáng lẫn tuổi thọ.</li>
 </ul>
-<p>Tên tham số thay đổi theo hãng, nhưng camera chuẩn GenICam thường có các tính năng tương đương (TriggerMode, TriggerSource, TriggerDelay, LineSource).</p>
 
-<h2>Lưu ý an toàn và độ tin cậy</h2>
+<h2>10. Sai lầm thường gặp</h2>
 <ul>
-  <li><strong>Overdrive đúng thông số nhà sản xuất</strong>: vượt giới hạn dòng hoặc chu kỳ làm việc sẽ làm hỏng LED.</li>
-  <li><strong>Đèn chớp tần số thấp có thể gây khó chịu</strong> cho người làm việc gần: che chắn trạm, hoặc dùng IR.</li>
-  <li><strong>Dùng cáp có chống nhiễu</strong> cho tín hiệu trigger, tránh đi chung máng với cáp động lực.</li>
-  <li>Kiểm tra bằng máy hiện sóng (oscilloscope) để xác nhận xung sáng nằm trong cửa sổ phơi sáng.</li>
+  <li><strong>Thử ở bàn với vật đứng yên</strong> rồi lắp ra băng tải với cùng thời gian phơi sáng.</li>
+  <li><strong>Phơi sáng dài "cho chắc"</strong> khi dùng đèn chớp ở trạm hở: ánh sáng xưởng chồng ảnh mờ lên ảnh sắc (mục 3).</li>
+  <li><strong>ExposureTime đúng bằng xung đèn</strong>: độ sáng dao động giữa các ảnh do độ trễ (mục 5).</li>
+  <li><strong>Bù vị trí bằng TriggerDelay lớn</strong> trên băng tải đổi tốc độ (mục 6).</li>
+  <li><strong>Overdrive không kiểm tra duty</strong> khi tăng tốc dây chuyền (mục 4).</li>
+  <li><strong>Dùng gain để bù</strong> phơi sáng ngắn thay vì thêm ánh sáng: ảnh nhiễu, ngưỡng mất ổn định.</li>
 </ul>
+
+<h2>11. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1 (thực hành của bài).</strong> Băng tải chạy 0,5 m/s, độ phân giải 0,1 mm/pixel. Tính thời gian chiếu sáng tối đa để nhòe dưới 1 pixel. Nếu trạm che kín và dùng đèn chớp với độ trễ lớn nhất đo được là 12 µs, bạn đặt độ rộng xung và ExposureTime bao nhiêu? Nếu sau này dùng cùng trạm để đo kích thước (nhòe ≤ 0,5 px) thì sao?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">v, p, tre = 500.0, 0.1, 12.0                  # mm/s, mm/px, µs
+for ten, nhoe_px in (("phát hiện lỗi", 1.0), ("đo kích thước", 0.5)):
+    t_max = nhoe_px * p / v * 1e6
+    xung = 0.8 * t_max                          # chừa 20% dự phòng
+    print(f"{ten}: t_max = {t_max:.0f} µs → xung {xung:.0f} µs, ExposureTime ≈ {xung + tre + 10:.0f} µs"
+          f" (nhòe {v * xung * 1e-6 / p:.2f} px)")</code></pre>
+<pre><code class="language-text">phát hiện lỗi: t_max = 200 µs → xung 160 µs, ExposureTime ≈ 182 µs (nhòe 0.80 px)
+đo kích thước: t_max = 100 µs → xung 80 µs, ExposureTime ≈ 102 µs (nhòe 0.40 px)</code></pre>
+<p>t_max = 0,1 mm / 500 mm/s = 200 µs. Trong trạm che kín, độ nhòe do <strong>xung</strong> quyết định, nên đặt xung khoảng 160 µs (dự phòng 20%) và ExposureTime khoảng 182 µs (xung + 12 µs trễ + 10 µs dự phòng) để chứa trọn xung. Khi dùng để đo kích thước, t_max chỉ còn 100 µs: xung 80 µs, ExposureTime khoảng 102 µs, ánh sáng giảm một nửa, có thể phải tăng mức overdrive hoặc dùng đèn mạnh hơn.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Một đèn có giới hạn (theo datasheet) ở mức overdrive đang dùng: xung tối đa 300 µs, duty tối đa 2%. Dây chuyền hiện chạy 60 sp/phút với xung 250 µs, kế hoạch tăng lên 300 sp/phút. Cấu hình có còn đạt không? Nếu không, xung tối đa là bao nhiêu?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">XUNG_MAX, DUTY_MAX = 300.0, 0.02
+for sp_phut in (60, 300):
+    f = sp_phut / 60
+    duty = f * 250e-6
+    xung_duty = DUTY_MAX / f * 1e6              # xung lớn nhất theo giới hạn duty
+    print(f"{sp_phut} sp/phút: duty {duty:.3%} → {'ĐẠT' if duty &lt;= DUTY_MAX else 'KHÔNG ĐẠT'};"
+          f" xung tối đa {min(XUNG_MAX, xung_duty):.0f} µs")</code></pre>
+<pre><code class="language-text">60 sp/phút: duty 0.025% → ĐẠT; xung tối đa 300 µs
+300 sp/phút: duty 0.125% → ĐẠT; xung tối đa 300 µs</code></pre>
+<p>Ở 300 sp/phút (5 Hz) duty chỉ 0,125%, vẫn rất xa giới hạn 2%; giới hạn ràng buộc là độ rộng xung tối đa 300 µs. Bài học: với sản phẩm rời, duty hiếm khi là vấn đề, độ rộng xung thường mới là giới hạn; với line scan hoặc tốc độ hàng trăm khung/giây thì ngược lại.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Cảm biến NPN (kéo xuống 0 V khi có vật) nối vào Line0, đặt trước tâm khung hình 6 mm. Băng tải 0,8 m/s, pixel 0,05 mm, phát hiện lỗi (nhòe ≤ 1 px), trạm che kín, trễ đèn tối đa 10 µs. Bộ điều khiển đèn cần mức cao tích cực trên ngõ vào. Liệt kê cấu hình GenICam.</p>
+<details><summary>Xem đáp án</summary>
+<ul>
+  <li>t_max = 1 × 0,05 / 800 = 62,5 µs → xung khoảng 50 µs.</li>
+  <li>TriggerSelector = FrameStart, TriggerMode = On, TriggerSource = Line0.</li>
+  <li>TriggerActivation: với ngõ vào cách ly quang đấu đúng kiểu NPN (cực dương ngõ vào nối +24 V, cực âm nối dây tín hiệu cảm biến), khi có vật cảm biến dẫn, có dòng qua opto, camera đọc mức 1: lúc vật tới là <strong>cạnh lên</strong> → RisingEdge. Cách đấu khác có thể đảo logic, nên luôn xác nhận bằng cách đọc trạng thái đường (LineStatus) khi che và bỏ che cảm biến.</li>
+  <li>TriggerDelay = 6 / 800 s = 7500 µs (tốc độ đổi thì vị trí đổi: cân nhắc dời cảm biến gần tâm hơn).</li>
+  <li>ExposureMode = Timed, ExposureTime ≈ 50 + 10 + 10 = 70 µs.</li>
+  <li>LineSelector = Line1 (ngõ ra), LineMode = Output (nếu là GPIO), LineSource = ExposureActive, LineInverter = False (mức cao tích cực).</li>
+</ul>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Nhòe (pixel) = v · t / p; t_max = nhòe cho phép · p / v. Đo lường ≤ 0,5 px, phát hiện lỗi ≤ 1 px. Nhòe làm cạnh rộng ra theo phương chuyển động và làm lỗi mảnh mất tương phản.</li>
+  <li>Trong trạm che kín, độ dài xung đèn quyết định nhòe; ExposureTime = xung + độ trễ lớn nhất + dự phòng, không dài hơn để tránh ánh sáng xưởng.</li>
+  <li>Overdrive cho ánh sáng mạnh hơn nhiều lần trong xung ngắn, bị giới hạn bởi độ rộng xung và duty (xung × tần số) theo datasheet; ánh sáng không tăng tuyến tính theo dòng.</li>
+  <li>Chuỗi phần cứng: cảm biến → ngõ vào camera → ExposureActive ra bộ điều khiển đèn; xung phải nằm trọn trong cửa sổ phơi sáng, kiểm chứng bằng máy hiện sóng hoặc quét ExposureTime.</li>
+  <li>GenICam SFNC: TriggerSelector/Mode/Source/Activation/Delay, ExposureMode/ExposureTime, LineSelector/LineMode/LineSource; tính và kiểm tra ràng buộc trước khi cài.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Tiêu chí OK/NG, escape và overkill</strong>, biến ảnh sắc nét thành quyết định OK/NG có thể kiểm chứng bằng con số.</p>

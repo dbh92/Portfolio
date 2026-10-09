@@ -1,58 +1,359 @@
-<p>Đếm hạt, viên thuốc, đồng xu, tế bào... bài toán sẽ rất dễ nếu chúng không chạm nhau. Khi các vật dính thành cụm, phân ngưỡng + contour chỉ thấy một khối lớn. Thuật toán <strong>watershed</strong> kết hợp với <strong>distance transform</strong> giúp tách chúng ra mà không cần Deep Learning.</p>
+<p>Bài "Phân ngưỡng và contour: đếm, đo vật thể" đếm đúng khi các vật nằm tách rời. Bài "Đặc trưng contour và blob analysis" cho bạn bộ số đo của từng vật. Nhưng trên khay thuốc, băng chuyền hạt, đĩa linh kiện, vật thường <strong>chạm nhau</strong>: phân ngưỡng cho một khối liền, và contour đếm cả cụm là một vật. Bài này tách các vật dính nhau bằng <strong>distance transform</strong> (tìm tâm từng vật) và <strong>watershed</strong> (vẽ đường ranh giới), rồi quan trọng không kém: <strong>kiểm tra</strong> kết quả đếm có đáng tin hay không trước khi gửi cho PLC.</p>
+<div class="tip"><strong>Chuẩn bị</strong>Dùng <code>opencv-python</code> và <code>numpy</code>. Ảnh mẫu là các viên thuốc tròn vẽ bằng OpenCV, xếp thành cụm chạm nhau, kèm file đáp án (vị trí, bán kính từng viên). Bài dùng opening của bài Morphology để làm sạch mặt nạ.</div>
 
-<h2>Ý tưởng</h2>
-<p>Hình dung ảnh như một địa hình: tâm mỗi vật là một "đáy thung lũng". Đổ nước từ các đáy, nước dâng lên; nơi nước từ hai thung lũng gặp nhau chính là đường ranh giới giữa hai vật. Distance transform tạo ra địa hình đó: mỗi điểm thuộc vật có giá trị bằng khoảng cách tới nền gần nhất, nên tâm vật có giá trị lớn nhất.</p>
+<h2>1. Vấn đề: contour đếm cụm thành một vật</h2>
+<p>Tạo khay 19 viên thuốc: phần lớn nằm trong các cụm 2–5 viên chạm nhau (khoảng cách tâm bằng 90% tổng hai bán kính, tức hai viên "lấn" vào nhau một chút như khi chụp từ trên xuống), vài viên đứng riêng. Mỗi viên có mặt vồng nên sáng ở tâm (khoảng 210) và tối dần ra mép (khoảng 130), giống viên thuốc thật dưới đèn chiếu từ trên. Hàm tạo ảnh cũng tạo luôn khay thứ hai cho bài tập 1.</p>
+<pre><code class="language-python">import json
 
-<h2>Cài đặt với OpenCV</h2>
-<pre><code>import cv2
+import cv2
 import numpy as np
 
-img = cv2.imread("vien-thuoc.png")
-gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-_, th = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-kernel = np.ones((3, 3), np.uint8)
-th = cv2.morphologyEx(th, cv2.MORPH_OPEN, kernel, iterations=2)
 
-# 1. Vùng chắc chắn là nền
-sure_bg = cv2.dilate(th, kernel, iterations=3)
+def tao_khay_thuoc(ten, seed, cum, H=360, W=480):
+    """cum: danh sách ((x, y), số viên). Các viên trong một cụm chạm nhau."""
+    rng = np.random.default_rng(seed)
+    vien = []
+    for (cx, cy), n in cum:
+        cac = [(cx, cy, int(rng.integers(17, 22)))]
+        while len(cac) &lt; n:
+            bx, by, br = cac[int(rng.integers(len(cac)))]
+            r = int(rng.integers(17, 22))
+            goc = rng.uniform(0, 2 * np.pi)
+            d = (br + r) * 0.9                            # lấn vào nhau 10%
+            x, y = bx + d * np.cos(goc), by + d * np.sin(goc)
+            if all(np.hypot(x - px, y - py) &gt; (r + pr) * 0.88 for px, py, pr in cac) \
+                    and r &lt; x &lt; W - r and r &lt; y &lt; H - r:
+                cac.append((int(x), int(y), r))
+        vien += cac
+    yy, xx = np.mgrid[0:H, 0:W]
+    anh = np.full((H, W), 40.0)
+    for x, y, r in vien:                                  # viên thuốc vồng lên: sáng ở tâm, tối dần ra mép
+        d2 = ((xx - x) ** 2 + (yy - y) ** 2) / r ** 2
+        anh = np.maximum(anh, np.where(d2 &lt;= 1, 130 + 80 * np.sqrt(np.clip(1 - d2, 0, 1)), 0))
+    anh = np.clip(anh + rng.normal(0, 6, anh.shape), 0, 255).astype(np.uint8)
+    cv2.imwrite(ten, anh)
+    with open(ten.replace(".png", ".json"), "w", encoding="utf-8") as f:
+        json.dump(vien, f)
+    return vien
 
-# 2. Vùng chắc chắn là tâm vật: đỉnh của distance transform
-dist = cv2.distanceTransform(th, cv2.DIST_L2, 5)
-_, sure_fg = cv2.threshold(dist, 0.5 * dist.max(), 255, cv2.THRESH_BINARY)
-sure_fg = sure_fg.astype(np.uint8)
 
-# 3. Vùng chưa biết (giữa nền và tâm)
-unknown = cv2.subtract(sure_bg, sure_fg)
+CUM = [((80, 80), 3), ((250, 70), 2), ((400, 90), 4), ((90, 250), 2),
+       ((240, 230), 5), ((400, 280), 1), ((150, 330), 1), ((330, 330), 1)]
+vien = tao_khay_thuoc("vien_thuoc.png", 6, CUM)
+tao_khay_thuoc("vien_thuoc_2.png", 5, CUM)                  # khay cho bài tập 1
 
-# 4. Đánh số các "hạt giống" (markers)
-n, markers = cv2.connectedComponents(sure_fg)
-markers = markers + 1          # nền chắc chắn = 1, không phải 0
-markers[unknown == 255] = 0    # 0 = vùng để watershed quyết định
+anh = cv2.imread("vien_thuoc.png", cv2.IMREAD_GRAYSCALE)
+mo = cv2.GaussianBlur(anh, (5, 5), 0)
+_, mat_na = cv2.threshold(mo, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+mat_na = cv2.morphologyEx(mat_na, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
+cv2.imwrite("vien_thuoc_mask.png", mat_na)
+cs, _ = cv2.findContours(mat_na, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+print("đáp án:", len(vien), "viên | contour thường đếm được:", len(cs))
+print("diện tích các contour:", sorted(int(cv2.contourArea(c)) for c in cs))</code></pre>
+<pre><code class="language-text">đáp án: 19 viên | contour thường đếm được: 8
+diện tích các contour: [821, 926, 1273, 2305, 2314, 2980, 4119, 4850]</code></pre>
+<p>Contour thường chỉ thấy 8 "vật": đúng bằng số cụm. Diện tích cũng cho thấy vấn đề: một viên đứng riêng khoảng 800–1300 px², còn các contour lớn gấp 2–5 lần. Bạn có thể ước lượng số viên bằng cách chia diện tích cho diện tích một viên, nhưng khi kích thước viên dao động ±20% và các viên lấn nhau, phép chia này dễ lệch một viên. Ta cần tách thật sự.</p>
 
-# 5. Chạy watershed
-markers = cv2.watershed(img, markers)
-img[markers == -1] = (0, 0, 255)          # đường biên được đánh dấu -1
+<h2>2. Distance transform: tâm vật là "đỉnh núi"</h2>
+<p><code>cv2.distanceTransform</code> gán cho mỗi điểm trắng của mặt nạ <strong>khoảng cách (pixel) tới điểm đen gần nhất</strong>. Với vật tròn, giá trị lớn nhất nằm ở tâm và gần bằng bán kính; tại "eo" nơi hai viên chạm nhau, khoảng cách tới nền nhỏ hơn hẳn. Hai viên dính nhau trên mặt nạ trở thành <strong>hai đỉnh núi</strong> nối bởi một yên ngựa thấp.</p>
+<pre><code class="language-python">import json
 
-count = len(np.unique(markers)) - 2       # trừ nhãn nền (1) và biên (-1)
-print("Số vật:", count)</code></pre>
+import cv2
+import numpy as np
 
-<h2>Tinh chỉnh</h2>
+mat_na = cv2.imread("vien_thuoc_mask.png", cv2.IMREAD_GRAYSCALE)
+vien = json.load(open("vien_thuoc.json", encoding="utf-8"))
+dist = cv2.distanceTransform(mat_na, cv2.DIST_L2, 5)     # float32, đơn vị pixel
+print("kiểu:", dist.dtype, "| lớn nhất:", round(float(dist.max()), 1))
+
+(x1, y1, r1), (x2, y2, r2) = vien[0], vien[1]             # hai viên chạm nhau trong cụm đầu
+xm, ym = (x1 + x2) // 2, (y1 + y2) // 2                   # điểm giữa hai tâm, gần "eo"
+print(f"tâm viên 1 ({x1},{y1}), r={r1}: dist = {dist[y1, x1]:.1f}")
+print(f"tâm viên 2 ({x2},{y2}), r={r2}: dist = {dist[y2, x2]:.1f}")
+print(f"giữa hai tâm ({xm},{ym})     : dist = {dist[ym, xm]:.1f}")
+cv2.imwrite("dist.png", cv2.normalize(dist, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8))</code></pre>
+<pre><code class="language-text">kiểu: float32 | lớn nhất: 20.4
+tâm viên 1 (80,80), r=19: dist = 18.6
+tâm viên 2 (61,108), r=19: dist = 18.2
+giữa hai tâm (70,94)     : dist = 9.2</code></pre>
+<p>Tại tâm, giá trị khoảng cách xấp xỉ bán kính; tại điểm giữa hai tâm thấp hơn rõ rệt. Hai tham số: <code>DIST_L2</code> là khoảng cách Euclid (đúng hình học, nên dùng); kích thước mặt nạ 5 cho xấp xỉ chính xác hơn 3 (hoặc dùng <code>DIST_MASK_PRECISE</code> nếu cần chính xác tuyệt đối). Mở <code>dist.png</code> sẽ thấy mỗi viên là một đốm sáng ở giữa, tối dần ra mép.</p>
+
+<h2>3. Tìm tâm (marker): hai cách</h2>
+<p>Watershed cần một <strong>marker</strong> (hạt giống) cho mỗi vật. Có hai cách lấy marker từ distance transform:</p>
 <ul>
-  <li><strong>Hệ số 0.5 × dist.max()</strong> quyết định độ "chắc chắn" của tâm. Vật kích thước khác nhau nhiều thì một ngưỡng toàn cục dễ bỏ sót vật nhỏ; khi đó tìm cực đại cục bộ của distance transform thay vì ngưỡng chung.</li>
-  <li><strong>Phân ngưỡng ban đầu</strong> phải sạch: lỗ bên trong vật tạo ra nhiều tâm giả. Dùng <code>MORPH_CLOSE</code> để lấp lỗ.</li>
-  <li><strong>Vật bị dính nhiều tầng, chồng lên nhau</strong> thì watershed cũng bó tay; cần giải pháp cơ khí (rung, dàn đều) hoặc mô hình instance segmentation.</li>
+  <li><strong>Ngưỡng toàn cục</strong>: giữ vùng có <code>dist &gt; f · dist.max()</code>. Đơn giản, là cách trong hầu hết tài liệu hướng dẫn, nhưng phụ thuộc mạnh vào hệ số <code>f</code>.</li>
+  <li><strong>Cực đại cục bộ</strong>: điểm có <code>dist</code> bằng giá trị lớn nhất trong lân cận (so sánh với ảnh đã <code>dilate</code>), kèm điều kiện <code>dist</code> đủ lớn để loại đỉnh nhỏ do nhiễu.</li>
+</ul>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+mat_na = cv2.imread("vien_thuoc_mask.png", cv2.IMREAD_GRAYSCALE)
+dist = cv2.distanceTransform(mat_na, cv2.DIST_L2, 5)
+
+for f in (0.4, 0.5, 0.6, 0.7):
+    tam = (dist &gt; f * dist.max()).astype(np.uint8)
+    n, _ = cv2.connectedComponents(tam)
+    print(f"ngưỡng {f:.1f} × max: {n - 1:2d} marker")
+
+ke = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21))   # khoảng bán kính viên nhỏ nhất
+dinh = ((dist == cv2.dilate(dist, ke)) &amp; (dist &gt; 10)).astype(np.uint8)
+n, _ = cv2.connectedComponents(dinh)
+print(f"cực đại cục bộ   : {n - 1:2d} marker")</code></pre>
+<pre><code class="language-text">ngưỡng 0.4 × max:  8 marker
+ngưỡng 0.5 × max: 19 marker
+ngưỡng 0.6 × max: 19 marker
+ngưỡng 0.7 × max: 19 marker
+cực đại cục bộ   : 19 marker</code></pre>
+<ul>
+  <li>Ngưỡng 0,4: vùng giữ lại vẫn nối qua các eo, mỗi cụm vẫn là một marker (8, như contour). Từ 0,5 đến 0,7: đủ 19. Ở ảnh này dải dùng được khá rộng vì các viên gần cùng cỡ; ảnh thật thường hẹp hơn, nên hãy quét hệ số như trên khi cài đặt và chọn giữa dải.</li>
+  <li>Nếu viên có kích thước khác nhau nhiều, ngưỡng toàn cục cao (0,7) sẽ <strong>bỏ sót viên nhỏ</strong>, vì đỉnh của viên nhỏ thấp hơn 0,7 lần đỉnh viên lớn nhất (bài tập 2).</li>
+  <li>Cực đại cục bộ không phụ thuộc vật lớn nhất, nhưng cần hai tham số: đường kính kernel (nhỏ hơn khoảng cách hai tâm gần nhất, ở đây khoảng 31 px; lớn hơn các gợn nhiễu) và ngưỡng tối thiểu (khoảng một nửa bán kính viên nhỏ nhất).</li>
 </ul>
 
-<h2>Kiểm tra kết quả</h2>
-<pre><code>for label in np.unique(markers):
-    if label &lt;= 1:
-        continue
-    mask = np.uint8(markers == label) * 255
-    area = cv2.countNonZero(mask)
-    cnts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    x, y, w, h = cv2.boundingRect(cnts[0])
-    cv2.putText(img, str(area), (x, y - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)</code></pre>
-<p>In diện tích từng vật giúp phát hiện trường hợp tách sai: một vùng có diện tích gấp đôi bình thường thường là hai vật chưa được tách.</p>
+<h2>4. Chạy watershed</h2>
+<p>Hình dung ảnh như địa hình: đổ nước từ mỗi marker, nước dâng lên; nơi nước từ hai marker gặp nhau thì dựng "đập", đó là ranh giới giữa hai vật. OpenCV cần bảng nhãn <code>int32</code> theo quy ước:</p>
+<table>
+  <tr><th>Giá trị trong <code>markers</code></th><th>Ý nghĩa đầu vào</th><th>Sau <code>cv2.watershed</code></th></tr>
+  <tr><td>1</td><td>Chắc chắn là nền</td><td>Vẫn là nền</td></tr>
+  <tr><td>2, 3, 4…</td><td>Chắc chắn thuộc vật số 2, 3, 4…</td><td>Vùng của từng vật đã mở rộng</td></tr>
+  <tr><td>0</td><td>Chưa biết, để watershed quyết định</td><td>Được gán cho nền hoặc một vật</td></tr>
+  <tr><td>−1</td><td>(không dùng)</td><td>Đường ranh giới</td></tr>
+</table>
+<pre><code class="language-python">import cv2
+import numpy as np
 
-<h2>Khi nào chuyển sang Deep Learning?</h2>
-<p>Nền phức tạp, vật có kết cấu không đồng nhất, hoặc vật dính chồng lên nhau: hãy dùng instance segmentation như <a href="yolo26-seg-phan-doan-vet-loi.html">YOLO26-seg</a>.</p>
+anh = cv2.imread("vien_thuoc.png", cv2.IMREAD_GRAYSCALE)
+mat_na = cv2.imread("vien_thuoc_mask.png", cv2.IMREAD_GRAYSCALE)
+dist = cv2.distanceTransform(mat_na, cv2.DIST_L2, 5)
+
+# 1. Vùng chắc chắn là nền: ngoài mặt nạ đã giãn rộng thêm
+nen_chac = cv2.dilate(mat_na, np.ones((3, 3), np.uint8), iterations=3)
+# 2. Vùng chắc chắn là tâm vật: cực đại cục bộ, nở ra một chút cho ổn định
+ke = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21))
+dinh = ((dist == cv2.dilate(dist, ke)) &amp; (dist &gt; 10)).astype(np.uint8) * 255
+tam_chac = cv2.dilate(dinh, np.ones((5, 5), np.uint8))
+# 3. Vùng chưa biết = trong mặt nạ giãn nhưng không phải tâm
+chua_biet = cv2.subtract(nen_chac, tam_chac)
+# 4. Đánh số marker: tâm vật 2, 3, ...; nền 1; chưa biết 0
+n, markers = cv2.connectedComponents(tam_chac)
+markers = markers + 1
+markers[chua_biet == 255] = 0
+# 5. Watershed cần ảnh màu 8 bit 3 kênh
+markers = cv2.watershed(cv2.cvtColor(anh, cv2.COLOR_GRAY2BGR), markers)
+
+nhan = [l for l in np.unique(markers) if l &gt; 1]
+print("số vật sau watershed:", len(nhan))
+print("số điểm ranh giới (-1):", int((markers == -1).sum()))
+np.save("markers.npy", markers)
+
+ve = cv2.cvtColor(anh, cv2.COLOR_GRAY2BGR)
+ve[markers == -1] = (0, 0, 255)                              # ranh giới màu đỏ
+for l in nhan:
+    ys, xs = np.nonzero(markers == l)
+    cv2.putText(ve, str(l - 1), (int(xs.mean()) - 6, int(ys.mean()) + 5),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 1)
+cv2.imwrite("watershed_ket_qua.png", ve)</code></pre>
+<pre><code class="language-text">số vật sau watershed: 19
+số điểm ranh giới (-1): 3561</code></pre>
+<p>Ba điểm hay làm sai:</p>
+<ul>
+  <li><strong>Nền phải là 1, không phải 0</strong> (<code>markers + 1</code>). Nếu để nền là 0, watershed coi cả nền là "chưa biết" và sẽ "nuốt" nền vào các vật.</li>
+  <li><code>cv2.watershed</code> yêu cầu ảnh <strong>BGR 8 bit</strong>; truyền ảnh xám sẽ báo lỗi. Watershed của OpenCV mở rộng vùng theo <strong>độ chênh màu</strong> giữa các điểm lân cận, nên ranh giới rơi vào nơi độ sáng thay đổi: ở đây là phần mép tối của các viên thuốc vồng. Nếu vật phẳng đồng màu tuyệt đối, ranh giới gần như tùy ý (số đếm vẫn đúng nhưng diện tích từng vật lệch nhiều), đó là lý do phải kiểm tra diện tích ở mục 5.</li>
+  <li><code>markers</code> bị sửa <strong>tại chỗ</strong> và cũng được trả về; đường ranh giới (−1) gồm cả viền ngoài sát nền, nên tổng diện tích các vật nhỏ hơn mặt nạ một chút.</li>
+</ul>
+
+<h2>5. Kiểm tra kết quả đếm</h2>
+<p>Một con số "19" không chứng minh được gì. Trước khi tin watershed, kiểm tra theo ba lớp, từ mạnh đến yếu.</p>
+<h3>5.1. So với đáp án (khi có ảnh mẫu đã biết số lượng)</h3>
+<p>Mỗi tâm thật phải rơi vào đúng một nhãn, và mỗi nhãn chứa đúng một tâm thật. Nhãn chứa hai tâm là <strong>dính chưa tách</strong> (đếm thiếu); tâm thật không có nhãn riêng hoặc nhãn không chứa tâm nào là <strong>tách thừa</strong>/sót.</p>
+<pre><code class="language-python">import json
+from collections import Counter
+
+import numpy as np
+
+markers = np.load("markers.npy")
+vien = json.load(open("vien_thuoc.json", encoding="utf-8"))
+nhan_cua_tam = [int(markers[y, x]) for x, y, _ in vien]   # nhãn tại tâm mỗi viên thật
+dem = Counter(nhan_cua_tam)
+nhan = [l for l in np.unique(markers) if l &gt; 1]
+dinh_chua_tach = sum(1 for l, k in dem.items() if l &gt; 1 and k &gt; 1)
+khong_tam = sum(1 for l in nhan if l not in dem)
+mat = sum(1 for l in nhan_cua_tam if l &lt;= 1)
+dung = sum(1 for l, k in dem.items() if l &gt; 1 and k == 1)
+print(f"viên thật: {len(vien)} | nhãn: {len(nhan)} | khớp 1-1: {dung}")
+print(f"nhãn chứa &gt;1 tâm: {dinh_chua_tach} | nhãn không chứa tâm: {khong_tam} | tâm rơi vào nền/biên: {mat}")</code></pre>
+<pre><code class="language-text">viên thật: 19 | nhãn: 19 | khớp 1-1: 19
+nhãn chứa &gt;1 tâm: 0 | nhãn không chứa tâm: 0 | tâm rơi vào nền/biên: 0</code></pre>
+<h3>5.2. Kiểm tra diện tích (luôn làm được, kể cả khi chạy thật)</h3>
+<p>Khi sản xuất không có đáp án, ta dựa vào việc các vật cùng loại có diện tích tương tự. Lấy <strong>trung vị</strong> diện tích (bền với vài giá trị sai) làm chuẩn, đánh dấu vật quá to (có thể là 2 viên chưa tách) hoặc quá nhỏ (mảnh vỡ, hoặc tách thừa), và ước lượng số viên độc lập từ tổng diện tích mặt nạ:</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+markers = np.load("markers.npy")
+mat_na = cv2.imread("vien_thuoc_mask.png", cv2.IMREAD_GRAYSCALE)
+nhan = [l for l in np.unique(markers) if l &gt; 1]
+dien_tich = {l: int((markers == l).sum()) for l in nhan}
+tv = float(np.median(list(dien_tich.values())))
+qua_to = [l - 1 for l, a in dien_tich.items() if a &gt; 1.6 * tv]
+qua_nho = [l - 1 for l, a in dien_tich.items() if a &lt; 0.5 * tv]
+uoc_luong = (mat_na &gt; 0).sum() / tv
+print(f"diện tích: nhỏ nhất {min(dien_tich.values())}, trung vị {tv:.0f}, lớn nhất {max(dien_tich.values())}")
+print("vật quá to:", qua_to, "| vật quá nhỏ:", qua_nho)
+print(f"ước lượng theo diện tích: {uoc_luong:.1f} viên | watershed: {len(nhan)} viên")
+ket_luan = "OK" if not qua_to and not qua_nho and abs(uoc_luong - len(nhan)) &lt; 2 else "CẦN KIỂM TRA"
+print("kết luận:", ket_luan)</code></pre>
+<pre><code class="language-text">diện tích: nhỏ nhất 729, trung vị 1022, lớn nhất 1283
+vật quá to: [] | vật quá nhỏ: []
+ước lượng theo diện tích: 20.0 viên | watershed: 19 viên
+kết luận: OK</code></pre>
+<p>Ước lượng theo diện tích lớn hơn số đếm một chút vì mặt nạ còn gồm các đường ranh giới (−1) và vì các viên lớn hơn trung vị. Hai con số chênh nhau dưới 2 viên là hợp lý; chênh nhiều hơn là dấu hiệu tách sai. Trong nhà máy, trạng thái "CẦN KIỂM TRA" nên đẩy khay sang kiểm tra lại (hoặc báo NG có lý do) thay vì gửi một con số đáng ngờ cho PLC.</p>
+<h3>5.3. Kiểm tra bằng mắt</h3>
+<p>Ảnh <code>watershed_ket_qua.png</code> vẽ ranh giới đỏ và số thứ tự. Khi cài đặt, xem ít nhất vài chục ảnh như vậy, chú ý các cụm lớn nhất. Đây cũng là ảnh minh chứng lưu kèm mỗi khay báo NG.</p>
+
+<h2>6. Gom thành hàm dùng lại</h2>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+
+def dem_vat_dinh_nhau(gray, k_dinh=21, dist_min=10, k_mo=5):
+    """Đếm vật sáng trên nền tối, kể cả khi chạm nhau. Trả về (số vật, markers, diện tích từng vật)."""
+    mo = cv2.GaussianBlur(gray, (5, 5), 0)
+    _, m = cv2.threshold(mo, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    m = cv2.morphologyEx(m, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k_mo, k_mo)))
+    dist = cv2.distanceTransform(m, cv2.DIST_L2, 5)
+    ke = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k_dinh, k_dinh))
+    dinh = ((dist == cv2.dilate(dist, ke)) &amp; (dist &gt; dist_min)).astype(np.uint8) * 255
+    tam = cv2.dilate(dinh, np.ones((5, 5), np.uint8))
+    nen = cv2.dilate(m, np.ones((3, 3), np.uint8), iterations=3)
+    _, markers = cv2.connectedComponents(tam)
+    markers = markers + 1
+    markers[cv2.subtract(nen, tam) == 255] = 0
+    markers = cv2.watershed(cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR), markers)
+    nhan = [l for l in np.unique(markers) if l &gt; 1]
+    return len(nhan), markers, [int((markers == l).sum()) for l in nhan]
+
+
+anh = cv2.imread("vien_thuoc.png", cv2.IMREAD_GRAYSCALE)
+so, _, dt = dem_vat_dinh_nhau(anh)
+print("số viên:", so, "| diện tích trung vị:", int(np.median(dt)))</code></pre>
+<pre><code class="language-text">số viên: 19 | diện tích trung vị: 1022</code></pre>
+
+<h2>7. Giới hạn và khi nào chuyển sang Deep Learning</h2>
+<ul>
+  <li><strong>Vật không lồi</strong> (thuôn dài, hình chữ L, viên nang): distance transform có "sống núi" dài thay vì một đỉnh, dễ sinh nhiều marker cho một vật, tức <strong>tách thừa</strong> (bài tập 3).</li>
+  <li><strong>Vật chồng lên nhau nhiều tầng</strong>: phần bị che không có trên ảnh, không thuật toán nào đếm chắc chắn. Giải pháp đúng là cơ khí: rung, dàn đều, tách hàng, hoặc dùng khay có ô định vị.</li>
+  <li><strong>Phân ngưỡng ban đầu kém</strong> (vật có lỗ, bóng, phản xạ): lỗ trong mặt nạ tạo đỉnh giả trên distance transform. Làm sạch mặt nạ trước (closing ở bài Morphology).</li>
+  <li><strong>Nền phức tạp, vật có kết cấu không đồng nhất, hình dạng đa dạng</strong>: chuyển sang instance segmentation (chặng 12, bài phân đoạn ảnh và YOLO26-seg). Kể cả khi đó, các bước kiểm tra ở mục 5 vẫn nguyên giá trị.</li>
+</ul>
+
+<h2>8. Lỗi thường gặp</h2>
+<table>
+  <tr><th>Hiện tượng</th><th>Nguyên nhân</th><th>Cách sửa</th></tr>
+  <tr><td>Watershed "ăn" cả nền, chỉ ra 1–2 vật khổng lồ</td><td>Quên <code>markers + 1</code>, nền mang nhãn 0</td><td>Nền = 1, chưa biết = 0</td></tr>
+  <tr><td>Lỗi kiểu ảnh khi gọi watershed</td><td>Truyền ảnh xám hoặc float</td><td><code>cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)</code>; markers kiểu int32</td></tr>
+  <tr><td>Vẫn đếm thiếu</td><td>Hệ số ngưỡng dist thấp, kernel cực đại cục bộ quá lớn</td><td>Tăng f hoặc giảm kernel; kiểm tra bằng nhãn quá to</td></tr>
+  <tr><td>Đếm thừa, một viên bị chia đôi</td><td>Kernel cực đại quá nhỏ, mặt nạ có lỗ, vật thuôn dài</td><td>Tăng kernel và <code>dist_min</code>, closing lấp lỗ, hoặc ngưỡng dist</td></tr>
+  <tr><td>Bỏ sót vật nhỏ</td><td>Ngưỡng <code>f · dist.max()</code> theo vật lớn nhất</td><td>Cực đại cục bộ với <code>dist_min</code> theo vật nhỏ nhất</td></tr>
+</table>
+
+<h2>9. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Đếm viên thuốc dính nhau trong khay mẫu thứ hai <code>vien_thuoc_2.png</code> (tạo ở mục 1), so sánh kết quả với đếm contour thường và với đáp án.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import json
+
+import cv2
+import numpy as np
+
+anh = cv2.imread("vien_thuoc_2.png", cv2.IMREAD_GRAYSCALE)
+mo = cv2.GaussianBlur(anh, (5, 5), 0)
+_, m = cv2.threshold(mo, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+m = cv2.morphologyEx(m, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
+cs, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+dist = cv2.distanceTransform(m, cv2.DIST_L2, 5)
+dinh = ((dist == cv2.dilate(dist, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21))))
+        &amp; (dist &gt; 10)).astype(np.uint8) * 255
+tam = cv2.dilate(dinh, np.ones((5, 5), np.uint8))
+nen = cv2.dilate(m, np.ones((3, 3), np.uint8), iterations=3)
+_, markers = cv2.connectedComponents(tam)
+markers = markers + 1
+markers[cv2.subtract(nen, tam) == 255] = 0
+markers = cv2.watershed(cv2.cvtColor(anh, cv2.COLOR_GRAY2BGR), markers)
+
+vien = json.load(open("vien_thuoc_2.json", encoding="utf-8"))
+print("đáp án:", len(vien), "| contour thường:", len(cs),
+      "| watershed:", len([l for l in np.unique(markers) if l &gt; 1]))</code></pre>
+<pre><code class="language-text">đáp án: 19 | contour thường: 8 | watershed: 19</code></pre>
+<p>Contour thường chỉ đếm số cụm; watershed đếm đúng số viên. Trong chương trình thật, bạn gọi hàm <code>dem_vat_dinh_nhau</code> ở mục 6 thay vì chép lại các bước.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Khay có cả viên lớn (bán kính 22) và viên nhỏ (bán kính 11) chạm nhau. So sánh marker bằng ngưỡng <code>0,6 × dist.max()</code> và bằng cực đại cục bộ. Cách nào bỏ sót, và vì sao?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+anh = np.full((200, 400), 40, np.uint8)
+viens = [(60, 100, 22), (98, 100, 22), (124, 118, 11), (220, 100, 22), (252, 82, 11),
+         (330, 60, 11), (330, 140, 22)]                      # 7 viên: 4 lớn, 3 nhỏ
+for x, y, r in viens:
+    cv2.circle(anh, (x, y), r, 200, -1)
+_, m = cv2.threshold(anh, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+dist = cv2.distanceTransform(m, cv2.DIST_L2, 5)
+
+n1, _ = cv2.connectedComponents((dist &gt; 0.6 * dist.max()).astype(np.uint8))
+ke = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (11, 11))
+n2, _ = cv2.connectedComponents(((dist == cv2.dilate(dist, ke)) &amp; (dist &gt; 5)).astype(np.uint8))
+print("đáp án 7 | ngưỡng 0.6*max:", n1 - 1, "| cực đại cục bộ:", n2 - 1)
+print("đỉnh viên lớn ≈", round(float(dist[100, 220]), 1), "| đỉnh viên nhỏ ≈", round(float(dist[60, 330]), 1),
+      "| ngưỡng 0.6*max =", round(0.6 * float(dist.max()), 1))</code></pre>
+<pre><code class="language-text">đáp án 7 | ngưỡng 0.6*max: 4 | cực đại cục bộ: 7
+đỉnh viên lớn ≈ 22.0 | đỉnh viên nhỏ ≈ 11.0 | ngưỡng 0.6*max = 13.2</code></pre>
+<p>Đỉnh của viên nhỏ (11) thấp hơn ngưỡng 0,6 × 22 = 13,2, nên ngưỡng toàn cục xóa mất cả 3 viên nhỏ. Cực đại cục bộ chỉ hỏi "điểm này có cao nhất trong vùng lân cận không", nên giữ được viên nhỏ. Lưu ý kernel phải giảm xuống 11 (cỡ bán kính viên nhỏ nhất) và <code>dist_min</code> xuống 5.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Thay viên tròn bằng 5 <strong>viên nang</strong> thuôn dài (dài 50 px, bán kính 15 px), hai viên chạm nhau. Đếm marker bằng cực đại cục bộ và bằng ngưỡng dist với hệ số 0,5; 0,7; 0,8; 0,9. Kết luận gì?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+rng = np.random.default_rng(1)
+anh = np.full((240, 400), 40, np.uint8)
+for (cx, cy), goc in [((80, 70), 20), ((125, 95), -30), ((260, 80), 90), ((300, 170), 0), ((110, 180), 60)]:
+    d = np.array([np.cos(np.deg2rad(goc)), np.sin(np.deg2rad(goc))]) * 25
+    p1 = tuple(int(v) for v in np.array([cx, cy]) - d)
+    p2 = tuple(int(v) for v in np.array([cx, cy]) + d)
+    cv2.line(anh, p1, p2, 200, 30)                       # thân viên nang
+    cv2.circle(anh, p1, 15, 200, -1)                     # hai đầu tròn
+    cv2.circle(anh, p2, 15, 200, -1)
+anh = np.clip(anh + rng.normal(0, 6, anh.shape), 0, 255).astype(np.uint8)
+_, m = cv2.threshold(cv2.GaussianBlur(anh, (5, 5), 0), 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+cs, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+dist = cv2.distanceTransform(m, cv2.DIST_L2, 5)
+
+ke = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21))
+n, _ = cv2.connectedComponents(((dist == cv2.dilate(dist, ke)) &amp; (dist &gt; 8)).astype(np.uint8))
+print("đáp án 5 | contour:", len(cs), "| cực đại cục bộ:", n - 1)
+for f in (0.5, 0.7, 0.8, 0.9):
+    n, _ = cv2.connectedComponents((dist &gt; f * dist.max()).astype(np.uint8))
+    print(f"ngưỡng {f}: {n - 1}")</code></pre>
+<pre><code class="language-text">đáp án 5 | contour: 4 | cực đại cục bộ: 27
+ngưỡng 0.5: 4
+ngưỡng 0.7: 4
+ngưỡng 0.8: 5
+ngưỡng 0.9: 1</code></pre>
+<p>Với viên nang, distance transform có một <strong>sống núi</strong> phẳng dọc thân viên; nhiễu ở mép mặt nạ tạo ra nhiều gợn nhỏ dọc sống núi, mỗi gợn thành một "cực đại cục bộ": tách thừa nghiêm trọng. Ngưỡng toàn cục lại hoạt động tốt ở một dải hẹp (0,8), vì mọi viên nang cùng bề rộng nên cùng chiều cao sống núi. Kết luận: <strong>không có cách tạo marker đúng cho mọi hình dạng</strong>. Chọn theo hình dạng sản phẩm, và luôn giữ lớp kiểm tra diện tích ở mục 5 để bắt các trường hợp tách sai.</p>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Vật chạm nhau làm contour đếm thiếu; distance transform biến mỗi vật thành một đỉnh, eo tiếp xúc thành yên ngựa.</li>
+  <li>Marker: ngưỡng <code>f · dist.max()</code> (đơn giản, hợp vật cùng cỡ và thuôn dài) hoặc cực đại cục bộ (hợp vật tròn khác cỡ).</li>
+  <li>Watershed: nền = 1, chưa biết = 0, vật = 2, 3…; ảnh BGR 8 bit; ranh giới = −1.</li>
+  <li>Kiểm tra kết quả: so đáp án trên ảnh mẫu; khi chạy thật, so diện tích với trung vị và ước lượng số lượng theo diện tích; trạng thái nghi ngờ thì không gửi số đếm.</li>
+  <li>Vật chồng nhiều tầng: giải bằng cơ khí; nền phức tạp: instance segmentation.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Biến đổi hình học: affine và phối cảnh</strong>, căn thẳng vật bị xoay và nắn ảnh chụp nghiêng trước khi đo.</p>
