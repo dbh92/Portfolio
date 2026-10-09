@@ -85,7 +85,19 @@ Không xóa hay sửa bài cũ.
 
 4. Merge PR (kiểu `merge`). Nếu main đã thay đổi gây xung đột: merge `origin/main` vào nhánh, build và
    kiểm tra lại, push, rồi merge.
-5. Nếu không sửa được lỗi kiểm tra: **không merge**, để PR mở và báo rõ lỗi.
+5. **Không có công cụ GitHub để tạo/merge PR** (không thấy `mcp__github__*`): bỏ qua bước tạo PR, đến 05:00 thì
+   merge bằng git rồi đẩy thẳng lên main:
+
+   ```bash
+   git fetch origin main
+   git checkout -B main origin/main
+   git merge --no-ff <nhánh> -m "Đăng 10 bài ngày DD/MM/YYYY (ngày N/20)"
+   python3 tools/build.py && python3 tools/check_site.py   # phải OK
+   git push origin main
+   ```
+
+   Nếu `git push` bị từ chối, báo rõ lỗi (nhánh bài viết vẫn nằm trên remote để chủ site gộp tay).
+6. Nếu không sửa được lỗi kiểm tra: **không merge**, để PR/nhánh mở và báo rõ lỗi.
 
 ## 6. Báo cáo
 
