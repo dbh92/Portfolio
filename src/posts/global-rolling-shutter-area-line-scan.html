@@ -1,39 +1,307 @@
-<p>Hai lựa chọn đầu tiên khi chọn camera công nghiệp ảnh hưởng trực tiếp tới việc ảnh có dùng được hay không: <strong>global shutter hay rolling shutter</strong>, và <strong>area scan hay line scan</strong>. Bài này giải thích sự khác nhau và cách chọn.</p>
+<p>Chặng 5 "Industrial Vision" kết thúc bằng một bản đặc tả trạm kiểm tra: tốc độ, nhịp, tiêu chí OK/NG, kịch bản nghiệm thu. Chặng 6 trả lời câu hỏi tiếp theo: <strong>phần cứng nào tạo ra được ảnh đủ tốt</strong> cho bản đặc tả đó. Hai lựa chọn đầu tiên khi chọn camera công nghiệp quyết định ảnh có dùng được hay không, trước cả độ phân giải: <strong>global shutter hay rolling shutter</strong>, và <strong>area scan hay line scan</strong>. Bài này giải thích từng loại bằng mô phỏng có số đo, dạy cách tính tốc độ dòng và encoder cho camera line scan, và cách đọc các thông số cảm biến trong datasheet (kích thước pixel, độ phân giải, tốc độ khung, độ sâu bit, băng thông giao tiếp, dải động). Bài sau, "Chọn camera và ống kính: độ phân giải, FOV, tiêu cự", dùng các thông số này để tính cấu hình cụ thể.</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Tính được độ méo nghiêng (skew) của rolling shutter cho một vật chuyển động và quyết định khi nào bắt buộc global shutter; nêu được ít nhất ba bài toán nên dùng line scan và giải thích vì sao; tính tốc độ dòng, bộ chia encoder và băng thông cho camera line scan; đọc datasheet cảm biến và tính tốc độ khung tối đa qua từng chuẩn giao tiếp.</div>
 
-<h2>Global shutter và rolling shutter</h2>
-<h3>Rolling shutter</h3>
-<p>Cảm biến đọc và phơi sáng <strong>lần lượt từng hàng</strong> từ trên xuống. Hàng cuối được chụp muộn hơn hàng đầu một khoảng thời gian nhỏ. Với vật đứng yên thì không sao; với vật chuyển động nhanh, ảnh bị <strong>méo nghiêng</strong> (cột thẳng thành nghiêng, cánh quạt quay thành hình cong).</p>
-<h3>Global shutter</h3>
-<p>Tất cả điểm ảnh <strong>phơi sáng cùng một lúc</strong>. Vật chuyển động không bị méo hình, chỉ có thể bị nhòe nếu thời gian phơi sáng dài.</p>
+<h2>1. Cảm biến ảnh hoạt động thế nào (vừa đủ để chọn camera)</h2>
+<p>Mỗi pixel là một phần tử quang điện: trong thời gian <strong>phơi sáng</strong> (exposure), photon đập vào pixel tạo ra electron và electron được tích lại; hết thời gian phơi sáng, điện tích được <strong>đọc ra</strong> (readout), chuyển thành số (ADC) và gửi đi. Gần như mọi camera công nghiệp mới hiện nay dùng cảm biến <strong>CMOS</strong>; cảm biến CCD đời trước gần như đã ngừng sản xuất. Khác biệt quan trọng giữa các cảm biến CMOS nằm ở <em>cách sắp xếp thời gian</em> phơi sáng và đọc ra của các hàng pixel, đó chính là kiểu màn trập điện tử.</p>
 <table>
   <tr><th></th><th>Rolling shutter</th><th>Global shutter</th></tr>
-  <tr><td>Vật chuyển động</td><td>Bị méo</td><td>Không méo</td></tr>
-  <tr><td>Giá thành</td><td>Thấp hơn</td><td>Cao hơn</td></tr>
-  <tr><td>Phổ biến ở</td><td>Webcam, điện thoại, camera giá rẻ</td><td>Camera Machine Vision</td></tr>
-  <tr><td>Dùng với đèn chớp</td><td>Phức tạp</td><td>Đơn giản</td></tr>
+  <tr><td>Phơi sáng</td><td>Từng hàng bắt đầu và kết thúc lệch nhau một khoảng "thời gian dòng" (line time), từ trên xuống</td><td>Mọi pixel bắt đầu và kết thúc phơi sáng cùng lúc; mỗi pixel có phần tử nhớ để giữ điện tích chờ đọc</td></tr>
+  <tr><td>Vật đứng yên</td><td>Tốt</td><td>Tốt</td></tr>
+  <tr><td>Vật chuyển động</td><td>Méo nghiêng (skew), hình tròn thành elip nghiêng, cánh quạt quay thành hình cong</td><td>Không méo hình; chỉ nhòe nếu phơi sáng dài (bài "Đèn strobe và đồng bộ trigger")</td></tr>
+  <tr><td>Đèn chớp</td><td>Chỉ dùng được khi mọi hàng cùng đang phơi sáng lúc đèn chớp (phơi sáng dài, trạm tối)</td><td>Đơn giản: xung nằm trong cửa sổ phơi sáng</td></tr>
+  <tr><td>Phổ biến ở</td><td>Điện thoại, webcam, nhiều camera độ phân giải rất cao giá thấp</td><td>Phần lớn camera Machine Vision cho dây chuyền</td></tr>
+  <tr><td>Giá</td><td>Thấp hơn ở cùng độ phân giải</td><td>Cao hơn; khoảng cách giá đã thu hẹp nhiều</td></tr>
 </table>
-<p>Quy tắc: <strong>vật di chuyển trên băng tải hoặc robot đang chạy → global shutter</strong>. Rolling shutter chỉ phù hợp khi vật đứng yên hoàn toàn lúc chụp, hoặc dùng đèn chớp ngắn trong môi trường tối.</p>
 
-<h2>Area scan và line scan</h2>
-<h3>Area scan</h3>
-<p>Cảm biến hình chữ nhật, chụp cả khung hình một lần như máy ảnh thông thường. Dễ cài đặt, dễ căn chỉnh, phù hợp phần lớn ứng dụng.</p>
-<h3>Line scan</h3>
-<p>Cảm biến chỉ có <strong>một (hoặc vài) hàng điểm ảnh</strong>, chụp liên tục khi vật di chuyển qua; các dòng ghép lại thành ảnh 2D. Ưu điểm:</p>
+<h2>2. Rolling shutter: mô phỏng và đo độ méo</h2>
+<p>Với rolling shutter, hàng thứ <code>r</code> phơi sáng muộn hơn hàng đầu một khoảng <code>r · t_dòng</code>. Trong thời gian đó vật đã đi thêm một đoạn, nên mỗi hàng "thấy" vật ở một vị trí khác. Độ lệch giữa hàng đầu và hàng cuối:</p>
+<pre><code class="language-text">skew (pixel) = v_px · (H − 1) · t_dòng
+
+v_px   : tốc độ vật trên ảnh (pixel/s) = tốc độ (mm/s) / kích thước pixel trên vật (mm/pixel)
+H      : số hàng được đọc (chiều cao ảnh hoặc ROI)
+t_dòng : thời gian dòng của cảm biến (µs), thường vài µs đến vài chục µs
+(H − 1) · t_dòng ≈ thời gian đọc hết khung hình</code></pre>
+<p>Mô phỏng một thanh thẳng đứng chạy ngang trên băng tải 0,5 m/s, pixel trên vật 0,1 mm (vật chạy 5.000 pixel/giây), cảm biến 480 hàng với thời gian dòng 15 µs. Mỗi hàng được tính đúng phần diện tích pixel bị thanh che (khử răng cưa). Sau đó ta tìm mép trái của thanh ở từng hàng với độ chính xác dưới pixel, rồi fit một đường thẳng để đo độ nghiêng:</p>
+<pre><code class="language-python">import numpy as np
+import cv2
+
+H, W = 480, 640
+V_PX = 500.0 / 0.1          # 0,5 m/s, 0,1 mm/pixel → 5000 pixel/s
+T_DONG = 15e-6              # thời gian dòng (s)
+PHOI_SANG = 50e-6           # phơi sáng mỗi hàng (s), ngắn để nhòe nhỏ
+X0, RONG = 200.0, 60.0      # mép trái thanh lúc t = 0 và bề rộng (pixel)
+
+
+def hang_anh(t_bat_dau):
+    """Một hàng ảnh: tích phân 10 thời điểm trong khoảng phơi sáng (vật đi được V_PX·PHOI_SANG)."""
+    cot = np.arange(W)
+    tong = np.zeros(W)
+    for k in range(10):
+        x = X0 + V_PX * (t_bat_dau + PHOI_SANG * (k + 0.5) / 10)
+        tong += np.clip(np.minimum(cot + 1, x + RONG) - np.maximum(cot, x), 0, 1)   # phần pixel bị che
+    return 40 + 180 * tong / 10
+
+
+def chup(rolling):
+    return np.array([hang_anh(r * T_DONG if rolling else 0.0) for r in range(H)])
+
+
+def mep_trai(hang, muc=130.0):
+    x = int(np.argmax(hang &gt;= muc))              # pixel đầu tiên vượt mức
+    return x - 1 + (muc - hang[x - 1]) / (hang[x] - hang[x - 1])
+
+
+for ten, rolling in (("global shutter", False), ("rolling shutter", True)):
+    img = chup(rolling)
+    cv2.imwrite(f"{ten.split()[0]}.png", img.astype(np.uint8))
+    mep = np.array([mep_trai(h) for h in img])
+    doc, _ = np.polyfit(np.arange(H), mep, 1)  # pixel lệch mỗi hàng
+    skew = round(doc * (H - 1), 1) + 0.0      # + 0.0: tránh in "-0.0"
+    goc = round(np.degrees(np.arctan(doc)), 1) + 0.0
+    print(f"{ten:15s}: mép hàng đầu {mep[0]:6.1f}, hàng cuối {mep[-1]:6.1f} → skew {skew:5.1f} px, nghiêng {goc:4.1f}°")
+print(f"Lý thuyết: {V_PX:.0f} px/s × {H - 1} hàng × {T_DONG * 1e6:.0f} µs = {V_PX * (H - 1) * T_DONG:.1f} px"
+      f" (đọc hết khung {(H - 1) * T_DONG * 1e3:.2f} ms)")</code></pre>
+<pre><code class="language-text">global shutter : mép hàng đầu  199.6, hàng cuối  199.6 → skew   0.0 px, nghiêng  0.0°
+rolling shutter: mép hàng đầu  199.6, hàng cuối  235.5 → skew  35.9 px, nghiêng  4.3°
+Lý thuyết: 5000 px/s × 479 hàng × 15 µs = 35.9 px (đọc hết khung 7.19 ms)</code></pre>
+<p>Mô phỏng khớp công thức: hàng cuối lệch hàng đầu khoảng 36 pixel, tức 3,6 mm trên vật. Một thanh thẳng đứng thành nghiêng vài độ; một lỗ tròn thành elip nghiêng; khoảng cách giữa hai chi tiết nằm ở trên và dưới ảnh bị sai vài mm. Không có ngưỡng hay hiệu chuẩn nào sửa được, vì độ méo thay đổi theo tốc độ băng tải. Mở <code>global.png</code> và <code>rolling.png</code> để so sánh.</p>
+<p>Hai điều suy ra từ công thức:</p>
 <ul>
-  <li><strong>Vật dài liên tục</strong>: cuộn vải, giấy, màng nhựa, thép tấm, kính.</li>
-  <li><strong>Bề mặt trụ</strong>: xoay chai, lon, ống trước camera để "trải phẳng" bề mặt.</li>
-  <li><strong>Độ phân giải rất cao</strong> theo chiều ngang (hàng nghìn đến hàng chục nghìn điểm ảnh) với chi phí hợp lý.</li>
-  <li>Chiếu sáng chỉ cần một dải hẹp, cường độ cao.</li>
+  <li><strong>Giảm ROI theo chiều dọc giảm skew</strong> (ít hàng hơn), nhưng không xóa được nó. Phơi sáng ngắn <em>không</em> giảm skew: skew đến từ độ lệch giữa các hàng, không phải từ thời gian phơi sáng mỗi hàng.</li>
+  <li><strong>Rolling shutter với đèn chớp</strong>: nếu trạm tối hoàn toàn và phơi sáng mỗi hàng dài hơn thời gian đọc khung cộng độ rộng xung, sẽ có một khoảng thời gian mọi hàng cùng đang phơi sáng; đèn chớp trong khoảng đó cho ảnh không méo (ở ví dụ trên: phơi sáng ≥ 7,2 ms + xung). Một số camera có chế độ "global reset" hỗ trợ cách này. Đây là cách làm có điều kiện, chỉ đáng dùng khi bắt buộc phải dùng cảm biến rolling shutter (ví dụ độ phân giải rất cao, chi phí thấp) và trạm che kín được.</li>
 </ul>
-<p>Nhược điểm: phải đồng bộ tốc độ chụp với tốc độ vật bằng <strong>encoder</strong>; nếu không, ảnh bị co giãn theo chiều chuyển động. Cài đặt và căn chỉnh phức tạp hơn area scan.</p>
+<div class="tip"><strong>Quy tắc chọn màn trập</strong>Vật chạy trên băng tải, camera gắn trên robot đang di chuyển, hoặc có rung đáng kể: <strong>global shutter</strong>. Rolling shutter chỉ phù hợp khi vật đứng yên hoàn toàn lúc chụp (đồ gá, băng tải bước dừng hẳn), hoặc trường hợp đèn chớp trong trạm tối như trên. Nếu không chắc, tính skew bằng công thức; nếu skew lớn hơn khoảng một phần nhỏ dung sai của bài toán, loại rolling shutter.</div>
 
-<h2>Bảng quyết định nhanh</h2>
+<h2>3. Area scan và line scan</h2>
+<p><strong>Area scan</strong> là camera "bình thường": cảm biến hình chữ nhật, chụp cả khung hình một lần. Dễ lắp, dễ căn chỉnh, đèn và ống kính phổ biến, phù hợp phần lớn ứng dụng với chi tiết rời.</p>
+<p><strong>Line scan</strong> có cảm biến chỉ một hàng pixel (hoặc vài hàng: hai hàng cho màu/độ nhạy cao hơn, hoặc nhiều hàng kiểu TDI cộng dồn tín hiệu khi vật đi qua). Camera chụp liên tục từng dòng trong khi vật chạy qua dưới nó; phần mềm hoặc card thu ghép các dòng thành ảnh 2D. Hệ quả:</p>
+<ul>
+  <li><strong>Chiều ngang</strong> (vuông góc với chuyển động): độ phân giải = số pixel của dòng, thường 2k, 4k, 8k, 16k pixel; hiếm area scan nào có 16.000 pixel trên một chiều với giá hợp lý.</li>
+  <li><strong>Chiều dọc</strong> (theo chuyển động): không giới hạn. Ảnh dài bao nhiêu tùy bạn, vật liệu chạy liên tục không có "đường nối" giữa các khung.</li>
+  <li><strong>Kích thước pixel theo chiều dọc</strong> = quãng đường vật đi giữa hai dòng = v / tốc độ dòng. Muốn pixel vuông thì tốc độ dòng phải bám theo tốc độ vật, nên line scan gần như luôn được kích bằng <strong>encoder</strong>.</li>
+  <li><strong>Chiếu sáng</strong> chỉ cần một dải hẹp nhưng rất mạnh (đèn dải, line light), vì thời gian phơi sáng mỗi dòng chỉ vài chục µs. Không có hiện tượng méo kiểu rolling shutter vì mỗi dòng là một lần chụp.</li>
+</ul>
 <table>
-  <tr><th>Tình huống</th><th>Lựa chọn</th></tr>
-  <tr><td>Chi tiết rời trên băng tải</td><td>Area scan, global shutter</td></tr>
-  <tr><td>Robot gắp, camera gắn trên tay robot đang chạy</td><td>Area scan, global shutter</td></tr>
-  <tr><td>Cuộn vật liệu chạy liên tục</td><td>Line scan + encoder</td></tr>
-  <tr><td>Kiểm tra quanh thân chai, lon</td><td>Line scan + xoay vật, hoặc nhiều camera area scan</td></tr>
-  <tr><td>Vật đứng yên, ngân sách thấp</td><td>Area scan rolling shutter có thể chấp nhận</td></tr>
+  <tr><th>Bài toán</th><th>Nên dùng</th><th>Vì sao</th></tr>
+  <tr><td>Chi tiết rời trên băng tải, khay, robot gắp</td><td>Area scan, global shutter</td><td>Một khung hình chứa cả chi tiết; dễ lắp đặt</td></tr>
+  <tr><td>Cuộn liên tục: giấy, màng nhựa, vải, thép cán, nhôm lá, kính tấm</td><td>Line scan + encoder</td><td>Vật không có điểm đầu cuối; bề rộng lớn cần hàng nghìn pixel; không có chồng lấn/khe hở giữa các khung</td></tr>
+  <tr><td>Bề mặt trụ: thân lon, chai, ống, ổ bi, lốp</td><td>Line scan + xoay vật một vòng (encoder trên trục quay)</td><td>"Trải phẳng" toàn bộ chu vi thành một ảnh chữ nhật, không méo do mặt cong như khi chụp area scan từ một phía</td></tr>
+  <tr><td>Vật lớn cần độ phân giải rất cao: tấm PCB, tấm pin mặt trời, màn hình phẳng, gỗ tấm</td><td>Line scan trên băng tải hoặc bàn trượt</td><td>Ghép hàng chục MP mỗi giây, ánh sáng đều trên cả vật, không phải ghép nhiều khung area scan</td></tr>
+  <tr><td>Vật đứng yên, ngân sách thấp</td><td>Area scan rolling shutter</td><td>Chấp nhận được khi không có chuyển động lúc chụp</td></tr>
 </table>
-<p>Xem thêm quy trình tính độ phân giải, tiêu cự trong bài <a href="chon-camera-ong-kinh-machine-vision.html">cách chọn camera và ống kính</a>.</p>
+<p>Nhược điểm của line scan: phải có chuyển động đều và đo được; lắp đặt, căn thẳng hàng cảm biến với đèn dải và ống kính khó hơn nhiều; đèn đắt; dữ liệu lớn thường cần card thu (frame grabber) hoặc giao tiếp tốc độ cao; với chi tiết rời phải tự cắt ảnh theo từng chi tiết.</p>
+
+<h2>4. Tính toán cho camera line scan</h2>
+<p>Ví dụ: kiểm tra màng nhựa khổ 1.600 mm chạy 180 m/phút (3 m/s), lỗi nhỏ nhất 0,5 mm, muốn lỗi phủ ít nhất 4 pixel. Encoder gắn con lăn chu vi 300 mm, 2.500 xung/vòng, giải mã ×4.</p>
+<pre><code class="language-python">import math
+
+KHO_MM, BIEN_MM = 1600.0, 25.0         # khổ màng và biên mỗi bên
+V_MM_S = 180 / 60 * 1000                # 180 m/phút → mm/s
+LOI_MM, PX_MOI_LOI = 0.5, 4
+CHU_VI, PPR, NHAN = 300.0, 2500, 4      # encoder trên con lăn
+CAC_CO = [2048, 4096, 8192, 16384]      # số pixel dòng phổ biến
+
+fov = KHO_MM + 2 * BIEN_MM
+px_can = LOI_MM / PX_MOI_LOI
+can = fov / px_can
+n_px = next(n for n in CAC_CO if n &gt;= can)
+px = fov / n_px
+toc_do_dong = V_MM_S / px               # dòng/giây để pixel vuông
+print(f"FOV {fov:.0f} mm, pixel ≤ {px_can:.3f} mm → cần ≥ {can:.0f} px → chọn camera {n_px} px,"
+      f" pixel {px:.4f} mm")
+print(f"Tốc độ dòng cho pixel vuông: {toc_do_dong / 1000:.1f} kHz → phơi sáng ≤ {1e6 / toc_do_dong:.1f} µs mỗi dòng")
+print(f"Dữ liệu 8 bit: {n_px * toc_do_dong / 1e6:.0f} MB/s")
+
+dem_mm = PPR * NHAN / CHU_VI
+print(f"Encoder: {dem_mm:.2f} xung đếm/mm; cần {1 / px:.2f} dòng/mm → chia {dem_mm * px:.2f}")
+for chia in (3, 4):                     # bộ chia nguyên: 1 dòng mỗi `chia` xung đếm
+    doc = chia / dem_mm
+    print(f"   chia {chia}: pixel dọc {doc:.4f} mm (ngang {px:.4f}), tỉ lệ dọc/ngang {doc / px:.3f},"
+          f" tốc độ dòng {V_MM_S / doc / 1000:.1f} kHz")</code></pre>
+<pre><code class="language-text">FOV 1650 mm, pixel ≤ 0.125 mm → cần ≥ 13200 px → chọn camera 16384 px, pixel 0.1007 mm
+Tốc độ dòng cho pixel vuông: 29.8 kHz → phơi sáng ≤ 33.6 µs mỗi dòng
+Dữ liệu 8 bit: 488 MB/s
+Encoder: 33.33 xung đếm/mm; cần 9.93 dòng/mm → chia 3.36
+   chia 3: pixel dọc 0.0900 mm (ngang 0.1007), tỉ lệ dọc/ngang 0.894, tốc độ dòng 33.3 kHz
+   chia 4: pixel dọc 0.1200 mm (ngang 0.1007), tỉ lệ dọc/ngang 1.192, tốc độ dòng 25.0 kHz</code></pre>
+<p>Ba kết luận rất thực tế từ vài dòng tính:</p>
+<ul>
+  <li><strong>16k pixel, gần 30 kHz, khoảng 490 MB/s</strong>: vượt xa GigE (khoảng 115 MB/s) và cả USB3 Vision. Cần 10GigE, CoaXPress hoặc Camera Link với card thu, và PC xử lý được gần nửa GB ảnh mỗi giây (hoặc chia khổ màng cho 2–3 camera 8k).</li>
+  <li><strong>Phơi sáng dưới 34 µs mỗi dòng</strong>, liên tục: đèn dải cường độ rất cao chạy liên tục (không overdrive được với duty gần 100%).</li>
+  <li><strong>Bộ chia encoder không ra số nguyên</strong> (3,36). Chọn chia 3 thì pixel dọc nhỏ hơn ngang 11% (ảnh bị giãn dọc, tốc độ dòng tăng lên 33 kHz), chia 4 thì lớn hơn 19%. Có ba cách: chấp nhận pixel không vuông và quy đổi trong phần mềm (đo theo mm từng chiều); dùng bộ chia/nhân phân số nếu camera hoặc card thu hỗ trợ; hoặc chọn encoder/con lăn sao cho chia ra số nguyên. Tần số đếm ở 3 m/s là 100 kHz: kiểm tra ngõ vào encoder của camera hoặc card thu chịu được.</li>
+</ul>
+<p>Điều gì xảy ra nếu chạy line scan ở tốc độ dòng cố định mà băng tải đổi tốc độ? Mô phỏng một tấm có các chấm tròn đường kính 10 mm, camera tính cho 1.000 mm/s (0,5 mm mỗi dòng), rồi băng tải giảm còn 700 mm/s ở giữa đoạn:</p>
+<pre><code class="language-python">import numpy as np
+import cv2
+
+PX = 0.5                                       # mm/pixel ngang, và quãng đường mỗi dòng ở tốc độ danh định
+TAM = [(x, y) for y in (20, 60, 100, 140) for x in (25, 50, 75)]   # tâm các chấm tròn (mm)
+R = 5.0                                        # bán kính 5 mm
+
+
+def dong(y_mm):
+    """Một dòng ảnh: các pixel ngang tại vị trí y_mm trên tấm (sáng = chấm tròn)."""
+    x = (np.arange(200) + 0.5) * PX
+    d = np.full_like(x, 1e9)
+    for cx, cy in TAM:
+        d = np.minimum(d, np.hypot(x - cx, y_mm - cy))
+    return np.where(d &lt;= R, 255, 30).astype(np.uint8)
+
+
+def toc_do(t):                                 # mm/s: 1000, giảm còn 700 trong khoảng 0,05–0,11 s
+    return 700.0 if 0.05 &lt;= t &lt; 0.11 else 1000.0
+
+
+def quet(dung_encoder):
+    y, t, dong_anh, y_dong_tiep = 0.0, 0.0, [], 0.0
+    dt = 1e-6
+    while y &lt; 160:
+        y += toc_do(t) * dt
+        t += dt
+        if dung_encoder:                       # 1 dòng mỗi khi tấm đi được PX mm
+            if y &gt;= y_dong_tiep:
+                dong_anh.append(dong(y))
+                y_dong_tiep += PX
+        elif len(dong_anh) &lt; t * 1000.0 / PX:  # 1 dòng mỗi PX/1000 s (tốc độ dòng cố định 2 kHz)
+            dong_anh.append(dong(y))
+    return np.array(dong_anh)
+
+
+for ten, enc in (("Tốc độ dòng cố định", False), ("Kích bằng encoder", True)):
+    img = quet(enc)
+    cv2.imwrite("linescan_" + ("encoder" if enc else "co_dinh") + ".png", img)
+    n, _, st, _ = cv2.connectedComponentsWithStats((img &gt; 128).astype(np.uint8))
+    ti_le = sorted({round(float(st[i, cv2.CC_STAT_HEIGHT] / st[i, cv2.CC_STAT_WIDTH]), 2) for i in range(1, n)})
+    print(f"{ten:20s}: ảnh {img.shape[0]} dòng, tỉ lệ cao/rộng các chấm tròn: {ti_le}")</code></pre>
+<pre><code class="language-text">Tốc độ dòng cố định : ảnh 357 dòng, tỉ lệ cao/rộng các chấm tròn: [0.95, 1.4]
+Kích bằng encoder   : ảnh 321 dòng, tỉ lệ cao/rộng các chấm tròn: [0.95]</code></pre>
+<p>Với tốc độ dòng cố định, các chấm đi qua lúc băng tải chậm bị kéo dài khoảng 1,4 lần theo chiều chuyển động (mỗi dòng chỉ đi 0,35 mm thay vì 0,5 mm), còn các chấm khác vẫn tròn: một phép đo kích thước sẽ sai tùy thời điểm. Kích bằng encoder thì mọi chấm tròn đều có tỉ lệ khoảng 1 (sai khác nhỏ là do lượng tử hóa pixel), bất kể tốc độ. Đây là cùng nguyên lý "theo quãng đường, không theo thời gian" của bài "Trigger, encoder và cycle time".</p>
+
+<h2>5. Đọc thông số cảm biến trong datasheet</h2>
+<table>
+  <tr><th>Thông số</th><th>Ví dụ</th><th>Ý nghĩa và cách dùng</th></tr>
+  <tr><td>Độ phân giải</td><td>2448 × 2048 (5 MP)</td><td>Số pixel ngang × dọc. Quyết định kích thước pixel trên vật cùng với FOV (bài sau)</td></tr>
+  <tr><td>Kích thước pixel</td><td>3,45 µm</td><td>Kích thước cảm biến = số pixel × kích thước pixel (8,45 × 7,07 mm). Pixel lớn thu nhiều ánh sáng hơn, ít đòi hỏi ống kính hơn</td></tr>
+  <tr><td>Định dạng quang học</td><td>2/3", 1", 1.1"</td><td>Tên gọi theo quy ước cũ của ống hình, <em>không</em> phải đường chéo thật (2/3" có đường chéo khoảng 11 mm, không phải 16,9 mm). Dùng để chọn ống kính phủ đủ cảm biến</td></tr>
+  <tr><td>Kiểu màn trập</td><td>Global / rolling</td><td>Mục 2</td></tr>
+  <tr><td>Tốc độ khung tối đa</td><td>75 fps ở toàn khung</td><td>Giới hạn của cảm biến; tốc độ thật còn bị giới hạn bởi giao tiếp (mục dưới). Giảm ROI theo chiều dọc thường tăng tốc độ khung</td></tr>
+  <tr><td>Độ sâu bit (ADC, định dạng điểm ảnh)</td><td>8 / 10 / 12 bit (Mono8, Mono12p…)</td><td>Số mức xám. 12 bit có ích khi cảm biến có dải động đủ lớn và bài toán cần (đo độ tương phản thấp); tốn băng thông hơn 8 bit 1,5–2 lần</td></tr>
+  <tr><td>Hiệu suất lượng tử (QE)</td><td>Ví dụ 65% ở 525 nm</td><td>Tỉ lệ photon thành electron theo bước sóng. Kiểm tra QE ở bước sóng của đèn (đỏ, hồng ngoại thường thấp hơn)</td></tr>
+  <tr><td>Dung lượng giếng (full well)</td><td>Ví dụ 10.000 e⁻</td><td>Số electron tối đa một pixel giữ được trước khi bão hòa</td></tr>
+  <tr><td>Nhiễu đọc (temporal dark noise)</td><td>Ví dụ 2,5 e⁻</td><td>Nhiễu nền khi không có ánh sáng</td></tr>
+  <tr><td>Dải động, SNR tối đa</td><td>dB</td><td>Dải động ≈ 20·log₁₀(full well / nhiễu đọc); SNR tối đa ≈ 10·log₁₀(full well) (giới hạn bởi nhiễu photon)</td></tr>
+  <tr><td>Giao tiếp</td><td>GigE Vision, USB3 Vision, 5/10GigE, CoaXPress, Camera Link</td><td>Băng thông, chiều dài cáp, cần card thu hay không</td></tr>
+</table>
+<p>Nhiều hãng công bố số đo theo chuẩn <strong>EMVA 1288</strong> (QE, nhiễu, full well, dải động đo theo cùng một phương pháp), nhờ đó so sánh được camera giữa các hãng. Đoạn code dưới đây tính các con số suy ra từ datasheet. Danh mục cảm biến và băng thông thực tế là <strong>số tham khảo, làm tròn</strong>; băng thông thực tế phụ thuộc card mạng, cáp, máy tính và cấu hình gói tin:</p>
+<pre><code class="language-python">import math
+
+CAM_BIEN = [  # (tên, ngang, dọc, pixel µm, fps tối đa của cảm biến) — số liệu tham khảo, làm tròn
+    ("1,6 MP", 1440, 1080, 3.45, 220),
+    ("5 MP", 2448, 2048, 3.45, 75),
+    ("12 MP", 4096, 3000, 3.45, 30),
+    ("24,5 MP", 5328, 4608, 2.74, 20),
+]
+GIAO_TIEP = {"GigE": 115, "USB3 Vision": 380, "5GigE": 580, "10GigE": 1150}   # MB/s thực tế (tham khảo)
+BYTE = {"Mono8": 1.0, "Mono12p": 1.5}          # Mono12p: 12 bit đóng gói, 1,5 byte/pixel
+
+print("cảm biến | kích thước (mm)  | chéo (mm) | MB/khung (Mono8) | fps tối đa: " + " | ".join(GIAO_TIEP))
+for ten, w, h, p, fps_cb in CAM_BIEN:
+    rong, cao = w * p / 1000, h * p / 1000
+    mb = w * h * BYTE["Mono8"] / 1e6
+    fps = [min(fps_cb, bw / mb) for bw in GIAO_TIEP.values()]
+    print(f"{ten:8s} | {rong:5.2f} × {cao:5.2f}    | {math.hypot(rong, cao):9.1f} | {mb:16.2f} | "
+          + " | ".join(f"{f:5.1f}" for f in fps))
+
+print("\n5 MP qua GigE theo định dạng điểm ảnh và ROI:")
+for dinh_dang in BYTE:
+    for roi_h in (2048, 1024, 512):
+        mb = 2448 * roi_h * BYTE[dinh_dang] / 1e6
+        print(f"   {dinh_dang:7s}, ROI 2448 × {roi_h:4d}: {mb:5.2f} MB/khung → {GIAO_TIEP['GigE'] / mb:6.1f} fps (giới hạn bởi GigE)")
+
+full_well, nhieu = 10_000, 2.5                 # e⁻ (ví dụ giả định)
+print(f"\nDải động {20 * math.log10(full_well / nhieu):.1f} dB, SNR tối đa {10 * math.log10(full_well):.1f} dB,"
+      f" cần khoảng {math.log2(full_well / nhieu):.1f} bit để không mất mức xám do ADC")</code></pre>
+<pre><code class="language-text">cảm biến | kích thước (mm)  | chéo (mm) | MB/khung (Mono8) | fps tối đa: GigE | USB3 Vision | 5GigE | 10GigE
+1,6 MP   |  4.97 ×  3.73    |       6.2 |             1.56 |  73.9 | 220.0 | 220.0 | 220.0
+5 MP     |  8.45 ×  7.07    |      11.0 |             5.01 |  22.9 |  75.0 |  75.0 |  75.0
+12 MP    | 14.13 × 10.35    |      17.5 |            12.29 |   9.4 |  30.0 |  30.0 |  30.0
+24,5 MP  | 14.60 × 12.63    |      19.3 |            24.55 |   4.7 |  15.5 |  20.0 |  20.0
+
+5 MP qua GigE theo định dạng điểm ảnh và ROI:
+   Mono8  , ROI 2448 × 2048:  5.01 MB/khung →   22.9 fps (giới hạn bởi GigE)
+   Mono8  , ROI 2448 × 1024:  2.51 MB/khung →   45.9 fps (giới hạn bởi GigE)
+   Mono8  , ROI 2448 ×  512:  1.25 MB/khung →   91.8 fps (giới hạn bởi GigE)
+   Mono12p, ROI 2448 × 2048:  7.52 MB/khung →   15.3 fps (giới hạn bởi GigE)
+   Mono12p, ROI 2448 × 1024:  3.76 MB/khung →   30.6 fps (giới hạn bởi GigE)
+   Mono12p, ROI 2448 ×  512:  1.88 MB/khung →   61.2 fps (giới hạn bởi GigE)
+
+Dải động 72.0 dB, SNR tối đa 40.0 dB, cần khoảng 12.0 bit để không mất mức xám do ADC</code></pre>
+<ul>
+  <li><strong>Tốc độ khung thật = nhỏ hơn của (giới hạn cảm biến) và (băng thông / dung lượng khung)</strong>. Camera 12 MP có cảm biến chạy 30 fps nhưng qua GigE chỉ khoảng 9 fps; với dây chuyền 10 sản phẩm/giây, camera đó không theo kịp (bài "Trigger, encoder và cycle time" đã cảnh báo trigger chồng).</li>
+  <li><strong>Chuyển sang Mono12p tốn thêm 50% băng thông</strong>: chỉ dùng khi cần. Cắt ROI theo chiều dọc là cách rẻ nhất để tăng tốc độ khung.</li>
+  <li><strong>Dải động 72 dB tương ứng khoảng 12 bit</strong>: xuất 8 bit (256 mức) bỏ đi một phần thông tin của cảm biến. Với phần lớn bài toán có chiếu sáng tốt, 8 bit là đủ; bài toán có cả vùng rất sáng và rất tối trong một ảnh mới cần 10–12 bit.</li>
+  <li>Chiều dài cáp cũng là thông số chọn: GigE tới khoảng 100 m cáp đồng, USB3 thường vài mét (dài hơn cần cáp chủ động hoặc cáp quang), CoaXPress hàng chục mét tùy tốc độ.</li>
+</ul>
+
+<h2>6. Sai lầm thường gặp</h2>
+<ul>
+  <li><strong>Chọn camera rolling shutter</strong> vì rẻ và nhiều pixel cho trạm có vật chuyển động; thử ở bàn với vật đứng yên nên không thấy méo.</li>
+  <li><strong>Nghĩ phơi sáng ngắn sẽ hết méo rolling shutter</strong>: phơi sáng ngắn chỉ giảm nhòe, không giảm skew.</li>
+  <li><strong>Đọc "fps tối đa" của cảm biến</strong> mà quên giới hạn của giao tiếp, của định dạng 12 bit, và của PC.</li>
+  <li><strong>Chạy line scan ở tốc độ dòng cố định</strong> trên băng tải đổi tốc độ, hoặc chọn encoder mà không tính bộ chia.</li>
+  <li><strong>Dùng line scan cho chi tiết rời</strong> khi một camera area scan làm được: thêm độ phức tạp lắp đặt, đèn, cắt ảnh mà không thêm lợi ích.</li>
+  <li><strong>Lẫn định dạng quang học với kích thước thật</strong>: luôn tính kích thước cảm biến từ số pixel × kích thước pixel.</li>
+</ul>
+
+<h2>7. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1 (thực hành của bài).</strong> Liệt kê 3 bài toán nên dùng camera line scan và giải thích vì sao.</p>
+<details><summary>Xem đáp án</summary>
+<ol>
+  <li><strong>Kiểm tra bề mặt cuộn vật liệu</strong> (màng nhựa, giấy, vải, thép/nhôm cán): vật liệu liên tục không có điểm bắt đầu/kết thúc để trigger area scan; khổ rộng 1–2 m cần hàng chục nghìn pixel theo chiều ngang; ghép dòng liên tục không có chồng lấn hay khe hở giữa các khung; đèn dải chiếu đều trên toàn khổ.</li>
+  <li><strong>Kiểm tra toàn bộ thân lon, chai, ống, ổ bi</strong>: xoay vật một vòng trước camera line scan (encoder trên trục quay) để "trải phẳng" chu vi thành một ảnh chữ nhật. Area scan nhìn từ một phía chỉ thấy khoảng một phần ba chu vi và bị méo do mặt cong, phải dùng 3–4 camera.</li>
+  <li><strong>Kiểm tra vật lớn với độ phân giải rất cao</strong>: tấm PCB, tấm pin mặt trời, tấm kính, màn hình phẳng, gỗ tấm chạy trên băng tải hoặc bàn trượt. Line scan 8k–16k cho ảnh hàng chục đến hàng trăm MP liền mạch, ánh sáng đều, trong khi area scan cần ghép nhiều khung với chồng lấn và hiệu chuẩn ghép.</li>
+</ol>
+<p>Các đáp án khác cũng đúng nếu có lý do: kiểm tra đường ray hoặc mặt đường từ xe chạy, phân loại nông sản rơi tự do hoặc trên băng tải tốc độ cao, kiểm tra in ấn trên máy in cuộn.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Một camera rolling shutter có 1.080 hàng, thời gian dòng 10 µs. Vật chạy 1 m/s, pixel trên vật 0,2 mm. Tính skew giữa hàng đầu và hàng cuối (pixel và mm). Nếu chỉ dùng ROI 200 hàng thì sao?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">v_px = 1000 / 0.2                        # pixel/s
+for hang in (1080, 200):
+    skew = v_px * (hang - 1) * 10e-6
+    print(f"{hang} hàng: skew {skew:.1f} px = {skew * 0.2:.1f} mm")</code></pre>
+<pre><code class="language-text">1080 hàng: skew 54.0 px = 10.8 mm
+200 hàng: skew 10.0 px = 2.0 mm</code></pre>
+<p>Toàn khung lệch gần 54 pixel (10,8 mm): không dùng được cho đo lường hay định vị. ROI 200 hàng giảm còn khoảng 10 pixel (2 mm), vẫn quá lớn cho phần lớn bài toán. Chọn global shutter.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Camera 12 MP (4096 × 3000) cần chụp 15 sản phẩm/giây. Với GigE (khoảng 115 MB/s) và USB3 Vision (khoảng 380 MB/s), ở Mono8 và Mono12p, cách nào đạt? Nếu chỉ cần vùng 4096 × 1200 thì sao?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">for bw_ten, bw in (("GigE", 115), ("USB3 Vision", 380)):
+    for fmt, byte in (("Mono8", 1.0), ("Mono12p", 1.5)):
+        for h in (3000, 1200):
+            fps = bw / (4096 * h * byte / 1e6)
+            print(f"{bw_ten:11s} {fmt:7s} 4096×{h}: {fps:5.1f} fps {'ĐẠT' if fps &gt;= 15 else 'không đạt'}")</code></pre>
+<pre><code class="language-text">GigE        Mono8   4096×3000:   9.4 fps không đạt
+GigE        Mono8   4096×1200:  23.4 fps ĐẠT
+GigE        Mono12p 4096×3000:   6.2 fps không đạt
+GigE        Mono12p 4096×1200:  15.6 fps ĐẠT
+USB3 Vision Mono8   4096×3000:  30.9 fps ĐẠT
+USB3 Vision Mono8   4096×1200:  77.3 fps ĐẠT
+USB3 Vision Mono12p 4096×3000:  20.6 fps ĐẠT
+USB3 Vision Mono12p 4096×1200:  51.5 fps ĐẠT</code></pre>
+<p>Toàn khung: chỉ USB3 Vision đạt (Mono8 khoảng 31 fps, Mono12p khoảng 21 fps, nếu cảm biến cho phép). Cắt ROI 4096 × 1200 thì GigE cũng đạt: Mono8 khoảng 23 fps, Mono12p khoảng 15,6 fps (sát giới hạn, không còn dự phòng). Nhớ kiểm tra thêm tốc độ khung tối đa của chính cảm biến ở ROI đó, chiều dài cáp (USB3 thường chỉ vài mét) và dự phòng cho trigger dồn dập.</p>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Rolling shutter phơi sáng lệch từng hàng: skew = v_px · (H − 1) · t_dòng, không giảm khi rút ngắn phơi sáng. Vật chuyển động → global shutter.</li>
+  <li>Line scan: một dòng pixel, ghép theo chuyển động; dùng cho cuộn liên tục, bề mặt trụ xoay, vật lớn cần độ phân giải rất cao. Pixel dọc = v / tốc độ dòng → kích bằng encoder, tính bộ chia, kiểm tra tần số đếm.</li>
+  <li>Line scan nhanh đòi đèn dải rất mạnh (phơi sáng vài chục µs liên tục) và băng thông lớn (hàng trăm MB/s).</li>
+  <li>Datasheet: kích thước cảm biến = số pixel × kích thước pixel; định dạng "inch" không phải đường chéo thật; fps thật = min(cảm biến, băng thông / dung lượng khung); dải động ≈ 20·log₁₀(full well/nhiễu), so sánh qua số liệu EMVA 1288.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Chọn camera và ống kính: độ phân giải, FOV, tiêu cự</strong>, tính số pixel cần thiết từ dung sai và chọn tiêu cự từ trường nhìn và khoảng làm việc.</p>

@@ -2,7 +2,7 @@
 <div class="tip"><strong>Chuẩn bị</strong>Dùng <code>opencv-python</code> và <code>numpy</code>. Ảnh mẫu là một khay đồng xu vẽ bằng OpenCV, kèm file "đáp án" ghi vị trí và bán kính thật của từng đồng xu, để bạn kiểm chứng kết quả đếm và đo bằng số.</div>
 
 <h2>1. Ảnh mẫu: khay đồng xu có đáp án</h2>
-<p>Khay có 7 đồng xu lớn (bán kính 28 px) và 5 đồng xu nhỏ (bán kính 20 px) màu sáng trên nền tối, không chạm nhau, cộng 6 hạt bụi nhỏ. Đèn chiếu lệch làm bên trái tối hơn bên phải, và có nhiễu cảm biến. Hàm <code>tao_khay</code> được dùng lại ở các mục sau với các tham số khác.</p>
+<p>Khay chính có 7 đồng xu lớn (bán kính 28 px) và 5 đồng xu nhỏ (bán kính 20 px) màu sáng trên nền tối, không chạm nhau, cộng 6 hạt bụi nhỏ. Đèn chiếu lệch làm bên trái tối hơn bên phải, và có nhiễu cảm biến. Cùng lúc ta tạo thêm hai khay dùng cho mục 4 và bài tập 1.</p>
 <pre><code class="language-python">import json
 
 import cv2
@@ -33,6 +33,8 @@ def tao_khay(ten, seed=0, n_lon=7, n_nho=5, den_trai=0.6):
 
 
 xu = tao_khay("khay_dong_xu.png")
+tao_khay("khay_toi.png", seed=0, den_trai=0.25)          # cùng vị trí, đèn lệch mạnh (mục 4)
+tao_khay("khay_5.png", seed=5, n_lon=6, n_nho=8)         # khay cho bài tập 1
 print("đáp án:", len(xu), "đồng xu |", sum(r == 28 for _, _, r in xu), "lớn,", sum(r == 20 for _, _, r in xu), "nhỏ")</code></pre>
 <pre><code class="language-text">đáp án: 12 đồng xu | 7 lớn, 5 nhỏ</code></pre>
 
@@ -42,19 +44,20 @@ print("đáp án:", len(xu), "đồng xu |", sum(r == 28 for _, _, r in xu), "l�
 
 g = cv2.imread("khay_dong_xu.png", cv2.IMREAD_GRAYSCALE)
 mo = cv2.GaussianBlur(g, (5, 5), 0)
-for T in (60, 90, 120, 150):
+for T in (45, 55, 90, 120, 150):
     _, mat_na = cv2.threshold(mo, T, 255, cv2.THRESH_BINARY)
     cs, _ = cv2.findContours(mat_na, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     lon = [c for c in cs if cv2.contourArea(c) &gt; 300]
     print(f"T={T:3d}: {len(cs):4d} contour, {len(lon):2d} contour có diện tích &gt; 300 px²")</code></pre>
-<pre><code class="language-text">T= 60:   17 contour, 12 contour có diện tích &gt; 300 px²
+<pre><code class="language-text">T= 45:  315 contour, 10 contour có diện tích &gt; 300 px²
+T= 55:   18 contour, 12 contour có diện tích &gt; 300 px²
 T= 90:   17 contour, 12 contour có diện tích &gt; 300 px²
 T=120:   26 contour, 12 contour có diện tích &gt; 300 px²
 T=150:   56 contour,  3 contour có diện tích &gt; 300 px²</code></pre>
 <ul>
-  <li>T quá thấp (60): nền bên phải (sáng hơn do đèn lệch) cộng nhiễu vượt ngưỡng, sinh ra rất nhiều contour giả.</li>
-  <li>T quá cao (150): các đồng xu bên trái (bị tối đi) không còn vượt ngưỡng, đếm thiếu.</li>
-  <li>Ở giữa có một <strong>dải ngưỡng dùng được</strong>. Dải này càng rộng thì hệ thống càng chịu được thay đổi ánh sáng. Khi cài đặt trạm, hãy ghi lại cả dải chứ không chỉ một giá trị, và chọn ngưỡng ở giữa dải.</li>
+  <li>T quá thấp (45): nền bên phải (mức khoảng 50) cộng nhiễu vượt ngưỡng, sinh ra hàng trăm contour giả, và các mảng nền dính vào nhau làm sai cả số contour lớn.</li>
+  <li>T quá cao (150): các đồng xu bên trái (bị tối đi) không còn vượt ngưỡng hoặc chỉ còn mảnh vụn, đếm thiếu.</li>
+  <li>Từ 55 đến 120 có một <strong>dải ngưỡng dùng được</strong> (luôn ra 12 contour lớn; số contour nhỏ là bụi, sẽ lọc ở mục 6). Dải này càng rộng thì hệ thống càng chịu được thay đổi ánh sáng. Khi cài đặt trạm, hãy ghi lại cả dải chứ không chỉ một giá trị, và chọn ngưỡng ở giữa dải.</li>
 </ul>
 <table>
   <tr><th>Kiểu</th><th>Kết quả</th><th>Dùng khi</th></tr>
@@ -95,10 +98,9 @@ tỉ lệ điểm trắng: 13.6%</code></pre>
 <div class="warn"><strong>Khi nào Otsu thất bại?</strong>Otsu giả định histogram có hai nhóm rõ ràng. Nó cho kết quả kém khi: vật chiếm diện tích rất nhỏ (ví dụ dưới vài phần trăm ảnh, đỉnh của vật gần như không thấy trên histogram); ánh sáng không đều đến mức nền chỗ sáng sáng hơn vật chỗ tối; hoặc ảnh không có vật nào (Otsu vẫn "tìm" ra một ngưỡng và cắt nền làm đôi). Trường hợp cuối rất hay gặp khi khay trống: luôn kiểm tra thêm, ví dụ độ chênh giữa hai nhóm phải đủ lớn.</div>
 
 <h2>4. Ngưỡng thích nghi (adaptive threshold)</h2>
-<p>Ngưỡng thích nghi tính <strong>một ngưỡng riêng cho từng điểm ảnh</strong>: trung bình (hoặc trung bình có trọng số Gaussian) của vùng <code>blockSize × blockSize</code> quanh điểm đó, trừ đi hằng số <code>C</code>. Nhờ vậy nó chịu được ánh sáng thay đổi chậm trên ảnh. Thử trên một khay có đèn lệch mạnh: mép trái chỉ còn 25% độ sáng.</p>
+<p>Ngưỡng thích nghi tính <strong>một ngưỡng riêng cho từng điểm ảnh</strong>: trung bình (hoặc trung bình có trọng số Gaussian) của vùng <code>blockSize × blockSize</code> quanh điểm đó, trừ đi hằng số <code>C</code>. Nhờ vậy nó chịu được ánh sáng thay đổi chậm trên ảnh. Thử trên khay <code>khay_toi.png</code> tạo ở mục 1: cùng vị trí đồng xu nhưng đèn lệch mạnh, mép trái chỉ còn 25% độ sáng.</p>
 <pre><code class="language-python">import cv2
 
-tao_khay("khay_toi.png", seed=0, den_trai=0.25)          # hàm ở mục 1, cùng vị trí đồng xu
 mo = cv2.GaussianBlur(cv2.imread("khay_toi.png", cv2.IMREAD_GRAYSCALE), (5, 5), 0)
 
 
@@ -191,7 +193,7 @@ sau khi lọc diện tích &gt;= 300: 12 vật</code></pre>
 <ul>
   <li><strong><code>RETR_EXTERNAL</code></strong> chỉ lấy đường bao ngoài cùng, đúng thứ cần để đếm vật. Các chế độ khác (<code>RETR_CCOMP</code>, <code>RETR_TREE</code>) và mảng <code>hierarchy</code> dùng để tìm lỗ bên trong vật, được dạy kỹ ở bài "Đặc trưng contour và blob analysis".</li>
   <li><strong><code>CHAIN_APPROX_SIMPLE</code></strong> chỉ lưu các điểm đầu mút của đoạn thẳng ngang, dọc, chéo, tiết kiệm bộ nhớ mà diện tích, khung bao không đổi. Dùng <code>CHAIN_APPROX_NONE</code> khi cần mọi điểm biên (ví dụ fitting đường tròn).</li>
-  <li><strong>Lọc theo diện tích</strong> loại bụi và nhiễu. Ngưỡng diện tích chọn ở khoảng giữa "nhiễu lớn nhất" và "vật nhỏ nhất hợp lệ". Ở đây bụi khoảng vài chục px², đồng xu nhỏ nhất khoảng 1200 px², nên 300 cách xa cả hai.</li>
+  <li><strong>Lọc theo diện tích</strong> loại bụi và nhiễu. Ngưỡng diện tích chọn ở khoảng giữa "nhiễu lớn nhất" và "vật nhỏ nhất hợp lệ". Ở đây bụi chỉ dưới 12 px², đồng xu nhỏ nhất khoảng 1150 px², nên 300 cách xa cả hai.</li>
   <li><code>contourArea</code> của contour 1 điểm hoặc 1 đường thẳng bằng 0. Đừng chia cho diện tích mà không kiểm tra.</li>
 </ul>
 <div class="tip"><strong>Khi lọc diện tích chưa đủ</strong>Lọc diện tích chỉ loại được nhiễu tách rời. Khi nhiễu dính vào vật, vật có lỗ thủng, hay đường biên lởm chởm, bạn cần làm sạch mặt nạ trước khi tìm contour: đó là nội dung bài "Morphology: erode, dilate, opening, closing" ngay sau bài này.</div>
@@ -250,6 +252,7 @@ Tổng: 12 đồng xu (7 lớn, 5 nhỏ)</code></pre>
 <ul>
   <li><strong>Đếm đúng 12</strong>, phân loại đúng 7 lớn và 5 nhỏ, khớp đáp án. Ngưỡng phân loại 1800 px² nằm giữa hai nhóm, cách mỗi nhóm hàng trăm px², nên có biên an toàn lớn.</li>
   <li>Đồng xu vẽ với bán kính 28 có đường kính thật trên lưới pixel là 57 px (2r + 1). Đường kính tương đương và bán kính đường tròn bao hơi khác nhau và hơi khác đáp án: biên bị làm mịn, đèn lệch làm đồng xu bên trái "co" lại nhẹ khi phân ngưỡng. Sai số cỡ 1 px là bình thường cho phương pháp phân ngưỡng; độ chính xác dưới pixel cần các kỹ thuật đo cạnh ở chặng 7.</li>
+  <li>Đồng số 12 có <code>r_bao</code> = 22,0 trong khi đường kính tương đương chỉ 40,0 px: một hạt bụi dính sát mép đồng xu tạo một chỗ lồi nhỏ, đủ kéo đường tròn bao ra 2 px nhưng gần như không đổi diện tích. Đại lượng dựa trên <strong>diện tích</strong> bền với nhiễu hơn đại lượng dựa trên <strong>điểm cực biên</strong> (khung bao, đường tròn bao).</li>
   <li>Đổi sang mm chỉ là nhân với tỉ lệ <code>MM_PER_PX</code>, nhưng tỉ lệ đó phải đến từ hiệu chuẩn (chặng 8, bài quy đổi pixel sang mm), không phải đoán. Diện tích đổi bằng <code>MM_PER_PX²</code>.</li>
   <li>Thứ tự contour OpenCV trả về <strong>không theo trái sang phải</strong>; ở đây tự sắp xếp theo <code>x</code> của khung bao. Cách sắp xếp theo hàng rồi cột cho khay nhiều hàng có ở bài "Đặc trưng contour và blob analysis".</li>
 </ul>
@@ -314,13 +317,12 @@ print(f"ngưỡng Otsu {t:.0f}, đếm được {len(ds)} vật, đã lưu minh_
 
 <h2>10. Bài tập</h2>
 <div class="ex">
-<p><strong>Bài 1.</strong> Đếm số đồng xu trong một khay mới (dùng <code>tao_khay</code> với <code>seed=5</code>, 6 đồng lớn, 8 đồng nhỏ) và in diện tích từng đồng. So số đếm với file đáp án JSON.</p>
+<p><strong>Bài 1.</strong> Đếm số đồng xu trong khay <code>khay_5.png</code> (tạo ở mục 1 với <code>seed=5</code>, 6 đồng lớn, 8 đồng nhỏ) và in diện tích từng đồng. So số đếm với file đáp án JSON.</p>
 <details><summary>Xem đáp án</summary>
 <pre><code class="language-python">import json
 
 import cv2
 
-tao_khay("khay_5.png", seed=5, n_lon=6, n_nho=8)          # hàm ở mục 1
 g = cv2.imread("khay_5.png", cv2.IMREAD_GRAYSCALE)
 _, m = cv2.threshold(cv2.GaussianBlur(g, (5, 5), 0), 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 cs, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -344,7 +346,7 @@ print("đếm được:", len(cs), "| đáp án:", len(dap_an), "|", "ĐÚNG" if
 đồng 13: diện tích   2441 px²
 đồng 14: diện tích   1264 px²
 đếm được: 14 | đáp án: 14 | ĐÚNG</code></pre>
-<p>Diện tích tách thành hai nhóm rõ rệt (quanh 1250 và quanh 2450). Khi làm thành chương trình riêng, chép hàm <code>tao_khay</code> vào hoặc đọc ảnh của bạn bằng <code>cv2.imread</code>. Nếu bạn chụp đồng xu thật, đặt chúng trên nền tối, không chạm nhau, đèn chiếu từ trên xuống đều.</p>
+<p>Diện tích tách thành hai nhóm rõ rệt (quanh 1250 và quanh 2450). Với ảnh của bạn, chỉ cần đổi tên file trong <code>cv2.imread</code>. Nếu bạn chụp đồng xu thật, đặt chúng trên nền tối, không chạm nhau, đèn chiếu từ trên xuống đều.</p>
 </details>
 </div>
 <div class="ex">
@@ -374,7 +376,7 @@ for bs in (7, 15, 31, 61):
 </details>
 </div>
 <div class="ex">
-<p><strong>Bài 3.</strong> Trạm đếm đai ốc dùng đèn nền: đai ốc hiện lên thành hình lục giác <strong>đen</strong> trên nền <strong>trắng</strong>. Tạo ảnh có 9 lục giác đen (bán kính 22 px) trên nền 230, đếm chúng bằng hàm <code>dem_vat</code> ở mục 8.</p>
+<p><strong>Bài 3.</strong> Trạm đếm đai ốc dùng đèn nền: đai ốc hiện lên thành hình lục giác <strong>đen</strong> trên nền <strong>trắng</strong>. Tạo ảnh có 9 lục giác đen (bán kính 22 px) trên nền 230 và đếm chúng. Thử cả hai kiểu <code>THRESH_BINARY</code> và <code>THRESH_BINARY_INV</code>.</p>
 <details><summary>Xem đáp án</summary>
 <pre><code class="language-python">import cv2
 import numpy as np
@@ -387,13 +389,15 @@ for i in range(9):
     cv2.fillPoly(anh, [pts], 25)
 anh = np.clip(anh + np.random.default_rng(0).normal(0, 5, anh.shape), 0, 255).astype(np.uint8)
 
-ds_sai, _, _ = dem_vat(anh)                     # quên vat_toi: nền trắng thành "vật"
-ds, _, t = dem_vat(anh, vat_toi=True)
-print("không đảo:", len(ds_sai), "vật, diện tích", [v["dien_tich"] for v in ds_sai])
-print("vat_toi=True:", len(ds), "vật, diện tích mỗi đai ốc ≈", ds[0]["dien_tich"], "px²")</code></pre>
-<pre><code class="language-text">không đảo: 1 vật, diện tích [119301]
-vat_toi=True: 9 vật, diện tích mỗi đai ốc ≈ 1300 px²</code></pre>
-<p>Không đảo, cả nền trắng thành một "vật" khổng lồ (các lục giác là lỗ bên trong nó, <code>RETR_EXTERNAL</code> bỏ qua). Với <code>THRESH_BINARY_INV</code> (tham số <code>vat_toi=True</code>), đếm đúng 9. Diện tích lý thuyết của lục giác đều bán kính 22 là (3√3/2)·22² ≈ 1257 px², khớp với số đo.</p>
+mo = cv2.GaussianBlur(anh, (5, 5), 0)
+for ten, kieu in [("THRESH_BINARY    ", cv2.THRESH_BINARY), ("THRESH_BINARY_INV", cv2.THRESH_BINARY_INV)]:
+    _, m = cv2.threshold(mo, 0, 255, kieu + cv2.THRESH_OTSU)
+    cs, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    dt = [round(cv2.contourArea(c)) for c in cs if cv2.contourArea(c) &gt;= 300]
+    print(f"{ten}: {len(dt)} vật, diện tích {sorted(set(dt))}")</code></pre>
+<pre><code class="language-text">THRESH_BINARY    : 1 vật, diện tích [119301]
+THRESH_BINARY_INV: 9 vật, diện tích [1285, 1300]</code></pre>
+<p>Không đảo, cả nền trắng thành một "vật" khổng lồ (các lục giác là lỗ bên trong nó, <code>RETR_EXTERNAL</code> bỏ qua). Với <code>THRESH_BINARY_INV</code> (tham số <code>vat_toi=True</code> của hàm <code>dem_vat</code> ở mục 8), đếm đúng 9. Diện tích lý thuyết của lục giác đều bán kính 22 là (3√3/2)·22² ≈ 1257 px²; số đo 1285–1300 px² lớn hơn khoảng 2–3% vì <code>fillPoly</code> tô cả các pixel nằm trên đường biên. Chênh lệch kiểu này là lý do dung sai luôn được lấy từ mẫu thật đo bằng chính chương trình, không lấy từ công thức.</p>
 </details>
 </div>
 
