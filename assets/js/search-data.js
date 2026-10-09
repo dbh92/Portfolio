@@ -115,6 +115,111 @@ window.HF_POSTS = [
   ]
  },
  {
+  "t": "OpenCV: không gian màu BGR, HSV, Gray và tách màu",
+  "u": "hoc/opencv-2-khong-gian-mau-va-tach-mau.html",
+  "e": "Vì sao OpenCV dùng BGR, khi nào chuyển Gray, HSV; tách vật theo màu bằng inRange, xử lý màu đỏ hai dải Hue và chọn ngưỡng từ ảnh thật.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 10,
+  "img": "assets/images/posts/opencv-2-khong-gian-mau-va-tach-mau.webp",
+  "tags": [
+   "OpenCV",
+   "Python",
+   "Computer Vision"
+  ]
+ },
+ {
+  "t": "OpenCV: cắt ROI, resize, xoay, lật và ghép ảnh",
+  "u": "hoc/opencv-3-roi-resize-xoay-lat.html",
+  "e": "Cắt ROI an toàn theo biên, resize đúng thứ tự (w, h) và chọn nội suy, letterbox giữ tỉ lệ, xoay không mất góc, viền và ghép ảnh so sánh.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 9,
+  "img": "assets/images/posts/opencv-3-roi-resize-xoay-lat.webp",
+  "tags": [
+   "OpenCV",
+   "Python",
+   "Computer Vision"
+  ]
+ },
+ {
+  "t": "OpenCV: vẽ kết quả kiểm tra lên ảnh (khung, chữ, overlay)",
+  "u": "hoc/opencv-4-ve-ket-qua-len-anh.html",
+  "e": "Vẽ khung, đường, điểm, chữ có viền, bảng trong suốt bằng addWeighted và thanh trạng thái OK/NG; lưu ý tiếng Việt với putText.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 9,
+  "img": "assets/images/posts/opencv-4-ve-ket-qua-len-anh.webp",
+  "tags": [
+   "OpenCV",
+   "Python",
+   "Computer Vision"
+  ]
+ },
+ {
+  "t": "Tổ chức pipeline xử lý ảnh bằng hàm, dataclass và cấu hình JSON",
+  "u": "hoc/opencv-5-to-chuc-pipeline-xu-ly.html",
+  "e": "Tách pipeline thành tiền xử lý, tìm vật, đánh giá; cấu hình JSON có kiểm tra, đo thời gian từng bước và chạy hồi quy trên thư mục ảnh.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/opencv-5-to-chuc-pipeline-xu-ly.webp",
+  "tags": [
+   "OpenCV",
+   "Python",
+   "Computer Vision"
+  ]
+ },
+ {
+  "t": "Dự án chặng 2: công cụ chụp và lưu ảnh kiểm tra OK/NG bằng OpenCV",
+  "u": "hoc/opencv-du-an-chang-2-cong-cu-chup-anh-kiem-tra.html",
+  "e": "Đọc camera hoặc video, chọn ROI bằng chuột, lưu ảnh OK/NG theo ngày bằng một phím, hiển thị FPS, độ sáng, độ nét: công cụ thu dữ liệu cho mọi dự án Vision.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/opencv-du-an-chang-2-cong-cu-chup-anh-kiem-tra.webp",
+  "tags": [
+   "OpenCV",
+   "Python",
+   "Computer Vision"
+  ]
+ },
+ {
+  "t": "Morphology trong OpenCV: erode, dilate, opening, closing, top-hat",
+  "u": "hoc/xu-ly-anh-4-morphology.html",
+  "e": "Làm sạch mặt nạ nhị phân: chọn phần tử cấu trúc và kích thước kernel, xóa nhiễu, lấp lỗ, nối nét đứt, top-hat cho nền sáng không đều.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 14,
+  "img": "assets/images/posts/xu-ly-anh-4-morphology.webp",
+  "tags": [
+   "Image Processing",
+   "OpenCV",
+   "Machine Vision"
+  ]
+ },
+ {
+  "t": "Đặc trưng contour và blob analysis: diện tích, độ tròn, góc xoay",
+  "u": "hoc/xu-ly-anh-5-dac-trung-contour-blob.html",
+  "e": "Tính diện tích, chu vi, tâm, độ tròn, độ đặc, khung xoay đúng trên mọi phiên bản OpenCV, đếm lỗ, phân loại vật và quyết định OK/NG theo dung sai.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "09/10/2026",
+  "m": 16,
+  "img": "assets/images/posts/xu-ly-anh-5-dac-trung-contour-blob.webp",
+  "tags": [
+   "Image Processing",
+   "OpenCV",
+   "Machine Vision"
+  ]
+ },
+ {
   "t": "Lộ trình 700 TOEIC trong 5 tháng cho người đi làm",
   "u": "ngoai-ngu/lo-trinh-700-toeic.html",
   "e": "Cấu trúc đề 200 câu, phân bổ điểm mục tiêu, kế hoạch từng tháng, lịch học 60–90 phút mỗi ngày và mốc thi thử để theo dõi tiến độ.",
@@ -1826,7 +1931,7 @@ window.HF_TOPICS = [
   "u": "hoc/python.html",
   "s": "Học AI & Lập trình",
   "g": "Programming",
-  "n": 20
+  "n": 25
  },
  {
   "t": "C#",
@@ -1875,21 +1980,21 @@ window.HF_TOPICS = [
   "u": "hoc/opencv.html",
   "s": "Học AI & Lập trình",
   "g": "Computer Vision",
-  "n": 11
+  "n": 18
  },
  {
   "t": "Image Processing",
   "u": "hoc/image-processing.html",
   "s": "Học AI & Lập trình",
   "g": "Computer Vision",
-  "n": 9
+  "n": 11
  },
  {
   "t": "Computer Vision",
   "u": "hoc/computer-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Computer Vision",
-  "n": 9
+  "n": 14
  },
  {
   "t": "OCR",
@@ -1917,7 +2022,7 @@ window.HF_TOPICS = [
   "u": "hoc/machine-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 19
+  "n": 21
  },
  {
   "t": "AI Vision",
@@ -2015,14 +2120,14 @@ window.HF_TOPICS = [
   "u": "kien-thuc/computer-vision.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 9
+  "n": 14
  },
  {
   "t": "Machine Vision",
   "u": "kien-thuc/machine-vision.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 19
+  "n": 21
  },
  {
   "t": "AI Vision",

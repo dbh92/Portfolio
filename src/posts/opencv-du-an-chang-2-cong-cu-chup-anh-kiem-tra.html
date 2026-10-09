@@ -1,0 +1,200 @@
+<p>Dự án cuối chặng 2: bạn sẽ viết <strong>công cụ chụp ảnh dữ liệu</strong>. Mọi dự án Vision, từ chỉnh ngưỡng rule-based đến huấn luyện AI, đều bắt đầu bằng việc thu ảnh. Công cụ này đọc camera (hoặc video), cho chọn vùng quan tâm bằng chuột, lưu ảnh OK/NG vào thư mục có cấu trúc chỉ bằng một phím bấm, và hiển thị thông tin ngay trên khung hình. Bạn sẽ dùng lại nó ở chặng 11 khi xây dataset cho AI.</p>
+<div class="tip"><strong>Cách làm</strong>Tự làm trước theo yêu cầu và gợi ý, chỉ mở lời giải khi kẹt. Không có webcam? Dùng một file video bất kỳ: chương trình nhận cả số camera lẫn đường dẫn video.</div>
+
+<h2>1. Yêu cầu</h2>
+<table>
+  <tr><th>#</th><th>Yêu cầu</th></tr>
+  <tr><td>1</td><td>Chạy bằng <code>python chup_anh.py 0</code> (camera số 0) hoặc <code>python chup_anh.py video.mp4</code>.</td></tr>
+  <tr><td>2</td><td>Phím <kbd>r</kbd>: chọn ROI bằng chuột; ROI lưu vào <code>chup_anh.json</code> để lần sau dùng lại.</td></tr>
+  <tr><td>3</td><td>Phím <kbd>o</kbd> / <kbd>n</kbd>: lưu ảnh ROI vào <code>dataset/&lt;ngày&gt;/OK/</code> hoặc <code>.../NG/</code>, tên file gồm thời gian đến mili giây, không bao giờ ghi đè.</td></tr>
+  <tr><td>4</td><td>Lưu <strong>ảnh gốc chưa vẽ</strong> (không lưu ảnh đã vẽ khung, chữ).</td></tr>
+  <tr><td>5</td><td>Hiển thị trên khung hình: khung ROI, FPS, số ảnh OK/NG đã lưu, độ sáng và độ nét của ROI, phím tắt.</td></tr>
+  <tr><td>6</td><td>Phím <kbd>q</kbd> hoặc hết video: thoát, giải phóng camera, in tổng kết.</td></tr>
+</table>
+
+<h2>2. Kiến thức sử dụng</h2>
+<ul>
+  <li>Đọc camera, video, <code>waitKey</code> (chặng 2, bài 1).</li>
+  <li>Cắt ROI an toàn (bài 3), vẽ chữ và khung (bài 4), cấu hình JSON (bài 5).</li>
+  <li><code>pathlib</code>, <code>datetime</code>, chia hàm (chặng 1).</li>
+  <li>Mới: <code>cv2.selectROI</code> cho người dùng kéo chuột chọn vùng, trả về <code>(x, y, w, h)</code>.</li>
+</ul>
+
+<h2>3. Gợi ý thiết kế</h2>
+<pre><code class="language-text">mo_nguon(arg)            → cv2.VideoCapture từ số camera hoặc đường dẫn
+doc_roi() / luu_roi(roi) → đọc/ghi ROI trong chup_anh.json
+chi_so(vung)             → (độ sáng, độ nét) của ảnh ROI
+luu_anh(vung, nhan)      → ghi file vào dataset/&lt;ngày&gt;/&lt;nhãn&gt;/, trả đường dẫn
+ve_thong_tin(khung, ...) → vẽ ROI và chữ lên BẢN SAO của khung hình
+main()                   → vòng lặp đọc khung → hiển thị → xử lý phím</code></pre>
+<p>Điểm dễ sai nhất: <code>cv2.waitKey()</code> trả về mã phím, phải so với <code>ord("o")</code>. Và chỉ gọi <code>waitKey</code> <strong>một lần mỗi vòng lặp</strong>, lưu vào biến rồi so sánh.</p>
+
+<h2>4. Lời giải mẫu</h2>
+<details><summary>Xem lời giải đầy đủ (chup_anh.py)</summary>
+<pre><code class="language-python">"""Công cụ chụp ảnh dữ liệu OK/NG từ camera hoặc video.
+
+Chạy: python chup_anh.py 0            (camera số 0)
+      python chup_anh.py video.mp4    (file video)
+Phím: r chọn ROI · o lưu OK · n lưu NG · q thoát
+"""
+import json
+import sys
+import time
+from datetime import datetime
+from pathlib import Path
+
+import cv2
+import numpy as np
+
+FILE_CAU_HINH = Path("chup_anh.json")
+THU_MUC_GOC = Path("dataset")
+CUA_SO = "Chup anh kiem tra"
+
+
+def mo_nguon(arg: str) -&gt; cv2.VideoCapture:
+    nguon = int(arg) if arg.isdigit() else arg
+    cap = cv2.VideoCapture(nguon)
+    if not cap.isOpened():
+        raise SystemExit(f"Không mở được nguồn video: {arg}")
+    return cap
+
+
+def doc_roi():
+    if FILE_CAU_HINH.exists():
+        roi = json.loads(FILE_CAU_HINH.read_text(encoding="utf-8")).get("roi")
+        if roi:
+            return tuple(roi)
+    return None
+
+
+def luu_roi(roi) -&gt; None:
+    FILE_CAU_HINH.write_text(json.dumps({"roi": list(roi)}, indent=2), encoding="utf-8")
+
+
+def cat_roi(khung, roi):
+    if roi is None:
+        return khung
+    x, y, w, h = roi
+    cao, rong = khung.shape[:2]
+    x1, y1, x2, y2 = max(0, x), max(0, y), min(rong, x + w), min(cao, y + h)
+    return khung[y1:y2, x1:x2] if x1 &lt; x2 and y1 &lt; y2 else khung
+
+
+def chi_so(vung) -&gt; tuple[float, float]:
+    xam = cv2.cvtColor(vung, cv2.COLOR_BGR2GRAY)
+    return float(xam.mean()), float(cv2.Laplacian(xam, cv2.CV_64F).var())
+
+
+def luu_anh(vung, nhan: str) -&gt; Path:
+    bay_gio = datetime.now()
+    thu_muc = THU_MUC_GOC / bay_gio.strftime("%Y-%m-%d") / nhan
+    thu_muc.mkdir(parents=True, exist_ok=True)
+    duong_dan = thu_muc / f"{bay_gio.strftime('%H%M%S_%f')[:-3]}_{nhan}.png"
+    dem = 1
+    while duong_dan.exists():                      # phòng khi bấm 2 lần trong cùng 1 ms
+        duong_dan = duong_dan.with_name(f"{duong_dan.stem}_{dem}.png")
+        dem += 1
+    cv2.imwrite(str(duong_dan), vung)
+    return duong_dan
+
+
+def ve_thong_tin(khung, roi, fps, dem, sang, net):
+    ve = khung.copy()
+    if roi:
+        x, y, w, h = roi
+        cv2.rectangle(ve, (x, y), (x + w, y + h), (0, 220, 255), 2)
+    dong = [f"FPS {fps:4.1f}   OK {dem['OK']}   NG {dem['NG']}",
+            f"Sang {sang:5.1f}   Net {net:7.1f}",
+            "r: chon ROI  o: luu OK  n: luu NG  q: thoat"]
+    for i, chu in enumerate(dong):
+        y = 28 + i * 26
+        cv2.putText(ve, chu, (12, y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 4, cv2.LINE_AA)       # viền đen
+        cv2.putText(ve, chu, (12, y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1, cv2.LINE_AA)
+    return ve
+
+
+def main(arg: str = "0") -&gt; dict:
+    cap = mo_nguon(arg)
+    roi = doc_roi()
+    dem = {"OK": 0, "NG": 0}
+    fps, t_truoc = 0.0, time.perf_counter()
+    try:
+        while True:
+            co, khung = cap.read()
+            if not co:
+                print("Hết video hoặc mất kết nối camera")
+                break
+            bay_gio = time.perf_counter()
+            fps = 0.9 * fps + 0.1 / max(bay_gio - t_truoc, 1e-6)      # FPS làm mượt
+            t_truoc = bay_gio
+
+            vung = cat_roi(khung, roi)
+            sang, net = chi_so(vung)
+            cv2.imshow(CUA_SO, ve_thong_tin(khung, roi, fps, dem, sang, net))
+
+            phim = cv2.waitKey(1) &amp; 0xFF
+            if phim == ord("q"):
+                break
+            if phim == ord("r"):
+                chon = cv2.selectROI(CUA_SO, khung, showCrosshair=True)
+                if chon[2] &gt; 0 and chon[3] &gt; 0:
+                    roi = tuple(int(v) for v in chon)
+                    luu_roi(roi)
+                    print("ROI mới:", roi)
+            elif phim in (ord("o"), ord("n")):
+                nhan = "OK" if phim == ord("o") else "NG"
+                p = luu_anh(vung, nhan)          # lưu ảnh gốc, không phải ảnh đã vẽ
+                dem[nhan] += 1
+                print(f"Đã lưu {p}")
+    finally:
+        cap.release()
+        cv2.destroyAllWindows()
+    print(f"Tổng kết: {dem['OK']} ảnh OK, {dem['NG']} ảnh NG trong {THU_MUC_GOC}")
+    return dem
+
+
+if __name__ == "__main__":
+    main(sys.argv[1] if len(sys.argv) &gt; 1 else "0")</code></pre>
+</details>
+
+<h3>Giải thích các điểm đáng học</h3>
+<ul>
+  <li><strong><code>cv2.waitKey(1) &amp; 0xFF</code></strong>: trên một số hệ thống, <code>waitKey</code> trả về số lớn hơn 255; phép <code>&amp; 0xFF</code> giữ lại 8 bit thấp để so sánh với <code>ord()</code> cho đúng.</li>
+  <li><strong><code>try/finally</code></strong> đảm bảo <code>cap.release()</code> luôn chạy. Quên giải phóng camera thì lần chạy sau báo "camera đang bận".</li>
+  <li><strong>Lưu <code>vung</code>, không lưu ảnh đã vẽ</strong>: ảnh dữ liệu dính khung vàng và chữ sẽ làm hỏng việc huấn luyện AI sau này.</li>
+  <li><strong>Tên file theo thời gian đến mili giây</strong> + vòng <code>while</code> kiểm tra tồn tại: không bao giờ ghi đè ảnh đã chụp.</li>
+  <li><strong>FPS làm mượt</strong> bằng trung bình trượt hàm mũ (<code>0,9·cũ + 0,1·mới</code>): số hiển thị ổn định, dễ đọc.</li>
+  <li><strong>Chữ có viền đen</strong> (vẽ hai lần: dày màu đen, mỏng màu trắng): đọc được trên mọi nền, sáng hay tối.</li>
+</ul>
+
+<h2>5. Chạy thử không cần camera</h2>
+<p>Tạo nhanh một video thử 3 giây có vật chuyển động, rồi chạy công cụ trên video đó:</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+viet = cv2.VideoWriter("video_thu.avi", cv2.VideoWriter_fourcc(*"MJPG"), 30, (640, 480))
+for i in range(90):
+    khung = np.full((480, 640, 3), 60, np.uint8)
+    cv2.circle(khung, (50 + i * 6, 240), 40, (220, 220, 220), -1)
+    viet.write(khung)
+viet.release()
+print("Đã tạo video_thu.avi")</code></pre>
+<pre><code class="language-bash">python chup_anh.py video_thu.avi</code></pre>
+
+<h2>6. Tự đánh giá</h2>
+<table>
+  <tr><th>Tiêu chí</th><th>Đạt khi</th></tr>
+  <tr><td>Nguồn</td><td>Chạy được với cả webcam và file video; báo lỗi rõ khi nguồn không mở được</td></tr>
+  <tr><td>ROI</td><td>Chọn ROI, tắt chương trình, mở lại vẫn nhớ ROI</td></tr>
+  <tr><td>Lưu ảnh</td><td>Bấm <kbd>o</kbd> 10 lần liên tục có đủ 10 file khác nhau, ảnh không có khung vẽ</td></tr>
+  <tr><td>Hiển thị</td><td>FPS, độ sáng, độ nét thay đổi khi che camera hoặc làm mờ ống kính</td></tr>
+  <tr><td>Thoát sạch</td><td>Nhấn <kbd>q</kbd>, chạy lại ngay không bị lỗi camera bận</td></tr>
+</table>
+
+<h2>7. Mở rộng</h2>
+<ol>
+  <li>Phím <kbd>Space</kbd> bật/tắt <strong>chế độ chụp tự động</strong> mỗi 0,5 giây (dùng khi cần nhiều ảnh nền OK).</li>
+  <li>Cảnh báo đỏ trên màn hình khi độ nét thấp hơn ngưỡng: nhắc người chụp lấy nét lại trước khi lưu.</li>
+  <li>Ghi file <code>nhat_ky.csv</code> mỗi lần lưu ảnh: thời gian, nhãn, độ sáng, độ nét, đường dẫn. Dữ liệu này rất hữu ích khi phân tích dataset ở chặng 11.</li>
+</ol>
+<p>Hoàn thành dự án này là bạn đã xong <strong>chặng 2: OpenCV</strong>. Chặng tiếp theo đi vào xử lý ảnh thực thụ: histogram, lọc nhiễu, tìm cạnh, phân ngưỡng, contour.</p>

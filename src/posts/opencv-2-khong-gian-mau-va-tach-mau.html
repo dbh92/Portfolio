@@ -1,0 +1,182 @@
+<p>Rất nhiều bài toán kiểm tra trong nhà máy là bài toán <strong>màu</strong>: dây điện cắm đúng màu chưa, nắp chai đúng loại chưa, có vết gỉ trên bề mặt không. Bài này giải thích ba không gian màu bạn dùng hằng ngày (BGR, Gray, HSV), vì sao tách màu bằng HSV ổn định hơn BGR, và cách dùng <code>cv2.inRange</code> để tạo mặt nạ màu, kể cả với màu đỏ "khó tính".</p>
+
+<h2>1. BGR: thứ tự màu của OpenCV</h2>
+<p>OpenCV lưu ảnh màu theo thứ tự <strong>Blue, Green, Red</strong>, ngược với RGB mà hầu hết phần mềm khác dùng. Tạo một ảnh thử có ba ô màu để thấy rõ:</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+anh = np.zeros((100, 300, 3), np.uint8)
+anh[:, 0:100] = (255, 0, 0)       # BGR: xanh dương
+anh[:, 100:200] = (0, 255, 0)     # xanh lá
+anh[:, 200:300] = (0, 0, 255)     # đỏ
+cv2.imwrite("ba_mau.png", anh)
+
+b, g, r = anh[50, 250]            # pixel trong ô thứ ba
+print(b, g, r)                    # 0 0 255 → đỏ</code></pre>
+<p>Hai lỗi kinh điển do BGR:</p>
+<ul>
+  <li>Hiển thị ảnh OpenCV bằng matplotlib thì màu đỏ và xanh dương bị đảo. Cách sửa: <code>cv2.cvtColor(anh, cv2.COLOR_BGR2RGB)</code> trước khi <code>plt.imshow</code>.</li>
+  <li>Đưa ảnh OpenCV vào mô hình AI huấn luyện bằng ảnh RGB (hầu hết mô hình PyTorch) mà quên đổi kênh: mô hình vẫn chạy nhưng độ chính xác giảm khó hiểu.</li>
+</ul>
+
+<h2>2. Ảnh xám (Gray)</h2>
+<pre><code class="language-python">xam = cv2.cvtColor(anh, cv2.COLOR_BGR2GRAY)
+print(xam.shape, xam[50, 50], xam[50, 150], xam[50, 250])</code></pre>
+<pre><code class="language-text">(100, 300) 29 150 76</code></pre>
+<p>OpenCV đổi sang xám theo công thức có trọng số <code>0,299·R + 0,587·G + 0,114·B</code>, vì mắt người nhạy với màu xanh lá nhất. Nên ba màu cùng "độ đậm" 255 lại cho ba mức xám khác nhau: xanh lá sáng nhất (150), xanh dương tối nhất (29).</p>
+<p>Phần lớn thuật toán Machine Vision (đo kích thước, tìm cạnh, đọc mã) chạy trên <strong>ảnh xám</strong>: nhanh hơn 3 lần và thường đủ thông tin. Thực tế camera công nghiệp cho bài đo lường thường là camera <strong>đơn sắc (mono)</strong>, cho ảnh nét hơn camera màu cùng độ phân giải.</p>
+
+<h2>3. Vì sao BGR không hợp để tách màu?</h2>
+<p>Thử tách "vật màu cam" bằng khoảng BGR: khi đèn mạnh lên hay yếu đi, cả ba giá trị B, G, R đều thay đổi, khoảng bạn chọn sẽ sai. Không gian <strong>HSV</strong> tách riêng <em>màu gì</em> khỏi <em>sáng hay tối</em>:</p>
+<table>
+  <tr><th>Kênh</th><th>Ý nghĩa</th><th>Khoảng giá trị trong OpenCV (ảnh 8 bit)</th></tr>
+  <tr><td><strong>H</strong> (Hue)</td><td>Sắc màu: đỏ, vàng, lục, lam…</td><td><strong>0 → 179</strong> (góc 0–360° chia đôi)</td></tr>
+  <tr><td><strong>S</strong> (Saturation)</td><td>Độ đậm: 0 là xám, 255 là màu thuần</td><td>0 → 255</td></tr>
+  <tr><td><strong>V</strong> (Value)</td><td>Độ sáng</td><td>0 → 255</td></tr>
+</table>
+<div class="warn"><strong>Bẫy: H trong OpenCV chỉ đến 179</strong>Các công cụ chọn màu (Photoshop, GIMP, trang web) cho H từ 0–360 và S, V theo %. Phải đổi: <code>H_opencv = H_độ / 2</code>, <code>S_opencv = S_% × 2,55</code>, <code>V_opencv = V_% × 2,55</code>.</div>
+<pre><code class="language-python">def hsv_cua(bgr):
+    """Đổi một màu BGR sang HSV của OpenCV."""
+    o = np.uint8([[bgr]])                      # ảnh 1x1 pixel
+    return cv2.cvtColor(o, cv2.COLOR_BGR2HSV)[0, 0]
+
+for ten, mau in [("đỏ", (0, 0, 255)), ("cam", (0, 128, 255)), ("vàng", (0, 255, 255)),
+                 ("xanh lá", (0, 255, 0)), ("xanh dương", (255, 0, 0)), ("cam tối", (0, 64, 128))]:
+    print(f"{ten:10s} HSV = {hsv_cua(mau)}")</code></pre>
+<pre><code class="language-text">đỏ         HSV = [  0 255 255]
+cam        HSV = [ 15 255 255]
+vàng       HSV = [ 30 255 255]
+xanh lá    HSV = [ 60 255 255]
+xanh dương HSV = [120 255 255]
+cam tối    HSV = [ 15 255 128]</code></pre>
+<p>Để ý dòng cuối: "cam tối" (cam dưới đèn yếu) vẫn có <strong>H = 15</strong> giống cam sáng, chỉ khác V. Đó là lý do tách màu bằng H ổn định hơn nhiều.</p>
+
+<h2>4. Tách màu bằng inRange</h2>
+<p><code>cv2.inRange(anh, thap, cao)</code> trả về mặt nạ: 255 nếu pixel nằm trong khoảng, 0 nếu không. Ví dụ tách nắp chai màu cam trên băng tải:</p>
+<pre><code class="language-python">rng = np.random.default_rng(0)
+anh = np.full((240, 360, 3), (90, 90, 90), np.uint8)          # băng tải xám
+cv2.circle(anh, (80, 120), 40, (0, 128, 255), -1)             # nắp cam, sáng
+cv2.circle(anh, (190, 120), 40, (0, 64, 128), -1)             # nắp cam, bị bóng đổ
+cv2.circle(anh, (300, 120), 40, (0, 200, 200), -1)            # nắp vàng (loại khác)
+anh = cv2.add(anh, rng.integers(0, 20, anh.shape, dtype=np.uint8))   # thêm nhiễu
+
+hsv = cv2.cvtColor(anh, cv2.COLOR_BGR2HSV)
+thap = np.array([8, 120, 60])       # H 8–22: dải cam; S ≥ 120: màu đậm; V ≥ 60: không quá tối
+cao = np.array([22, 255, 255])
+mat_na = cv2.inRange(hsv, thap, cao)
+
+so_vat, nhan = cv2.connectedComponents(mat_na)
+print("Số nắp cam:", so_vat - 1)      # trừ 1 vì nhãn 0 là nền
+cv2.imwrite("mat_na_cam.png", mat_na)
+cv2.imwrite("chi_mau_cam.png", cv2.bitwise_and(anh, anh, mask=mat_na))</code></pre>
+<pre><code class="language-text">Số nắp cam: 2</code></pre>
+<p>Kết quả: cả nắp cam sáng và nắp cam bị bóng đều được tách, nắp vàng bị loại. <code>cv2.connectedComponents</code> đếm các vùng trắng rời nhau (chặng 3 sẽ học kỹ về contour và blob). <code>cv2.bitwise_and</code> với <code>mask</code> giữ lại phần ảnh gốc trong mặt nạ, rất tiện để kiểm tra trực quan.</p>
+
+<h3>Chọn ngưỡng thế nào cho đúng?</h3>
+<ol>
+  <li>Chụp vật mẫu <strong>dưới đúng đèn của trạm</strong> (không phải đèn văn phòng).</li>
+  <li>Cắt vùng chỉ chứa màu cần tách, in phân bố H, S, V của vùng đó.</li>
+  <li>Đặt khoảng H rộng hơn min–max quan sát được vài đơn vị; S và V chặn dưới để loại vùng xám, tối.</li>
+  <li>Kiểm tra trên nhiều ảnh, cả ảnh có vật "gần giống" màu cần tách.</li>
+</ol>
+<pre><code class="language-python">vung = hsv[100:140, 60:100]            # vùng nằm gọn trong nắp cam sáng
+for i, ten in enumerate("HSV"):
+    kenh = vung[:, :, i]
+    print(f"{ten}: min {kenh.min()}, max {kenh.max()}, trung vị {int(np.median(kenh))}")</code></pre>
+<pre><code class="language-text">H: min 14, max 17, trung vị 16
+S: min 236, max 255, trung vị 245
+V: min 255, max 255, trung vị 255</code></pre>
+
+<h2>5. Màu đỏ: nằm ở hai đầu dải Hue</h2>
+<p>Hue là một vòng tròn: đỏ ở 0, và cũng ở 179 (≈360°). Một vật đỏ thật thường có pixel H = 2 lẫn pixel H = 177. Phải dùng <strong>hai khoảng</strong> rồi gộp:</p>
+<pre><code class="language-python">do_dam = np.full((60, 120, 3), (0, 20, 200), np.uint8)    # đỏ hơi ngả cam (G &gt; B): H gần 0
+do_tim = np.full((60, 120, 3), (40, 0, 200), np.uint8)    # đỏ hơi ngả tím: H gần 179
+anh_do = np.hstack([do_dam, do_tim])
+hsv_do = cv2.cvtColor(anh_do, cv2.COLOR_BGR2HSV)
+print("H hai nửa:", hsv_do[30, 30, 0], hsv_do[30, 150, 0])
+
+mat_na1 = cv2.inRange(hsv_do, (0, 120, 70), (10, 255, 255))
+mat_na2 = cv2.inRange(hsv_do, (170, 120, 70), (179, 255, 255))
+mat_na_do = cv2.bitwise_or(mat_na1, mat_na2)
+print("Tỉ lệ pixel đỏ:", round(cv2.countNonZero(mat_na_do) / mat_na_do.size, 2))</code></pre>
+<pre><code class="language-text">H hai nửa: 3 174
+Tỉ lệ pixel đỏ: 1.0</code></pre>
+<p>Chỉ dùng một khoảng <code>(0–10)</code> thì nửa bên phải (H = 174) bị bỏ sót hoàn toàn. Chỉ cần thành phần xanh dương (B) lớn hơn xanh lá (G) một chút là H của màu đỏ đã nhảy sang phía 170–179: lỗi rất hay gặp khi kiểm tra dây điện đỏ hoặc nhãn đỏ.</p>
+
+<h2>6. Các phép chuyển màu khác nên biết</h2>
+<table>
+  <tr><th>Mã chuyển đổi</th><th>Khi nào dùng</th></tr>
+  <tr><td><code>COLOR_BGR2RGB</code></td><td>Hiển thị bằng matplotlib, đưa vào mô hình AI huấn luyện bằng RGB</td></tr>
+  <tr><td><code>COLOR_GRAY2BGR</code></td><td>Muốn vẽ khung màu lên ảnh xám</td></tr>
+  <tr><td><code>COLOR_BGR2LAB</code></td><td>So sánh độ khác màu theo cảm nhận của mắt (ΔE), kiểm tra sai màu sơn, in ấn</td></tr>
+  <tr><td><code>COLOR_BayerBG2BGR</code> (và các biến thể)</td><td>Ảnh thô từ camera màu công nghiệp chưa nội suy màu</td></tr>
+</table>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>OpenCV dùng BGR; đổi sang RGB khi hiển thị bằng matplotlib hoặc đưa vào mô hình RGB.</li>
+  <li>Xám = trọng số 0,299R + 0,587G + 0,114B; phần lớn thuật toán đo lường chạy trên ảnh xám.</li>
+  <li>Tách màu dùng HSV: H 0–179 (không phải 0–360), chặn dưới S và V.</li>
+  <li><code>cv2.inRange</code> tạo mặt nạ; màu đỏ cần hai khoảng H gộp bằng <code>bitwise_or</code>.</li>
+  <li>Chọn ngưỡng từ ảnh chụp dưới đèn thật của trạm, kiểm tra với vật gần giống màu.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Đổi màu từ công cụ chọn màu</h3>
+<p>Công cụ chọn màu cho màu xanh lá của dây tiếp địa là H = 120°, S = 80%, V = 60%. Tính giá trị HSV tương ứng trong OpenCV và đề xuất khoảng <code>inRange</code> với H ±8.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">h, s, v = 120 / 2, 80 * 2.55, 60 * 2.55
+print(round(h), round(s), round(v))          # 60 204 153
+thap = (round(h) - 8, 100, 60)
+cao = (round(h) + 8, 255, 255)
+print(thap, cao)</code></pre>
+<pre><code class="language-text">60 204 153
+(52, 100, 60) (68, 255, 255)</code></pre>
+<p>S chặn dưới khoảng 100 (thấp hơn nhiều so với 204 quan sát) để chịu được ánh sáng thay đổi; V chặn dưới 60 để loại vùng quá tối.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Kiểm tra dây đúng màu</h3>
+<p>Tạo ảnh 3 "dây" (hình chữ nhật đứng) màu đỏ, xanh lá, xanh dương. Viết hàm <code>ti_le_mau(anh_bgr, khoang_list)</code> trả về tỉ lệ pixel thuộc màu cần tìm trong ảnh (nhận nhiều khoảng để xử lý màu đỏ). Kiểm tra vùng của từng dây có đúng màu không với tiêu chí tỉ lệ &gt; 0,8.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+KHOANG = {
+    "do": [((0, 120, 70), (10, 255, 255)), ((170, 120, 70), (179, 255, 255))],
+    "xanh_la": [((45, 100, 60), (75, 255, 255))],
+    "xanh_duong": [((105, 100, 60), (130, 255, 255))],
+}
+
+
+def ti_le_mau(anh_bgr, khoang_list):
+    hsv = cv2.cvtColor(anh_bgr, cv2.COLOR_BGR2HSV)
+    mat_na = np.zeros(hsv.shape[:2], np.uint8)
+    for thap, cao in khoang_list:
+        mat_na |= cv2.inRange(hsv, thap, cao)
+    return cv2.countNonZero(mat_na) / mat_na.size
+
+
+anh = np.full((200, 300, 3), 80, np.uint8)
+mau_day = {"do": (0, 0, 220), "xanh_la": (0, 200, 0), "xanh_duong": (210, 60, 0)}
+for i, (ten, mau) in enumerate(mau_day.items()):
+    cv2.rectangle(anh, (30 + i * 100, 20), (70 + i * 100, 180), mau, -1)
+
+for i, ten in enumerate(mau_day):
+    vung = anh[30:170, 35 + i * 100:65 + i * 100]          # ROI nằm gọn trong dây thứ i
+    tl = ti_le_mau(vung, KHOANG[ten])
+    print(f"Dây {i + 1} cần {ten}: {tl:.2f} → {'OK' if tl &gt; 0.8 else 'NG'}")</code></pre>
+<pre><code class="language-text">Dây 1 cần do: 1.00 → OK
+Dây 2 cần xanh_la: 1.00 → OK
+Dây 3 cần xanh_duong: 1.00 → OK</code></pre>
+<p>Thử đổi màu dây 2 thành vàng <code>(0, 220, 220)</code>: kết quả dây 2 phải ra NG.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 3. Công cụ chọn ngưỡng bằng thanh trượt</h3>
+<p>Với ảnh của bạn (hoặc ảnh webcam), tạo cửa sổ có 6 thanh trượt <code>cv2.createTrackbar</code> cho H, S, V thấp và cao, hiển thị mặt nạ theo thời gian thực. Đây là công cụ bạn sẽ dùng lại nhiều lần khi cài đặt trạm thật.</p>
+<details><summary>Gợi ý</summary>
+<p>Tạo cửa sổ bằng <code>cv2.namedWindow("chinh")</code>, mỗi thanh trượt <code>cv2.createTrackbar("H thap", "chinh", 0, 179, lambda v: None)</code>. Trong vòng lặp <code>while True</code>, đọc giá trị bằng <code>cv2.getTrackbarPos</code>, gọi <code>inRange</code>, <code>imshow</code> mặt nạ và thoát khi <code>cv2.waitKey(30) == ord("q")</code>. In ra khoảng cuối cùng để chép vào file cấu hình.</p>
+</details>
+</div>

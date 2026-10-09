@@ -1,0 +1,190 @@
+<p>Trước khi phân tích, ảnh thường phải được "sửa soạn": cắt đúng vùng cần kiểm tra, thu nhỏ để chạy nhanh, xoay về đúng hướng, thêm viền cho đủ kích thước đầu vào mô hình AI. Bài này dạy các thao tác hình học cơ bản đó và những cái bẫy đi kèm: thứ tự (x, y), cắt ra ngoài biên, méo tỉ lệ, góc xoay bị cắt mất.</p>
+
+<h2>Chuẩn bị ảnh thử</h2>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+anh = np.full((480, 640, 3), 60, np.uint8)
+cv2.rectangle(anh, (200, 150), (440, 330), (200, 200, 200), -1)       # "sản phẩm"
+cv2.circle(anh, (260, 240), 25, (40, 40, 40), -1)                     # lỗ trên sản phẩm
+cv2.putText(anh, "SP-01", (330, 250), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+cv2.imwrite("goc.png", anh)
+print(anh.shape)       # (cao, rộng, kênh)</code></pre>
+<pre><code class="language-text">(480, 640, 3)</code></pre>
+
+<h2>1. Cắt vùng quan tâm (ROI)</h2>
+<p>ROI thường được lưu dạng <code>(x, y, w, h)</code>: góc trái trên và chiều rộng, cao (đây cũng là định dạng <code>cv2.selectROI</code> và <code>cv2.boundingRect</code> trả về). Cắt bằng slicing NumPy, nhớ <strong>hàng (y) trước, cột (x) sau</strong>:</p>
+<pre><code class="language-python">def cat_roi(anh, roi):
+    """Cắt ROI (x, y, w, h); tự giới hạn trong biên ảnh."""
+    x, y, w, h = roi
+    cao, rong = anh.shape[:2]
+    x1, y1 = max(0, x), max(0, y)
+    x2, y2 = min(rong, x + w), min(cao, y + h)
+    if x1 &gt;= x2 or y1 &gt;= y2:
+        raise ValueError(f"ROI {roi} nằm ngoài ảnh {rong}x{cao}")
+    return anh[y1:y2, x1:x2]
+
+
+vung = cat_roi(anh, (200, 150, 240, 180))
+print(vung.shape)                                   # (180, 240, 3)
+print(cat_roi(anh, (600, 400, 100, 100)).shape)     # bị cắt bớt ở biên: (80, 40, 3)</code></pre>
+<pre><code class="language-text">(180, 240, 3)
+(80, 40, 3)</code></pre>
+<p>Vì sao cần hàm riêng? Slicing NumPy <strong>không báo lỗi</strong> khi cắt ra ngoài biên mà lặng lẽ trả về vùng nhỏ hơn, thậm chí rỗng. Một ROI rỗng đưa vào thuật toán sẽ gây lỗi khó hiểu ở bước sau. Kiểm tra sớm, báo lỗi rõ.</p>
+<div class="tip"><strong>Nhớ: ROI là view</strong>Như bài NumPy, <code>vung</code> dùng chung bộ nhớ với ảnh gốc. Vẽ lên <code>vung</code> là vẽ lên ảnh gốc. Đôi khi đó chính là điều bạn muốn (tô màu vùng lỗi lên ảnh gốc); nếu không, dùng <code>.copy()</code>.</div>
+
+<h2>2. Thay đổi kích thước (resize)</h2>
+<pre><code class="language-python">nho = cv2.resize(anh, (320, 240))                          # chú ý: (rộng, cao)!
+nua = cv2.resize(anh, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_AREA)
+to = cv2.resize(vung, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+print(nho.shape, nua.shape, to.shape)</code></pre>
+<pre><code class="language-text">(240, 320, 3) (240, 320, 3) (360, 480, 3)</code></pre>
+<div class="warn"><strong>Bẫy: cv2.resize nhận (rộng, cao)</strong>Trong khi <code>anh.shape</code> trả về <code>(cao, rộng)</code>. Viết <code>cv2.resize(anh, anh.shape[:2])</code> sẽ cho ảnh bị xoay chiều. Cách an toàn: dùng <code>fx</code>, <code>fy</code>, hoặc ghi rõ <code>(rong, cao)</code>.</div>
+<p>Chọn phương pháp nội suy:</p>
+<table>
+  <tr><th>Phương pháp</th><th>Dùng khi</th></tr>
+  <tr><td><code>INTER_AREA</code></td><td><strong>Thu nhỏ</strong> ảnh: ít răng cưa, giữ chi tiết tốt</td></tr>
+  <tr><td><code>INTER_LINEAR</code> (mặc định)</td><td>Phóng to vừa phải, nhanh</td></tr>
+  <tr><td><code>INTER_CUBIC</code></td><td>Phóng to cần mịn hơn (chậm hơn)</td></tr>
+  <tr><td><code>INTER_NEAREST</code></td><td><strong>Mặt nạ, ảnh nhãn</strong>: không tạo giá trị trung gian (nhãn 1 và 2 không được thành 1,5)</td></tr>
+</table>
+
+<h3>Resize giữ tỉ lệ và letterbox</h3>
+<p>Mô hình AI thường cần đầu vào vuông, ví dụ 640×640. Kéo giãn ảnh 640×480 thành 640×640 sẽ làm vật bị méo, mô hình đoán sai. Cách đúng: thu nhỏ giữ tỉ lệ rồi thêm viền (letterbox), cách YOLO dùng:</p>
+<pre><code class="language-python">def letterbox(anh, kich_thuoc=640, mau=(114, 114, 114)):
+    """Resize giữ tỉ lệ vào khung vuông, phần thừa tô màu. Trả về ảnh, tỉ lệ, độ dời (dx, dy)."""
+    cao, rong = anh.shape[:2]
+    ti_le = kich_thuoc / max(cao, rong)
+    moi_rong, moi_cao = round(rong * ti_le), round(cao * ti_le)
+    thu_nho = cv2.resize(anh, (moi_rong, moi_cao), interpolation=cv2.INTER_AREA)
+    dx, dy = (kich_thuoc - moi_rong) // 2, (kich_thuoc - moi_cao) // 2
+    khung = cv2.copyMakeBorder(thu_nho, dy, kich_thuoc - moi_cao - dy, dx, kich_thuoc - moi_rong - dx,
+                               cv2.BORDER_CONSTANT, value=mau)
+    return khung, ti_le, (dx, dy)
+
+
+lb, ti_le, (dx, dy) = letterbox(anh, 416)
+print(lb.shape, round(ti_le, 3), dx, dy)
+
+# Đổi tọa độ trên ảnh letterbox về ảnh gốc (dùng khi mô hình trả về hộp phát hiện)
+x_lb, y_lb = 208, 208
+print("Về ảnh gốc:", round((x_lb - dx) / ti_le), round((y_lb - dy) / ti_le))</code></pre>
+<pre><code class="language-text">(416, 416, 3) 0.65 0 52
+Về ảnh gốc: 320 240</code></pre>
+<p>Phải nhớ <code>ti_le</code> và <code>(dx, dy)</code> để đổi kết quả của mô hình về tọa độ ảnh gốc. Quên bước này là lỗi phổ biến nhất khi tự viết phần xử lý sau cho mô hình phát hiện vật.</p>
+
+<h2>3. Lật và xoay 90°</h2>
+<pre><code class="language-python">lat_ngang = cv2.flip(anh, 1)        # 1: lật trái-phải, 0: lật trên-dưới, -1: cả hai
+xoay_90 = cv2.rotate(anh, cv2.ROTATE_90_CLOCKWISE)
+xoay_180 = cv2.rotate(anh, cv2.ROTATE_180)
+print(lat_ngang.shape, xoay_90.shape, xoay_180.shape)</code></pre>
+<pre><code class="language-text">(480, 640, 3) (640, 480, 3) (480, 640, 3)</code></pre>
+<p>Camera lắp ngược hoặc lắp dọc là chuyện thường gặp ở nhà máy. Xoay 90°/180° bằng <code>cv2.rotate</code> nhanh và không mất chi tiết. Nhiều camera công nghiệp còn có sẵn chức năng ReverseX/ReverseY trong phần cấu hình, nên dùng chức năng đó để không tốn thời gian xử lý.</p>
+
+<h2>4. Xoay góc bất kỳ</h2>
+<p>Để xoay góc tùy ý, tạo ma trận xoay rồi dùng <code>warpAffine</code>:</p>
+<pre><code class="language-python">cao, rong = anh.shape[:2]
+tam = (rong / 2, cao / 2)
+M = cv2.getRotationMatrix2D(tam, 30, 1.0)     # góc dương = ngược chiều kim đồng hồ
+xoay = cv2.warpAffine(anh, M, (rong, cao), borderValue=(0, 0, 0))
+print(xoay.shape)</code></pre>
+<p>Ảnh giữ nguyên kích thước nên <strong>bốn góc bị cắt mất</strong>. Muốn giữ trọn ảnh, tính kích thước mới và dịch tâm:</p>
+<pre><code class="language-python">def xoay_giu_tron(anh, goc):
+    cao, rong = anh.shape[:2]
+    M = cv2.getRotationMatrix2D((rong / 2, cao / 2), goc, 1.0)
+    cos, sin = abs(M[0, 0]), abs(M[0, 1])
+    moi_rong = int(cao * sin + rong * cos)
+    moi_cao = int(cao * cos + rong * sin)
+    M[0, 2] += moi_rong / 2 - rong / 2       # dịch để ảnh nằm giữa khung mới
+    M[1, 2] += moi_cao / 2 - cao / 2
+    return cv2.warpAffine(anh, M, (moi_rong, moi_cao))
+
+
+print(xoay_giu_tron(anh, 30).shape)</code></pre>
+<pre><code class="language-text">(480, 640, 3)
+(735, 794, 3)</code></pre>
+<p>Ứng dụng thật của xoay góc bất kỳ là <strong>căn thẳng sản phẩm</strong> nằm nghiêng trên băng tải trước khi đo hoặc đọc chữ. Bài "Biến đổi hình học" ở chặng 3 sẽ dùng góc lấy từ <code>minAreaRect</code> để làm việc này tự động.</p>
+
+<h2>5. Thêm viền</h2>
+<pre><code class="language-python">vien_den = cv2.copyMakeBorder(vung, 10, 10, 10, 10, cv2.BORDER_CONSTANT, value=(0, 0, 0))
+vien_phan_chieu = cv2.copyMakeBorder(vung, 10, 10, 10, 10, cv2.BORDER_REFLECT)
+print(vung.shape, vien_den.shape)</code></pre>
+<pre><code class="language-text">(180, 240, 3) (200, 260, 3)</code></pre>
+<p><code>BORDER_REFLECT</code> (phản chiếu) hữu ích khi xử lý gần mép ảnh: bộ lọc không bị ảnh hưởng bởi viền đen giả.</p>
+
+<h2>6. Ghép ảnh để so sánh</h2>
+<p>Đặt ảnh gốc cạnh ảnh kết quả là cách nhanh nhất để kiểm tra thuật toán. Ảnh ghép phải cùng chiều cao (ghép ngang) và cùng số kênh:</p>
+<pre><code class="language-python">def ghep_ngang(*ds_anh, cao=240):
+    """Ghép nhiều ảnh (xám hoặc màu) thành một hàng cùng chiều cao."""
+    ket = []
+    for a in ds_anh:
+        if a.ndim == 2:
+            a = cv2.cvtColor(a, cv2.COLOR_GRAY2BGR)
+        ti_le = cao / a.shape[0]
+        ket.append(cv2.resize(a, (round(a.shape[1] * ti_le), cao), interpolation=cv2.INTER_AREA))
+    return np.hstack(ket)
+
+
+xam = cv2.cvtColor(anh, cv2.COLOR_BGR2GRAY)
+so_sanh = ghep_ngang(anh, xam, vung)
+cv2.imwrite("so_sanh.png", so_sanh)
+print(so_sanh.shape)</code></pre>
+<pre><code class="language-text">(240, 960, 3)</code></pre>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>ROI <code>(x, y, w, h)</code> → <code>anh[y:y+h, x:x+w]</code>; kiểm tra biên vì slicing không báo lỗi.</li>
+  <li><code>cv2.resize</code> nhận <code>(rộng, cao)</code>; thu nhỏ dùng <code>INTER_AREA</code>, mặt nạ dùng <code>INTER_NEAREST</code>.</li>
+  <li>Đầu vào mô hình: letterbox giữ tỉ lệ, nhớ tỉ lệ và độ dời để đổi kết quả về ảnh gốc.</li>
+  <li><code>cv2.flip</code>, <code>cv2.rotate</code> cho góc 90°; <code>getRotationMatrix2D</code> + <code>warpAffine</code> cho góc bất kỳ.</li>
+  <li>Ghép ảnh cùng chiều cao, cùng số kênh để so sánh kết quả.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Lưới ô kiểm tra</h3>
+<p>Chia ảnh 640×480 thành lưới 4×3 ô, lưu từng ô thành file <code>o_hang_cot.png</code>. In kích thước từng ô.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+anh = np.random.default_rng(0).integers(0, 256, (480, 640, 3), dtype=np.uint8)
+so_cot, so_hang = 4, 3
+cao_o, rong_o = anh.shape[0] // so_hang, anh.shape[1] // so_cot
+for h in range(so_hang):
+    for c in range(so_cot):
+        o = anh[h * cao_o:(h + 1) * cao_o, c * rong_o:(c + 1) * rong_o]
+        cv2.imwrite(f"o_{h}_{c}.png", o)
+print(cao_o, rong_o)    # mỗi ô 160 x 160</code></pre>
+<pre><code class="language-text">160 160</code></pre>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Đổi hộp phát hiện về ảnh gốc</h3>
+<p>Mô hình chạy trên ảnh letterbox 640×640 của ảnh gốc 1920×1080 và trả về hộp <code>(x1, y1, x2, y2) = (100, 200, 300, 400)</code>. Tính tọa độ hộp trên ảnh gốc.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">rong, cao, kt = 1920, 1080, 640
+ti_le = kt / max(rong, cao)                   # 1/3
+dx = (kt - round(rong * ti_le)) // 2          # 0
+dy = (kt - round(cao * ti_le)) // 2           # 140
+x1, y1, x2, y2 = 100, 200, 300, 400
+goc = [round((x1 - dx) / ti_le), round((y1 - dy) / ti_le), round((x2 - dx) / ti_le), round((y2 - dy) / ti_le)]
+print(ti_le, dx, dy, goc)</code></pre>
+<pre><code class="language-text">0.3333333333333333 0 140 [300, 180, 900, 780]</code></pre>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 3. Xoay tìm hướng</h3>
+<p>Viết hàm nhận ảnh và trả về list 4 ảnh xoay 0°, 90°, 180°, 270° (dùng <code>cv2.rotate</code>). Đây là kỹ thuật "test-time augmentation" đơn giản: chạy mô hình trên cả 4 hướng rồi lấy kết quả tin cậy nhất khi sản phẩm có thể nằm theo hướng bất kỳ.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">def bon_huong(anh):
+    return [anh,
+            cv2.rotate(anh, cv2.ROTATE_90_CLOCKWISE),
+            cv2.rotate(anh, cv2.ROTATE_180),
+            cv2.rotate(anh, cv2.ROTATE_90_COUNTERCLOCKWISE)]
+
+
+print([a.shape for a in bon_huong(np.zeros((100, 200), np.uint8))])</code></pre>
+<pre><code class="language-text">[(100, 200), (200, 100), (100, 200), (200, 100)]</code></pre>
+</details>
+</div>
