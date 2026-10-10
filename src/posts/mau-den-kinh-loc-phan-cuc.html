@@ -1,48 +1,399 @@
-<p>Chọn đúng <em>kiểu</em> đèn (backlight, dome, coaxial...) là bước đầu. Bước tiếp theo, thường bị bỏ qua, là chọn đúng <strong>màu đèn, kính lọc và phân cực</strong>. Ba yếu tố này có thể biến một khuyết tật gần như vô hình thành vết đen rõ ràng.</p>
+<p>Chọn đúng <em>kiểu</em> đèn (đèn nền, vòm, đồng trục, góc thấp…) ở bài <em>7 kiểu chiếu sáng và khi nào dùng</em> mới là một nửa việc. Nửa còn lại, thường bị bỏ qua, là chọn <strong>bước sóng</strong> của đèn, <strong>kính lọc</strong> trước ống kính và <strong>phân cực</strong>. Ba thứ này rẻ hơn nhiều so với camera, nhưng có thể biến một vết mực gần như vô hình thành vết đen đặc, cắt phần lớn ánh sáng xưởng lọt vào ảnh, và xóa vệt chói trên màng bọc bóng. Bài này giải thích bằng phổ ánh sáng (có mô phỏng NumPy tính tương phản cho từng màu đèn), tính bằng số kính lọc dải thông chặn được bao nhiêu ánh sáng môi trường, và mô phỏng phân cực chéo theo định luật Malus. Bài sau, <em>Kiểm soát ánh sáng môi trường</em>, sẽ dùng lại các con số về kính lọc này.</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>(1) Chọn màu đèn theo quy tắc màu bù và kiểm chứng bằng tính toán phổ; (2) đọc thông số kính lọc dải thông và ước lượng hệ số chặn ánh sáng môi trường; (3) dùng phân cực chéo để xóa chói, biết nó tốn bao nhiêu ánh sáng và khi nào không hiệu quả.</div>
 
-<h2>Màu đèn với camera đơn sắc</h2>
-<p>Camera mono không thấy màu, nhưng thấy <strong>độ sáng phản xạ</strong> của vật dưới ánh sáng chiếu vào:</p>
+<h2>1. Camera đơn sắc "nhìn" màu như thế nào?</h2>
+<p>Camera mono không phân biệt màu, nó chỉ đo tổng năng lượng ánh sáng mỗi pixel nhận được. Mức xám của một điểm trên vật là tích phân theo bước sóng λ của ba đường cong:</p>
+<pre><code class="language-text">Mức xám ∝ ∫ S(λ) · R(λ) · QE(λ) dλ
+
+S(λ)  : phổ phát xạ của đèn (LED đỏ: một đỉnh hẹp quanh 625 nm, rộng khoảng 20 nm)
+R(λ)  : hệ số phản xạ phổ của vật (mực đỏ: thấp dưới ~600 nm, cao trên ~600 nm)
+QE(λ) : hiệu suất lượng tử của cảm biến (silic nhạy từ ~400 tới ~1000 nm, cao nhất ở vùng xanh lá)</code></pre>
+<p>Một vật "màu đỏ" là vật phản xạ mạnh ánh sáng đỏ và hấp thụ phần còn lại. Chiếu nó bằng đèn đỏ: tích S·R lớn, vật <strong>sáng</strong>, gần bằng giấy trắng. Chiếu bằng đèn xanh lá (màu bù của đỏ trên vòng màu): S·R gần 0, vật <strong>tối</strong>. Từ đó có quy tắc kinh điển:</p>
 <ul>
-  <li>Vật phản xạ mạnh ánh sáng <strong>cùng màu</strong> với nó → hiện sáng.</li>
-  <li>Vật hấp thụ ánh sáng <strong>màu bù</strong> (đối diện trên vòng màu) → hiện tối.</li>
+  <li><strong>Đèn cùng màu với vật → vật sáng.</strong></li>
+  <li><strong>Đèn màu bù (đối diện trên vòng màu) → vật tối.</strong></li>
 </ul>
 <table>
-  <tr><th>Muốn làm tối</th><th>Dùng đèn</th></tr>
-  <tr><td>Chữ, vết màu đỏ</td><td>Xanh lá hoặc xanh dương</td></tr>
-  <tr><td>Chi tiết xanh dương</td><td>Đỏ hoặc vàng</td></tr>
-  <tr><td>Chi tiết xanh lá</td><td>Đỏ hoặc tím</td></tr>
+  <tr><th>Chi tiết màu</th><th>Muốn chi tiết tối: dùng đèn</th><th>Muốn chi tiết sáng: dùng đèn</th></tr>
+  <tr><td>Đỏ</td><td>Xanh lá (hoặc xanh dương)</td><td>Đỏ</td></tr>
+  <tr><td>Xanh lá</td><td>Đỏ (hoặc xanh dương)</td><td>Xanh lá</td></tr>
+  <tr><td>Xanh dương</td><td>Đỏ, hổ phách (amber, khoảng 590 nm)</td><td>Xanh dương</td></tr>
+  <tr><td>Vàng</td><td>Xanh dương</td><td>Đỏ hoặc xanh lá (vàng phản xạ cả hai)</td></tr>
+  <tr><td>Đen carbon</td><td>Luôn tối, kể cả hồng ngoại</td><td>Không</td></tr>
 </table>
-<p>Ví dụ: kiểm tra mực in đỏ trên hộp giấy trắng dưới đèn xanh lá, chữ sẽ đen đậm trên nền trắng, phân ngưỡng cực kỳ ổn định.</p>
+<p>Quy tắc chỉ là điểm xuất phát: nền cũng có màu, và điều ta cần là <strong>chênh lệch giữa vật và nền</strong>, không phải độ tối tuyệt đối của vật. Cách chắc chắn là tính (hoặc chụp thử) cho từng màu đèn.</p>
 
-<h2>Đặc tính từng bước sóng</h2>
+<h2>2. Mô phỏng phổ: tương phản dưới 5 màu đèn</h2>
+<p>Đoạn mã sau dựng phổ gần đúng của 5 loại LED, đường QE của một cảm biến CMOS mono giả định và hệ số phản xạ phổ của 5 vật liệu, rồi tính mức xám theo tích phân ở mục 1. Với mỗi màu đèn, phơi sáng được chỉnh để giấy trắng bằng 200 (như kỹ sư chỉnh phơi sáng khi đổi đèn), nên các mức xám so sánh được với nhau. Tương phản dùng chỉ số Michelson C = |a − b| / (a + b), từ 0 (không phân biệt) đến 1 (một bên đen tuyệt đối).</p>
+<pre><code class="language-python">import numpy as np
+
+lam = np.arange(400, 1001, 5.0)                     # bước sóng (nm), cảm biến silic nhạy ~400–1000 nm
+
+
+def gauss(c, fwhm):
+    return np.exp(-4 * np.log(2) * (lam - c) ** 2 / fwhm ** 2)
+
+
+def sigmoid(c, w):
+    return 1 / (1 + np.exp(-(lam - c) / w))
+
+
+QE = 0.7 * np.exp(-((lam - 560) / 250) ** 2)        # độ nhạy giả định của cảm biến CMOS mono
+
+DEN = {                                             # phổ phát xạ LED (dạng gần đúng)
+    "Xanh dương 470": gauss(470, 25),
+    "Xanh lá 525": gauss(525, 35),
+    "Đỏ 625": gauss(625, 20),
+    "Trắng": 0.6 * gauss(450, 20) + gauss(560, 120),
+    "IR 850": gauss(850, 40),
+}
+VL = {                                              # hệ số phản xạ phổ R(λ) của vật liệu
+    "giấy trắng": np.full_like(lam, 0.85),
+    "mực đỏ": 0.05 + 0.80 * sigmoid(600, 12),
+    "sơn xanh lá": 0.05 + 0.45 * gauss(530, 90) + 0.45 * sigmoid(720, 20),
+    "mực xanh dương": 0.05 + 0.50 * gauss(460, 90) + 0.75 * sigmoid(700, 20),
+    "mực đen carbon": np.full_like(lam, 0.05),
+}
+CANH = {"A": ("mực đỏ", "sơn xanh lá"), "B": ("mực đỏ", "giấy trắng"),
+        "C": ("mực xanh dương", "giấy trắng"), "D": ("mực đen carbon", "mực đỏ")}
+
+
+def muc_xam(S, R):
+    """Mức xám camera mono: ∫ S·QE·R dλ, chỉnh phơi sáng để giấy trắng = 200."""
+    return 200 * np.sum(S * QE * R) / np.sum(S * QE * VL["giấy trắng"])
+
+
+for k, (a, b) in CANH.items():
+    print(f"Cảnh {k}: {a} trên nền {b}")
+print(f"{'Đèn':15s}" + "".join(f" | {'cảnh ' + k + ': vật/nền':15s}" for k in CANH))
+for ten, S in DEN.items():
+    dong = f"{ten:15s}"
+    for a, b in CANH.values():
+        ga, gb = muc_xam(S, VL[a]), muc_xam(S, VL[b])
+        c = abs(ga - gb) / (ga + gb)                 # tương phản Michelson
+        dong += f" | {ga:3.0f}/{gb:3.0f} C={c:4.2f}"
+    print(dong)</code></pre>
+<pre><code class="language-text">Cảnh A: mực đỏ trên nền sơn xanh lá
+Cảnh B: mực đỏ trên nền giấy trắng
+Cảnh C: mực xanh dương trên nền giấy trắng
+Cảnh D: mực đen carbon trên nền mực đỏ
+Đèn             | cảnh A: vật/nền | cảnh B: vật/nền | cảnh C: vật/nền | cảnh D: vật/nền
+Xanh dương 470  |  12/ 45 C=0.58 |  12/200 C=0.89 | 121/200 C=0.24 |  12/ 12 C=0.00
+Xanh lá 525     |  13/110 C=0.79 |  13/200 C=0.88 |  43/200 C=0.65 |  12/ 13 C=0.03
+Đỏ 625          | 175/ 18 C=0.81 | 175/200 C=0.07 |  16/200 C=0.85 |  12/175 C=0.87
+Trắng           |  51/ 67 C=0.13 |  51/200 C=0.59 |  41/200 C=0.66 |  12/ 51 C=0.63
+IR 850          | 200/117 C=0.26 | 200/200 C=0.00 | 188/200 C=0.03 |  12/200 C=0.89</code></pre>
+<p>Đọc bảng theo từng cảnh:</p>
 <ul>
-  <li><strong>Xanh dương (khoảng 470 nm)</strong>: bước sóng ngắn, tán xạ nhiều trên bề mặt, làm nổi vết xước nhỏ, kết cấu bề mặt.</li>
-  <li><strong>Đỏ (khoảng 620–660 nm)</strong>: xuyên tốt hơn qua một số vật liệu, ít nhạy với nhám bề mặt, hiệu suất LED cao.</li>
-  <li><strong>Hồng ngoại (IR, khoảng 850–940 nm)</strong>: "nhìn xuyên" một số loại mực, nhựa màu và nhãn, giảm ảnh hưởng của màu sắc in ấn; con người không thấy nên không gây chói mắt công nhân.</li>
-  <li><strong>Tia cực tím (UV)</strong>: làm phát quang keo, dầu, mực huỳnh quang, dùng kiểm tra có/không có keo trong suốt.</li>
-  <li><strong>Đèn trắng</strong>: cần cho camera màu, nhưng với camera mono thường kém tương phản hơn đèn đơn sắc.</li>
+  <li><strong>Cảnh A, mực đỏ trên sơn xanh lá</strong>: đèn xanh lá cho vật <strong>tối nhất</strong> (13) trên nền khá sáng (110), C = 0,79. Đèn đỏ cho tương phản tương đương (C = 0,81) nhưng đảo chiều: vật sáng 175 trên nền tối 18. Đèn trắng gần như vô dụng (C = 0,13) vì dưới ánh sáng trắng, mực đỏ và sơn xanh lá phản xạ tổng năng lượng xấp xỉ nhau: mắt người thấy hai màu rất khác, camera mono thấy hai mảng xám gần giống nhau.</li>
+  <li><strong>Cảnh B, mực đỏ trên giấy trắng</strong>: xanh lá hoặc xanh dương cho chữ đen đặc (C ≈ 0,88); đèn đỏ làm chữ đỏ <strong>biến mất</strong> (C = 0,07). Đây là cách cố ý "xóa" một lớp in: ví dụ bỏ đường kẻ ô màu đỏ trên phiếu để chỉ đọc chữ viết.</li>
+  <li><strong>Cảnh C, mực xanh dương</strong>: đèn đỏ cho tương phản cao nhất (C = 0,85), đèn xanh dương tệ nhất (C = 0,24). Đúng quy tắc màu bù.</li>
+  <li><strong>Cảnh D, số lô in mực đen carbon chồng lên logo đỏ</strong>: dưới đèn xanh dương hay xanh lá, cả hai đều tối (C ≈ 0) nên OCR không tách được chữ khỏi logo. Đèn đỏ làm logo sáng như giấy, chữ đen nổi rõ (C = 0,87). Đèn hồng ngoại 850 nm còn tốt hơn một chút (C = 0,89): mực màu gốc thuốc nhuộm thường "trong suốt" với hồng ngoại, còn carbon đen hấp thụ cả hồng ngoại.</li>
+</ul>
+<p>Phổ phản xạ trong mô phỏng là dạng giả định cho dễ hiểu. Mực và sơn thật có thể khác nhiều, đặc biệt ở vùng hồng ngoại: hai loại mực cùng "màu đỏ" với mắt người có thể phản ứng hoàn toàn khác dưới 850 nm. Vì vậy luôn chụp thử với mẫu thật.</p>
+<div class="tip"><strong>Thử nhanh không cần đèn màu</strong>Chụp vật bằng camera màu (hay điện thoại) dưới ánh sáng trắng, tách 3 kênh R, G, B bằng <code>cv2.split</code> và xem kênh nào cho tương phản tốt nhất. Kết quả gợi ý màu đèn nên thử trước. Đây chỉ là gợi ý: bộ lọc màu của camera rộng hơn và chồng lấn nhiều hơn phổ LED đơn sắc (mục 3).</div>
+
+<h2>3. Camera màu, kênh màu và cái bẫy của ảnh xám</h2>
+<p>Camera màu dùng bộ lọc Bayer: mỗi pixel chỉ nhận một trong ba dải R, G, B khá rộng, chồng lấn nhau, và luôn có kính cắt hồng ngoại. Mô phỏng cảnh A dưới đèn trắng với camera màu đã cân bằng trắng:</p>
+<pre><code class="language-python">import numpy as np
+
+lam = np.arange(400, 1001, 5.0)
+g = lambda c, fwhm: np.exp(-4 * np.log(2) * (lam - c) ** 2 / fwhm ** 2)
+sig = lambda c, w: 1 / (1 + np.exp(-(lam - c) / w))
+
+QE = 0.7 * np.exp(-((lam - 560) / 250) ** 2)
+IR_CUT = 1 - sig(660, 8)                             # camera màu luôn có kính cắt hồng ngoại
+KENH = {"B": g(460, 90), "G": g(540, 90), "R": sig(585, 15)}   # bộ lọc Bayer (gần đúng)
+TRANG = 0.6 * g(450, 20) + g(560, 120)               # đèn LED trắng
+VL = {"giấy trắng": np.full_like(lam, 0.85),
+      "mực đỏ": 0.05 + 0.80 * sig(600, 12),
+      "sơn xanh lá": 0.05 + 0.45 * g(530, 90) + 0.45 * sig(720, 20)}
+
+
+def rgb(R):
+    """Giá trị 3 kênh, cân bằng trắng sao cho giấy trắng = (200, 200, 200)."""
+    out = {}
+    for k, F in KENH.items():
+        w = TRANG * QE * IR_CUT * F
+        out[k] = 200 * np.sum(w * R) / np.sum(w * VL["giấy trắng"])
+    return out
+
+
+vat, nen = rgb(VL["mực đỏ"]), rgb(VL["sơn xanh lá"])
+for ten, c in (("mực đỏ", vat), ("sơn xanh lá", nen)):
+    print(f"{ten:12s}: R={c['R']:5.1f} G={c['G']:5.1f} B={c['B']:5.1f}")
+xam = lambda c: 0.299 * c["R"] + 0.587 * c["G"] + 0.114 * c["B"]   # như cv2.COLOR_BGR2GRAY
+print("Tương phản Michelson giữa vật và nền:")
+for k in ("R", "G", "B"):
+    print(f"  kênh {k}: {abs(vat[k] - nen[k]) / (vat[k] + nen[k]):.2f}")
+gv, gn = xam(vat), xam(nen)
+print(f"  ảnh xám (cvtColor): {gv:.1f} / {gn:.1f} → {abs(gv - gn) / (gv + gn):.2f}")</code></pre>
+<pre><code class="language-text">mực đỏ      : R=111.6 G= 26.2 B= 12.2
+sơn xanh lá : R= 38.8 G= 89.1 B= 61.2
+Tương phản Michelson giữa vật và nền:
+  kênh R: 0.48
+  kênh G: 0.55
+  kênh B: 0.67
+  ảnh xám (cvtColor): 50.2 / 70.9 → 0.17</code></pre>
+<p>Ba bài học:</p>
+<ul>
+  <li><strong>Chuyển ảnh màu sang xám bằng <code>cv2.cvtColor(..., COLOR_BGR2GRAY)</code> có thể giết tương phản</strong>: công thức 0,299R + 0,587G + 0,114B được thiết kế cho cảm nhận độ sáng của mắt, không cho bài toán của bạn. Ở đây C chỉ còn 0,17. Nếu buộc phải dùng camera màu, hãy chọn kênh (hoặc tổ hợp kênh, ví dụ G − R, hay kênh Hue) cho tương phản cao nhất.</li>
+  <li><strong>Mỗi kênh vẫn kém camera mono + LED đơn sắc</strong> (0,48–0,67 so với 0,79 của đèn xanh lá) vì bộ lọc Bayer rộng hơn phổ LED.</li>
+  <li><strong>Camera màu mất độ phân giải và ánh sáng</strong>: trong mẫu Bayer, kênh G chỉ chiếm 1/2 số pixel, R và B mỗi kênh 1/4; phần còn lại phải nội suy (demosaic). Bộ lọc màu cũng chặn phần lớn ánh sáng. Khi bài toán không cần phân biệt màu, <strong>camera mono + đèn đơn sắc</strong> là lựa chọn mặc định trong công nghiệp.</li>
 </ul>
 
-<h2>Kính lọc (filter)</h2>
+<h2>4. Đặc tính từng bước sóng</h2>
+<table>
+  <tr><th>Dải</th><th>Bước sóng LED phổ biến</th><th>Đặc tính</th><th>Dùng khi</th></tr>
+  <tr><td>Tử ngoại gần (UV)</td><td>365, 385, 395 nm</td><td>Kích thích chất huỳnh quang phát ra ánh sáng nhìn thấy</td><td>Kiểm tra có keo, dầu, sơn phủ, mực có chất huỳnh quang</td></tr>
+  <tr><td>Xanh dương</td><td>450–470 nm</td><td>Bước sóng ngắn: nhiễu xạ nhỏ hơn (biên sắc hơn), tán xạ bề mặt mạnh hơn, làm nổi vân và xước mảnh</td><td>Chi tiết rất nhỏ, xước mảnh, tương phản với vật đỏ/vàng</td></tr>
+  <tr><td>Xanh lá</td><td>520–530 nm</td><td>Gần đỉnh nhạy của nhiều cảm biến silic</td><td>Tương phản với vật đỏ; đèn nền telecentric</td></tr>
+  <tr><td>Đỏ</td><td>617–660 nm</td><td>LED hiệu suất cao, giá rẻ; ít nhạy với nhám và vân bề mặt hơn xanh dương</td><td>Lựa chọn mặc định cho nhiều trạm; xóa mực đỏ, làm nổi mực xanh</td></tr>
+  <tr><td>Hồng ngoại gần (NIR)</td><td>850, 940 nm</td><td>Mắt người không thấy (850 nm vẫn thấy chấm đỏ mờ ở LED); xuyên qua nhiều mực màu, nhựa mỏng; QE cảm biến thấp hơn</td><td>Bỏ qua in ấn màu, nhìn chữ carbon; trạm gần người làm việc (không chói mắt)</td></tr>
+  <tr><td>Trắng</td><td>Phổ rộng</td><td>Cần cho camera màu; với camera mono thường kém tương phản hơn đèn đơn sắc</td><td>Phân loại màu, kiểm tra màu dây điện, nhãn nhiều màu</td></tr>
+</table>
+<p>Lưu ý khi dùng <strong>hồng ngoại</strong>:</p>
 <ul>
-  <li><strong>Bandpass</strong>: chỉ cho qua dải bước sóng của đèn bạn dùng. Ánh sáng môi trường (đèn nhà xưởng, nắng) bị chặn phần lớn, hệ thống ổn định hơn rất nhiều. Đây là phụ kiện rẻ mà hiệu quả cao nhất.</li>
-  <li><strong>Longpass / shortpass</strong>: chặn một phía bước sóng, ví dụ chặn ánh sáng nhìn thấy khi dùng IR.</li>
-  <li><strong>Kính bảo vệ</strong>: tấm kính phẳng phía trước ống kính, dễ thay khi bị bám bụi, dầu.</li>
+  <li>Camera màu có kính cắt hồng ngoại nên gần như không thấy 850 nm; dùng camera mono không có kính cắt IR (kiểm tra datasheet: nhiều camera mono có kính bảo vệ trong suốt, một số có tùy chọn kính cắt IR).</li>
+  <li>QE ở 850 nm thường chỉ bằng một phần nhỏ so với ở vùng xanh lá (cảm biến "NIR-enhanced" cải thiện được), nên cần đèn mạnh hơn hoặc phơi sáng lâu hơn.</li>
+  <li>Ống kính thường được hiệu chỉnh cho ánh sáng nhìn thấy: tiêu điểm ở 850 nm lệch đi, phải lấy nét lại <strong>dưới chính đèn IR</strong>, và độ sắc có thể kém hơn; có ống kính hiệu chỉnh cho dải NIR.</li>
+  <li>Không ít mực và nhựa phản ứng khó đoán ở IR: phải thử với mẫu thật.</li>
 </ul>
+<p>Lưu ý khi dùng <strong>tử ngoại (UV)</strong>: camera không chụp chính ánh sáng UV mà chụp <strong>ánh sáng huỳnh quang</strong> do keo, dầu hay mực phát ra (thường xanh dương hoặc xanh lá). Đặt kính lọc chặn UV và cho qua màu huỳnh quang trước ống kính, nếu không phản xạ UV từ bề mặt sẽ làm nhòe tương phản. Tín hiệu huỳnh quang yếu, nên trạm cần che tối tốt. Ánh sáng UV gây hại cho mắt và da: phải che chắn, có nhãn cảnh báo, không để người nhìn trực tiếp vào đèn.</p>
 
-<h2>Phân cực (polarization)</h2>
-<p>Ánh sáng phản xạ gương (chói) trên vật bóng phi kim loại như nhựa, kính, sơn bóng thường bị phân cực. Đặt <strong>một tấm phân cực trước đèn và một tấm trước ống kính</strong>, xoay tấm ở ống kính vuông góc với tấm ở đèn: phần lớn ánh sáng chói bị chặn, chi tiết bên dưới hiện ra.</p>
+<h2>5. Kính lọc: chặn ánh sáng môi trường</h2>
+<p>Các loại kính lọc thường gặp trong Machine Vision:</p>
+<table>
+  <tr><th>Loại</th><th>Tác dụng</th><th>Ví dụ dùng</th></tr>
+  <tr><td>Dải thông (band-pass, BP)</td><td>Chỉ cho qua một dải quanh bước sóng trung tâm (CWL), rộng FWHM</td><td>BP625 đi với đèn đỏ 625 nm: chặn phần lớn ánh sáng xưởng</td></tr>
+  <tr><td>Thông dài (long-pass, LP)</td><td>Cho qua bước sóng dài hơn ngưỡng</td><td>LP780 khi dùng đèn IR: chặn toàn bộ ánh sáng nhìn thấy; chặn UV khi chụp huỳnh quang</td></tr>
+  <tr><td>Thông ngắn (short-pass, SP) / cắt IR</td><td>Cho qua bước sóng ngắn hơn ngưỡng</td><td>Cắt IR cho camera màu, chặn IR của nắng</td></tr>
+  <tr><td>ND (neutral density)</td><td>Giảm đều mọi bước sóng</td><td>Khi đèn quá mạnh mà không muốn đóng khẩu độ</td></tr>
+  <tr><td>Kính bảo vệ</td><td>Không lọc, chỉ che ống kính</td><td>Môi trường bụi, dầu, nước; thay rẻ hơn thay ống kính</td></tr>
+</table>
+<p>Thông số cần đọc trên datasheet kính lọc dải thông: <strong>CWL</strong> (bước sóng trung tâm, phải khớp đỉnh LED), <strong>FWHM</strong> (độ rộng tại nửa độ truyền cực đại), <strong>độ truyền cực đại</strong> (thường 85–95%) và <strong>mức chặn ngoài dải</strong> theo mật độ quang OD (OD3 = chỉ còn 0,1%, OD4 = 0,01%). Mô phỏng sau tính cụ thể: đèn đỏ 625 nm và đèn IR 850 nm, ba loại ánh sáng môi trường (nắng gần đúng bằng vật đen 5800 K, đèn LED trắng trần xưởng, đèn huỳnh quang ba phổ), camera mono không có kính cắt IR.</p>
+<pre><code class="language-python">import numpy as np
+
+lam = np.arange(400, 1001, 1.0)
+g = lambda c, fwhm: np.exp(-4 * np.log(2) * (lam - c) ** 2 / fwhm ** 2)
+QE = 0.7 * np.exp(-((lam - 560) / 250) ** 2)          # cảm biến mono, không có kính cắt IR
+
+
+def bandpass(cwl, fwhm, t_max=0.90, od=3):
+    """Kính lọc dải thông đỉnh phẳng (dạng Butterworth bậc 4), chặn ngoài dải ở mức 10^-od."""
+    T = t_max / (1 + ((lam - cwl) / (fwhm / 2)) ** 8)
+    return np.maximum(T, 10.0 ** -od)
+
+
+h, c, k = 6.626e-34, 2.998e8, 1.381e-23
+m = lam * 1e-9
+MAT_TROI = 1 / (m ** 5 * (np.exp(h * c / (m * k * 5800)) - 1))        # vật đen 5800 K
+NGUON = {
+    "Nắng (vật đen 5800 K)": MAT_TROI / MAT_TROI.max(),
+    "Đèn LED trắng trần xưởng": 0.6 * g(450, 20) + g(560, 120),
+    "Đèn huỳnh quang": g(436, 4) + 1.5 * g(546, 4) + 2 * g(611, 6) + 0.3 * g(580, 80),
+}
+LED = {625: g(625, 20), 850: g(850, 40)}
+
+
+def qua(S, T):
+    """Tỉ lệ tín hiệu (đã nhân QE) còn lại sau kính lọc."""
+    return np.sum(S * QE * T) / np.sum(S * QE)
+
+
+for cwl, fwhm in ((625, 50), (625, 25), (850, 50)):
+    T = bandpass(cwl, fwhm)
+    led = qua(LED[cwl], T)
+    print(f"Đèn {cwl} nm + kính lọc BP{cwl}, FWHM {fwhm} nm: tín hiệu đèn còn {100 * led:.0f}%")
+    for ten, S in NGUON.items():
+        a = qua(S, T)
+        print(f"   {ten:26s} còn {100 * a:5.2f}%  → tỉ số đèn/môi trường tăng {led / a:6.1f} lần")</code></pre>
+<pre><code class="language-text">Đèn 625 nm + kính lọc BP625, FWHM 50 nm: tín hiệu đèn còn 89%
+   Nắng (vật đen 5800 K)      còn 12.47%  → tỉ số đèn/môi trường tăng    7.1 lần
+   Đèn LED trắng trần xưởng   còn 14.94%  → tỉ số đèn/môi trường tăng    6.0 lần
+   Đèn huỳnh quang            còn 35.50%  → tỉ số đèn/môi trường tăng    2.5 lần
+Đèn 625 nm + kính lọc BP625, FWHM 25 nm: tín hiệu đèn còn 76%
+   Nắng (vật đen 5800 K)      còn  6.30%  → tỉ số đèn/môi trường tăng   12.1 lần
+   Đèn LED trắng trần xưởng   còn  7.33%  → tỉ số đèn/môi trường tăng   10.4 lần
+   Đèn huỳnh quang            còn 14.30%  → tỉ số đèn/môi trường tăng    5.3 lần
+Đèn 850 nm + kính lọc BP850, FWHM 50 nm: tín hiệu đèn còn 76%
+   Nắng (vật đen 5800 K)      còn  2.33%  → tỉ số đèn/môi trường tăng   32.6 lần
+   Đèn LED trắng trần xưởng   còn  0.10%  → tỉ số đèn/môi trường tăng  760.5 lần
+   Đèn huỳnh quang            còn  0.10%  → tỉ số đèn/môi trường tăng  760.6 lần</code></pre>
+<p>Những điều rút ra:</p>
 <ul>
-  <li>Hiệu quả kém với bề mặt kim loại (phản xạ kim loại giữ trạng thái phân cực khác).</li>
-  <li>Mỗi tấm phân cực làm mất một phần đáng kể ánh sáng, cần đèn mạnh hơn.</li>
-  <li>Camera phân cực chuyên dụng (cảm biến có bộ lọc phân cực trên từng điểm ảnh) còn phát hiện được ứng suất trong nhựa trong suốt, vết xước trên kính.</li>
+  <li><strong>BP625 rộng 50 nm</strong> giữ 89% tín hiệu đèn nhưng chỉ để lọt 12–15% nắng và đèn LED xưởng: tỉ số đèn/môi trường tăng 6–7 lần, gần như miễn phí. Kính lọc hẹp 25 nm tăng lên 10–12 lần nhưng cũng mất thêm tín hiệu đèn (76%), và kính lọc hẹp nhạy hơn với góc tia (xem cảnh báo bên dưới).</li>
+  <li><strong>Đèn huỳnh quang ba phổ có vạch phát xạ mạnh khoảng 611 nm</strong>, nằm sát dải của đèn đỏ 625 nm: kính lọc chỉ cải thiện 2,5–5 lần. Trước khi chọn màu đèn, hãy hỏi xưởng dùng loại đèn gì; đôi khi đổi sang 660 nm hoặc 850 nm có lợi hơn.</li>
+  <li><strong>Đèn IR 850 nm + BP850</strong> chặn đèn LED và huỳnh quang trong xưởng gần như hoàn toàn (hơn 700 lần, giới hạn bởi mức chặn OD3 của kính lọc), nhưng với nắng chỉ khoảng 33 lần, vì ánh nắng chứa rất nhiều hồng ngoại. Trạm cạnh cửa sổ vẫn cần che chắn.</li>
 </ul>
+<div class="warn"><strong>Kính lọc dải thông và góc tia</strong>Kính lọc giao thoa (loại BP phổ biến) dịch dải thông về phía bước sóng <em>ngắn</em> khi tia sáng đi xiên. Với ống kính tiêu cự ngắn (góc nhìn rộng), tia ở mép ảnh đi xiên nhiều hơn, nên mép ảnh có thể tối hơn tâm nếu FWHM quá hẹp. Với đèn LED, chọn FWHM rộng hơn phổ LED một chút (30–60 nm là phổ biến) và kiểm tra độ đều sáng trên cả ảnh. Kính lọc vặn ren phía trước ống kính; kích thước ren phải khớp ống kính.</div>
 
-<h2>Quy trình thử nghiệm</h2>
+<h2>6. Phân cực: xóa chói</h2>
+<h3>6.1. Định luật Malus và phản xạ trên điện môi</h3>
+<p>Ánh sáng từ LED là ánh sáng <strong>không phân cực</strong> (điện trường dao động theo mọi hướng vuông góc tia). Kính phân cực thẳng (linear polarizer) chỉ cho qua thành phần dao động theo trục của nó: với ánh sáng không phân cực, kính lý tưởng cho qua 50%, kính thật khoảng 35–45%. Ánh sáng đã phân cực thẳng đi qua kính phân cực thứ hai lệch góc θ tuân theo <strong>định luật Malus: I = I₀·cos²θ</strong>. Khi phản xạ gương trên điện môi (nhựa, kính, sơn), hai thành phần phân cực s (vuông góc mặt phẳng tới) và p (nằm trong mặt phẳng tới) phản xạ khác nhau theo công thức Fresnel; ở <strong>góc Brewster</strong> θ<sub>B</sub> = atan(n), thành phần p không phản xạ chút nào.</p>
+<pre><code class="language-python">import numpy as np
+
+# 1. Định luật Malus: ánh sáng phân cực thẳng qua kính phân cực lệch góc θ
+print("θ (độ) :", "  ".join(f"{t:5d}" for t in (0, 30, 45, 60, 80, 90)))
+print("I/I0   :", "  ".join(f"{np.cos(np.radians(t)) ** 2:5.3f}" for t in (0, 30, 45, 60, 80, 90)))
+
+# 2. Phản xạ Fresnel trên điện môi n = 1,5 (nhựa, kính, sơn bóng)
+n = 1.5
+print(f"\nGóc Brewster = atan(n) = {np.degrees(np.arctan(n)):.1f}°")
+print("góc tới | Rs (%) | Rp (%) | độ phân cực của tia phản xạ")
+for ti in (0, 30, 45, 56.3, 70, 85):
+    a = np.radians(ti)
+    b = np.arcsin(np.sin(a) / n)                      # góc khúc xạ (định luật Snell)
+    rs = ((np.cos(a) - n * np.cos(b)) / (np.cos(a) + n * np.cos(b))) ** 2
+    rp = ((n * np.cos(a) - np.cos(b)) / (n * np.cos(a) + np.cos(b))) ** 2
+    print(f"{ti:6.1f}° | {100 * rs:6.2f} | {100 * rp:6.2f} | {(rs - rp) / (rs + rp):5.2f}")</code></pre>
+<pre><code class="language-text">θ (độ) :     0     30     45     60     80     90
+I/I0   : 1.000  0.750  0.500  0.250  0.030  0.000
+
+Góc Brewster = atan(n) = 56.3°
+góc tới | Rs (%) | Rp (%) | độ phân cực của tia phản xạ
+   0.0° |   4.00 |   4.00 |  0.00
+  30.0° |   5.78 |   2.52 |  0.39
+  45.0° |   9.20 |   0.85 |  0.83
+  56.3° |  14.79 |   0.00 |  1.00
+  70.0° |  29.96 |   4.25 |  0.75
+  85.0° |  73.23 |  49.33 |  0.20</code></pre>
+<p>Hai hệ quả thực tế:</p>
+<ul>
+  <li><strong>Một kính phân cực trên ống kính</strong> (như kính phân cực của nhiếp ảnh) chặn được phần lớn chói từ ánh sáng <em>không phân cực</em> (cửa sổ, đèn trần) phản xạ trên mặt nhựa, kính khi góc phản xạ gần góc Brewster (khoảng 45–70° với n = 1,5), vì khi đó tia phản xạ gần như chỉ còn thành phần s. Nhìn thẳng góc (0°) thì tia phản xạ không phân cực, một kính phân cực không giúp gì.</li>
+  <li><strong>Hai kính phân cực chéo nhau (cross-polarization)</strong>: một trên đèn, một trên ống kính, trục lệch 90°. Phản xạ gương trên điện môi giữ phần lớn trạng thái phân cực của ánh sáng tới (xấp xỉ tốt khi góc tới nhỏ và khi trục kính trên đèn trùng hướng s hoặc p), nên bị kính trên ống kính chặn gần hết. Ánh sáng khuếch tán đã đi vào lớp vật liệu, tán xạ nhiều lần nên <strong>mất phân cực</strong>, và vẫn đi qua được một nửa. Đây là cách xóa chói hiệu quả với mọi góc nhìn.</li>
+</ul>
+<h3>6.2. Mô phỏng phân cực chéo trên nhãn có màng bóng</h3>
+<p>Nhãn giấy in "LOT 2417" được phủ màng bóng; đèn tạo một vệt chói (thành phần phản xạ gương S, mạnh gấp 3 lần ánh sáng khuếch tán của giấy) nằm ngay trên chữ. Ảnh = D (khuếch tán, mất phân cực) + S (phản xạ gương, giữ phân cực). Mỗi kính phân cực truyền 80% theo trục của nó, tỉ số chặn 1000:1. Sau khi lắp kính, phơi sáng được tăng để giấy ngoài vùng chói vẫn bằng 200.</p>
+<pre><code class="language-python">import numpy as np
+import cv2
+
+H, W = 120, 300
+yy, xx = np.mgrid[0:H, 0:W]
+chu = np.zeros((H, W), np.uint8)
+cv2.putText(chu, "LOT 2417", (20, 80), cv2.FONT_HERSHEY_SIMPLEX, 1.6, 255, 5)
+D = np.where(chu &gt; 0, 0.10, 0.80)                   # phần khuếch tán: nhãn giấy + chữ in
+S = 3.0 * np.exp(-((xx - 150) ** 2 + (yy - 60) ** 2) / (2 * 30.0 ** 2))  # vệt chói trên màng bóng
+choi = S &gt; 0.5                                      # vùng bị chói
+K_POL = 0.8          # độ truyền của kính phân cực theo trục của nó (thực tế 0,7–0,9)
+TAT = 1e-3           # tỉ số chặn (extinction) 1000:1
+rng = np.random.default_rng(1)
+
+
+def chup(D_cam, S_cam, gain):
+    img = gain * (D_cam + S_cam) + rng.normal(0, 2, (H, W))
+    return np.clip(img, 0, 255).astype(np.uint8).astype(np.float64)
+
+
+def do(img, ten):
+    nen, muc = (chu == 0) &amp; choi, (chu &gt; 0) &amp; choi    # đo trong vùng chói
+    c = (img[nen].mean() - img[muc].mean()) / (img[nen].mean() + img[muc].mean())
+    print(f"{ten:24s} | {img[nen].mean():5.0f} | {img[muc].mean():5.0f} | {c:4.2f} | "
+          f"{100 * (img &gt;= 255).mean():5.1f}%")
+
+
+print("Đo trong vùng chói: mức xám nền, mức xám chữ, tương phản C, tỉ lệ pixel bão hòa toàn ảnh")
+print(f"{'Cấu hình':24s} | {'nền':&gt;5s} | {'chữ':&gt;5s} | {'C':&gt;4s} | bão hòa")
+do(chup(D, S, 200 / 0.80), "Không phân cực")
+for theta in (0, 45, 70, 80, 90):
+    D_cam = D * 0.5 * K_POL * 0.5 * K_POL               # khuếch tán bị khử phân cực: còn 1/2 qua kính 2
+    S_cam = S * 0.5 * K_POL * K_POL * (np.cos(np.radians(theta)) ** 2 + TAT)   # Malus
+    gain = 200 / (0.80 * 0.5 * K_POL * 0.5 * K_POL)     # tăng phơi sáng để giấy ngoài vùng chói = 200
+    do(chup(D_cam, S_cam, gain), f"Phân cực, lệch {theta:2d}°")
+print(f"Phơi sáng phải tăng {1 / (0.5 * K_POL * 0.5 * K_POL):.2f} lần khi lắp đủ 2 kính phân cực")</code></pre>
+<pre><code class="language-text">Đo trong vùng chói: mức xám nền, mức xám chữ, tương phản C, tỉ lệ pixel bão hòa toàn ảnh
+Cấu hình                 |   nền |   chữ |    C | bão hòa
+Không phân cực           |   255 |   247 | 0.02 |  37.2%
+Phân cực, lệch  0°       |   255 |   255 | 0.00 |  43.8%
+Phân cực, lệch 45°       |   255 |   247 | 0.02 |  37.3%
+Phân cực, lệch 70°       |   249 |   140 | 0.28 |  14.2%
+Phân cực, lệch 80°       |   219 |    55 | 0.60 |   0.0%
+Phân cực, lệch 90°       |   200 |    25 | 0.77 |   0.0%
+Phơi sáng phải tăng 6.25 lần khi lắp đủ 2 kính phân cực</code></pre>
+<ul>
+  <li><strong>Không phân cực</strong>: trong vùng chói, cả nền lẫn chữ bão hòa (255/247), C = 0,02; 37% ảnh bão hòa. Không thuật toán nào đọc được chữ bị chói trắng.</li>
+  <li><strong>Hai kính song song (0°)</strong> còn tệ hơn: phản xạ gương đi qua trọn, còn khuếch tán mất một nửa, nên chói càng trội.</li>
+  <li><strong>Lệch 90°</strong>: phản xạ gương chỉ còn phần rò rỉ 0,1%, chữ hiện rõ (C = 0,77), không pixel nào bão hòa. Lệch 80° vẫn còn 3% chói (Malus: cos²80° = 0,03) đủ làm nền chói lên 219. Khi lắp đặt, xoay kính trên ống kính tới khi vệt chói tối nhất, rồi khóa vít.</li>
+  <li><strong>Cái giá</strong>: phơi sáng phải tăng 6,25 lần (hai kính, mỗi kính 80%, và mỗi kính bỏ một nửa ánh sáng không phân cực). Với vật chuyển động, phơi sáng không tăng được thì phải tăng cường độ đèn (bài <em>Đèn strobe và đồng bộ trigger camera</em>).</li>
+</ul>
+<div class="warn"><strong>Khi nào phân cực không giúp được</strong>
+<ul>
+  <li><strong>Kim loại trần</strong>: phản xạ gương trên kim loại cũng giữ phần lớn phân cực khi góc tới nhỏ, nên phân cực chéo xóa được chói, nhưng kim loại gần như không có thành phần khuếch tán nên ảnh còn lại rất tối, ít thông tin. Ở góc tới lớn, phản xạ kim loại biến phân cực thẳng thành elip nên không chặn hết. Với kim loại bóng, đổi hình học chiếu sáng (vòm, góc thấp, đồng trục) thường hiệu quả hơn.</li>
+  <li><strong>Vật liệu lưỡng chiết</strong> (màng nhựa kéo căng, hộp nhựa ép phun trong): làm quay phân cực, tạo vân màu và vệt sáng. Đây lại là ứng dụng: soi ứng suất trong nhựa trong và kính bằng phân cực chéo với đèn nền.</li>
+  <li><strong>Đèn yếu</strong>: mất 80–85% ánh sáng có thể buộc phải tăng phơi sáng tới mức nhòe chuyển động.</li>
+</ul>
+Camera phân cực (cảm biến có lưới phân cực 0°, 45°, 90°, 135° trên từng nhóm 4 pixel) chụp đủ 4 hướng trong một lần, tính được độ phân cực và góc phân cực từng điểm: hữu ích cho xước trên kính, ứng suất trong nhựa, nhưng mỗi kênh chỉ còn 1/4 độ phân giải.</div>
+
+<h2>7. Quy trình thử màu, kính lọc, phân cực</h2>
 <ol>
-  <li>Chụp mẫu tốt và mẫu lỗi dưới đèn trắng, đỏ, xanh lá, xanh dương, IR.</li>
-  <li>Tính độ tương phản giữa vùng lỗi và nền cho từng cấu hình.</li>
-  <li>Chọn cấu hình tương phản cao nhất, thêm bandpass filter tương ứng.</li>
-  <li>Thử với ánh sáng nhà xưởng bật/tắt để chắc chắn hệ thống không bị ảnh hưởng.</li>
+  <li>Giữ nguyên kiểu đèn và hình học đã chọn ở bài trước; thay lần lượt màu đèn (xanh dương, xanh lá, đỏ, trắng, IR nếu có), chỉnh phơi sáng để nền chuẩn cùng một mức xám.</li>
+  <li>Đo tương phản (C hoặc CNR như bài trước) giữa lỗi/đặc trưng và nền trên bộ mẫu OK xấu nhất và NG nhỏ nhất. Chọn màu có tương phản nhỏ nhất (trên mọi mẫu) lớn nhất.</li>
+  <li>Lắp kính lọc dải thông khớp màu đèn; kiểm tra độ sáng mép ảnh so với tâm.</li>
+  <li>Chụp ảnh với đèn trạm <strong>tắt</strong> và đèn xưởng bật (cả nắng nếu có cửa sổ): mức xám còn lại chính là phần ánh sáng môi trường; so với ảnh có đèn trạm để có tỉ số đèn/môi trường.</li>
+  <li>Nếu có chói: thử phân cực chéo, xoay tìm điểm tối nhất của vệt chói, ghi lại góc; tính lại phơi sáng và kiểm tra nhòe.</li>
+  <li>Ghi biên bản: màu, CWL/FWHM kính lọc, góc phân cực, phơi sáng, bảng tương phản.</li>
 </ol>
-<p>Xem tổng quan các kiểu chiếu sáng trong bài <a href="7-kieu-chieu-sang-machine-vision.html">7 kiểu chiếu sáng trong Machine Vision</a>.</p>
+
+<h2>8. Sai lầm thường gặp</h2>
+<ul>
+  <li><strong>Dùng camera màu rồi chuyển xám bằng <code>cvtColor</code></strong> cho bài toán tương phản màu: công thức độ sáng của mắt có thể làm hai màu khác nhau thành cùng một mức xám.</li>
+  <li><strong>Chọn màu đèn chỉ nhìn màu vật, quên màu nền</strong>: đèn làm vật tối cũng có thể làm nền tối (đèn xanh dương ở cảnh A).</li>
+  <li><strong>Kính lọc không khớp đèn</strong>: BP635 dùng với LED đỏ 617 nm mất phần lớn tín hiệu. Đọc đỉnh phổ của đèn và CWL, FWHM của kính lọc.</li>
+  <li><strong>Lấy nét dưới đèn trắng rồi chuyển sang đèn IR</strong>: ảnh mờ vì tiêu điểm lệch theo bước sóng.</li>
+  <li><strong>Lắp phân cực mà không xoay chỉnh, không khóa</strong>: lệch 10° đã để lọt 3% chói; rung máy làm kính tự xoay.</li>
+  <li><strong>Kỳ vọng phân cực xóa chói trên kim loại bóng</strong> mà không tính đến việc ảnh còn lại quá tối.</li>
+  <li><strong>Quên an toàn UV và IR</strong>: UV hại mắt; đèn IR mạnh không nhìn thấy nên người dễ nhìn thẳng vào mà không biết.</li>
+</ul>
+
+<h2>9. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Vật màu đỏ trên nền xanh lá, camera mono. Chọn màu đèn để vật <strong>tối nhất</strong> và giải thích. Màu nào làm vật sáng nhất? Vì sao đèn trắng là lựa chọn kém?</p>
+<details><summary>Xem đáp án</summary>
+<p><strong>Đèn xanh lá (khoảng 525 nm).</strong> Vật đỏ hấp thụ ánh sáng xanh lá (màu bù của đỏ) nên phản xạ rất ít: vật tối (13 trong mô phỏng); nền xanh lá phản xạ mạnh đúng bước sóng này nên sáng (110). Hai hiệu ứng cùng chiều nên tương phản cao (C = 0,79). Kèm kính lọc BP525 để ánh sáng xưởng không làm sáng vật lên.</p>
+<p>Đèn xanh dương cũng làm vật tối (12) nhưng nền xanh lá cũng khá tối dưới 470 nm (45), tương phản chỉ 0,58. Đèn <strong>đỏ</strong> làm vật sáng nhất (175) trên nền tối (18): tương phản cũng cao nhưng đảo chiều, phù hợp khi thuật toán cần vật sáng. Đèn trắng chiếu cả hai dải, vật đỏ và nền xanh lá phản xạ tổng năng lượng gần bằng nhau nên chỉ còn C = 0,13.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Trạm dùng đèn đỏ 625 nm, chưa có kính lọc. Ảnh với đèn trạm: nền 160. Tắt đèn trạm, chỉ còn đèn LED trần xưởng: nền 40. Lắp BP625 FWHM 25 nm (số liệu mục 5: đèn còn 76%, đèn LED trần còn 7,33%), rồi tăng phơi sáng để nền trở lại 160. Ánh sáng xưởng đóng góp bao nhiêu mức xám, tỉ số đèn/môi trường trước và sau là bao nhiêu?</p>
+<details><summary>Xem đáp án</summary>
+<p>Chú ý: 160 là tổng đèn + môi trường, nên đèn trạm một mình là 120.</p>
+<pre><code class="language-python">tong, moi_truong = 160.0, 40.0
+den = tong - moi_truong                     # phần của riêng đèn trạm
+den_loc, mt_loc = den * 0.76, moi_truong * 0.0733
+k = tong / (den_loc + mt_loc)               # tăng phơi sáng để tổng trở lại 160
+print(f"Trước: đèn {den:.0f}, môi trường {moi_truong:.0f}, tỉ số {den / moi_truong:.1f}")
+print(f"Sau  : tăng phơi sáng {k:.2f} lần → đèn {den_loc * k:.1f}, môi trường {mt_loc * k:.1f}, "
+      f"tỉ số {den_loc / mt_loc:.1f}")</code></pre>
+<pre><code class="language-text">Trước: đèn 120, môi trường 40, tỉ số 3.0
+Sau  : tăng phơi sáng 1.70 lần → đèn 155.0, môi trường 5.0, tỉ số 31.1</code></pre>
+<p>Ánh sáng xưởng giảm từ 40 xuống khoảng 5 mức xám: khi đèn xưởng bật/tắt, ảnh chỉ đổi khoảng 3% thay vì 25%. Phơi sáng tăng 1,7 lần là cái giá; nếu vật chuyển động, kiểm tra lại nhòe hoặc tăng dòng đèn thay vì tăng phơi sáng.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Lắp phân cực chéo nhưng vít giữ kính trên ống kính bị lỏng. Yêu cầu: phần chói còn lại không quá 1% so với khi hai kính song song. Kính được phép lệch khỏi vị trí 90° tối đa bao nhiêu độ (bỏ qua rò rỉ của kính)?</p>
+<details><summary>Xem đáp án</summary>
+<p>Lệch δ khỏi 90° thì θ = 90° − δ, I/I₀ = cos²(90° − δ) = sin²δ ≤ 0,01 → sin δ ≤ 0,1 → δ ≤ 5,7°.</p>
+<pre><code class="language-python">import math
+
+for delta in (2, 5, 5.74, 8, 10):
+    print(f"lệch {delta:5.2f}° → chói còn {100 * math.sin(math.radians(delta)) ** 2:5.2f}%")
+print(f"giới hạn: {math.degrees(math.asin(0.1)):.2f}°")</code></pre>
+<pre><code class="language-text">lệch  2.00° → chói còn  0.12%
+lệch  5.00° → chói còn  0.76%
+lệch  5.74° → chói còn  1.00%
+lệch  8.00° → chói còn  1.94%
+lệch 10.00° → chói còn  3.02%
+giới hạn: 5.74°</code></pre>
+<p>Sai số vài độ chưa đáng ngại vì hàm sin² tăng chậm quanh 0, nhưng kính tự xoay 10° là chói tăng 25 lần so với khi lệch 2°. Khóa kính bằng vít, đánh dấu vị trí, và đưa "độ sáng vùng chói" vào giám sát (bài sau).</p>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Camera mono đo ∫ S·R·QE dλ. Đèn cùng màu với vật → vật sáng; đèn màu bù → vật tối. Luôn xét cả màu nền; kiểm chứng bằng tính toán hoặc ảnh thật.</li>
+  <li>Camera màu + <code>cvtColor</code> sang xám có thể xóa tương phản giữa hai màu khác nhau; camera mono + LED đơn sắc cho tương phản và độ phân giải tốt hơn.</li>
+  <li>Xanh dương: chi tiết mảnh, bề mặt; đỏ: mặc định, ít nhạy nhám; IR: xuyên mực màu, cần lấy nét lại, QE thấp; UV: chụp huỳnh quang qua kính chặn UV, chú ý an toàn.</li>
+  <li>Kính lọc dải thông khớp đèn giữ ~76–89% tín hiệu nhưng chỉ cho lọt vài đến 15% ánh sáng trắng: tỉ số đèn/môi trường tăng khoảng 6–12 lần; IR 850 + BP850 chặn đèn xưởng hơn 700 lần nhưng không chặn được nắng nhiều như vậy.</li>
+  <li>Malus: I = I₀·cos²θ. Phân cực chéo xóa phản xạ gương (giữ phân cực), giữ ánh sáng khuếch tán (mất phân cực); tốn khoảng 6 lần ánh sáng; kém hiệu quả trên kim loại trần.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Kiểm soát ánh sáng môi trường</strong>, nơi bạn định lượng ảnh hưởng của nắng, đèn xưởng nhấp nháy và xây hàm giám sát độ sáng trong sản xuất.</p>
