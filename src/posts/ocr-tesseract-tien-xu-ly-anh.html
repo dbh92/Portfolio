@@ -1,57 +1,496 @@
-<p><strong>Tesseract</strong> là bộ OCR mã nguồn mở lâu đời và phổ biến, hỗ trợ hơn 100 ngôn ngữ kể cả tiếng Việt. Nó đọc rất tốt văn bản in rõ ràng, nhưng nếu đưa thẳng ảnh chụp thực tế vào thì kết quả thường tệ. Bí quyết nằm ở <strong>tiền xử lý ảnh</strong>.</p>
+<p>Bài OCR và OCV trong công nghiệp đã cho bạn bức tranh chung: quy trình định vị, chuẩn hóa, nhận dạng, kiểm tra định dạng. Bài này đi vào công cụ OCR mã nguồn mở lâu đời nhất: <strong>Tesseract</strong>. Tesseract đọc rất tốt văn bản in rõ ràng như trang sách, nhưng đưa thẳng ảnh chụp trên dây chuyền vào thì kết quả thường tệ, vì ảnh công nghiệp khác xa trang sách: chữ nhỏ, sáng không đều, chữ trắng trên nền tối, nhiễu, nghiêng, chữ in chấm. Phần lớn công việc vì thế nằm ở <strong>tiền xử lý</strong>: biến ảnh thực tế thành "trang sách" mà Tesseract thích. Bạn sẽ xây một pipeline tiền xử lý, đo chất lượng ảnh trước và sau, chọn đúng chế độ phân đoạn (PSM), giới hạn ký tự, và dùng độ tin cậy từng từ để quyết định. Bài sau, <strong>OCR bằng Deep Learning</strong>, dành cho những trường hợp tiền xử lý không cứu được.</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Cài và gọi được Tesseract từ Python; xây pipeline tiền xử lý (đảo cực tính, làm phẳng nền, lọc nhiễu, phóng to, nhị phân, nối chấm, xoay thẳng, thêm viền) và đo được hiệu quả bằng số; chọn <code>--psm</code>, <code>--oem</code>, whitelist cho từng bài toán; đọc độ tin cậy từng từ bằng <code>image_to_data</code> để quyết định OK/NOREAD; đo tỉ lệ đọc đúng hạn dùng trên 10 ảnh mẫu trước và sau tiền xử lý.</div>
 
-<h2>Cài đặt</h2>
-<ul>
-  <li>Cài chương trình Tesseract cho hệ điều hành (Windows có bộ cài sẵn; Ubuntu: <code>sudo apt install tesseract-ocr tesseract-ocr-vie</code>).</li>
-  <li>Cài thư viện Python: <code>pip install pytesseract opencv-python</code>.</li>
-</ul>
-<pre><code>import pytesseract
-# Windows: chỉ đường dẫn nếu chưa có trong PATH
+<h2>1. Tesseract hoạt động thế nào</h2>
+<p>Tesseract (giấy phép Apache 2.0) xử lý ảnh theo ba bước: nhị phân hóa (mặc định dùng ngưỡng Otsu toàn cục), <strong>phân tích bố cục</strong> (tìm khối, dòng, từ) và nhận dạng từng dòng. Từ phiên bản 4, bộ nhận dạng chính là mạng <strong>LSTM</strong> đọc cả dòng; bộ nhận dạng cũ (legacy, so khớp hình dạng ký tự) vẫn còn trong một số file dữ liệu. Mô hình cho từng ngôn ngữ nằm trong file <code>.traineddata</code> (ví dụ <code>eng</code>, <code>vie</code>), có ba bộ: <code>tessdata_fast</code> (nhanh, mặc định khi cài từ gói), <code>tessdata_best</code> (chính xác hơn, chậm hơn) và <code>tessdata</code> (gồm cả mô hình legacy).</p>
+<p>Điều quan trọng cho kỹ sư vision: Tesseract được thiết kế cho <strong>tài liệu</strong>. Tài liệu của Tesseract đưa ra các khuyến nghị về chất lượng ảnh mà ta sẽ biến thành mục tiêu đo được:</p>
+<table>
+  <tr><th>Khuyến nghị</th><th>Lý do</th><th>Mục tiêu đo trong bài</th></tr>
+  <tr><td>Chữ tối trên nền sáng</td><td>Từ bản 4.x, mô hình LSTM được huấn luyện với chữ tối nền sáng; ảnh âm bản cho kết quả kém</td><td>Tỉ lệ pixel "mực" nhỏ hơn 50%</td></tr>
+  <tr><td>Độ phân giải tương đương ít nhất 300 DPI</td><td>Độ chính xác giảm nhanh khi chữ quá nhỏ (dưới khoảng 10 pt ở 300 DPI)</td><td>Chiều cao chữ hoa, chữ số khoảng 30–40 px</td></tr>
+  <tr><td>Nhị phân sạch, ít nhiễu</td><td>Nhiễu bị phân tích bố cục coi là ký tự hoặc làm vỡ nét</td><td>Số thành phần liên thông gần bằng số ký tự</td></tr>
+  <tr><td>Dòng chữ thẳng</td><td>Dòng nghiêng làm phân tích dòng sai</td><td>Góc nghiêng dưới khoảng 0,5°</td></tr>
+  <tr><td>Có viền trắng quanh chữ</td><td>Chữ sát mép ảnh dễ bị bỏ sót</td><td>Thêm viền khoảng 10 px</td></tr>
+</table>
+
+<h2>2. Cài đặt</h2>
+<p>Tesseract là một chương trình riêng; <code>pytesseract</code> chỉ là lớp Python gọi chương trình đó qua dòng lệnh. Phải cài cả hai.</p>
+<pre><code class="language-bash"># Windows: tải bộ cài Tesseract do UB Mannheim đóng gói (trang github.com/UB-Mannheim/tesseract/wiki),
+# khi cài chọn thêm dữ liệu ngôn ngữ cần dùng; mặc định cài vào C:\Program Files\Tesseract-OCR
+# Ubuntu/Debian:
+sudo apt install tesseract-ocr tesseract-ocr-vie
+# macOS:
+brew install tesseract
+# Thư viện Python (mọi hệ điều hành):
+pip install pytesseract opencv-python
+# Kiểm tra:
+tesseract --version
+tesseract --list-langs</code></pre>
+<pre><code class="language-python"># (minh họa) — cần chương trình Tesseract đã cài
+import pytesseract
+
+# Windows: nếu tesseract.exe chưa có trong PATH, chỉ đường dẫn trực tiếp
 # pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-print(pytesseract.get_tesseract_version())</code></pre>
+print(pytesseract.get_tesseract_version())
+print(pytesseract.get_languages(config=""))</code></pre>
+<p>Môi trường chạy thử của bài không có chương trình Tesseract, nên các khối gọi <code>pytesseract</code> được đánh dấu minh họa để bạn chạy trên máy mình. Phần tiền xử lý, đo chất lượng ảnh, kiểm tra kết quả và vòng đánh giá đều chạy được; để đo tỉ lệ đọc trong bài, ta dùng một <strong>bộ đọc thay thế</strong> nhỏ (mục 5) với cùng giao diện, và bạn chỉ cần thay đúng một hàm để chạy với Tesseract.</p>
 
-<h2>Thử nghiệm ban đầu</h2>
-<pre><code>import cv2
-img = cv2.imread("nhan-san-pham.png")
-text = pytesseract.image_to_string(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), lang="eng")
-print(text)</code></pre>
+<h2>3. Bộ 10 ảnh hạn dùng mẫu</h2>
+<p>Bài thực hành: đọc ngày hạn dùng (HSD) in trên bao bì từ 10 ảnh, mỗi ảnh mang một khó khăn điển hình ở nhà máy. Khối dưới tạo 10 ảnh 360×60 và file đáp án. Trên dây chuyền thật, bạn thay bằng 10 ảnh chụp và gõ đáp án vào CSV.</p>
+<pre><code class="language-python">import csv
+import os
 
-<h2>Tiền xử lý: biến ảnh thực tế thành "trang sách"</h2>
-<p>Tesseract hoạt động tốt nhất với chữ đen trên nền trắng, nét rõ, chiều cao chữ khoảng 20–40 pixel, dòng thẳng.</p>
-<pre><code>import numpy as np
+import cv2
+import numpy as np
 
-def preprocess(bgr):
-    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
-    # 1. phóng to nếu chữ nhỏ
-    gray = cv2.resize(gray, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
-    # 2. tăng tương phản cục bộ
-    gray = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray)
-    # 3. giảm nhiễu nhưng giữ biên
-    gray = cv2.bilateralFilter(gray, 9, 50, 50)
-    # 4. nhị phân, đảm bảo chữ đen nền trắng
-    _, th = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    if np.mean(th) &lt; 127:          # nền đen -&gt; đảo
-        th = 255 - th
-    return th
+os.makedirs("hsd", exist_ok=True)
+FONT = cv2.FONT_HERSHEY_SIMPLEX
 
-clean = preprocess(img)</code></pre>
-<p>Với chữ in phun dạng chấm, thêm bước <strong>giãn (dilate)</strong> nhẹ để nối các chấm thành nét liền trước khi đọc (chú ý: trên ảnh chữ đen nền trắng, cần đảo ảnh, giãn, rồi đảo lại).</p>
 
-<h2>Chế độ phân đoạn trang (PSM) và giới hạn ký tự</h2>
-<pre><code>config = "--psm 7 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-/"
-code = pytesseract.image_to_string(clean, lang="eng", config=config).strip()</code></pre>
+def ve_dong(chu, co=1.0, net=2, h=60, w=360):
+    """Mặt nạ mực (0..1) của một dòng chữ căn giữa."""
+    a = np.zeros((h, w), np.uint8)
+    (tw, th), _ = cv2.getTextSize(chu, FONT, co, net)
+    cv2.putText(a, chu, ((w - tw) // 2, (h + th) // 2), FONT, co, 255, net, cv2.LINE_AA)
+    return a.astype(np.float32) / 255
+
+
+def tao_anh(chu, kieu, rng):
+    m = ve_dong(chu, 0.55, 1) if kieu == "chữ nhỏ" else ve_dong(chu)
+    if kieu == "in chấm":                                    # máy in phun: chỉ còn chấm trên lưới 4 px
+        m0, m = ve_dong(chu, 1.0, 4), np.zeros((60, 360), np.float32)
+        for y in range(0, 60, 4):
+            for x in range(0, 360, 4):
+                if m0[y, x] &gt; 0.5:
+                    cv2.circle(m, (x, y), 1, 1.0, -1)
+    if kieu == "nghiêng 6°":
+        m = cv2.warpAffine(m, cv2.getRotationMatrix2D((180, 30), 6, 1.0), (360, 60))
+    nen, muc = (150.0, 115.0) if kieu == "tương phản thấp" else (215.0, 40.0)
+    anh = nen + (muc - nen) * m
+    if kieu == "sáng không đều":
+        anh = anh * (0.35 + 0.75 * np.linspace(0, 1, 360)[None, :])   # đèn chiếu lệch một bên
+    if kieu == "âm bản":
+        anh = 255 - anh                                      # chữ sáng (khắc laser) trên nền tối
+    if kieu == "nền sọc":
+        anh[:, ::6] = np.minimum(anh[:, ::6], 90)            # hoa văn sọc mảnh trên bao bì
+    if kieu == "mờ":
+        anh = cv2.GaussianBlur(anh, (0, 0), 1.6)
+    anh = anh + rng.normal(0, 6, anh.shape)
+    if kieu == "nhiễu hạt":
+        r = rng.random(anh.shape)
+        anh[r &lt; 0.03], anh[r &gt; 0.97] = 30, 240               # hạt bụi, chấm sáng
+    return np.clip(anh, 0, 255).astype(np.uint8)
+
+
+KIEU = ["rõ", "tương phản thấp", "sáng không đều", "chữ nhỏ", "âm bản",
+        "nhiễu hạt", "nghiêng 6°", "in chấm", "nền sọc", "mờ"]
+rng = np.random.default_rng(3)
+with open("hsd/dap_an.csv", "w", newline="", encoding="utf-8") as f:
+    ghi = csv.writer(f)
+    ghi.writerow(["file", "kieu", "hsd"])
+    for i, kieu in enumerate(KIEU):
+        hsd = f"{rng.integers(1, 29):02d}/{rng.integers(1, 13):02d}/20{rng.integers(26, 29)}"
+        ten = f"hsd/hsd_{i:02d}.png"
+        cv2.imwrite(ten, tao_anh("HSD " + hsd, kieu, rng))
+        ghi.writerow([ten, kieu, hsd])
+        print(f"{ten}  {kieu:16s} đáp án {hsd}")</code></pre>
+<pre><code class="language-text">hsd/hsd_00.png  rõ               đáp án 23/02/2026
+hsd/hsd_01.png  tương phản thấp  đáp án 07/09/2028
+hsd/hsd_02.png  sáng không đều   đáp án 10/06/2028
+hsd/hsd_03.png  chữ nhỏ          đáp án 02/03/2026
+hsd/hsd_04.png  âm bản           đáp án 11/10/2027
+hsd/hsd_05.png  nhiễu hạt        đáp án 13/11/2026
+hsd/hsd_06.png  nghiêng 6°       đáp án 16/12/2028
+hsd/hsd_07.png  in chấm          đáp án 05/07/2026
+hsd/hsd_08.png  nền sọc          đáp án 07/12/2026
+hsd/hsd_09.png  mờ               đáp án 19/05/2026</code></pre>
+
+<h2>4. Pipeline tiền xử lý và đo chất lượng ảnh</h2>
+<p>Mỗi bước của pipeline giải quyết một khuyến nghị ở mục 1. Thứ tự quan trọng:</p>
+<ol>
+  <li><strong>Đưa về chữ tối nền sáng</strong>: nhị phân Otsu thử; nếu lớp tối chiếm hơn nửa ảnh thì đó là nền, đảo ảnh.</li>
+  <li><strong>Làm phẳng nền</strong>: ước lượng nền bằng phép đóng (closing) với phần tử lớn hơn nét chữ (25×25), phép đóng xóa các chi tiết tối nhỏ (chữ) và giữ lại nền; rồi chia ảnh cho nền. Ánh sáng không đều biến mất.</li>
+  <li><strong>Nối chấm</strong> nếu là chữ in chấm (nhận biết qua số lượng lớn các thành phần nhỏ cỡ một chấm), làm <em>trước</em> lọc nhiễu, vì lọc trung vị sẽ xóa luôn các chấm.</li>
+  <li><strong>Lọc trung vị 3×3</strong>: xóa hạt nhiễu và đường kẻ mảnh 1 px, giữ cạnh chữ.</li>
+  <li><strong>Xoay thẳng</strong>: thử các góc −10° đến 10°, chọn góc làm hình chiếu theo hàng "nhọn" nhất (phương sai lớn nhất), vì khi dòng chữ nằm ngang, mực dồn vào ít hàng. Làm trước khi đo chiều cao chữ, vì dòng nghiêng trông "cao" hơn thật.</li>
+  <li><strong>Phóng to</strong> để chiều cao dòng chữ khoảng 40 px (nội suy bậc ba <code>INTER_CUBIC</code>).</li>
+  <li><strong>Nhị phân Otsu</strong>, <strong>xóa thành phần chạm mép</strong> (vết sọc, mép nhãn bị cắt vào ROI).</li>
+  <li><strong>Thêm viền trắng</strong> 10 px.</li>
+</ol>
+<p>Hàm <code>do_chat_luong</code> đo các chỉ số ở bảng mục 1 để biết ảnh đã "giống trang sách" chưa. Độ dày nét ước lượng bằng công thức 2 × diện tích / chu vi: một nét dài L, dày w có diện tích ≈ L·w và chu vi ≈ 2L.</p>
+<pre><code class="language-python">import csv
+
+import cv2
+import numpy as np
+
+
+def do_chat_luong(xam):
+    """Chỉ số chất lượng ảnh chữ: tỉ lệ mực, tương phản, chiều cao dòng, độ dày nét, số thành phần."""
+    t, nhi = cv2.threshold(xam, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    ti_le_muc = (nhi &gt; 0).mean()
+    tuong_phan = abs(float(np.median(xam[nhi == 0])) - float(np.median(xam[nhi &gt; 0])))
+    hang = np.where(nhi.mean(axis=1) &gt; 255 * 0.02)[0]
+    cao = int(hang.max() - hang.min() + 1) if len(hang) else 0
+    cs, _ = cv2.findContours(nhi, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    lon = [c for c in cs if cv2.contourArea(c) &gt; 20]
+    net = np.mean([2 * cv2.contourArea(c) / cv2.arcLength(c, True) for c in lon]) if lon else 0.0
+    return ti_le_muc, tuong_phan, cao, net, len(cs)
+
+
+def goc_nghieng(nhi, pham_vi=10, buoc=0.5):
+    tot, goc_tot = -1.0, 0.0
+    tam = (nhi.shape[1] / 2, nhi.shape[0] / 2)
+    for goc in np.arange(-pham_vi, pham_vi + 1e-9, buoc):
+        r = cv2.warpAffine(nhi, cv2.getRotationMatrix2D(tam, goc, 1.0), nhi.shape[::-1], flags=cv2.INTER_NEAREST)
+        v = float(np.var(r.sum(axis=1, dtype=np.float64)))
+        if v &gt; tot:
+            tot, goc_tot = v, float(goc)
+    return goc_tot
+
+
+def tien_xu_ly(xam, cao_muc_tieu=40):
+    g = xam.copy()
+    t, _ = cv2.threshold(g, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    if (g &lt; t).mean() &gt; 0.5:                                  # 1. lớp tối là nền → âm bản → đảo
+        g = 255 - g
+    nen = cv2.morphologyEx(g, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_RECT, (25, 25)))
+    g = np.clip(g.astype(np.float32) / np.maximum(nen, 1) * 230, 0, 255).astype(np.uint8)   # 2. làm phẳng nền
+    _, nhi = cv2.threshold(g, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    _, _, st, _ = cv2.connectedComponentsWithStats(nhi)
+    so_cham = int(((st[1:, cv2.CC_STAT_AREA] &gt;= 4) &amp; (st[1:, cv2.CC_STAT_AREA] &lt;= 30)).sum())
+    if so_cham &gt; 60:                                         # 3. chữ in chấm → nối chấm (mở trên ảnh chữ tối)
+        g = cv2.morphologyEx(g, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
+    g = cv2.medianBlur(g, 3)                                  # 4. lọc trung vị
+    _, nhi = cv2.threshold(g, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    goc = goc_nghieng(nhi)                                    # 5. xoay thẳng (trước khi đo chiều cao chữ)
+    if goc != 0:
+        M = cv2.getRotationMatrix2D((g.shape[1] / 2, g.shape[0] / 2), goc, 1.0)
+        g = cv2.warpAffine(g, M, g.shape[::-1], flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+        _, nhi = cv2.threshold(g, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    hang = np.where(nhi.mean(axis=1) &gt; 255 * 0.02)[0]
+    cao = hang.max() - hang.min() + 1 if len(hang) else cao_muc_tieu
+    k = cao_muc_tieu / cao
+    g = cv2.resize(g, None, fx=k, fy=k, interpolation=cv2.INTER_CUBIC)   # 6. phóng to
+    _, nhi = cv2.threshold(g, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)   # 7. nhị phân
+    n, nhan, st, _ = cv2.connectedComponentsWithStats(nhi)
+    H, W = nhi.shape
+    for i in range(1, n):                                     #    xóa thành phần chạm mép
+        x, y, w, h, _ = st[i]
+        if x == 0 or y == 0 or x + w == W or y + h == H:
+            nhi[nhan == i] = 0
+    return cv2.copyMakeBorder(255 - nhi, 10, 10, 10, 10, cv2.BORDER_CONSTANT, value=255), goc   # 8. viền
+
+
+with open("hsd/dap_an.csv", encoding="utf-8") as f:
+    mau = list(csv.DictReader(f))
+print(f"{'ảnh':16s} {'mực':&gt;5s} {'t.phản':&gt;6s} {'cao':&gt;4s} {'nét':&gt;4s} {'tp':&gt;4s}  →  {'mực':&gt;5s} {'cao':&gt;4s} {'nét':&gt;4s} {'tp':&gt;4s} {'xoay':&gt;5s}")
+for m in mau:
+    xam = cv2.imread(m["file"], cv2.IMREAD_GRAYSCALE)
+    sau, goc = tien_xu_ly(xam)
+    cv2.imwrite(m["file"].replace("hsd_", "sau_"), sau)
+    a, b = do_chat_luong(xam), do_chat_luong(sau)
+    print(f"{m['kieu']:16s} {a[0]:5.0%} {a[1]:6.0f} {a[2]:4d} {a[3]:4.1f} {a[4]:4d}  →  "
+          f"{b[0]:5.0%} {b[2]:4d} {b[3]:4.1f} {b[4]:4d} {goc:5.1f}")</code></pre>
+<pre><code class="language-text">ảnh                mực t.phản  cao  nét   tp  →    mực  cao  nét   tp  xoay
+rõ                 11%    172   24  4.4   13  →     9%   39  8.5   13   0.0
+tương phản thấp    12%     32   23  5.1   80  →     9%   38  9.7   13   0.0
+sáng không đều     49%     94   60  8.0   65  →     9%   39  9.8   13   0.0
+chữ nhỏ             3%    154   11  2.4   13  →     3%   39  8.6   12   0.0
+âm bản             90%    172   60 50.7    1  →     9%   39  8.2   13   0.0
+nhiễu hạt          13%    176   57  3.6  480  →     9%   39  7.5   13   0.0
+nghiêng 6°         11%    167   42  4.5   13  →     9%   39  8.7   13  -6.0
+in chấm             4%    175   19  0.0  154  →     5%   41  5.2   50   0.0
+nền sọc            26%    129   60  1.3   34  →    10%   38  8.3   14   0.0
+mờ                 15%    109   24  6.0   10  →    12%   38 10.1   10   0.0</code></pre>
+<p>Đọc bảng (cột trái: ảnh gốc, cột phải: sau tiền xử lý; "tp" là số thành phần, chuỗi "HSD dd/mm/yyyy" có 13 ký tự không kể dấu cách):</p>
 <ul>
-  <li><code>--psm 7</code>: ảnh là một dòng chữ. <code>--psm 8</code>: một từ. <code>--psm 6</code>: một khối văn bản.</li>
-  <li><strong>Whitelist</strong> chỉ cho phép các ký tự có thể xuất hiện, giảm mạnh nhầm lẫn.</li>
+  <li><strong>Âm bản</strong>: tỉ lệ "mực" của ảnh gốc trên 80%, tức Otsu coi nền là chữ. Sau khi đảo, về mức bình thường như các ảnh khác.</li>
+  <li><strong>Sáng không đều, nền sọc</strong>: ảnh gốc có tỉ lệ mực và số thành phần bất thường (nửa tối của ảnh, các sọc bị coi là mực); sau làm phẳng nền và lọc trung vị thì về đúng dòng chữ.</li>
+  <li><strong>Chữ nhỏ</strong>: dòng chữ chỉ cao 11 px, được phóng lên 40 px như các ảnh khác. Phóng to không thêm thông tin, nhưng đưa chữ về cỡ mà bộ nhận dạng được huấn luyện.</li>
+  <li><strong>Nhiễu hạt</strong>: hàng trăm thành phần (hạt nhiễu) về gần số ký tự.</li>
+  <li><strong>Nghiêng 6°</strong>: góc tìm được −6,0°, xoay ngược lại đúng 6°. Trên ảnh gốc, dòng nghiêng làm chiều cao đo được (42 px) lớn gần gấp đôi thật; vì vậy pipeline xoay thẳng trước rồi mới đo chiều cao để phóng to.</li>
+  <li><strong>In chấm</strong>: hơn trăm chấm rời được nhận ra và nối lại; số thành phần giảm mạnh nhưng chưa về đúng số ký tự (mục 5 sẽ cho thấy hậu quả).</li>
 </ul>
 
-<h2>Lấy vị trí và độ tin cậy từng từ</h2>
-<pre><code>data = pytesseract.image_to_data(clean, config="--psm 6", output_type=pytesseract.Output.DICT)
-for word, conf, x, y, w, h in zip(data["text"], data["conf"], data["left"],
-                                  data["top"], data["width"], data["height"]):
-    if word.strip():
-        print(word, conf, (x, y, w, h))</code></pre>
-<p>Dùng độ tin cậy để quyết định: dưới ngưỡng thì báo người vận hành kiểm tra, không tự đoán.</p>
+<h2>5. Đo tỉ lệ đọc đúng trước và sau tiền xử lý</h2>
+<p>Bộ đọc thay thế dưới đây mô phỏng cách một OCR cổ điển làm việc: nhị phân Otsu toàn cục (giống mặc định của Tesseract), tách thành phần liên thông, tách khối chữ dính tại cột ít mực nhất, rồi so từng ô với mẫu của 14 ký tự được phép bằng NCC. Bảng mẫu chỉ có 14 ký tự đóng vai trò giống <strong>whitelist</strong> của Tesseract ở mục 6. Hàm <code>doc_hsd</code> lấy ngày từ chuỗi đọc được bằng biểu thức chính quy và kiểm tra đó là ngày có thật.</p>
+<pre><code class="language-python">import csv
+import re
+from datetime import date
 
-<h2>Khi Tesseract không đủ</h2>
-<p>Chữ trên nền phức tạp, cong, nghiêng nhiều, ánh sáng không đều: hãy thử OCR dựa trên Deep Learning, xem <a href="ocr-deep-learning-paddleocr-easyocr.html">PaddleOCR và EasyOCR</a>.</p>
+import cv2
+import numpy as np
+
+BANG = "0123456789/HSD"                                      # các ký tự được phép (như whitelist)
+
+
+def chuan_hoa(o):
+    return cv2.resize(o, (20, 32), interpolation=cv2.INTER_AREA).astype(np.float32)
+
+
+MAU = {}
+for c in BANG:
+    a = np.zeros((60, 50), np.uint8)
+    cv2.putText(a, c, (10, 45), cv2.FONT_HERSHEY_SIMPLEX, 1.0, 255, 2, cv2.LINE_AA)
+    x, y, w, h = cv2.boundingRect((a &gt; 127).astype(np.uint8))
+    MAU[c] = chuan_hoa(a[y:y + h, x:x + w])
+
+
+def tach_dinh(nhi, x, y, w, h):
+    """Khối rộng hơn 1,15 lần chiều cao là chữ dính: cắt tại cột ít mực nhất ở khoảng giữa."""
+    if w &lt;= 1.15 * h or w &lt; 8:
+        return [(x, y, w, h)]
+    cot = nhi[y:y + h, x:x + w].sum(axis=0)
+    c = int(0.25 * w) + int(np.argmin(cot[int(0.25 * w):int(0.75 * w)]))
+    return tach_dinh(nhi, x, y, c, h) + tach_dinh(nhi, x + c, y, w - c, h)
+
+
+def doc_thay_the(xam):
+    """Bộ đọc thay thế: trả (chuỗi, điểm NCC thấp nhất) — cùng vai trò với pytesseract ở mục 6."""
+    _, nhi = cv2.threshold(xam, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    n, _, st, _ = cv2.connectedComponentsWithStats(nhi, connectivity=8)
+    tp = [tuple(int(v) for v in st[i][:4]) for i in range(1, n) if st[i, cv2.CC_STAT_AREA] &gt;= 8]
+    if not tp:
+        return "", 0.0
+    h_max = max(t[3] for t in tp)
+    o_chu = []
+    for x, y, w, h in sorted(t for t in tp if t[3] &gt;= 0.5 * h_max):
+        o_chu += tach_dinh(nhi, x, y, w, h)
+    chu, diem = "", []
+    for x, y, w, h in o_chu:
+        o = nhi[y:y + h, x:x + w]
+        r = np.where(o.max(axis=1) &gt; 0)[0]
+        o = chuan_hoa(o[r.min():r.max() + 1])
+        s = {c: float(cv2.matchTemplate(o, m, cv2.TM_CCOEFF_NORMED)[0, 0]) for c, m in MAU.items()}
+        tot = max(s, key=s.get)
+        chu += tot
+        diem.append(s[tot])
+    return chu, min(diem)
+
+
+def doc_hsd(chu):
+    """Lấy dd/mm/yyyy từ chuỗi OCR; trả None nếu không có hoặc không phải ngày có thật."""
+    m = re.search(r"(\d{2})/(\d{2})/(\d{4})", chu.replace(" ", ""))
+    if not m:
+        return None
+    try:
+        date(int(m.group(3)), int(m.group(2)), int(m.group(1)))
+    except ValueError:
+        return None
+    return m.group(0)
+
+
+with open("hsd/dap_an.csv", encoding="utf-8") as f:
+    mau = list(csv.DictReader(f))
+dung = {"trước": 0, "sau": 0}
+print(f"{'ảnh':16s} {'đáp án':10s} | {'trước: chuỗi đọc':18s} {'HSD':10s} | {'sau: chuỗi đọc':16s} {'HSD':10s}")
+for m in mau:
+    dong = f"{m['kieu']:16s} {m['hsd']:10s}"
+    for nhan, ten in (("trước", m["file"]), ("sau", m["file"].replace("hsd_", "sau_"))):
+        chu, diem = doc_thay_the(cv2.imread(ten, cv2.IMREAD_GRAYSCALE))
+        hsd = doc_hsd(chu)
+        dung[nhan] += hsd == m["hsd"]
+        dau = "✓" if hsd == m["hsd"] else "✗"
+        dong += f" | {chu[:16]:16s} {dau} {str(hsd):10s}"
+    print(dong)
+print(f"\nTỉ lệ đọc đúng HSD: trước {dung['trước']}/10, sau tiền xử lý {dung['sau']}/10")</code></pre>
+<pre><code class="language-text">ảnh              đáp án     | trước: chuỗi đọc   HSD        | sau: chuỗi đọc   HSD       
+rõ               23/02/2026 | HSD23/02/2026    ✓ 23/02/2026 | HSD23/02/2026    ✓ 23/02/2026
+tương phản thấp  07/09/2028 | HSD07/09/2028    ✓ 07/09/2028 | HSD07/09/2028    ✓ 07/09/2028
+sáng không đều   10/06/2028 | 0096             ✗ None       | HSD10/06/2028    ✓ 10/06/2028
+chữ nhỏ          02/03/2026 | HSD02/03/2026    ✓ 02/03/2026 | H9302/03/2026    ✓ 02/03/2026
+âm bản           11/10/2027 | 0123132          ✗ None       | HSD11/10/2027    ✓ 11/10/2027
+nhiễu hạt        13/11/2026 | HSD13/11/2026    ✓ 13/11/2026 | HS013/11/2026    ✓ 13/11/2026
+nghiêng 6°       16/12/2028 | HSD16/12/2028    ✓ 16/12/2028 | HSD16/12/2028    ✓ 16/12/2028
+in chấm          05/07/2026 |                  ✗ None       | H4571633SD1336   ✗ None      
+nền sọc          07/12/2026 | 0000000000HHH044 ✗ None       | HSD07/12/2026    ✓ 07/12/2026
+mờ               19/05/2026 | HSD19/05/2626    ✗ 19/05/2626 | HS019/05/2026    ✓ 19/05/2026
+
+Tỉ lệ đọc đúng HSD: trước 5/10, sau tiền xử lý 9/10</code></pre>
+<p>Tiền xử lý nâng tỉ lệ đọc đúng rõ rệt. Bốn ảnh được cứu là những khó khăn mà bộ đọc dựa trên Otsu toàn cục không tự xử lý được: sáng không đều, âm bản, nền sọc, và ảnh mờ (sau khi phóng to và nhị phân lại, hình dạng chữ số đủ rõ để không nhầm 0 thành 6). Hai chi tiết đáng chú ý:</p>
+<ul>
+  <li>Ảnh "mờ" trước tiền xử lý đọc ra năm <code>2626</code>: đây là <strong>đọc sai</strong>, nguy hiểm hơn không đọc được. Hàm <code>doc_hsd</code> không chặn được vì 2626 vẫn là năm hợp lệ về lịch; trạm thật phải so thêm với khoảng hợp lý (ví dụ HSD trong vòng 1–36 tháng kể từ ngày sản xuất) hoặc với lệnh sản xuất.</li>
+  <li>Ảnh "in chấm" vẫn hỏng sau tiền xử lý: nối chấm làm chữ liền lại nhưng méo, bộ đọc học trên chữ nét liền không nhận ra. Tesseract gặp đúng vấn đề này với chữ in phun chấm. Giải pháp: điều chỉnh kích thước phần tử nối chấm theo khoảng cách chấm thực tế, dùng công cụ OCR có font chấm (phần mềm thương mại), hoặc huấn luyện mô hình riêng (bài OCR bằng Deep Learning).</li>
+</ul>
+<p>Khi chạy với Tesseract trên máy bạn, chỉ cần thay <code>doc_thay_the</code> bằng hàm gọi Tesseract (mục 6) và giữ nguyên vòng đánh giá. Kết quả cụ thể sẽ khác, nhưng nguyên tắc giữ nguyên: <strong>luôn đo trước và sau trên cùng bộ ảnh có đáp án</strong>, đừng chỉnh pipeline bằng cảm giác nhìn một ảnh.</p>
+<div class="warn"><strong>Đừng tiền xử lý quá tay</strong>Mỗi bước thêm vào có thể giúp ảnh này nhưng hại ảnh khác (ví dụ phép đóng quá lớn làm dính hai ký tự sát nhau, lọc trung vị xóa dấu chấm thập phân). Giữ pipeline ngắn nhất đạt yêu cầu, và chạy lại toàn bộ bộ ảnh đánh giá mỗi lần thay đổi.</div>
+
+<h2>6. Gọi Tesseract: PSM, OEM và whitelist</h2>
+<p>Tham số quan trọng nhất là <code>--psm</code> (page segmentation mode, chế độ phân đoạn trang): nó nói cho Tesseract biết ảnh chứa gì, để bỏ qua bước phân tích bố cục vốn dành cho trang tài liệu.</p>
+<table>
+  <tr><th>PSM</th><th>Ý nghĩa</th><th>Dùng khi</th></tr>
+  <tr><td>3</td><td>Tự động phân đoạn trang, không phát hiện hướng (mặc định)</td><td>Ảnh tài liệu nhiều đoạn</td></tr>
+  <tr><td>4</td><td>Một cột văn bản, cỡ chữ có thể khác nhau</td><td>Nhãn nhiều dòng thẳng hàng</td></tr>
+  <tr><td>6</td><td>Một khối văn bản đồng nhất</td><td>ROI chứa vài dòng cùng cỡ</td></tr>
+  <tr><td>7</td><td>Đúng một dòng chữ</td><td><strong>Phổ biến nhất trong công nghiệp</strong>: ROI một dòng HSD, số lô, seri</td></tr>
+  <tr><td>8</td><td>Đúng một từ</td><td>Một mã không có dấu cách</td></tr>
+  <tr><td>10</td><td>Đúng một ký tự</td><td>Đã tự tách ký tự</td></tr>
+  <tr><td>11, 12</td><td>Chữ thưa, tìm càng nhiều càng tốt (12: kèm phát hiện hướng)</td><td>Chữ rải rác trên ảnh, không biết vị trí</td></tr>
+  <tr><td>13</td><td>Dòng thô, bỏ qua các xử lý riêng của Tesseract</td><td>Khi PSM 7 cho kết quả lạ</td></tr>
+</table>
+<p>Ngoài ra: PSM 0 chỉ phát hiện hướng và hệ chữ (OSD), PSM 1 phân đoạn tự động kèm OSD, PSM 5 khối chữ dọc, PSM 9 một từ trong vòng tròn. <code>--oem</code> chọn bộ nhận dạng: 0 legacy, 1 LSTM, 2 cả hai, 3 mặc định theo những gì có trong file <code>.traineddata</code>. Với dữ liệu <code>tessdata_fast</code>/<code>tessdata_best</code> chỉ có LSTM, nên dùng <code>--oem 1</code> hoặc để mặc định.</p>
+<p><strong>Whitelist</strong> (<code>-c tessedit_char_whitelist=...</code>) giới hạn tập ký tự đầu ra, giảm mạnh các nhầm lẫn kiểu O/0. Bộ LSTM hỗ trợ whitelist từ Tesseract 4.1; với bản 4.0 tham số này bị bỏ qua. Với mã không phải từ ngữ, tắt từ điển (<code>load_system_dawg</code>, <code>load_freq_dawg</code>) để Tesseract không "sửa" mã thành từ tiếng Anh gần giống.</p>
+<pre><code class="language-python">def cau_hinh_tesseract(psm=7, oem=1, whitelist=None, tat_tu_dien=True, dpi=None):
+    """Tạo chuỗi config cho pytesseract.image_to_string / image_to_data."""
+    phan = [f"--oem {oem}", f"--psm {psm}"]
+    if dpi:
+        phan.append(f"--dpi {dpi}")                          # báo DPI khi ảnh không có thông tin DPI
+    if whitelist:
+        phan.append(f"-c tessedit_char_whitelist={whitelist}")
+    if tat_tu_dien:
+        phan += ["-c load_system_dawg=0", "-c load_freq_dawg=0"]
+    return " ".join(phan)
+
+
+print(cau_hinh_tesseract(whitelist="0123456789/HSD"))
+print(cau_hinh_tesseract(psm=8, whitelist="ABCDEFGHJKLMNPRSTUVWXYZ0123456789-"))</code></pre>
+<pre><code class="language-text">--oem 1 --psm 7 -c tessedit_char_whitelist=0123456789/HSD -c load_system_dawg=0 -c load_freq_dawg=0
+--oem 1 --psm 8 -c tessedit_char_whitelist=ABCDEFGHJKLMNPRSTUVWXYZ0123456789- -c load_system_dawg=0 -c load_freq_dawg=0</code></pre>
+<p>Chú ý: whitelist không được chứa dấu cách (chuỗi config bị tách theo dấu cách). Muốn đọc cả dấu cách, đừng đưa nó vào whitelist; Tesseract vẫn tách từ theo khoảng trắng. Thay bộ đọc thay thế của mục 5 bằng Tesseract như sau:</p>
+<pre><code class="language-python"># (minh họa) — cần chương trình Tesseract + pip install pytesseract
+import csv
+import time
+
+import cv2
+import pytesseract
+
+CAU_HINH = "--oem 1 --psm 7 -c tessedit_char_whitelist=0123456789/HSD -c load_system_dawg=0 -c load_freq_dawg=0"
+
+
+def doc_tesseract(xam):
+    chu = pytesseract.image_to_string(xam, lang="eng", config=CAU_HINH)
+    return chu.strip(), None
+
+
+with open("hsd/dap_an.csv", encoding="utf-8") as f:
+    mau = list(csv.DictReader(f))
+for nhan, doi in (("trước", lambda t: t), ("sau", lambda t: t.replace("hsd_", "sau_"))):
+    dung, t0 = 0, time.perf_counter()
+    for m in mau:
+        chu, _ = doc_tesseract(cv2.imread(doi(m["file"]), cv2.IMREAD_GRAYSCALE))
+        dung += doc_hsd(chu) == m["hsd"]                    # doc_hsd ở mục 5
+    print(f"{nhan}: {dung}/10 đúng, {(time.perf_counter() - t0) / len(mau) * 1000:.0f} ms/ảnh")</code></pre>
+<p><code>pytesseract</code> nhận trực tiếp mảng NumPy (ảnh xám hoặc RGB). Nếu đưa ảnh màu đọc bằng OpenCV, nhớ đổi BGR sang RGB. Mỗi lần gọi, pytesseract ghi ảnh ra file tạm và chạy chương trình <code>tesseract</code>, nên có chi phí cố định vài chục mili giây; với cycle time ngắn, hãy đo thời gian thật trên máy trạm (hoặc dùng thư viện gọi trực tiếp API C của Tesseract, như <code>tesserocr</code>, để tránh khởi động lại mỗi lần).</p>
+
+<h2>7. Độ tin cậy từng từ và quyết định</h2>
+<p><code>image_to_string</code> chỉ trả chuỗi. Để quyết định OK hay NOREAD, dùng <code>image_to_data</code>: nó trả về bảng (dạng TSV) mỗi dòng là một phần tử bố cục, gồm <code>level</code> (1 trang, 2 khối, 3 đoạn, 4 dòng, 5 từ), vị trí <code>left, top, width, height</code>, <code>conf</code> (độ tin cậy 0–100 cho từ; −1 cho các cấp không phải từ) và <code>text</code>.</p>
+<pre><code class="language-python"># (minh họa) — cần chương trình Tesseract + pip install pytesseract
+import cv2
+import pytesseract
+
+xam = cv2.imread("hsd/sau_00.png", cv2.IMREAD_GRAYSCALE)
+d = pytesseract.image_to_data(xam, config="--oem 1 --psm 7 -c tessedit_char_whitelist=0123456789/HSD",
+                              output_type=pytesseract.Output.DICT)
+for i, chu in enumerate(d["text"]):
+    if d["level"][i] == 5 and chu.strip():
+        print(chu, float(d["conf"][i]), (d["left"][i], d["top"][i], d["width"][i], d["height"][i]))</code></pre>
+<p>Logic quyết định không phụ thuộc Tesseract, nên ta viết và thử trên dữ liệu có cùng cấu trúc với <code>Output.DICT</code>. Quy tắc: trường quan trọng (ngày) phải có độ tin cậy từ ≥ ngưỡng và đúng định dạng; nếu không thì NOREAD, không đoán. Độ tin cậy là thang riêng của Tesseract, không phải xác suất; ngưỡng (ví dụ 70) phải chọn từ thống kê trên ảnh thật của bạn.</p>
+<pre><code class="language-python">import re
+from datetime import date
+
+
+def quyet_dinh(d, nguong=70.0, hsd_mong_doi=None):
+    """d: dict cùng cấu trúc pytesseract.Output.DICT. Trả (kết quả, ngày, lý do)."""
+    tu = [(t.strip(), float(c)) for t, c, lv in zip(d["text"], d["conf"], d["level"]) if lv == 5 and t.strip()]
+    for t, c in tu:
+        m = re.fullmatch(r"(\d{2})/(\d{2})/(\d{4})", t)
+        if not m:
+            continue
+        if c &lt; nguong:
+            return "NOREAD", t, f"độ tin cậy {c:.0f} &lt; {nguong:.0f}"
+        try:
+            date(int(m.group(3)), int(m.group(2)), int(m.group(1)))
+        except ValueError:
+            return "NOREAD", t, "không phải ngày có thật"
+        if hsd_mong_doi and t != hsd_mong_doi:
+            return "NG", t, f"khác HSD của lệnh ({hsd_mong_doi})"
+        return "OK", t, f"độ tin cậy {c:.0f}"
+    return "NOREAD", None, "không tìm thấy từ dạng dd/mm/yyyy"
+
+
+def gia_lap(*tu):
+    """Tạo dict giống Output.DICT: 1 dòng cấp 4 (dòng chữ) rồi các từ cấp 5."""
+    return {"level": [4] + [5] * len(tu), "text": [""] + [t for t, _ in tu], "conf": [-1] + [c for _, c in tu]}
+
+
+THU = {
+    "đọc tốt": gia_lap(("HSD", 95.1), ("23/02/2026", 93.4)),
+    "ngày mờ": gia_lap(("HSD", 91.0), ("23/02/2026", 41.7)),
+    "ngày 31/02": gia_lap(("HSD", 96.0), ("31/02/2026", 88.2)),
+    "in sai HSD": gia_lap(("HSD", 94.3), ("23/03/2026", 92.8)),
+    "mất chữ số": gia_lap(("HSD", 90.2), ("23/02/026", 85.0)),
+}
+for ten, d in THU.items():
+    print(f"{ten:12s} → {quyet_dinh(d, hsd_mong_doi='23/02/2026')}")</code></pre>
+<pre><code class="language-text">đọc tốt      → ('OK', '23/02/2026', 'độ tin cậy 93')
+ngày mờ      → ('NOREAD', '23/02/2026', 'độ tin cậy 42 &lt; 70')
+ngày 31/02   → ('NOREAD', '31/02/2026', 'không phải ngày có thật')
+in sai HSD   → ('NG', '23/03/2026', 'khác HSD của lệnh (23/02/2026)')
+mất chữ số   → ('NOREAD', None, 'không tìm thấy từ dạng dd/mm/yyyy')</code></pre>
+<p>Ngoài độ tin cậy từng từ, hãy lưu cả <strong>khung</strong> (<code>left, top, width, height</code>) của từ: nếu dòng HSD dịch dần trong ảnh qua nhiều giờ, máy in hoặc băng tải đang lệch. Tesseract cũng có thể trả độ tin cậy từng ký tự qua các API khác (ví dụ <code>tesserocr</code> với iterator cấp ký tự); với trạm công nghiệp, độ tin cậy cấp từ cộng kiểm tra định dạng thường là đủ.</p>
+
+<h2>8. Lỗi thường gặp</h2>
+<table>
+  <tr><th>Lỗi</th><th>Triệu chứng</th><th>Cách sửa</th></tr>
+  <tr><td>Đưa cả ảnh camera vào Tesseract với PSM mặc định</td><td>Chuỗi rác lẫn từ các vùng in khác, chậm</td><td>Cắt ROI dòng chữ, dùng <code>--psm 7</code></td></tr>
+  <tr><td>Ảnh chữ sáng nền tối</td><td>Đọc rất kém dù ảnh nét</td><td>Đảo ảnh về chữ tối nền sáng</td></tr>
+  <tr><td>Chữ quá nhỏ (dưới khoảng 20 px)</td><td>Ký tự bị gộp hoặc mất</td><td>Phóng to <code>INTER_CUBIC</code> tới 30–40 px; tốt hơn là tăng độ phân giải quang học</td></tr>
+  <tr><td>Quên đổi BGR sang RGB khi đưa ảnh màu</td><td>Kết quả thay đổi thất thường giữa ảnh màu và ảnh xám</td><td>Đưa ảnh xám hoặc ảnh nhị phân đã tiền xử lý</td></tr>
+  <tr><td>Whitelist không có tác dụng</td><td>Vẫn ra ký tự ngoài danh sách</td><td>Kiểm tra phiên bản ≥ 4.1; không đặt dấu cách trong whitelist</td></tr>
+  <tr><td>Tin <code>image_to_string</code> mà không xét độ tin cậy</td><td>Đọc sai lọt qua</td><td><code>image_to_data</code> + ngưỡng + kiểm tra định dạng, giá trị</td></tr>
+  <tr><td>Chỉnh pipeline trên một ảnh</td><td>Ảnh đó đẹp, ảnh khác hỏng</td><td>Bộ ảnh đánh giá có đáp án, đo trước và sau mỗi thay đổi</td></tr>
+</table>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Ở mục 5, thêm bước "kiểm tra khoảng hợp lý": HSD phải nằm trong khoảng 1 đến 36 tháng sau ngày sản xuất 01/01/2026. Hàm của bạn xử lý thế nào với kết quả <code>19/05/2626</code> của ảnh mờ trước tiền xử lý?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">from datetime import date
+
+
+def hop_ly(hsd_chuoi, nsx=date(2026, 1, 1), thang_min=1, thang_max=36):
+    d, m, y = (int(x) for x in hsd_chuoi.split("/"))
+    try:
+        hsd = date(y, m, d)
+    except ValueError:
+        return False
+    so_thang = (hsd.year - nsx.year) * 12 + hsd.month - nsx.month
+    return thang_min &lt;= so_thang &lt;= thang_max
+
+
+for s in ("19/05/2026", "19/05/2626", "07/09/2028", "31/12/2029"):
+    print(s, hop_ly(s))</code></pre>
+<pre><code class="language-text">19/05/2026 True
+19/05/2626 False
+07/09/2028 True
+31/12/2029 False</code></pre>
+<p><code>19/05/2626</code> bị loại (7.204 tháng), nên đọc sai trở thành NOREAD, an toàn hơn. <code>31/12/2029</code> bị loại vì quá 36 tháng. Kiểm tra khoảng hợp lý là lớp chặn rẻ và hiệu quả cho mọi trường ngày tháng.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Chọn PSM và whitelist cho từng ROI: (a) một dòng "LOT: L2610A07"; (b) nhãn 3 dòng: tên sản phẩm, NSX, HSD, cùng cỡ chữ; (c) số seri 12 ký tự chữ-số không có dấu cách, công ty không dùng chữ I, O, Q; (d) một chữ số đơn lẻ in trên nắp chai.</p>
+<details><summary>Xem đáp án</summary>
+<ul>
+  <li>(a) <code>--psm 7</code>, whitelist <code>LOT:0123456789ABC</code> (nếu dây chuyền chỉ có A–C); sau đó sửa theo mặt nạ như bài OCR và OCV trong công nghiệp.</li>
+  <li>(b) <code>--psm 6</code> (một khối đồng nhất) hoặc <code>--psm 4</code>; hoặc tốt hơn: cắt ba ROI và đọc từng dòng với <code>--psm 7</code>, mỗi dòng một whitelist riêng. Tên sản phẩm có tiếng Việt thì dùng <code>-l vie</code> và không dùng whitelist cho dòng đó.</li>
+  <li>(c) <code>--psm 8</code>, whitelist chữ in hoa bỏ I, O, Q cộng 10 chữ số; tắt từ điển.</li>
+  <li>(d) <code>--psm 10</code>, whitelist <code>0123456789</code>.</li>
+</ul>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Ảnh "in chấm" vẫn đọc sai sau tiền xử lý. Thử đổi kích thước phần tử nối chấm trong <code>tien_xu_ly</code> thành 3×3 và 7×7, chạy lại mục 4–5 cho riêng ảnh này. Giải thích vì sao không có kích thước nào hoàn hảo, và đề xuất cách tiếp cận cho dây chuyền in phun chấm thật.</p>
+<details><summary>Xem đáp án</summary>
+<p>Phần tử nhỏ (3×3) không lấp được khe giữa các chấm, ký tự vẫn vỡ thành nhiều mảnh. Phần tử lớn (7×7) lấp được khe nhưng cũng lấp cả các lỗ trong chữ (0, 6, 8, D) và nối các ký tự sát nhau, làm mất hình dạng. Kích thước đúng phụ thuộc khoảng cách chấm, mà khoảng cách này thay đổi theo tốc độ băng tải và độ cao đầu in. Trên dây chuyền thật: (1) cố định khoảng cách chấm (đồng bộ máy in với encoder băng tải), (2) chọn phần tử theo khoảng cách chấm đo được trên ảnh mẫu, (3) ưu tiên OCV (so với ảnh mẫu chữ chấm thật) thay vì OCR, hoặc dùng công cụ OCR có hỗ trợ font chấm, hoặc huấn luyện mô hình nhận dạng trên ảnh chữ chấm của chính dây chuyền.</p>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Tesseract được thiết kế cho tài liệu: chữ tối nền sáng, chữ cao khoảng 30–40 px, ảnh sạch, dòng thẳng, có viền. Tiền xử lý là đưa ảnh công nghiệp về điều kiện đó.</li>
+  <li>Pipeline: đảo cực tính → làm phẳng nền → nối chấm (nếu cần) → lọc trung vị → phóng to → Otsu, xóa thành phần chạm mép → xoay thẳng → thêm viền. Đo chất lượng ảnh bằng số trước và sau.</li>
+  <li>Trong công nghiệp hay dùng <code>--psm 7</code> cho một dòng, whitelist theo định dạng (Tesseract ≥ 4.1), tắt từ điển cho mã.</li>
+  <li><code>image_to_data</code> cho độ tin cậy và vị trí từng từ; quyết định OK/NG/NOREAD bằng ngưỡng tin cậy cộng kiểm tra định dạng, ngày có thật, khoảng hợp lý, lệnh sản xuất.</li>
+  <li>Luôn đánh giá trên bộ ảnh có đáp án; chữ in chấm và chữ khắc tương phản thấp là giới hạn thật của Tesseract.</li>
+</ul>
+<p>Bài tiếp theo: <strong>OCR bằng Deep Learning</strong>, với PaddleOCR và EasyOCR cho những ảnh mà tiền xử lý không cứu được.</p>

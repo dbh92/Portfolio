@@ -1,83 +1,540 @@
-<p>Mã 2D như <strong>QR Code</strong> và <strong>DataMatrix</strong> là "chứng minh thư" của sản phẩm: số seri, lô, ngày sản xuất. Đọc mã tự động trên dây chuyền là nền tảng của truy xuất nguồn gốc. Dự án này đọc mã trên bao bì bằng Python, kèm kiểm tra chất lượng in cơ bản và mã nguồn đầy đủ.</p>
+<p>Ở bài feature matching và shape matching, bạn đã định vị được vật xoay bất kỳ góc nào. Mã 2D là trường hợp đặc biệt dễ chịu: <strong>QR Code</strong> và <strong>DataMatrix</strong> được thiết kế sẵn các mẫu định vị để máy tự tìm vị trí, góc xoay và lưới ô, rồi có cả mã sửa lỗi Reed-Solomon. Chúng là "chứng minh thư" của sản phẩm: mã sản phẩm, số lô, hạn dùng, số seri. Trạm đọc mã trên dây chuyền đóng gói là một trong những ứng dụng vision phổ biến nhất ở nhà máy Việt Nam (thực phẩm, dược, điện tử, linh kiện ô tô). Bài lab này dạy bạn đọc mã bằng OpenCV và libdmtx, kiểm tra nội dung trước khi chấp nhận, đo giới hạn khi mã mờ hoặc nghiêng, và tự làm bộ thử 20 ảnh để đo tỉ lệ đọc. Bài sau, <strong>OCR và OCV trong công nghiệp</strong>, chuyển sang đọc chữ in, việc khó hơn nhiều vì chữ không có cơ chế sửa lỗi.</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Đọc được QR bằng <code>cv2.QRCodeDetector</code> và <code>cv2.QRCodeDetectorAruco</code>, đọc DataMatrix bằng <code>pylibdmtx</code> (libdmtx); tách và kiểm tra chuỗi GS1 (chữ số kiểm tra, hạn dùng, lô, trùng seri); đo được mã đọc tới mức mờ, nghiêng, tương phản nào; dùng chiến lược đọc "bậc thang" để tăng tỉ lệ đọc mà không tăng cycle time.</div>
 
-<h2>QR Code và DataMatrix</h2>
+<h2>1. QR Code và DataMatrix: cấu tạo cần biết</h2>
+<p>Đơn vị nhỏ nhất của mã 2D là <strong>module</strong> (một ô vuông đen hoặc trắng). Mọi quy tắc thiết kế trạm đọc đều tính theo module: camera phải nhìn mỗi module bằng vài pixel, độ mờ phải nhỏ hơn một phần module, và quanh mã phải có <strong>vùng yên tĩnh</strong> (quiet zone) không in gì.</p>
 <table>
-  <tr><th></th><th>QR Code</th><th>DataMatrix</th></tr>
-  <tr><td>Nhận dạng</td><td>Ba ô vuông định vị ở góc</td><td>Đường viền chữ L liền và cạnh chấm xen kẽ</td></tr>
-  <tr><td>Phổ biến ở</td><td>Bao bì tiêu dùng, marketing, thanh toán</td><td>Linh kiện điện tử, ô tô, dược phẩm, khắc trực tiếp lên kim loại</td></tr>
-  <tr><td>Kích thước nhỏ</td><td>Khá</td><td>Rất tốt, phù hợp vùng in nhỏ</td></tr>
-  <tr><td>Sửa lỗi</td><td>Có (Reed-Solomon, nhiều mức)</td><td>Có (Reed-Solomon)</td></tr>
+  <tr><th></th><th>QR Code (ISO/IEC 18004)</th><th>DataMatrix ECC 200 (ISO/IEC 16022)</th></tr>
+  <tr><td>Mẫu định vị</td><td>3 ô vuông lớn (finder pattern) ở 3 góc, thêm ô căn chỉnh (alignment) từ phiên bản 2</td><td>Hai cạnh liền tạo hình chữ L (finder), hai cạnh đối diện chấm đen trắng xen kẽ (clock/timing)</td></tr>
+  <tr><td>Kích thước</td><td>Phiên bản 1–40: từ 21×21 đến 177×177 module</td><td>Vuông 10×10 đến 144×144 module, có cả dạng chữ nhật (ví dụ 8×18)</td></tr>
+  <tr><td>Sửa lỗi</td><td>Reed-Solomon, chọn mức L/M/Q/H: phục hồi khoảng 7/15/25/30% dữ liệu hỏng</td><td>Reed-Solomon, mức cố định theo kích thước mã</td></tr>
+  <tr><td>Vùng yên tĩnh</td><td>4 module</td><td>1 module</td></tr>
+  <tr><td>Dùng nhiều ở</td><td>Bao bì tiêu dùng, thanh toán, marketing, nhãn thùng</td><td>Linh kiện điện tử, ô tô, dược phẩm; khắc trực tiếp lên kim loại, nhựa (DPM)</td></tr>
+  <tr><td>Ưu điểm</td><td>Đọc được bằng điện thoại, thư viện mở hỗ trợ tốt</td><td>Nhỏ gọn hơn với cùng dữ liệu, chịu được khắc chấm (dot peen)</td></tr>
+</table>
+<p>Trong chuỗi cung ứng, nội dung mã thường theo chuẩn <strong>GS1</strong>: dữ liệu ghép từ các trường có <strong>mã định danh ứng dụng</strong> (Application Identifier, AI) đứng trước, ví dụ <code>(01)</code> là GTIN 14 chữ số, <code>(17)</code> hạn dùng dạng YYMMDD, <code>(10)</code> số lô, <code>(21)</code> số seri. Trường có độ dài thay đổi (lô, seri) kết thúc bằng ký tự phân cách <strong>GS</strong> (ASCII 29) nếu còn trường khác theo sau. Mã GS1 DataMatrix và GS1 QR thật bắt đầu bằng ký tự đặc biệt FNC1; khi được cấu hình, đầu đọc gửi kèm tiền tố nhận dạng như <code>]d2</code> (GS1 DataMatrix) hoặc <code>]Q3</code> (GS1 QR) để phần mềm biết đây là chuỗi GS1.</p>
+
+<h2>2. Cài đặt và kiểm tra OpenCV có gì</h2>
+<pre><code class="language-bash">pip install opencv-python numpy
+# DataMatrix: pylibdmtx là lớp Python bọc thư viện C libdmtx
+pip install pylibdmtx
+# Ubuntu/Debian: cài thêm thư viện hệ thống (bản Windows của pylibdmtx đã kèm sẵn DLL)
+sudo apt install libdmtx0b
+# macOS
+brew install libdmtx</code></pre>
+<p>Trên Windows, nếu <code>import pylibdmtx</code> báo lỗi thiếu DLL, thường là máy thiếu gói Visual C++ Redistributable; tài liệu của pylibdmtx ghi rõ phiên bản cần cài. Trước khi viết code, hãy kiểm tra bản OpenCV của bạn thực sự có những bộ đọc nào, đừng đoán:</p>
+<pre><code class="language-python">import cv2
+
+print("OpenCV", cv2.__version__)
+for ten in ("QRCodeEncoder", "QRCodeDetector", "QRCodeDetectorAruco"):
+    print(f"cv2.{ten:28s}", hasattr(cv2, ten))
+print(f"{'cv2.barcode.BarcodeDetector':32s}", hasattr(cv2, "barcode") and hasattr(cv2.barcode, "BarcodeDetector"))
+dm = [n for n in dir(cv2) if "datamatrix" in n.lower() or "dmtx" in n.lower()]
+print(f"{'Bộ đọc DataMatrix trong cv2':32s}", dm if dm else "không có")</code></pre>
+<pre><code class="language-text">OpenCV 5.0.0
+cv2.QRCodeEncoder                True
+cv2.QRCodeDetector               True
+cv2.QRCodeDetectorAruco          True
+cv2.barcode.BarcodeDetector      True
+Bộ đọc DataMatrix trong cv2      không có</code></pre>
+<p>Bài viết chạy với OpenCV 5.0. OpenCV có bộ tạo và hai bộ đọc QR, bộ đọc mã vạch 1D, nhưng <strong>không có bộ giải mã DataMatrix</strong> (hàm <code>findDataMatrix</code> của OpenCV 2.x đã bị bỏ từ OpenCV 3). Vì vậy DataMatrix cần thư viện khác: <code>pylibdmtx</code> (mã nguồn mở), <code>zxing-cpp</code> (gói pip <code>zxing-cpp</code>, đọc được nhiều loại mã), hoặc thư viện của các hãng vision thương mại. Môi trường chạy thử của bài không có libdmtx, nên phần chạy được dùng QR; phần DataMatrix ở mục 5 là mã để bạn chạy trên máy mình. Mọi kỹ thuật còn lại (kiểm tra nội dung, đo giới hạn, đọc bậc thang) áp dụng y hệt cho DataMatrix.</p>
+
+<h2>3. Tạo nhãn thử và đọc QR đầu tiên</h2>
+<p>Ta tạo một nhãn thùng 640×480: mã QR chứa chuỗi GS1 (GTIN, hạn dùng, lô, seri), mức sửa lỗi M, mỗi module 5 pixel. <code>cv2.QRCodeEncoder</code> trả về ảnh có 1 pixel cho mỗi module, nên ta phóng to bằng <code>INTER_NEAREST</code> để giữ cạnh sắc.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+GS = "\x1d"                                                   # ký tự phân cách GS1 (ASCII 29)
+NOI_DUNG = "01" + "08931234567897" + "17" + "271231" + "10" + "L2610A" + GS + "21" + "VN000123"
+
+p = cv2.QRCodeEncoder_Params()
+p.correction_level = cv2.QRCODE_ENCODER_CORRECT_LEVEL_M
+qr = cv2.QRCodeEncoder.create(p).encode(NOI_DUNG)             # 1 pixel = 1 module
+den = np.where(qr.min(axis=0) == 0)[0]
+print("ảnh mã:", qr.shape, "| vùng có module đen: cột", den.min(), "đến", den.max())
+
+MOD = 5
+ma = cv2.resize(qr, None, fx=MOD, fy=MOD, interpolation=cv2.INTER_NEAREST)
+nhan = np.full((480, 640), 190, np.uint8)                     # thùng carton
+cv2.rectangle(nhan, (40, 60), (600, 420), 245, -1)            # nhãn trắng
+nhan[100:100 + ma.shape[0], 380:380 + ma.shape[1]] = ma
+cv2.putText(nhan, "GTIN 08931234567897", (60, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.7, 20, 2, cv2.LINE_AA)
+cv2.putText(nhan, "HSD 31/12/2027", (60, 190), cv2.FONT_HERSHEY_SIMPLEX, 0.7, 20, 2, cv2.LINE_AA)
+cv2.putText(nhan, "LOT L2610A", (60, 240), cv2.FONT_HERSHEY_SIMPLEX, 0.7, 20, 2, cv2.LINE_AA)
+rng = np.random.default_rng(0)
+nhan = np.clip(nhan + rng.normal(0, 3, nhan.shape), 0, 255).astype(np.uint8)
+cv2.imwrite("nhan_thung.png", nhan)
+
+bo_doc = cv2.QRCodeDetector()
+chuoi, goc, ma_thang = bo_doc.detectAndDecode(nhan)
+print("nội dung:", repr(chuoi))
+print("4 góc (px):", goc.reshape(4, 2).round(1).tolist())
+canh = np.linalg.norm(goc[0, 1] - goc[0, 0])
+print(f"cạnh mã {canh:.1f} px, lưới {ma_thang.shape[0]} module → {canh / ma_thang.shape[0]:.2f} px/module")</code></pre>
+<pre><code class="language-text">ảnh mã: (37, 37) | vùng có module đen: cột 2 đến 34
+nội dung: '01089312345678971727123110L2610A\x1d21VN000123'
+4 góc (px): [[390.0, 110.0], [554.0, 110.0], [554.0, 274.0], [390.0, 274.0]]
+cạnh mã 164.0 px, lưới 33 module → 4.97 px/module</code></pre>
+<p>Ba điều cần để ý:</p>
+<ul>
+  <li>Mã có 33×33 module (phiên bản 4, vì chuỗi GS1 dài 43 ký tự ở mức sửa lỗi M). Bộ tạo của OpenCV chỉ chừa vùng yên tĩnh 2 module mỗi bên (ảnh 37×37), ít hơn chuẩn 4 module; nhãn thật phải chừa đủ. Ở đây nền nhãn trắng quanh mã đóng vai vùng yên tĩnh.</li>
+  <li><code>detectAndDecode</code> trả về 3 thứ: chuỗi (rỗng nếu không đọc được), 4 góc theo thứ tự trên-trái, trên-phải, dưới-phải, dưới-trái <em>của mã</em> (không phải của ảnh: mã xoay 90° thì "trên-trái" là góc có finder pattern tương ứng), và ảnh mã đã nắn thẳng, 1 pixel mỗi module.</li>
+  <li>Từ cạnh mã và số module, ta tính được <strong>px/module</strong>. Con số này nên ghi vào log mỗi lần đọc: nó tụt dần là dấu hiệu camera bị xô lệch hoặc khách đổi mẫu nhãn.</li>
+</ul>
+<p>Ký tự GS (<code>\x1d</code>) đi qua mã nguyên vẹn. Nếu bạn in chuỗi ra màn hình mà không dùng <code>repr</code>, ký tự này vô hình và bạn sẽ không hiểu vì sao phép so sánh chuỗi thất bại.</p>
+
+<h2>4. Nhiều mã trên một ảnh và bộ đọc thứ hai</h2>
+<p>Thùng hàng thường có nhiều mã (mã thùng, mã pallet, mã của từng hộp nhìn qua cửa sổ). <code>detectAndDecodeMulti</code> đọc tất cả. OpenCV còn có <code>QRCodeDetectorAruco</code>, dùng thuật toán tìm finder pattern kiểu ArUco, có giao diện giống hệt. Hai bộ đọc mạnh yếu khác nhau, ta sẽ tận dụng điều đó ở mục 8.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+rng = np.random.default_rng(1)
+anh = np.full((480, 640), 200, np.uint8)
+for i, (x, y, goc) in enumerate(((40, 60, 0), (250, 180, 30), (450, 40, 90))):
+    qr = cv2.QRCodeEncoder.create().encode(f"21VN00012{i}")
+    ma = cv2.resize(qr, None, fx=5, fy=5, interpolation=cv2.INTER_NEAREST)
+    ma = cv2.copyMakeBorder(ma, 10, 10, 10, 10, cv2.BORDER_CONSTANT, value=255)
+    h, w = ma.shape
+    M = cv2.getRotationMatrix2D((w / 2, h / 2), goc, 1.0)
+    xoay = cv2.warpAffine(ma, M, (w, h), flags=cv2.INTER_LINEAR, borderValue=200)
+    anh[y:y + h, x:x + w] = xoay
+anh = np.clip(anh + rng.normal(0, 3, anh.shape), 0, 255).astype(np.uint8)
+
+for ten, bo_doc in (("QRCodeDetector", cv2.QRCodeDetector()), ("QRCodeDetectorAruco", cv2.QRCodeDetectorAruco())):
+    ok, chuoi, goc, _ = bo_doc.detectAndDecodeMulti(anh)
+    ket_qua = sorted(zip(chuoi, goc.mean(axis=1).round().astype(int).tolist())) if ok else []
+    print(f"{ten:20s} đọc được {sum(1 for c, _ in ket_qua if c)} mã:")
+    for c, tam in ket_qua:
+        print(f"    {c!r:16s} tâm {tam}")</code></pre>
+<pre><code class="language-text">QRCodeDetector       đọc được 3 mã:
+    '21VN000120'     tâm [112, 132]
+    '21VN000121'     tâm [322, 252]
+    '21VN000122'     tâm [522, 112]
+QRCodeDetectorAruco  đọc được 3 mã:
+    '21VN000120'     tâm [112, 132]
+    '21VN000121'     tâm [322, 253]
+    '21VN000122'     tâm [522, 113]</code></pre>
+<p>Thứ tự kết quả của <code>detectAndDecodeMulti</code> không theo vị trí, nên luôn sắp xếp lại (theo nội dung hoặc theo tọa độ) trước khi so với kỳ vọng. Một phần tử chuỗi rỗng nghĩa là tìm thấy mã nhưng không giải được; đếm riêng trường hợp này, nó thường báo hiệu mã in kém chứ không phải thiếu mã.</p>
+
+<h2>5. DataMatrix với pylibdmtx (chạy trên máy bạn)</h2>
+<p>Khối dưới đây cần <code>pylibdmtx</code> và libdmtx (mục 2). Nó sinh một mã DataMatrix rồi đọc lại, đúng cách bạn sẽ dùng ở trạm thật.</p>
+<pre><code class="language-python"># (minh họa) — cần: pip install pylibdmtx (+ libdmtx của hệ điều hành)
+import time
+
+import cv2
+import numpy as np
+from pylibdmtx.pylibdmtx import decode, encode
+
+GS = "\x1d"
+noi_dung = "0108931234567897" + "17271231" + "10L2610A" + GS + "21VN000123"
+enc = encode(noi_dung.encode("ascii"))                 # Encoded(width, height, bpp, pixels), ảnh RGB
+dm = np.frombuffer(enc.pixels, np.uint8).reshape(enc.height, enc.width, 3)
+xam = cv2.cvtColor(dm, cv2.COLOR_RGB2GRAY)
+xam = cv2.resize(xam, None, fx=2, fy=2, interpolation=cv2.INTER_NEAREST)
+xam = cv2.copyMakeBorder(xam, 40, 40, 40, 40, cv2.BORDER_CONSTANT, value=255)
+
+t0 = time.perf_counter()
+ket_qua = decode(xam, timeout=200, max_count=1)       # timeout tính bằng mili giây; max_count: dừng khi đủ số mã
+print(f"{(time.perf_counter() - t0) * 1000:.0f} ms")
+for r in ket_qua:
+    print(repr(r.data.decode("ascii")), r.rect)     # data là bytes; rect = Rect(left, top, width, height)
+    x, w, h = r.rect.left, r.rect.width, r.rect.height
+    y_tren = xam.shape[0] - r.rect.top - h          # libdmtx đặt gốc tọa độ ở góc DƯỚI-trái
+    cv2.rectangle(xam, (x, y_tren), (x + w, y_tren + h), 128, 2)   # vẽ thử để kiểm tra khung</code></pre>
+<p>Những điểm khác với bộ đọc QR của OpenCV:</p>
+<ul>
+  <li><strong>Luôn đặt <code>timeout</code></strong> (mili giây). Không có mã trong ảnh, libdmtx có thể quét rất lâu trên ảnh lớn, đủ để trễ cả chục chu kỳ dây chuyền. <code>max_count=1</code> dừng ngay khi đọc được một mã.</li>
+  <li><code>shrink=2</code> cho libdmtx giảm ảnh trước khi tìm (nhanh hơn, cần module đủ lớn). Các tham số khác như <code>shape</code>, <code>min_edge</code>, <code>max_edge</code>, <code>threshold</code> giúp thu hẹp tìm kiếm; ý nghĩa và giá trị hợp lệ xem trong tài liệu của phiên bản bạn cài.</li>
+  <li>Kết quả chỉ có một hình chữ nhật <code>rect</code>, không có 4 góc và hướng như QR. Trường <code>top</code> tính theo hệ tọa độ của libdmtx (gốc dưới-trái), nên phải đổi như dòng <code>y_tren</code>; hãy vẽ khung lên ảnh để xác nhận với phiên bản bạn đang dùng.</li>
+  <li>Hiệu quả nhất là cắt ROI quanh vùng có mã (nhờ đồ gá hoặc định vị bằng template matching như bài trước) rồi mới gọi <code>decode</code>.</li>
+</ul>
+
+<h2>6. Kiểm tra nội dung trước khi chấp nhận</h2>
+<p>Đọc được mã mới là một nửa. Trạm phải trả lời: <strong>nội dung có đúng cho lô đang chạy không?</strong> Máy in nhãn cài nhầm dữ liệu lô cũ, đổi ca quên cập nhật hạn dùng, máy in lặp lại một seri: các lỗi này đều cho mã đọc "đẹp" nhưng sai. Quy trình kiểm tra:</p>
+<ol>
+  <li>Tách chuỗi GS1 thành các trường. Trường độ dài cố định (01: 14 chữ số, 17: 6 chữ số) cắt theo độ dài; trường độ dài thay đổi (10, 21: tối đa 20 ký tự) đọc tới ký tự GS hoặc hết chuỗi.</li>
+  <li>Kiểm tra <strong>chữ số kiểm tra GTIN</strong> (thuật toán GS1 mod 10): nhân các chữ số với trọng số 3, 1, 3, 1… tính từ phải sang (không tính chữ số kiểm tra), chữ số kiểm tra = (10 − tổng mod 10) mod 10.</li>
+  <li>Hạn dùng phải là ngày hợp lệ và khớp lệnh sản xuất; GTIN và lô khớp lệnh sản xuất.</li>
+  <li>Seri chưa từng xuất hiện (chống trùng).</li>
+</ol>
+<pre><code class="language-python">from datetime import date
+
+GS = "\x1d"
+DO_DAI_CO_DINH = {"01": 14, "17": 6, "11": 6}                 # AI có độ dài cố định dùng trong bài
+DO_DAI_TOI_DA = {"10": 20, "21": 20}                          # AI độ dài thay đổi, kết thúc bằng GS
+
+
+def chu_so_kiem_tra_gs1(than):
+    """Chữ số kiểm tra GS1 (GTIN-8/12/13/14, SSCC): trọng số 3,1,3,1... tính từ phải sang."""
+    tong = sum(int(c) * (3 if i % 2 == 0 else 1) for i, c in enumerate(reversed(than)))
+    return str((10 - tong % 10) % 10)
+
+
+def tach_gs1(chuoi):
+    """'0108931234567897172712...' → {'01': '0893...', '17': '271231', ...}; lỗi → ValueError."""
+    truong, i = {}, 0
+    while i &lt; len(chuoi):
+        ai = chuoi[i:i + 2]
+        if ai in DO_DAI_CO_DINH:
+            n = DO_DAI_CO_DINH[ai]
+            gia_tri = chuoi[i + 2:i + 2 + n]
+            if len(gia_tri) != n:
+                raise ValueError(f"AI {ai} thiếu ký tự")
+            i += 2 + n
+        elif ai in DO_DAI_TOI_DA:
+            j = chuoi.find(GS, i + 2)
+            j = len(chuoi) if j &lt; 0 else j
+            gia_tri = chuoi[i + 2:j]
+            if not 1 &lt;= len(gia_tri) &lt;= DO_DAI_TOI_DA[ai]:
+                raise ValueError(f"AI {ai} sai độ dài")
+            i = j + 1
+        else:
+            raise ValueError(f"AI không hỗ trợ: {ai!r}")
+        truong[ai] = gia_tri
+    return truong
+
+
+LENH_SX = {"gtin": "08931234567897", "lo": "L2610A", "hsd": date(2027, 12, 31)}
+da_doc = set()
+
+
+def kiem_tra(chuoi):
+    try:
+        t = tach_gs1(chuoi)
+    except ValueError as e:
+        return "NG", f"sai cấu trúc GS1: {e}"
+    if not {"01", "17", "10", "21"} &lt;= t.keys():
+        return "NG", "thiếu trường bắt buộc"
+    gtin = t["01"]
+    if not gtin.isdigit() or chu_so_kiem_tra_gs1(gtin[:-1]) != gtin[-1]:
+        return "NG", f"GTIN {gtin} sai chữ số kiểm tra"
+    if gtin != LENH_SX["gtin"]:
+        return "NG", f"GTIN {gtin} không thuộc lệnh sản xuất"
+    try:
+        hsd = date(2000 + int(t["17"][:2]), int(t["17"][2:4]), int(t["17"][4:]))
+    except ValueError:
+        return "NG", f"hạn dùng {t['17']} không phải ngày hợp lệ"
+    if hsd != LENH_SX["hsd"]:
+        return "NG", f"hạn dùng {hsd} khác lệnh ({LENH_SX['hsd']})"
+    if t["10"] != LENH_SX["lo"]:
+        return "NG", f"lô {t['10']} khác lệnh ({LENH_SX['lo']})"
+    if t["21"] in da_doc:
+        return "NG", f"seri {t['21']} bị trùng"
+    da_doc.add(t["21"])
+    return "OK", f"seri {t['21']}"
+
+
+THU = {
+    "nhãn đúng": "0108931234567897" + "17271231" + "10L2610A" + GS + "21VN000123",
+    "đọc lại nhãn trên": "0108931234567897" + "17271231" + "10L2610A" + GS + "21VN000123",
+    "seri kế tiếp": "0108931234567897" + "17271231" + "10L2610A" + GS + "21VN000124",
+    "GTIN in sai 1 số": "0108931234567887" + "17271231" + "10L2610A" + GS + "21VN000125",
+    "ngày 31/02": "0108931234567897" + "17270231" + "10L2610A" + GS + "21VN000126",
+    "lô cũ chưa đổi": "0108931234567897" + "17271231" + "10L2609C" + GS + "21VN000127",
+    "chuỗi không phải GS1": "PN:VB-500;SN:123",
+}
+print("Chữ số kiểm tra của 0893123456789:", chu_so_kiem_tra_gs1("0893123456789"))
+for ten, chuoi in THU.items():
+    kq, ly_do = kiem_tra(chuoi)
+    print(f"{ten:22s} {kq}  {ly_do}")</code></pre>
+<pre><code class="language-text">Chữ số kiểm tra của 0893123456789: 7
+nhãn đúng              OK  seri VN000123
+đọc lại nhãn trên      NG  seri VN000123 bị trùng
+seri kế tiếp           OK  seri VN000124
+GTIN in sai 1 số       NG  GTIN 08931234567887 sai chữ số kiểm tra
+ngày 31/02             NG  hạn dùng 270231 không phải ngày hợp lệ
+lô cũ chưa đổi         NG  lô L2609C khác lệnh (L2610A)
+chuỗi không phải GS1   NG  sai cấu trúc GS1: AI không hỗ trợ: 'PN'</code></pre>
+<p>Thứ tự kiểm tra có chủ ý: kiểm cấu trúc và chữ số kiểm tra trước (lỗi đọc hoặc lỗi in), rồi mới so với lệnh sản xuất (lỗi dữ liệu), và <strong>chống trùng sau cùng</strong>: chỉ ghi nhận seri khi sản phẩm qua hết các bước khác, nếu không một hộp bị loại vì sai lô sẽ "chiếm" seri và hộp làm lại bị báo trùng oan. Trên trạm thật, tập <code>da_doc</code> phải nằm trong cơ sở dữ liệu (SQLite hoặc MES) để không mất khi khởi động lại phần mềm. Cách in chuỗi GS1 dễ đọc cho người: thay mỗi AI bằng dạng có ngoặc, ví dụ <code>(01)08931234567897(17)271231(10)L2610A(21)VN000123</code>.</p>
+<div class="tip"><strong>Mã vạch 1D cũng dùng chữ số kiểm tra này</strong>EAN-13 trên bao bì là GTIN-13, chữ số cuối tính bằng đúng hàm <code>chu_so_kiem_tra_gs1</code>. <code>cv2.barcode.BarcodeDetector().detectAndDecodeWithType(anh)</code> đọc mã vạch họ EAN/UPC và trả về loại mã (ví dụ <code>EAN_13</code>); bộ đọc tự kiểm tra chữ số cuối, nên mã in sai chữ số kiểm tra sẽ không giải được thay vì trả về chuỗi sai.</div>
+
+<h2>7. Mã mờ, nghiêng, tương phản thấp: đo giới hạn</h2>
+<p>Thay vì tin vào "thư viện đọc tốt lắm", hãy đo. Hàm <code>chup</code> mô phỏng camera nhìn mã với 5 yếu tố: xoay trong mặt phẳng, nghiêng (mặt nhãn không vuông góc trục camera, gây méo phối cảnh), mờ (lệch nét hoặc rung, mô phỏng bằng Gaussian với độ lệch chuẩn σ pixel), tương phản và kích thước module. Mỗi ô kết quả ghi hai ký hiệu: bộ đọc <code>QRCodeDetector</code> rồi <code>QRCodeDetectorAruco</code>, <code>+</code> là đọc đúng, <code>.</code> là không đọc được.</p>
+<pre><code class="language-python">import math
+
+import cv2
+import numpy as np
+
+p = cv2.QRCodeEncoder_Params()
+p.correction_level = cv2.QRCODE_ENCODER_CORRECT_LEVEL_M
+NOI_DUNG = "0108931234567897" + "17271231" + "10L2610A\x1d" + "21VN000123"
+QR = cv2.QRCodeEncoder.create(p).encode(NOI_DUNG)
+
+
+def chup(goc=0, nghieng=0, sigma=0.0, tuong_phan=1.0, mod=5, seed=0):
+    """Ảnh 640×480 của mã QR trên nhãn trắng, tâm (320, 240)."""
+    rng = np.random.default_rng(seed)
+    ma = cv2.resize(QR, None, fx=mod, fy=mod, interpolation=cv2.INTER_NEAREST).astype(np.float32)
+    n = ma.shape[0]
+    c, k = math.cos(math.radians(nghieng)), 0.25 * math.sin(math.radians(nghieng))
+    dich = np.float32([[n * k / 2, 0], [n - n * k / 2, 0], [n, n * c], [0, n * c]])   # cạnh xa co lại
+    dich -= dich.mean(axis=0)
+    a = math.radians(goc)
+    R = np.float32([[math.cos(a), -math.sin(a)], [math.sin(a), math.cos(a)]])
+    dich = dich @ R.T + np.float32([320, 240])
+    H = cv2.getPerspectiveTransform(np.float32([[0, 0], [n, 0], [n, n], [0, n]]), dich)
+    anh = cv2.warpPerspective(ma, H, (640, 480), flags=cv2.INTER_AREA, borderValue=255)
+    anh = 128 + (anh - 128) * tuong_phan
+    if sigma &gt; 0:
+        anh = cv2.GaussianBlur(anh, (0, 0), sigma)
+    return np.clip(anh + rng.normal(0, 4, anh.shape), 0, 255).astype(np.uint8)
+
+
+BO_DOC = (cv2.QRCodeDetector(), cv2.QRCodeDetectorAruco())
+
+
+def thu(anh):
+    return "".join("+" if b.detectAndDecode(anh)[0] == NOI_DUNG else "." for b in BO_DOC)
+
+
+print("xoay (độ)      :", "  ".join(f"{g}:{thu(chup(goc=g))}" for g in (0, 15, 45, 90, 135, 180)))
+print("nghiêng (độ)   :", "  ".join(f"{g}:{thu(chup(nghieng=g))}" for g in (0, 20, 40, 50, 60, 70)))
+print("tương phản     :", "  ".join(f"{t}:{thu(chup(tuong_phan=t))}" for t in (1, 0.5, 0.2, 0.1, 0.05)))
+print()
+print("px/module  tỉ lệ đọc (6 ảnh, góc khác nhau)")
+for mod in (2, 3, 4, 5):
+    kq = [thu(chup(goc=7.3 * s, mod=mod, seed=s)) for s in range(6)]
+    print(f"   {mod}       {' '.join(kq)}   QRCodeDetector {sum(k[0] == '+' for k in kq)}/6, Aruco {sum(k[1] == '+' for k in kq)}/6")
+print()
+print("độ mờ σ (px) theo px/module:")
+for mod in (4, 5, 6, 8):
+    print(f"   {mod} px/module:", "  ".join(f"σ={s}:{thu(chup(sigma=s, mod=mod))}" for s in (0, 1, 1.5, 2, 2.5, 3)))</code></pre>
+<pre><code class="language-text">xoay (độ)      : 0:++  15:++  45:++  90:++  135:++  180:++
+nghiêng (độ)   : 0:++  20:++  40:++  50:++  60:.+  70:..
+tương phản     : 1:++  0.5:++  0.2:++  0.1:++  0.05:..
+
+px/module  tỉ lệ đọc (6 ảnh, góc khác nhau)
+   2       .+ .+ .+ .. .. .+   QRCodeDetector 0/6, Aruco 4/6
+   3       .. ++ .+ ++ ++ ++   QRCodeDetector 4/6, Aruco 5/6
+   4       ++ ++ ++ ++ ++ ++   QRCodeDetector 6/6, Aruco 6/6
+   5       ++ ++ ++ ++ ++ ++   QRCodeDetector 6/6, Aruco 6/6
+
+độ mờ σ (px) theo px/module:
+   4 px/module: σ=0:++  σ=1:++  σ=1.5:..  σ=2:..  σ=2.5:..  σ=3:..
+   5 px/module: σ=0:++  σ=1:++  σ=1.5:++  σ=2:..  σ=2.5:..  σ=3:..
+   6 px/module: σ=0:++  σ=1:++  σ=1.5:+.  σ=2:..  σ=2.5:..  σ=3:..
+   8 px/module: σ=0:++  σ=1:++  σ=1.5:++  σ=2:++  σ=2.5:++  σ=3:+.</code></pre>
+<p>Kết luận rút ra từ bảng (với nhiễu σ = 4 mức xám như camera công nghiệp bình thường):</p>
+<table>
+  <tr><th>Yếu tố</th><th>Kết quả đo</th><th>Ý nghĩa cho thiết kế trạm</th></tr>
+  <tr><td>Xoay trong mặt phẳng</td><td>Mọi góc đều đọc được</td><td>Không cần đồ gá giữ góc mã; khác hẳn template matching</td></tr>
+  <tr><td>Nghiêng</td><td>Đọc tới khoảng 50°, hỏng từ khoảng 60°</td><td>Giữ camera gần vuông góc nhãn; nghiêng nhẹ 10–15° lại có lợi với nhãn bóng (tránh phản xạ gương)</td></tr>
+  <tr><td>Tương phản</td><td>Chênh lệch đen trắng còn 10% vẫn đọc, 5% thì hỏng</td><td>Tương phản là tỉ lệ với nhiễu; mã khắc laser mờ cần chiếu sáng tạo tương phản (mục 9)</td></tr>
+  <tr><td>Kích thước module</td><td>2 px: bộ đọc thường hỏng hết, Aruco chập chờn; 3 px chập chờn; từ 4 px ổn định</td><td>Chọn FOV và độ phân giải để module ≥ 4 px với thư viện mã nguồn mở</td></tr>
+  <tr><td>Độ mờ</td><td>Ngưỡng σ tăng theo module: 4 px chịu σ = 1, 5 px chịu σ = 1,5, 8 px chịu σ = 2,5</td><td>Quy tắc gần đúng: σ nhỏ hơn khoảng 0,3 module</td></tr>
+</table>
+<p>Từ bảng này bạn tính ngược được yêu cầu cho camera. Ví dụ mã DataMatrix 16×16 module, mỗi module 0,25 mm: muốn 4 px/module thì cần 16 px/mm, tức FOV rộng 50 mm cần cảm biến ít nhất 800 px theo chiều đó. Độ mờ do chuyển động: băng tải 0,5 m/s, thời gian phơi sáng 100 µs làm vật dịch 0,05 mm = 0,8 px, chấp nhận được; phơi sáng 1 ms thì dịch 8 px, mã không thể đọc dù thuật toán nào.</p>
+
+<h2>8. Chiến lược đọc bậc thang</h2>
+<p>Ở bảng trên, đôi khi bộ này đọc được còn bộ kia không. Đầu đọc thương mại xử lý chuyện này bằng cách thử nhiều cách giải trên cùng một ảnh. Ta làm tương tự với một <strong>bậc thang</strong>: thử cách nhanh nhất trước, chỉ khi thất bại mới thử cách tốn kém hơn. Ảnh tốt (đa số) chỉ tốn một lần đọc, nên cycle time trung bình gần như không đổi; chỉ ảnh khó mới tốn thêm.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+BO_DOC = (("QR", cv2.QRCodeDetector()), ("Aruco", cv2.QRCodeDetectorAruco()))
+
+
+def bien_the(anh):
+    """Sinh lần lượt các biến thể ảnh, rẻ trước đắt sau."""
+    yield "gốc", anh
+    _, otsu = cv2.threshold(anh, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    yield "otsu", otsu
+    mo = cv2.GaussianBlur(anh, (0, 0), 2)
+    sac = cv2.addWeighted(anh, 2.0, mo, -1.0, 0)                # unsharp mask: tăng độ sắc cạnh
+    _, sac_otsu = cv2.threshold(sac, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    yield "sắc+otsu", sac_otsu
+    yield "thích nghi", cv2.adaptiveThreshold(anh, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 5)
+
+
+def doc_bac_thang(anh):
+    """Trả (chuỗi, 4 góc, bậc đã dùng, số lần thử) hoặc (None, None, None, số lần thử)."""
+    lan = 0
+    for ten_anh, x in bien_the(anh):
+        for ten_bo, bo in BO_DOC:
+            lan += 1
+            chuoi, goc, _ = bo.detectAndDecode(x)
+            if chuoi:
+                return chuoi, goc, f"{ten_bo}/{ten_anh}", lan
+    return None, None, None, lan
+
+
+anh = cv2.imread("nhan_thung.png", cv2.IMREAD_GRAYSCALE)
+chuoi, goc, bac, lan = doc_bac_thang(anh)
+print(f"ảnh rõ : {chuoi!r} bậc {bac}, {lan} lần thử")
+mo = cv2.GaussianBlur(anh, (0, 0), 1.8)
+chuoi, goc, bac, lan = doc_bac_thang(mo)
+print(f"ảnh mờ : {chuoi!r} bậc {bac}, {lan} lần thử")</code></pre>
+<pre><code class="language-text">ảnh rõ : '01089312345678971727123110L2610A\x1d21VN000123' bậc QR/gốc, 1 lần thử
+ảnh mờ : '01089312345678971727123110L2610A\x1d21VN000123' bậc Aruco/gốc, 2 lần thử</code></pre>
+<p>Ảnh rõ đọc ngay lần thử đầu. Ảnh mờ σ = 1,8 px (module 5 px) làm bộ đọc thứ nhất thất bại, bộ Aruco đọc được ở lần thử thứ hai; ảnh mờ hơn sẽ phải xuống tới các bậc nhị phân hóa. Hãy ghi lại <strong>bậc đã dùng</strong> cho mỗi sản phẩm: tỉ lệ sản phẩm phải dùng bậc 2 trở lên tăng dần theo ngày là cảnh báo sớm rằng ống kính bẩn, lệch nét hoặc đèn yếu, trước khi tỉ lệ không đọc được tăng lên.</p>
+
+<h2>9. Thực hành: 20 ảnh, đo tỉ lệ đọc thành công</h2>
+<p>Bài thực hành của bài lab: tạo 20 ảnh mã QR với góc xoay và độ mờ khác nhau, lưu kèm đáp án, rồi đo tỉ lệ đọc đúng của bộ đọc đơn và bậc thang. Khối đầu tạo dữ liệu, khối sau đánh giá: tách riêng như vậy để bạn thay bộ ảnh tổng hợp bằng ảnh chụp thật mà không sửa phần đánh giá.</p>
+<pre><code class="language-python">import csv
+import os
+
+import cv2
+import numpy as np
+
+os.makedirs("bo_20_anh", exist_ok=True)
+GOC = (0, 30, 60, 135)
+SIGMA = (0.0, 1.0, 1.5, 2.0, 2.5)
+rng = np.random.default_rng(42)
+
+with open("bo_20_anh/dap_an.csv", "w", newline="", encoding="utf-8") as f:
+    ghi = csv.writer(f)
+    ghi.writerow(["file", "goc", "sigma", "noi_dung"])
+    for i, (g, s) in enumerate((g, s) for g in GOC for s in SIGMA):
+        noi_dung = "0108931234567897" + "17271231" + f"10L2610A\x1d21VN{i + 200:06d}"
+        qr = cv2.QRCodeEncoder.create().encode(noi_dung)
+        ma = cv2.resize(qr, None, fx=5, fy=5, interpolation=cv2.INTER_NEAREST)
+        ma = cv2.copyMakeBorder(ma, 15, 15, 15, 15, cv2.BORDER_CONSTANT, value=250)
+        anh = np.full((480, 640), 185, np.float32)                  # carton
+        h, w = ma.shape
+        M = cv2.getRotationMatrix2D((w / 2, h / 2), g, 1.0)
+        M[:, 2] += (320 - w / 2 + rng.uniform(-40, 40), 240 - h / 2 + rng.uniform(-30, 30))
+        nhan = cv2.warpAffine(ma.astype(np.float32), M, (640, 480), flags=cv2.INTER_LINEAR, borderValue=-1)
+        anh = np.where(nhan &gt;= 0, nhan, anh)
+        if s &gt; 0:
+            anh = cv2.GaussianBlur(anh, (0, 0), s)
+        anh = np.clip(anh + rng.normal(0, 4, anh.shape), 0, 255).astype(np.uint8)
+        ten = f"qr_{i:02d}_g{g:03d}_s{s:.1f}.png"
+        cv2.imwrite(f"bo_20_anh/{ten}", anh)
+        ghi.writerow([ten, g, s, noi_dung])
+print("Đã tạo", len(os.listdir("bo_20_anh")) - 1, "ảnh và bo_20_anh/dap_an.csv")</code></pre>
+<pre><code class="language-text">Đã tạo 20 ảnh và bo_20_anh/dap_an.csv</code></pre>
+<p>Khối đánh giá đọc lại từng ảnh, so với đáp án (đọc ra chuỗi khác đáp án được tính là <strong>đọc sai</strong>, nguy hiểm hơn không đọc được), in bảng theo góc × độ mờ và đo thời gian. Hàm <code>doc_bac_thang</code> được viết lại cho khối chạy độc lập.</p>
+<pre><code class="language-python">import csv
+import time
+
+import cv2
+import numpy as np
+
+BO_DOC = (("QR", cv2.QRCodeDetector()), ("Aruco", cv2.QRCodeDetectorAruco()))
+
+
+def bien_the(anh):
+    yield "gốc", anh
+    _, otsu = cv2.threshold(anh, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    yield "otsu", otsu
+    sac = cv2.addWeighted(anh, 2.0, cv2.GaussianBlur(anh, (0, 0), 2), -1.0, 0)
+    yield "sắc+otsu", cv2.threshold(sac, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+    yield "thích nghi", cv2.adaptiveThreshold(anh, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 5)
+
+
+def doc_don(anh):
+    return BO_DOC[0][1].detectAndDecode(anh)[0] or None
+
+
+def doc_bac_thang(anh):
+    for _, x in bien_the(anh):
+        for _, bo in BO_DOC:
+            chuoi = bo.detectAndDecode(x)[0]
+            if chuoi:
+                return chuoi
+    return None
+
+
+with open("bo_20_anh/dap_an.csv", encoding="utf-8") as f:
+    mau = list(csv.DictReader(f))
+
+for ten, ham in (("QRCodeDetector đơn", doc_don), ("bậc thang", doc_bac_thang)):
+    bang, dung, sai, thoi_gian = {}, 0, 0, []
+    for m in mau:
+        anh = cv2.imread("bo_20_anh/" + m["file"], cv2.IMREAD_GRAYSCALE)
+        t0 = time.perf_counter()
+        chuoi = ham(anh)
+        thoi_gian.append((time.perf_counter() - t0) * 1000)
+        ky_hieu = "." if chuoi is None else ("+" if chuoi == m["noi_dung"] else "X")
+        dung += ky_hieu == "+"
+        sai += ky_hieu == "X"
+        bang[(int(m["goc"]), float(m["sigma"]))] = ky_hieu
+    print(f"== {ten}: đọc đúng {dung}/20 = {dung / 20:.0%}, đọc sai {sai}, "
+          f"thời gian trung bình {np.mean(thoi_gian):.1f} ms, lâu nhất {max(thoi_gian):.1f} ms")
+    print("   góc \\ σ   " + "  ".join(f"{s:3.1f}" for s in (0.0, 1.0, 1.5, 2.0, 2.5)))
+    for g in (0, 30, 60, 135):
+        print(f"   {g:3d}°      " + "    ".join(bang[(g, s)] for s in (0.0, 1.0, 1.5, 2.0, 2.5)))</code></pre>
+<pre><code class="language-text">== QRCodeDetector đơn: đọc đúng 7/20 = 35%, đọc sai 0, thời gian trung bình 22.1 ms, lâu nhất 30.2 ms
+   góc \ σ   0.0  1.0  1.5  2.0  2.5
+     0°      +    .    .    .    .
+    30°      +    +    .    .    .
+    60°      +    +    .    .    .
+   135°      +    +    .    .    .
+== bậc thang: đọc đúng 16/20 = 80%, đọc sai 0, thời gian trung bình 69.0 ms, lâu nhất 181.9 ms
+   góc \ σ   0.0  1.0  1.5  2.0  2.5
+     0°      +    +    +    +    .
+    30°      +    +    +    +    .
+    60°      +    +    +    +    .
+   135°      +    +    +    +    .</code></pre>
+<p>Thời gian phụ thuộc máy (con số trên chỉ để tham khảo), nhưng xu hướng thì ổn định: góc xoay gần như không ảnh hưởng, độ mờ quyết định tất cả. Bộ đọc đơn chỉ chắc chắn với ảnh nét, chập chờn từ σ = 1; bậc thang đọc hết mọi ảnh tới σ = 2 (với module 5 px), không đọc sai ảnh nào, và tốn thời gian chủ yếu ở các ảnh thất bại, vì phải thử hết mọi bậc. Ở σ = 2,5 (một nửa module) thông tin đã mất, không bậc nào cứu được: giải pháp là chỉnh nét, giảm thời gian phơi sáng hoặc tăng độ phân giải, không phải thuật toán.</p>
+<div class="warn"><strong>Giới hạn thời gian cho bậc thang</strong>Ảnh không có mã (sản phẩm bị lật, nhãn rơi) sẽ đi hết bậc thang, là trường hợp chậm nhất. Hãy đo thời gian của trường hợp xấu nhất này và so với ngân sách cycle time; nếu vượt, cắt bớt bậc hoặc dừng khi hết thời gian và báo "không đọc được".</div>
+
+<h2>10. Đưa vào dây chuyền</h2>
+<ul>
+  <li><strong>Trigger</strong>: cảm biến quang báo thùng tới, camera chụp đúng lúc mã nằm giữa khung hình. Băng tải nhanh cần phơi sáng ngắn (vài chục đến vài trăm µs) và đèn đủ mạnh, có thể chớp (strobe).</li>
+  <li><strong>ROI</strong>: nếu vị trí nhãn tương đối cố định, chỉ đọc trong vùng quanh nhãn. Ảnh nhỏ hơn thì đọc nhanh hơn và ít bị nhiễu bởi chữ, hình in khác trên thùng.</li>
+  <li><strong>Không đọc được = NG</strong>: thùng không đọc được mã phải bị đẩy ra (reject) hoặc dừng băng tải để người xử lý, không được cho qua. Lưu ảnh mọi trường hợp NG để phân tích.</li>
+  <li><strong>Chất lượng in</strong>: ISO/IEC 15415 chấm điểm mã 2D in trên nhãn (tương phản, độ đều module, sai lệch lưới, hỏng mẫu định vị, mức dùng sửa lỗi), xếp hạng A–F hoặc 4–0; ISO/IEC TR 29158 cho mã khắc trực tiếp (DPM). Kết quả chính thức cần máy kiểm định (verifier) có hiệu chuẩn. Trạm tự viết vẫn nên theo dõi các chỉ số gần đúng: px/module, tương phản trong vùng mã, bậc đã dùng.</li>
+  <li><strong>Chiếu sáng mã DPM</strong>: mã khắc laser trên kim loại phẳng, bóng thường dùng đèn đồng trục (coaxial) hoặc đèn vòm; mã khắc chấm (dot peen) thường dùng đèn góc thấp (dark field) để các chấm lõm sáng lên trên nền tối.</li>
+  <li><strong>Truy xuất</strong>: gửi nội dung mã, kết quả OK/NG, thời điểm và đường dẫn ảnh lên MES hoặc cơ sở dữ liệu.</li>
+</ul>
+
+<h2>11. Lỗi thường gặp</h2>
+<table>
+  <tr><th>Lỗi</th><th>Triệu chứng</th><th>Cách sửa</th></tr>
+  <tr><td>Module quá nhỏ (dưới 3 px)</td><td>Đọc chập chờn, phụ thuộc vị trí mã</td><td>Thu hẹp FOV hoặc camera độ phân giải cao hơn; tính trước px/module</td></tr>
+  <tr><td>Phơi sáng dài trên băng tải</td><td>Đứng yên đọc tốt, chạy thì hỏng</td><td>Giảm thời gian phơi sáng, tăng đèn hoặc gain</td></tr>
+  <tr><td>Nhãn bóng, màng co</td><td>Một vệt sáng trắng che mất module</td><td>Nghiêng camera 10–15°, đèn khuếch tán, kính lọc phân cực</td></tr>
+  <tr><td>So chuỗi mà quên ký tự GS hoặc khoảng trắng</td><td>Mã đọc đúng nhưng bị báo NG</td><td>In bằng <code>repr</code>, tách trường GS1 thay vì so cả chuỗi</td></tr>
+  <tr><td>Chỉ kiểm tra "đọc được"</td><td>Thùng sai lô, sai hạn dùng vẫn qua</td><td>Kiểm tra nội dung với lệnh sản xuất, chống trùng seri</td></tr>
+  <tr><td>Gọi libdmtx không có timeout trên ảnh lớn</td><td>Thỉnh thoảng một chu kỳ kéo dài hàng giây</td><td>Đặt <code>timeout</code>, <code>max_count</code>, cắt ROI</td></tr>
 </table>
 
-<h2>Cài đặt</h2>
-<pre><code>pip install opencv-python pylibdmtx</code></pre>
-<p><code>pylibdmtx</code> cần thư viện <code>libdmtx</code> của hệ điều hành (trên Ubuntu: <code>sudo apt install libdmtx0b</code>; trên Windows, gói pip thường kèm sẵn DLL). QR Code đọc được bằng OpenCV có sẵn.</p>
+<h2>Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Mở rộng bộ thử ở mục 9 thành 40 ảnh: thêm độ nghiêng 0° và 55° (dùng hàm <code>chup</code> ở mục 7 hoặc tự viết phép biến đổi phối cảnh). Dự đoán trước: tỉ lệ đọc ở hàng nghiêng 55° sẽ thấp hơn hay bằng hàng 0°? Vì sao độ nghiêng làm giảm khả năng chịu mờ?</p>
+<details><summary>Xem đáp án</summary>
+<p>Thấp hơn. Nghiêng 55° làm mã co theo chiều nghiêng còn khoảng cos 55° ≈ 0,57 lần, và cạnh xa camera co thêm do phối cảnh. Module 5 px theo chiều đó chỉ còn khoảng 2,5–3 px, nên theo bảng ở mục 7 (σ phải nhỏ hơn khoảng 0,3 module) mức mờ chịu được giảm xuống dưới σ = 1. Thử với hàm <code>chup</code> của mục 7: ở nghiêng 0°, cả hai bộ đọc chịu được σ = 1,5; ở nghiêng 55°, cả hai đã hỏng ngay từ σ = 1. Bài học: kích thước module phải tính theo chiều <em>nhỏ nhất</em> của mã trên ảnh, sau khi đã tính nghiêng.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Viết hàm <code>gs1_de_doc(t)</code> nhận dict từ <code>tach_gs1</code> và trả về chuỗi dạng <code>(01)...(17)...(10)...(21)...</code>. Sau đó kiểm tra: GTIN-13 trên mã vạch EAN của sản phẩm là <code>893123456789?</code>; chữ số cuối phải là bao nhiêu? GTIN-14 tương ứng (thêm số 0 ở đầu) có cùng chữ số kiểm tra không?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">def chu_so_kiem_tra_gs1(than):
+    tong = sum(int(c) * (3 if i % 2 == 0 else 1) for i, c in enumerate(reversed(than)))
+    return str((10 - tong % 10) % 10)
 
-<h2>Mã nguồn</h2>
-<pre><code>import cv2
-import numpy as np
-from pylibdmtx.pylibdmtx import decode as dm_decode
 
-qr = cv2.QRCodeDetector()
+def gs1_de_doc(t):
+    return "".join(f"({ai}){gia_tri}" for ai, gia_tri in t.items())
 
-def preprocess(gray):
-    gray = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray)
-    return cv2.GaussianBlur(gray, (3, 3), 0)
 
-def read_codes(bgr):
-    gray = preprocess(cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY))
-    found = []
-
-    text, pts, _ = qr.detectAndDecode(gray)
-    if text:
-        found.append(("QR", text, pts.reshape(-1, 2).astype(int)))
-
-    for r in dm_decode(gray, timeout=200, max_count=1):     # timeout: mili giây
-        x, y, w, h = r.rect.left, r.rect.top, r.rect.width, r.rect.height
-        # libdmtx dùng gốc tọa độ ở dưới-trái; đổi sang gốc trên-trái của ảnh
-        y = gray.shape[0] - y - h
-        found.append(("DataMatrix", r.data.decode("utf-8", "replace"),
-                      [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]))
-    return found
-
-cap = cv2.VideoCapture(0)
-seen = set()
-while True:
-    ok, frame = cap.read()
-    if not ok:
-        break
-    for kind, text, box in read_codes(frame):
-        cv2.polylines(frame, [np.array(box, dtype=np.int32).reshape(-1, 1, 2)], True, (0, 255, 0), 2)
-        x0, y0 = box[0]
-        cv2.putText(frame, f"{kind}: {text}", (int(x0), int(y0) - 8),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-        if text not in seen:
-            seen.add(text)
-            print(kind, text)
-    cv2.imshow("Doc ma", frame)
-    if cv2.waitKey(1) &amp; 0xFF == ord("q"):
-        break
-cap.release()
-cv2.destroyAllWindows()</code></pre>
-
-<h2>Kiểm tra dữ liệu đọc được</h2>
-<p>Đọc được mã chưa đủ; cần kiểm tra nội dung hợp lệ trước khi chấp nhận:</p>
-<pre><code>import re
-
-PATTERN = re.compile(r"^SN\d{10}$")          # ví dụ định dạng số seri
-
-def validate(text, expected_lot=None):
-    if not PATTERN.match(text):
-        return False, "sai định dạng"
-    if expected_lot and expected_lot not in text:
-        return False, "không khớp lô sản xuất"
-    return True, "OK"</code></pre>
-
-<h2>Đưa vào dây chuyền</h2>
+print(gs1_de_doc({"01": "08931234567897", "17": "271231", "10": "L2610A", "21": "VN000123"}))
+print("EAN-13 :", "893123456789" + chu_so_kiem_tra_gs1("893123456789"))
+print("GTIN-14:", "0893123456789" + chu_so_kiem_tra_gs1("0893123456789"))</code></pre>
+<pre><code class="language-text">(01)08931234567897(17)271231(10)L2610A(21)VN000123
+EAN-13 : 8931234567897
+GTIN-14: 08931234567897</code></pre>
+<p>Chữ số kiểm tra là 7 cho cả hai: trọng số tính từ phải sang, nên thêm số 0 ở đầu không làm thay đổi tổng. Vì thế GTIN-13 đổi sang GTIN-14 chỉ cần thêm 0 ở đầu.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Dây chuyền dược phẩm chạy 300 hộp/phút, mỗi hộp có một DataMatrix 14×14 module, mỗi module 0,3 mm, hộp có thể lệch ±10 mm so với tâm camera theo mỗi chiều. Đề xuất FOV tối thiểu, độ phân giải camera, thời gian phơi sáng tối đa nếu băng tải chạy 0,4 m/s, và ngân sách thời gian cho việc đọc.</p>
+<details><summary>Xem đáp án</summary>
 <ul>
-  <li><strong>Trigger</strong> bằng cảm biến quang, chụp đúng lúc mã nằm giữa khung hình.</li>
-  <li><strong>Phát hiện trùng lặp</strong>: cùng một mã xuất hiện hai lần trên dây chuyền là dấu hiệu lỗi in hoặc lỗi quy trình.</li>
-  <li><strong>Chất lượng in</strong>: các tiêu chuẩn ISO/IEC (ví dụ ISO/IEC 15415 cho mã 2D in, ISO/IEC TR 29158 cho mã khắc trực tiếp) đánh giá độ tương phản, độ đều, độ lệch. Thiết bị kiểm định chuyên dụng cho kết quả chính thức; vision tự viết phù hợp để cảnh báo sớm.</li>
-  <li>Mã khắc trên kim loại cần <a href="../kien-thuc/7-kieu-chieu-sang-machine-vision.html">chiếu sáng đồng trục hoặc góc thấp</a>.</li>
-  <li>Gửi số seri và kết quả lên MES để truy xuất (xem <a href="../kien-thuc/mes-truy-xuat-nguon-goc-vision.html">MES và truy xuất nguồn gốc</a>).</li>
+  <li>Mã rộng 14 × 0,3 = 4,2 mm; cộng vùng yên tĩnh và lệch ±10 mm, FOV khoảng 30 × 30 mm là đủ (có dư).</li>
+  <li>Muốn 4 px/module thì cần 4 / 0,3 ≈ 13,3 px/mm; FOV 30 mm cần khoảng 400 px. Camera 640×480 (VGA) đã đủ; dùng 1280×1024 để dư (khoảng 6–8 px/module với FOV 30–40 mm), chịu được mờ và nghiêng tốt hơn.</li>
+  <li>Độ mờ chuyển động nên dưới khoảng 0,3 module = 0,09 mm: thời gian phơi sáng ≤ 0,09 mm / 400 mm/s ≈ 225 µs. Chọn khoảng 100 µs và đèn chớp đủ sáng.</li>
+  <li>300 hộp/phút = 200 ms mỗi hộp. Trừ thời gian chụp, truyền ảnh, gửi kết quả cho PLC, ngân sách đọc mã khoảng 50–100 ms, kể cả trường hợp xấu nhất của bậc thang và <code>timeout</code> của libdmtx (đặt khoảng 50 ms).</li>
 </ul>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>QR có 3 finder pattern và 4 mức sửa lỗi; DataMatrix có viền chữ L và nhỏ gọn, phổ biến cho linh kiện và mã khắc trực tiếp. Mọi quy tắc tính theo module và vùng yên tĩnh.</li>
+  <li>OpenCV 5 có <code>QRCodeDetector</code>, <code>QRCodeDetectorAruco</code> (cùng <code>detectAndDecode</code>, <code>detectAndDecodeMulti</code>) và <code>barcode.BarcodeDetector</code>, nhưng không có bộ đọc DataMatrix; dùng <code>pylibdmtx</code> với <code>timeout</code>, <code>max_count</code> và nhớ gốc tọa độ dưới-trái.</li>
+  <li>Đọc được chưa đủ: tách trường GS1, kiểm tra chữ số kiểm tra, ngày hợp lệ, khớp lệnh sản xuất, chống trùng ở bước cuối.</li>
+  <li>Đo được: xoay không ảnh hưởng, nghiêng tới khoảng 50°, module ≥ 4 px, độ mờ σ dưới khoảng 0,3 module.</li>
+  <li>Đọc bậc thang tăng tỉ lệ đọc mà không làm chậm ảnh tốt; theo dõi bậc đã dùng để phát hiện sớm suy giảm quang học.</li>
+</ul>
+<p>Bài tiếp theo: <strong>OCR và OCV trong công nghiệp</strong>, khi thông tin không nằm trong mã 2D mà được in thành chữ.</p>

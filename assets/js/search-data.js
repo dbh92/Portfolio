@@ -1150,17 +1150,18 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Kiểm tra hiệu chuẩn định kỳ cho hệ thống đo bằng camera",
+  "t": "Kiểm tra hiệu chuẩn định kỳ: mẫu chuẩn, ngưỡng và khóa sản xuất",
   "u": "kien-thuc/kiem-tra-hieu-chuan-dinh-ky-san-xuat.html",
-  "e": "Mẫu chuẩn, quy trình kiểm tra đầu ca, kiểm tra tự động bằng dấu chuẩn và khi nào cần hiệu chuẩn lại hoàn toàn.",
+  "e": "Thiết kế mẫu chuẩn và quy trình đầu ca, ngưỡng suy ra từ dung sai, phát hiện trôi bằng xu hướng, khóa sản xuất tự động và khi nào phải hiệu chuẩn lại.",
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "02/10/2026",
-  "m": 3,
+  "m": 34,
   "img": "assets/images/posts/kiem-tra-hieu-chuan-dinh-ky-san-xuat.webp",
   "tags": [
    "Calibration",
-   "Machine Vision"
+   "Industrial Vision",
+   "Đo lường"
   ]
  },
  {
@@ -1594,22 +1595,18 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Dự án: đo kích thước chi tiết cơ khí bằng camera",
+  "t": "Dự án: đo kích thước chi tiết cơ khí bằng camera đã hiệu chuẩn",
   "u": "projects/do-kich-thuoc-chi-tiet-bang-camera.html",
-  "e": "Hiệu chuẩn camera bằng bàn cờ, quy đổi pixel sang mm, đo dài, rộng, đường kính lỗ và kiểm chứng độ lặp lại như một kỹ sư đo lường.",
+  "e": "Hiệu chuẩn nội tại và mặt phẳng đo, caliper subpixel, fit đường và tròn trong mm, báo cáo theo dung sai và đánh giá độ lặp lại 10 lần đặt lại.",
   "c": "projects",
   "cn": "Projects",
   "d": "21/09/2026",
-  "m": 4,
+  "m": 25,
   "img": "assets/images/posts/do-kich-thuoc-chi-tiet-bang-camera.webp",
   "tags": [
-   "Industrial Project",
    "Calibration",
-   "Machine Vision",
-   "Industrial Vision",
-   "Lens",
-   "Lighting",
-   "Source Code"
+   "Đo lường",
+   "Machine Vision"
   ]
  },
  {
@@ -1629,15 +1626,16 @@ window.HF_POSTS = [
  {
   "t": "Hand-eye calibration: nối tọa độ camera với tọa độ robot",
   "u": "hoc/hand-eye-calibration-camera-robot.html",
-  "e": "Từ ánh xạ 2D pixel sang mm robot bằng homography đến bài toán 3D AX = XB với cv2.calibrateHandEye và các nguồn sai số.",
+  "e": "Ánh xạ pixel sang robot bằng affine và quy trình 9 điểm, bài toán AX = XB giải bằng NumPy và calibrateHandEye, eye-in-hand, eye-to-hand và nguồn sai số.",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "20/09/2026",
-  "m": 3,
+  "m": 31,
   "img": "assets/images/posts/hand-eye-calibration-camera-robot.webp",
   "tags": [
    "Calibration",
-   "Robot"
+   "Robot",
+   "Python"
   ]
  },
  {
@@ -1687,15 +1685,16 @@ window.HF_POSTS = [
  {
   "t": "Homography: đo kích thước trên mặt phẳng khi camera đặt nghiêng",
   "u": "kien-thuc/homography-do-tren-mat-phang.html",
-  "e": "Tính homography từ bàn cờ, quy đổi pixel sang mm, nắn ảnh và những giới hạn quan trọng khi vật có chiều cao.",
+  "e": "Tính homography từ điểm mốc, đổi pixel sang mm, RANSAC, nắn ảnh nhìn thẳng và tính bằng số sai số khi vật có chiều cao.",
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "18/09/2026",
-  "m": 3,
+  "m": 31,
   "img": "assets/images/posts/homography-do-tren-mat-phang.webp",
   "tags": [
    "Calibration",
-   "Image Processing"
+   "Đo lường",
+   "OpenCV"
   ]
  },
  {
@@ -1787,18 +1786,18 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Dự án: đọc và xác minh số seri in trên linh kiện",
+  "t": "Dự án: đọc và xác minh số seri in trên linh kiện (OCR + OCV)",
   "u": "projects/doc-so-seri-linh-kien-ocr-ocv.html",
-  "e": "Định vị vùng chữ bằng template matching, đọc bằng Tesseract, sửa nhầm lẫn theo định dạng và xác minh với lệnh sản xuất.",
+  "e": "Định vị vùng chữ bằng template matching, đọc và sửa nhầm theo định dạng, kiểm tra chữ số kiểm tra, xác minh với lệnh sản xuất và xuất báo cáo CSV.",
   "c": "projects",
   "cn": "Projects",
   "d": "16/09/2026",
-  "m": 3,
+  "m": 25,
   "img": "assets/images/posts/doc-so-seri-linh-kien-ocr-ocv.webp",
   "tags": [
-   "Industrial Project",
    "OCR",
-   "Source Code"
+   "Machine Vision",
+   "Python"
   ]
  },
  {
@@ -1874,17 +1873,18 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "OCR bằng Deep Learning: PaddleOCR và EasyOCR",
+  "t": "OCR bằng Deep Learning: PaddleOCR, EasyOCR và cách chọn so với Tesseract",
   "u": "hoc/ocr-deep-learning-paddleocr-easyocr.html",
-  "e": "Kiến trúc phát hiện + nhận dạng chữ, cách dùng hai thư viện phổ biến, so sánh và mẹo áp dụng cho chữ in trên sản phẩm công nghiệp.",
+  "e": "Hiểu phát hiện chữ và nhận dạng chữ (DBNet, CRNN, CTC), tự huấn luyện mô hình nhỏ, dùng EasyOCR, PaddleOCR 3.x và so sánh độ chính xác, thời gian.",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "13/09/2026",
-  "m": 3,
+  "m": 31,
   "img": "assets/images/posts/ocr-deep-learning-paddleocr-easyocr.webp",
   "tags": [
    "OCR",
-   "Deep Learning"
+   "Deep Learning",
+   "Python"
   ]
  },
  {
@@ -2034,33 +2034,33 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Dự án: đọc mã QR và DataMatrix trên bao bì",
+  "t": "Đọc mã QR và DataMatrix trên bao bì bằng OpenCV và libdmtx",
   "u": "projects/doc-ma-qr-datamatrix-tren-bao-bi.html",
-  "e": "Đọc mã 2D bằng OpenCV và libdmtx, kiểm tra nội dung hợp lệ, phát hiện trùng lặp và đưa vào dây chuyền.",
+  "e": "Đọc QR bằng OpenCV, DataMatrix bằng pylibdmtx, kiểm tra chuỗi GS1 với lệnh sản xuất, đo giới hạn mờ, nghiêng và tăng tỉ lệ đọc bằng chiến lược bậc thang.",
   "c": "projects",
   "cn": "Projects",
   "d": "09/09/2026",
-  "m": 3,
+  "m": 33,
   "img": "assets/images/posts/doc-ma-qr-datamatrix-tren-bao-bi.webp",
   "tags": [
-   "Industrial Project",
-   "OCR",
-   "Source Code"
+   "Machine Vision",
+   "OpenCV",
+   "OCR"
   ]
  },
  {
-  "t": "OCR với Tesseract: tiền xử lý ảnh để đọc chữ chính xác",
+  "t": "OCR với Tesseract: tiền xử lý ảnh, chọn PSM và độ tin cậy từng từ",
   "u": "hoc/ocr-tesseract-tien-xu-ly-anh.html",
-  "e": "Cài đặt Tesseract, biến ảnh thực tế thành ảnh dễ đọc, chọn chế độ PSM, giới hạn ký tự và lấy độ tin cậy từng từ.",
+  "e": "Cài Tesseract, xây pipeline tiền xử lý đo được hiệu quả, chọn PSM, whitelist và dùng độ tin cậy từng từ để quyết định OK hay không đọc được.",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "08/09/2026",
-  "m": 3,
+  "m": 30,
   "img": "assets/images/posts/ocr-tesseract-tien-xu-ly-anh.webp",
   "tags": [
    "OCR",
    "Python",
-   "Image Processing"
+   "OpenCV"
   ]
  },
  {
@@ -2107,17 +2107,18 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Hiệu chuẩn camera: ma trận nội tại và méo ống kính",
+  "t": "Hiệu chuẩn camera: ma trận nội tại, méo ống kính và sai số reprojection",
   "u": "hoc/hieu-chuan-camera-intrinsic-meo-ong-kinh.html",
-  "e": "Mô hình pinhole, các hệ số méo, quy trình hiệu chuẩn bằng bàn cờ, đánh giá sai số reprojection và khử méo ảnh.",
+  "e": "Mô hình pinhole và hệ số méo, hiệu chuẩn bàn cờ với OpenCV trên bộ ảnh có đáp án, đánh giá reprojection từng ảnh, khử méo, lưu YAML và cách chụp ảnh hiệu chuẩn đúng.",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "06/09/2026",
-  "m": 3,
+  "m": 42,
   "img": "assets/images/posts/hieu-chuan-camera-intrinsic-meo-ong-kinh.webp",
   "tags": [
    "Calibration",
-   "Computer Vision"
+   "OpenCV",
+   "Python"
   ]
  },
  {
@@ -2137,15 +2138,16 @@ window.HF_POSTS = [
  {
   "t": "OCR và OCV trong công nghiệp: đọc số lô, hạn dùng, số seri",
   "u": "kien-thuc/ocr-trong-cong-nghiep.html",
-  "e": "Phân biệt đọc và xác minh ký tự, các loại chữ in khắc trong nhà máy, quy trình OCR và các bẫy nhầm lẫn ký tự.",
+  "e": "Phân biệt đọc và xác minh ký tự, các loại chữ in khắc trong nhà máy, các cặp ký tự hay nhầm và cách sửa theo định dạng mã lô.",
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "05/09/2026",
-  "m": 3,
+  "m": 27,
   "img": "assets/images/posts/ocr-trong-cong-nghiep.webp",
   "tags": [
    "OCR",
-   "Machine Vision"
+   "Machine Vision",
+   "Industrial Vision"
   ]
  },
  {
@@ -2529,7 +2531,7 @@ window.HF_TOPICS = [
   "u": "hoc/python.html",
   "s": "Học AI & Lập trình",
   "g": "Programming",
-  "n": 47
+  "n": 51
  },
  {
   "t": "C#",
@@ -2578,21 +2580,21 @@ window.HF_TOPICS = [
   "u": "hoc/opencv.html",
   "s": "Học AI & Lập trình",
   "g": "Computer Vision",
-  "n": 27
+  "n": 31
  },
  {
   "t": "Image Processing",
   "u": "hoc/image-processing.html",
   "s": "Học AI & Lập trình",
   "g": "Computer Vision",
-  "n": 11
+  "n": 9
  },
  {
   "t": "Computer Vision",
   "u": "hoc/computer-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Computer Vision",
-  "n": 14
+  "n": 13
  },
  {
   "t": "OCR",
@@ -2620,7 +2622,7 @@ window.HF_TOPICS = [
   "u": "hoc/machine-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 43
+  "n": 44
  },
  {
   "t": "AI Vision",
@@ -2634,21 +2636,21 @@ window.HF_TOPICS = [
   "u": "hoc/industrial-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 23
+  "n": 24
  },
  {
   "t": "Camera & Lens",
   "u": "hoc/camera-lens.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 12
+  "n": 11
  },
  {
   "t": "Lighting",
   "u": "hoc/lighting.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 4
+  "n": 3
  },
  {
   "t": "Calibration",
@@ -2690,7 +2692,7 @@ window.HF_TOPICS = [
   "u": "projects/industrial-vision-projects.html",
   "s": "Projects",
   "g": "",
-  "n": 5
+  "n": 2
  },
  {
   "t": "Programming",
@@ -2718,14 +2720,14 @@ window.HF_TOPICS = [
   "u": "kien-thuc/computer-vision.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 14
+  "n": 13
  },
  {
   "t": "Machine Vision",
   "u": "kien-thuc/machine-vision.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 43
+  "n": 44
  },
  {
   "t": "AI Vision",
@@ -2816,7 +2818,7 @@ window.HF_TOPICS = [
   "u": "tai-nguyen/source-code.html",
   "s": "Tài nguyên",
   "g": "",
-  "n": 6
+  "n": 3
  },
  {
   "t": "Dataset",
