@@ -1,48 +1,422 @@
-<p>Hiệu chuẩn một lần khi nghiệm thu là chưa đủ. Trong môi trường nhà máy, rung động, nhiệt độ, va chạm khi bảo trì đều làm camera và ống kính xê dịch dần. Hệ thống đo lường cần <strong>quy trình kiểm tra hiệu chuẩn định kỳ</strong> để kết quả luôn đáng tin.</p>
+<p>Các bài trước của chặng đã cho bạn hệ số mm/pixel, mô hình ống kính, homography và phép biến đổi camera – robot. Tất cả đều đúng <strong>vào ngày hiệu chuẩn</strong>. Sau đó nhà máy bắt đầu làm việc với chúng: rung động làm lỏng vít giá camera, nhiệt độ xưởng lên xuống 10 °C giữa ca đêm và ca trưa, đèn LED yếu dần, thợ bảo trì lau ống kính và vô tình xoay vòng lấy nét, xe nâng va vào khung máy. Bài <em>Hand-eye calibration camera – robot</em> kết thúc bằng câu hỏi: làm sao biết các hiệu chuẩn vẫn còn đúng? Bài này trả lời bằng một quy trình cụ thể: <strong>mẫu chuẩn</strong>, <strong>kiểm tra đầu ca</strong> có ngưỡng bằng số, <strong>tự động phát hiện trôi</strong> qua nhiều ngày, logic <strong>khóa sản xuất</strong> khi kiểm tra không đạt, và tiêu chí <strong>khi nào phải hiệu chuẩn lại</strong>.</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Thiết kế được mẫu chuẩn và quy trình kiểm tra đầu ca 5 bước cho trạm đo đường kính Ø8,00 ± 0,05 mm, với ngưỡng cảnh báo và ngưỡng dừng suy ra từ dung sai; viết code đo mẫu chuẩn trên ảnh, phán xét, ghi nhật ký; mô phỏng 30 ngày có trôi nhiệt, va chạm, đèn yếu, mất nét và chứng minh hệ thống phát hiện được từng sự cố; viết logic khóa sản xuất.</div>
 
-<h2>Những gì có thể thay đổi theo thời gian</h2>
+<h2>1. Cái gì thay đổi theo thời gian, và thay đổi bao nhiêu?</h2>
+<table>
+  <tr><th>Nguồn</th><th>Cơ chế</th><th>Ảnh hưởng tới phép đo</th><th>Cách phát hiện</th></tr>
+  <tr><td>Nhiệt độ</td><td>Cột nhôm giữ camera dài ra / co lại; khoảng cách làm việc Z thay đổi</td><td>Tỉ lệ đổi theo ΔZ/Z: sai số tỉ lệ với kích thước đo, đổi theo giờ trong ngày</td><td>Đo mẫu chuẩn có kích thước lớn; ghi nhiệt độ cùng kết quả</td></tr>
+  <tr><td>Rung, va chạm, bảo trì</td><td>Giá camera dịch, nghiêng; đồ gá dịch</td><td>Vị trí ROI lệch; nghiêng làm tỉ lệ không đều; hand-eye sai</td><td>Dấu chuẩn (fiducial) cố định trên đồ gá trong khung hình</td></tr>
+  <tr><td>Lấy nét, khẩu độ</td><td>Vòng ống kính xoay do rung hoặc do người lau</td><td>Biên mờ: dịch vị trí biên, tăng σ; nét đổi thì K đổi</td><td>Chỉ số độ nét trên một vùng cố định</td></tr>
+  <tr><td>Đèn</td><td>LED suy giảm, bụi trên tấm khuếch tán, nguồn đèn hỏng một nhánh</td><td>Ngưỡng cắt dịch, biên dịch (bias), tăng nhiễu</td><td>Độ sáng vùng nền tham chiếu, độ đều sáng</td></tr>
+  <tr><td>Phần mềm, cấu hình</td><td>Ai đó sửa tham số, chép file hiệu chuẩn cũ, nâng cấp phiên bản</td><td>Bất kỳ</td><td>Mã băm (hash) file hiệu chuẩn và cấu hình, phiên bản phần mềm ghi vào mỗi kết quả</td></tr>
+</table>
+<p>Tính thử ảnh hưởng của nhiệt độ cho một trạm thật, vì đây là nguồn hay bị bỏ qua nhất:</p>
+<pre><code class="language-python">ALPHA_NHOM = 23e-6               # hệ số giãn nở nhiệt của nhôm, 1/°C (thép khoảng 12e-6)
+L_COT = 300.0                    # chiều dài cột nhôm từ mặt đồ gá tới giá camera, mm
+Z = 150.0                        # khoảng cách làm việc của ống kính thường (không telecentric), mm
+dT = 8.0                         # chênh nhiệt giữa ca đêm và ca trưa, °C
+
+dL = ALPHA_NHOM * L_COT * dT
+ti_le = dL / Z                   # sai số tỉ lệ tương đối = ΔZ / Z
+print(f"Cột dài thêm {1000 * dL:.0f} µm → tỉ lệ mm/px đổi {100 * ti_le:.3f}%")
+for kich_thuoc, dung_sai in ((8.0, 0.05), (60.0, 0.10)):
+    sai = 1000 * kich_thuoc * ti_le
+    print(f"  kích thước {kich_thuoc:4.0f} mm (±{dung_sai} mm): sai {sai:5.1f} µm = {100 * sai / (2000 * dung_sai):.0f}% dải dung sai")</code></pre>
+<pre><code class="language-text">Cột dài thêm 55 µm → tỉ lệ mm/px đổi 0.037%
+  kích thước    8 mm (±0.05 mm): sai   2.9 µm = 3% dải dung sai
+  kích thước   60 mm (±0.1 mm): sai  22.1 µm = 11% dải dung sai</code></pre>
+<p>Với đường kính Ø8 mm, trôi nhiệt chỉ chiếm vài phần trăm dải dung sai; với chiều dài 60 mm, nó ăn hơn 10% dải dung sai, đủ để làm hỏng một nghiên cứu độ lặp lại đã đạt. Đó là lý do trạm đo kích thước lớn thường dùng ống kính telecentric (tỉ lệ gần như không đổi theo Z), khung thép hoặc vật liệu ít giãn nở, và mẫu chuẩn kiểm tra nhiều lần trong ngày.</p>
+
+<h2>2. Mẫu chuẩn: thiết kế và quản lý</h2>
+<p>Mẫu chuẩn (master, golden sample, reference artifact) là "thước" để hỏi hệ thống: hôm nay đo có đúng không? Một mẫu chuẩn tốt:</p>
 <ul>
-  <li><strong>Vị trí và góc camera</strong>: giá đỡ lỏng, bị va chạm.</li>
-  <li><strong>Lấy nét và khẩu độ</strong>: vòng ống kính xoay do rung nếu không khóa vít.</li>
-  <li><strong>Giãn nở nhiệt</strong>: khung cơ khí dài ra vài phần trăm milimét khi nhiệt độ xưởng thay đổi, đủ để ảnh hưởng phép đo độ chính xác cao.</li>
-  <li><strong>Ánh sáng</strong>: đèn suy giảm làm vị trí biên đo được thay đổi nhẹ.</li>
+  <li><strong>Có đặc trưng giống sản phẩm</strong>: cùng loại kích thước (đường kính ngoài, lỗ, khoảng cách), cùng vật liệu và độ bóng bề mặt nếu được, để kiểm tra cả thuật toán tìm biên chứ không chỉ quang học. Với trạm đo đường kính chốt, mẫu chuẩn tốt nhất là một <strong>chốt chuẩn</strong> (pin gauge) có giá trị đã chứng nhận.</li>
+  <li><strong>Có giá trị tham chiếu tin cậy hơn hệ đo ít nhất khoảng 4–10 lần</strong>: đo bằng CMM, máy đo quang học chính xác, hoặc mua kèm chứng nhận hiệu chuẩn. Ví dụ: chốt Ø8,002 mm, độ không đảm bảo ±0,001 mm, cho trạm có dung sai ±0,05 mm.</li>
+  <li><strong>Nằm gần các giới hạn quan trọng</strong> nếu có thể: một mẫu gần danh định, và (nâng cao) một mẫu gần giới hạn trên, một mẫu gần giới hạn dưới để kiểm tra trạm phán xét đúng OK/NG. Đây là bộ mẫu vàng OK/NG dùng ở bài nghiệm thu.</li>
+  <li><strong>Bền và ổn định</strong>: thép tôi, gốm, kính; không gỉ, không biến dạng. Mẫu cắt từ sản phẩm nhựa mềm thì đo lại thường xuyên hơn.</li>
+  <li><strong>Được quản lý</strong>: mã số khắc trên mẫu, hộp đựng riêng, vị trí cất cố định gần trạm, chu kỳ hiệu chuẩn lại mẫu (thường 6–12 tháng theo hệ thống chất lượng), lịch sử sử dụng. Mẫu chuẩn rơi xuống sàn thì phải đo lại trước khi dùng tiếp.</li>
+</ul>
+<p>Ngoài mẫu chuẩn đưa vào trạm, nên có các <strong>dấu chuẩn cố định</strong> trên đồ gá, luôn nằm trong khung hình: hai chấm tròn khắc laser hoặc hai lỗ chốt. Chúng được kiểm tra ở <em>mọi</em> ảnh, không chỉ đầu ca, nên phát hiện va chạm ngay lập tức.</p>
+
+<h2>3. Ngưỡng kiểm tra suy ra từ dung sai</h2>
+<p>Ngưỡng không được chọn theo cảm tính. Với trạm đo Ø8,00 ± 0,05 mm (dải dung sai T = 0,10 mm), dùng các mức đã học ở bài <em>Quy đổi pixel sang mm và đánh giá sai số</em>: hệ đo tốt khi sai số hệ thống (bias) và độ lặp lại nhỏ so với T. Hai mức cho mỗi chỉ tiêu: <strong>cảnh báo</strong> (vẫn chạy, báo kỹ thuật kiểm tra trong ca) và <strong>dừng</strong> (khóa sản xuất).</p>
+<table>
+  <tr><th>Chỉ tiêu</th><th>Cách tính</th><th>Cảnh báo</th><th>Dừng</th><th>Căn cứ</th></tr>
+  <tr><td>Bias</td><td>trung bình 10 lần đo − giá trị chứng nhận</td><td>|bias| &gt; 5 µm</td><td>|bias| &gt; 10 µm</td><td>5% và 10% của T</td></tr>
+  <tr><td>Độ lặp lại σ</td><td>độ lệch chuẩn 10 lần đo, mỗi lần nhấc ra đặt lại</td><td>σ &gt; 1,7 µm</td><td>σ &gt; 3,3 µm</td><td>6σ = 10% và 20% của T</td></tr>
+  <tr><td>Dịch dấu chuẩn</td><td>lệch lớn nhất của 2 dấu so với lúc hiệu chuẩn</td><td>&gt; 1 px</td><td>&gt; 3 px</td><td>1 px ≈ 20 µm; trên 3 px coi như giá camera đã dịch</td></tr>
+  <tr><td>Độ nét</td><td>độ dốc biên trung bình so với lúc hiệu chuẩn</td><td>&lt; 80%</td><td>&lt; 60%</td><td>Biên mờ làm biên dịch và σ tăng</td></tr>
+  <tr><td>Độ sáng nền</td><td>trung vị mức xám nền so với lúc hiệu chuẩn</td><td>&lt; 85%</td><td>&lt; 70%</td><td>Theo dõi đèn trước khi ảnh hưởng tới biên</td></tr>
+</table>
+<p>Giới hạn bias 10 µm còn có một vai trò: nó là "ngân sách" mà bạn có thể trừ thêm vào giới hạn chấp nhận sản phẩm (dải bảo vệ) nếu muốn chắc chắn không lọt hàng lỗi giữa hai lần kiểm tra.</p>
+
+<h2>4. Mô phỏng trạm và đo mẫu chuẩn trên ảnh</h2>
+<p>Trạm mô phỏng: camera nhìn thẳng xuống đèn nền, 0,02 mm/px, ảnh 640 × 520. Trong ảnh có chốt chuẩn Ø8,002 mm (bóng tối tròn) và hai dấu chuẩn trên đồ gá. Hàm <code>chup()</code> nhận "trạng thái trạm" của ngày hôm đó (tỉ lệ thật, độ mờ, độ sáng đèn, độ dịch giá camera) để sau này ta tạo sự cố. Hàm <code>do_mau()</code> là phần mềm đo: tìm tâm, quét 72 tia hướng tâm lấy biên subpixel, fit đường tròn, đổi ra mm bằng hệ số đã hiệu chuẩn; đồng thời đo vị trí dấu chuẩn, độ dốc biên và độ sáng nền.</p>
+<pre><code class="language-python">import json
+import math
+
+import cv2
+import numpy as np
+
+W, H = 640, 520
+S_HIEU_CHUAN = 0.020                 # mm/px ghi trong file hiệu chuẩn
+D_CHUAN = 8.002                      # chốt chuẩn mã GS-08-01, giá trị chứng nhận (mm)
+DAU_CHUAN = [(60.0, 60.0), (580.0, 460.0)]     # vị trí 2 dấu chuẩn trên ảnh lúc hiệu chuẩn (px)
+
+
+def chup(rng, s_that=0.020, mo=0.8, den=220.0, dich=(0.0, 0.0), lech_dat=0.3):
+    """Ảnh mẫu chuẩn: chốt đặt lệch ngẫu nhiên ±lech_dat mm mỗi lần; dấu chuẩn đi theo giá camera."""
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float64)
+    s_that = s_that * (1 + rng.normal(0, 1e-4))       # mỗi lần đặt, chốt cao thấp khác nhau vài µm
+    anh = np.full((H, W), den)
+    cx, cy = W / 2 + rng.uniform(-1, 1) * lech_dat / s_that, H / 2 + rng.uniform(-1, 1) * lech_dat / s_that
+    hinh = [(cx + dich[0], cy + dich[1], D_CHUAN / 2 / s_that)]
+    hinh += [(x + dich[0], y + dich[1], 12.0) for x, y in DAU_CHUAN]
+    for x0, y0, r in hinh:
+        phu = np.clip(0.5 - (np.hypot(xx - x0, yy - y0) - r), 0, 1)       # biên chính xác dưới pixel
+        anh = anh * (1 - phu) + 25.0 * phu
+    anh = cv2.GaussianBlur(anh, (0, 0), mo) + rng.normal(0, 2.0, anh.shape)
+    return np.clip(np.round(anh), 0, 255).astype(np.uint8)
+
+
+def tam_dom(anh, x, y, r=30):
+    """Trọng tâm có trọng số độ tối trong cửa sổ quanh (x, y)."""
+    x0, y0 = int(x) - r, int(y) - r
+    roi = anh[y0:y0 + 2 * r, x0:x0 + 2 * r].astype(np.float64)
+    ts = np.clip(np.median(anh) - roi, 0, None)
+    yy, xx = np.mgrid[0:2 * r, 0:2 * r]
+    return x0 + (ts * xx).sum() / ts.sum(), y0 + (ts * yy).sum() / ts.sum()
+
+
+def do_mau(anh):
+    a = anh.astype(np.float32)
+    nen = float(np.median(anh))
+    _, bw = cv2.threshold(anh, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    n, _, st, tam = cv2.connectedComponentsWithStats(bw)
+    i = 1 + int(np.argmax(st[1:, cv2.CC_STAT_AREA]))                    # vùng tối lớn nhất = chốt
+    cx, cy = tam[i]
+    r0 = math.sqrt(st[i, cv2.CC_STAT_AREA] / math.pi)
+    diem, doc = [], []
+    for g in np.linspace(0, 2 * math.pi, 72, endpoint=False):
+        s = np.arange(r0 - 15, r0 + 15, 0.25)
+        prof = cv2.remap(a, (cx + s * math.cos(g)).astype(np.float32).reshape(1, -1),
+                         (cy + s * math.sin(g)).astype(np.float32).reshape(1, -1), cv2.INTER_LINEAR).ravel()
+        muc = (prof[:8].mean() + prof[-8:].mean()) / 2
+        k = int(np.argmax(prof &gt; muc))
+        r = s[k - 1] + 0.25 * (muc - prof[k - 1]) / (prof[k] - prof[k - 1])
+        diem.append((cx + r * math.cos(g), cy + r * math.sin(g)))
+        doc.append(np.max(np.diff(prof)) / 0.25 / (prof[-8:].mean() - prof[:8].mean()))   # độ dốc biên chuẩn hóa
+    P = np.array(diem)
+    A = np.column_stack([P, np.ones(len(P))])
+    D, E, F = np.linalg.lstsq(A, -(P ** 2).sum(axis=1), rcond=None)[0]
+    ban_kinh = math.sqrt(D * D / 4 + E * E / 4 - F)
+    dau = [tam_dom(anh, x, y) for x, y in DAU_CHUAN]
+    lech_dau = max(math.hypot(u - x, v - y) for (u, v), (x, y) in zip(dau, DAU_CHUAN))
+    return {"d_mm": 2 * ban_kinh * S_HIEU_CHUAN, "do_net": float(np.mean(doc)), "sang": nen, "lech_dau_px": lech_dau}
+
+
+rng = np.random.default_rng(0)
+mot_lan = do_mau(chup(rng))
+print({k: round(v, 4) for k, v in mot_lan.items()})
+
+# Lưu "dấu vân tay" của trạm lúc hiệu chuẩn: giá trị gốc để so mỗi ngày
+goc = [do_mau(chup(rng)) for _ in range(10)]
+chuan_goc = {"do_net": float(np.mean([g["do_net"] for g in goc])), "sang": float(np.mean([g["sang"] for g in goc]))}
+json.dump(chuan_goc, open("chuan_goc.json", "w"))
+d = np.array([g["d_mm"] for g in goc])
+print(f"Lúc hiệu chuẩn: 10 lần đo chốt {D_CHUAN} mm → TB {d.mean():.4f}, σ = {1000 * d.std(ddof=1):.2f} µm; "
+      f"độ nét gốc {chuan_goc['do_net']:.3f}, độ sáng gốc {chuan_goc['sang']:.0f}")</code></pre>
+<pre><code class="language-text">{'d_mm': 8.002, 'do_net': 0.4217, 'sang': 218.0, 'lech_dau_px': 0.0077}
+Lúc hiệu chuẩn: 10 lần đo chốt 8.002 mm → TB 8.0020, σ = 0.86 µm; độ nét gốc 0.429, độ sáng gốc 218</code></pre>
+<p>Ngày hiệu chuẩn, trạm đo chốt Ø8,002 mm đúng tới phần nhỏ của micromet với σ khoảng 0,9 µm (mô phỏng đã cộng dao động chiều cao chốt mỗi lần đặt; trạm thật ở 0,02 mm/px thường được σ 1–3 µm). Độ nét và độ sáng gốc được lưu lại làm mốc so sánh.</p>
+
+<h2>5. Kiểm tra đầu ca: phán xét và nhật ký</h2>
+<p>Hàm <code>kiem_tra_dau_ca()</code> làm đúng việc người vận hành làm mỗi đầu ca: đưa mẫu chuẩn vào 10 lần (mỗi lần nhấc ra đặt lại), tính bias, σ, độ nét, độ sáng, độ dịch dấu chuẩn, so với bảng ngưỡng ở mục 3, trả về <strong>OK / CẢNH BÁO / DỪNG</strong> cùng lý do, và ghi một dòng JSON vào nhật ký. Ghi theo định dạng JSON Lines (mỗi dòng một bản ghi) giúp nối thêm an toàn và đọc lại dễ bằng bất kỳ công cụ nào.</p>
+<pre><code class="language-python">import datetime
+import hashlib
+import json
+
+import numpy as np
+
+NGUONG = {  # chỉ tiêu: (cảnh báo, dừng, chiều) — chiều "tren": xấu khi lớn; "duoi": xấu khi nhỏ
+    "bias_um": (5.0, 10.0, "tren"), "sigma_um": (1.7, 3.3, "tren"), "lech_dau_px": (1.0, 3.0, "tren"),
+    "do_net_ti_le": (0.80, 0.60, "duoi"), "sang_ti_le": (0.85, 0.70, "duoi")}
+PHIEN_BAN = "tram-do-D8 v1.4.2"
+open("hieu_chuan.json", "w").write(json.dumps({"s_mm_px": S_HIEU_CHUAN, "ngay": "2026-09-01"}))
+
+
+def ma_bam(ten_file):
+    return hashlib.sha256(open(ten_file, "rb").read()).hexdigest()[:12]
+
+
+def kiem_tra_dau_ca(anh_list, thoi_diem, nguoi, file_log="nhat_ky_hieu_chuan.jsonl"):
+    goc = json.load(open("chuan_goc.json"))
+    kq = [do_mau(a) for a in anh_list]
+    d = np.array([k["d_mm"] for k in kq])
+    chi_tieu = {"bias_um": 1000 * (d.mean() - D_CHUAN), "sigma_um": 1000 * d.std(ddof=1),
+                "lech_dau_px": max(k["lech_dau_px"] for k in kq),
+                "do_net_ti_le": np.mean([k["do_net"] for k in kq]) / goc["do_net"],
+                "sang_ti_le": np.mean([k["sang"] for k in kq]) / goc["sang"]}
+    trang_thai, ly_do = "OK", []
+    for ten, (canh_bao, dung, chieu) in NGUONG.items():
+        v = abs(chi_tieu[ten]) if ten == "bias_um" else chi_tieu[ten]
+        xau = (lambda a, b: a &gt; b) if chieu == "tren" else (lambda a, b: a &lt; b)
+        if xau(v, dung):
+            trang_thai = "DUNG"
+            ly_do.append(f"{ten}={chi_tieu[ten]:.2f} vượt ngưỡng dừng {dung}")
+        elif xau(v, canh_bao):
+            trang_thai = "CANH_BAO" if trang_thai == "OK" else trang_thai
+            ly_do.append(f"{ten}={chi_tieu[ten]:.2f} vượt ngưỡng cảnh báo {canh_bao}")
+    ban_ghi = {"loai": "kiem_tra", "thoi_diem": thoi_diem.isoformat(timespec="minutes"), "nguoi": nguoi,
+               "mau": "GS-08-01", "so_lan": len(d), **{k: round(float(v), 4) for k, v in chi_tieu.items()},
+               "trang_thai": trang_thai, "ly_do": ly_do, "phien_ban": PHIEN_BAN, "hash_hieu_chuan": ma_bam("hieu_chuan.json")}
+    with open(file_log, "a", encoding="utf-8") as f:
+        f.write(json.dumps(ban_ghi, ensure_ascii=False) + "\n")
+    return ban_ghi
+
+
+rng = np.random.default_rng(1)
+bg = kiem_tra_dau_ca([chup(rng) for _ in range(10)], datetime.datetime(2026, 9, 1, 6, 0), "NV-017")
+print(json.dumps(bg, ensure_ascii=False, indent=1))</code></pre>
+<pre><code class="language-text">{
+ "loai": "kiem_tra",
+ "thoi_diem": "2026-09-01T06:00",
+ "nguoi": "NV-017",
+ "mau": "GS-08-01",
+ "so_lan": 10,
+ "bias_um": -0.2669,
+ "sigma_um": 1.084,
+ "lech_dau_px": 0.0182,
+ "do_net_ti_le": 1.0046,
+ "sang_ti_le": 1.0,
+ "trang_thai": "OK",
+ "ly_do": [],
+ "phien_ban": "tram-do-D8 v1.4.2",
+ "hash_hieu_chuan": "ae30132b3321"
+}</code></pre>
+
+<h2>6. Mô phỏng 30 ngày: trôi, va chạm, đèn yếu, mất nét</h2>
+<p>Giờ cho trạm "sống" 30 ngày, mỗi ngày một lần kiểm tra đầu ca ca sáng. Ta cài sẵn bốn sự cố mà phần mềm không được biết:</p>
+<ul>
+  <li><strong>Trôi tỉ lệ</strong> chậm do giá đỡ "lún" dần và nhiệt: tỉ lệ thật tăng 0,004% mỗi ngày, cộng dao động nhiệt ngẫu nhiên hằng ngày.</li>
+  <li><strong>Đèn yếu dần</strong> 0,6% mỗi ngày.</li>
+  <li><strong>Ngày 18</strong>: xe nâng va vào khung máy, giá camera dịch 4 px. Chiều cùng ngày, kỹ thuật lắp lại camera theo chốt định vị và hiệu chuẩn lại tỉ lệ (có ghi sự kiện bảo trì vào nhật ký).</li>
+  <li><strong>Từ ngày 24</strong>: vòng lấy nét bị lỏng, ảnh mờ dần.</li>
+</ul>
+<pre><code class="language-python">import datetime
+import json
+import os
+
+import numpy as np
+
+if os.path.exists("nhat_ky_hieu_chuan.jsonl"):
+    os.remove("nhat_ky_hieu_chuan.jsonl")
+rng = np.random.default_rng(7)
+ngay0 = datetime.datetime(2026, 9, 1, 6, 0)
+print("ngày | bias µm | σ µm | dấu px | nét  | sáng | trạng thái")
+for ngay in range(30):
+    if ngay == 19:   # chiều ngày 18, sau sự cố: lắp lại camera theo chốt định vị, hiệu chuẩn lại tỉ lệ
+        with open("nhat_ky_hieu_chuan.jsonl", "a", encoding="utf-8") as f:
+            f.write(json.dumps({"loai": "bao_tri", "thoi_diem": "2026-09-19T14:00", "nguoi": "KS-002",
+                                "noi_dung": "siết lại giá camera, hiệu chuẩn lại tỉ lệ"}, ensure_ascii=False) + "\n")
+    tu_ngay = ngay if ngay &lt; 19 else ngay - 19                    # hiệu chuẩn lại thì trôi tính lại từ đầu
+    s_that = S_HIEU_CHUAN * (1 + 0.00004 * tu_ngay + rng.normal(0, 0.00012))   # trôi + nhiệt hằng ngày
+    den = 220.0 * (1 - 0.006 * ngay)
+    dich = (4.0, 1.0) if ngay == 18 else (0.0, 0.0)
+    mo = 0.8 + max(0, ngay - 23) * 0.25
+    anh = [chup(rng, s_that=s_that, mo=mo, den=den, dich=dich) for _ in range(10)]
+    bg = kiem_tra_dau_ca(anh, ngay0 + datetime.timedelta(days=ngay), "NV-017")
+    if ngay % 3 == 0 or bg["trang_thai"] != "OK":
+        print(f" {ngay:3d} | {bg['bias_um']:+6.2f}  | {bg['sigma_um']:4.2f} | {bg['lech_dau_px']:5.2f}  | "
+              f"{bg['do_net_ti_le']:.2f} | {bg['sang_ti_le']:.2f} | {bg['trang_thai']}")</code></pre>
+<pre><code class="language-text">ngày | bias µm | σ µm | dấu px | nét  | sáng | trạng thái
+   0 |  -0.31  | 0.90 |  0.02  | 0.99 | 1.00 | OK
+   3 |  -0.60  | 0.82 |  0.02  | 0.99 | 0.98 | OK
+   6 |  -2.36  | 0.89 |  0.02  | 0.99 | 0.96 | OK
+   9 |  -3.22  | 0.85 |  0.02  | 1.00 | 0.94 | OK
+  10 |  -5.90  | 0.68 |  0.02  | 0.99 | 0.94 | CANH_BAO
+  12 |  -6.10  | 0.39 |  0.02  | 0.99 | 0.93 | CANH_BAO
+  15 |  -4.50  | 0.64 |  0.02  | 0.99 | 0.91 | OK
+  16 |  -5.96  | 0.77 |  0.02  | 0.99 | 0.90 | CANH_BAO
+  18 |  -7.55  | 0.93 |  4.10  | 0.99 | 0.89 | DUNG
+  21 |  +0.30  | 0.96 |  0.02  | 1.00 | 0.87 | OK
+  24 |  -0.87  | 0.59 |  0.03  | 0.81 | 0.85 | OK
+  25 |  -3.00  | 0.66 |  0.03  | 0.68 | 0.85 | CANH_BAO
+  26 |  -2.32  | 0.96 |  0.03  | 0.58 | 0.84 | DUNG
+  27 |  -2.70  | 0.98 |  0.03  | 0.51 | 0.83 | DUNG
+  28 |  -4.02  | 0.71 |  0.02  | 0.46 | 0.83 | DUNG
+  29 |  -3.32  | 1.25 |  0.05  | 0.42 | 0.83 | DUNG</code></pre>
+<p>(Bảng in các ngày chia hết cho 3 và mọi ngày không OK.) Đọc theo từng sự cố:</p>
+<ul>
+  <li><strong>Trôi tỉ lệ</strong>: tỉ lệ thật tăng nên chốt trông nhỏ đi, bias âm dần từ 0 xuống −6 µm, lẫn trong dao động nhiệt ngày này qua ngày khác. Ngưỡng cảnh báo bị chạm lần đầu ngày 10, sau đó trạng thái "nhảy" giữa OK và CẢNH BÁO (ngày 15 lại OK) vì dao động nhiệt: kiểm tra từng ngày riêng lẻ vừa phát hiện muộn vừa khó đọc. Mục 7 phát hiện sớm hơn bằng xu hướng.</li>
+  <li><strong>Va chạm ngày 18</strong>: dấu chuẩn lệch hơn 4 px, trạm DỪNG ngay buổi sáng đó. Lưu ý bản thân dịch ngang không làm sai đường kính ở trạm này (bias ngày 18 chỉ là trôi tỉ lệ đang có). Nhưng camera bị va có thể đã nghiêng, ROI của các công cụ khác đã lệch; với trạm dẫn đường robot, dịch 4 px là 0,08 mm sai vị trí gắp. Dấu chuẩn bắt được loại sự cố mà mẫu chuẩn không bắt được.</li>
+  <li><strong>Sau sửa chữa chiều ngày 18</strong>: từ ngày 19, dấu chuẩn về 0,02 px, bias về gần 0 (đã hiệu chuẩn lại), trạm OK trở lại. Bảng không in ngày 19–20 vì đều OK.</li>
+  <li><strong>Đèn</strong>: độ sáng giảm dần tới 0,83 lần giá trị gốc, chạm ngưỡng cảnh báo 0,85 từ ngày 26 mà phép đo không hề bị ảnh hưởng (thuật toán biên dùng mức 50% tương đối). Đây là cảnh báo bảo trì dự phòng: thay đèn theo kế hoạch, không phải khi đã hỏng.</li>
+  <li><strong>Mất nét từ ngày 24</strong>: độ nét giảm còn 0,68 ngày 25 (CẢNH BÁO), 0,58 ngày 26 (DỪNG). Trong khi đó bias và σ gần như chưa đổi (σ chỉ lên 1,25 µm ngày 29): nếu chỉ nhìn kết quả đo mẫu chuẩn, sự cố này bị phát hiện rất muộn. Mỗi chỉ số theo dõi một nguyên nhân riêng, nên cần đủ bộ.</li>
 </ul>
 
-<h2>Mẫu chuẩn (golden sample)</h2>
-<p>Chuẩn bị một hoặc vài <strong>chi tiết mẫu đã được đo bằng thiết bị chính xác hơn</strong> (máy đo tọa độ CMM, máy đo quang học), dán nhãn, cất giữ cẩn thận. Đây là "thước chuẩn" của hệ thống vision.</p>
+<h2>7. Phát hiện trôi sớm bằng xu hướng</h2>
+<p>Ngưỡng cố định chỉ báo khi đã muộn. Với các đại lượng trôi chậm như bias, hãy fit đường thẳng qua N lần kiểm tra gần nhất và ước lượng <strong>còn bao nhiêu ngày</strong> trước khi chạm ngưỡng. Để không báo nhầm do dao động ngẫu nhiên, chỉ tin độ dốc khi nó lớn hơn hẳn sai số chuẩn của chính nó (ở đây: gấp 3 lần).</p>
+<pre><code class="language-python">import json
 
-<h2>Quy trình kiểm tra hằng ca</h2>
-<ol>
-  <li>Đầu ca, đưa mẫu chuẩn vào trạm, đo 5–10 lần.</li>
-  <li>So sánh giá trị trung bình với giá trị chuẩn; so sánh độ lệch chuẩn với giới hạn lặp lại cho phép.</li>
-  <li>Nếu nằm trong giới hạn: ghi nhận, bắt đầu sản xuất.</li>
-  <li>Nếu vượt giới hạn: <strong>không chạy sản xuất</strong>, báo kỹ thuật kiểm tra và hiệu chuẩn lại.</li>
-</ol>
-<pre><code>import statistics
+import numpy as np
 
-def verify(measurements, nominal, max_bias=0.02, max_std=0.01):
-    bias = statistics.mean(measurements) - nominal
-    std = statistics.stdev(measurements)
-    ok = abs(bias) &lt;= max_bias and std &lt;= max_std
-    return ok, round(bias, 4), round(std, 4)
+ban_ghi = [json.loads(dong) for dong in open("nhat_ky_hieu_chuan.jsonl", encoding="utf-8")]
+bias = np.array([b["bias_um"] for b in ban_ghi if b["loai"] == "kiem_tra"])
 
-print(verify([25.012, 25.009, 25.015, 25.011, 25.010], nominal=25.000))</code></pre>
-<p>Ghi kết quả mỗi lần vào cơ sở dữ liệu. Vẽ biểu đồ theo thời gian giúp phát hiện xu hướng trôi trước khi vượt giới hạn.</p>
 
-<h2>Kiểm tra nhanh tự động</h2>
+def du_bao(y, n=10, nguong=5.0):
+    """Fit y = a + b·ngày trên n điểm cuối; trả về độ dốc, sai số chuẩn của độ dốc, số ngày tới ngưỡng."""
+    n = min(n, len(y))
+    x = np.arange(len(y))[-n:]
+    yy = y[-n:]
+    A = np.column_stack([np.ones(n), x])
+    (a, b), *_ = np.linalg.lstsq(A, yy, rcond=None)
+    du = yy - A @ [a, b]
+    se_b = np.sqrt(du @ du / (n - 2) / np.sum((x - x.mean()) ** 2))
+    con = (np.sign(b) * nguong - (a + b * x[-1])) / b if abs(b) &gt; 3 * se_b else None
+    return b, se_b, con
+
+
+print("sau ngày | độ dốc µm/ngày | ±SE   | dự báo chạm ngưỡng cảnh báo 5 µm")
+for ngay in (5, 7, 9, 11):
+    b, se, con = du_bao(bias[:ngay + 1])
+    if con is None:
+        ket_luan = "chưa có xu hướng rõ"
+    else:
+        ket_luan = f"sau khoảng {con:.0f} ngày nữa" if con &gt; 0 else "đã vượt ngưỡng"
+    print(f"   {ngay:2d}    |    {b:+.3f}      | {se:.3f} | {ket_luan}")</code></pre>
+<pre><code class="language-text">sau ngày | độ dốc µm/ngày | ±SE   | dự báo chạm ngưỡng cảnh báo 5 µm
+    5    |    -0.273      | 0.148 | chưa có xu hướng rõ
+    7    |    -0.336      | 0.098 | sau khoảng 9 ngày nữa
+    9    |    -0.488      | 0.105 | sau khoảng 3 ngày nữa
+   11    |    -0.507      | 0.152 | sau khoảng 1 ngày nữa</code></pre>
+<p>Sau ngày 5, độ dốc chưa vượt 3 lần sai số chuẩn của nó nên hàm im lặng (tránh báo nhầm). Sau ngày 7, xu hướng đã rõ: dự báo chạm ngưỡng trong khoảng 9 ngày; sau ngày 9: khoảng 3 ngày (thực tế bị chạm ngày 10). Kỹ thuật có vài ngày để lên kế hoạch hiệu chuẩn lại vào giờ nghỉ thay vì bị dừng máy bất ngờ. Trên thực tế, nhiều nhà máy vẽ thêm <strong>biểu đồ kiểm soát</strong> (control chart) cho bias với các giới hạn ±3σ tính từ giai đoạn ổn định, và áp dụng các quy tắc như "7 điểm liên tiếp cùng phía đường trung tâm" để phát hiện trôi; ý tưởng giống hệt: tìm thay đổi có hệ thống trước khi nó vượt dung sai.</p>
+
+<h2>8. Logic khóa sản xuất</h2>
+<p>Kiểm tra mà không có hậu quả thì sẽ bị bỏ qua vào một ca bận. Phần mềm trạm phải <strong>tự khóa</strong>: không cho chạy sản xuất (không trả OK cho PLC) khi điều kiện kiểm tra không thỏa. Các điều kiện điển hình:</p>
+<pre><code class="language-python">import datetime
+import json
+
+
+def duoc_phep_chay(file_log, bay_gio, hash_hien_tai, han_gio=12):
+    """Trả về (True/False, lý do). Chỉ chạy khi có lần kiểm tra đạt gần đây, đúng file hiệu chuẩn,
+    và không có sự kiện bảo trì/thay đổi nào sau lần kiểm tra đó."""
+    ban_ghi = [json.loads(d) for d in open(file_log, encoding="utf-8")]
+    kiem_tra = [b for b in ban_ghi if b["loai"] == "kiem_tra"]
+    if not kiem_tra:
+        return False, "chưa từng kiểm tra mẫu chuẩn"
+    cuoi = kiem_tra[-1]
+    t_cuoi = datetime.datetime.fromisoformat(cuoi["thoi_diem"])
+    if cuoi["trang_thai"] == "DUNG":
+        return False, "lần kiểm tra gần nhất DỪNG: " + "; ".join(cuoi["ly_do"])
+    if bay_gio - t_cuoi &gt; datetime.timedelta(hours=han_gio):
+        return False, f"lần kiểm tra gần nhất đã quá {han_gio} giờ"
+    if cuoi["hash_hieu_chuan"] != hash_hien_tai:
+        return False, "file hiệu chuẩn đã thay đổi sau lần kiểm tra"
+    if any(b["loai"] == "bao_tri" and datetime.datetime.fromisoformat(b["thoi_diem"]) &gt; t_cuoi for b in ban_ghi):
+        return False, "có bảo trì sau lần kiểm tra, phải kiểm tra lại"
+    return True, "OK" if cuoi["trang_thai"] == "OK" else "chạy được, có cảnh báo: " + "; ".join(cuoi["ly_do"])
+
+
+# Thử với nhật ký 30 ngày: ngày 9 (OK), ngày 18 (va chạm), ngày 12 nhưng đã 14 giờ sau kiểm tra
+import shutil
+shutil.copy("nhat_ky_hieu_chuan.jsonl", "nk_thu.jsonl")
+dong = open("nk_thu.jsonl", encoding="utf-8").readlines()
+h = ma_bam("hieu_chuan.json")
+for ten, n_dong, gio in (("ngày 9, 7 giờ", 10, 7), ("ngày 18, 7 giờ", 19, 7), ("ngày 12, 20 giờ", 13, 20)):
+    open("nk_thu.jsonl", "w", encoding="utf-8").writelines(dong[:n_dong])
+    ngay = datetime.datetime(2026, 9, 1) + datetime.timedelta(days=n_dong - 1, hours=gio)
+    print(f"{ten:15s}: {duoc_phep_chay('nk_thu.jsonl', ngay, h)}")
+
+# Bảo trì lau ống kính lúc 9 giờ ngày 9, sau lần kiểm tra lúc 6 giờ
+with open("nk_thu.jsonl", "w", encoding="utf-8") as f:
+    f.writelines(dong[:10])
+    f.write(json.dumps({"loai": "bao_tri", "thoi_diem": "2026-09-10T09:00", "nguoi": "BT-003",
+                        "noi_dung": "lau ống kính"}, ensure_ascii=False) + "\n")
+print(f"{'ngày 9, sau bảo trì':15s}: {duoc_phep_chay('nk_thu.jsonl', datetime.datetime(2026, 9, 10, 10, 0), h)}")
+print(f"{'đổi file h.chuẩn':15s}: {duoc_phep_chay('nk_thu.jsonl', datetime.datetime(2026, 9, 10, 8, 0), 'abc123')}")</code></pre>
+<pre><code class="language-text">ngày 9, 7 giờ  : (True, 'OK')
+ngày 18, 7 giờ : (False, 'lần kiểm tra gần nhất DỪNG: bias_um=-7.55 vượt ngưỡng cảnh báo 5.0; lech_dau_px=4.10 vượt ngưỡng dừng 3.0')
+ngày 12, 20 giờ: (False, 'lần kiểm tra gần nhất đã quá 12 giờ')
+ngày 9, sau bảo trì: (False, 'có bảo trì sau lần kiểm tra, phải kiểm tra lại')
+đổi file h.chuẩn: (False, 'file hiệu chuẩn đã thay đổi sau lần kiểm tra')</code></pre>
+<p>Khi trạm bị khóa, PLC nhận trạng thái "chưa sẵn sàng" (bit READY = 0, xem chặng tích hợp PLC) và dây chuyền không chạy qua trạm, hoặc sản phẩm được chuyển sang kiểm tra thủ công. Quyền mở khóa tạm thời (bypass) chỉ dành cho kỹ sư, có ghi nhật ký người mở, lý do và thời hạn.</p>
+<div class="warn"><strong>Sản phẩm đã đo từ lần kiểm tra đạt cuối cùng</strong>Khi kiểm tra đầu ca thất bại, câu hỏi tiếp theo của QC luôn là: các sản phẩm đo từ lần kiểm tra đạt trước đó có tin được không? Không ai biết sự cố xảy ra lúc nào trong khoảng đó, nên theo nguyên tắc phải <strong>cách ly và kiểm tra lại</strong> toàn bộ số sản phẩm ấy. Kiểm tra càng thưa, số hàng phải cách ly càng nhiều (bài tập 2). Đây là lý do kiểm tra dấu chuẩn ở mọi ảnh và thêm lần kiểm tra mẫu chuẩn giữa ca đáng giá hơn nhiều so với chi phí của chúng.</div>
+
+<h2>9. Khi nào phải hiệu chuẩn lại?</h2>
+<p>Hiệu chuẩn lại không phải phản xạ mặc định khi kiểm tra thất bại. Nếu hiệu chuẩn lại để "che" một nguyên nhân chưa được sửa (đèn hỏng, ống kính bẩn, đồ gá mòn), lỗi sẽ quay lại và hồ sơ hiệu chuẩn mất ý nghĩa. Bảng quyết định:</p>
+<table>
+  <tr><th>Triệu chứng</th><th>Nguyên nhân có thể</th><th>Hành động</th></tr>
+  <tr><td>Chỉ bias vượt ngưỡng, σ bình thường, dấu chuẩn không dịch</td><td>Trôi tỉ lệ (nhiệt, giá lún), mẫu chuẩn bẩn</td><td>Lau mẫu chuẩn, đo lại; nếu vẫn lệch: hiệu chuẩn lại tỉ lệ (bài <em>Quy đổi pixel sang mm</em>), rồi kiểm tra lại bằng mẫu chuẩn. Nếu lặp lại theo mùa, xử lý gốc: ổn định nhiệt, kiểm tra nhiều lần trong ngày</td></tr>
+  <tr><td>Dấu chuẩn dịch</td><td>Va chạm, giá lỏng</td><td>Kiểm tra cơ khí, siết lại; chỉnh lại camera về vị trí cũ nếu có chốt định vị; sau đó <strong>hiệu chuẩn lại đầy đủ</strong> những gì phụ thuộc vị trí: tỉ lệ/homography, hand-eye, vị trí ROI</td></tr>
+  <tr><td>Độ nét giảm</td><td>Ống kính bẩn, vòng nét xoay</td><td>Lau trước; nếu phải chỉnh nét: <strong>hiệu chuẩn lại nội tại</strong> (bài <em>Hiệu chuẩn camera</em>) rồi tỉ lệ, rồi khóa vít vòng nét</td></tr>
+  <tr><td>σ tăng, bias bình thường</td><td>Rung, đèn nhấp nháy, mẫu đặt không ổn định, nhiễu</td><td>Tìm nguyên nhân; <strong>không</strong> hiệu chuẩn lại (hiệu chuẩn không sửa được độ lặp lại)</td></tr>
+  <tr><td>Độ sáng giảm</td><td>Đèn suy giảm, tấm khuếch tán bẩn</td><td>Vệ sinh, thay đèn theo kế hoạch; kiểm tra lại bias sau khi thay đèn (đèn mới có thể đổi bias biên)</td></tr>
+  <tr><td>Thay camera, ống kính, đèn; đổi độ phân giải; di chuyển trạm</td><td>Thay đổi có chủ đích</td><td>Hiệu chuẩn lại toàn bộ, ghi lại "dấu vân tay" mới (độ nét, độ sáng, vị trí dấu chuẩn), cập nhật hash</td></tr>
+  <tr><td>Đến hạn theo kế hoạch</td><td>Yêu cầu hệ thống chất lượng</td><td>Hiệu chuẩn lại theo chu kỳ (ví dụ 6 hoặc 12 tháng), dù kiểm tra hằng ngày vẫn đạt</td></tr>
+</table>
+<p>Hồ sơ mỗi lần hiệu chuẩn lại: ngày, người làm, lý do, mẫu chuẩn dùng (mã, ngày chứng nhận), kết quả trước và sau, phiên bản phần mềm, file hiệu chuẩn cũ (lưu lại, không ghi đè). Đó là thứ đánh giá viên (audit) của khách hàng sẽ hỏi.</p>
+
+<h2>10. Lỗi thường gặp</h2>
 <ul>
-  <li><strong>Dấu chuẩn trong khung hình</strong>: gắn vài điểm đánh dấu cố định trên đồ gá; mỗi lần chụp, kiểm tra vị trí của chúng. Lệch quá vài pixel nghĩa là camera đã xê dịch.</li>
-  <li><strong>Chỉ số độ nét</strong> của một vùng cố định: giảm dần là dấu hiệu ống kính bẩn hoặc mất nét.</li>
-  <li><strong>Độ sáng vùng tham chiếu</strong>: phát hiện đèn suy giảm.</li>
+  <li><strong>Đo mẫu chuẩn 10 lần mà không nhấc ra</strong>: σ rất nhỏ, không phản ánh độ lặp lại thật.</li>
+  <li><strong>Chỉnh hệ số tỉ lệ bằng tay</strong> mỗi sáng cho mẫu chuẩn "ra đúng số": xóa mất bằng chứng trôi, không còn gì để phân tích xu hướng.</li>
+  <li><strong>Ngưỡng không gắn với dung sai</strong> ("lệch dưới 0,02 mm là được" cho mọi trạm).</li>
+  <li><strong>Nhật ký ghi tay trên giấy</strong> hoặc ghi đè file: không truy xuất, không vẽ xu hướng được.</li>
+  <li><strong>Không ghi hash file hiệu chuẩn và phiên bản phần mềm</strong>: không chứng minh được kết quả đo hôm đó dùng hiệu chuẩn nào.</li>
+  <li><strong>Mẫu chuẩn để ngay trên máy</strong>, dính dầu, va đập, không ai đo lại.</li>
 </ul>
 
-<h2>Khi nào cần hiệu chuẩn lại hoàn toàn?</h2>
-<ul>
-  <li>Thay camera, ống kính, hoặc thay đổi lấy nét, khẩu độ.</li>
-  <li>Sau bảo trì cơ khí liên quan đến giá đỡ camera hoặc đồ gá.</li>
-  <li>Kiểm tra mẫu chuẩn thất bại.</li>
-  <li>Theo chu kỳ cố định do hệ thống quản lý chất lượng quy định.</li>
-</ul>
+<h2>11. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1 (bài thực hành của bài học).</strong> Viết quy trình kiểm tra đầu ca 5 bước cho trạm đo đường kính, gồm ngưỡng cảnh báo. Trạm: Ø8,00 ± 0,05 mm, 0,02 mm/px, chạy 2 ca, có PLC.</p>
+<details><summary>Xem đáp án</summary>
+<table>
+  <tr><th>Bước</th><th>Việc làm</th><th>Ngưỡng / tiêu chí</th><th>Nếu không đạt</th></tr>
+  <tr><td>1. Chuẩn bị</td><td>Lấy chốt chuẩn GS-08-01 (Ø8,002 mm) từ hộp; kiểm tra nhãn còn hạn chứng nhận; lau bằng khăn không xơ; lau tấm kính đèn nền. Phần mềm tự kiểm tra dấu chuẩn và độ sáng trên ảnh trống</td><td>Hạn chứng nhận còn hiệu lực; dấu chuẩn lệch ≤ 1 px; độ sáng ≥ 85% gốc</td><td>Mẫu hết hạn: dùng mẫu dự phòng, báo QC. Dấu chuẩn lệch &gt; 3 px hoặc sáng &lt; 70%: dừng, gọi kỹ thuật</td></tr>
+  <tr><td>2. Đo lặp lại</td><td>Chọn chế độ "Kiểm tra mẫu chuẩn" trên HMI (PLC giữ READY = 0); đặt chốt vào đồ gá, nhấn đo; nhấc ra, đặt lại; lặp 10 lần</td><td>Đủ 10 lần đo hợp lệ</td><td>Lần đo lỗi (không tìm thấy chốt): kiểm tra đặt mẫu, đo bù</td></tr>
+  <tr><td>3. Phán xét tự động</td><td>Phần mềm tính bias, σ, độ nét, độ sáng, dấu chuẩn</td><td>Cảnh báo: |bias| &gt; 5 µm, σ &gt; 1,7 µm, nét &lt; 80%, sáng &lt; 85%, dấu &gt; 1 px. Dừng: |bias| &gt; 10 µm, σ &gt; 3,3 µm, nét &lt; 60%, sáng &lt; 70%, dấu &gt; 3 px</td><td>CẢNH BÁO: được chạy, phần mềm tạo yêu cầu kỹ thuật kiểm tra trong ca. DỪNG: khóa sản xuất</td></tr>
+  <tr><td>4. Ghi nhận và mở khóa</td><td>Phần mềm ghi nhật ký (thời gian, người, mã mẫu, kết quả, trạng thái, hash hiệu chuẩn, phiên bản); nếu OK/CẢNH BÁO thì bật READY cho PLC; cất mẫu vào hộp</td><td>Bản ghi tồn tại; READY chỉ bật khi lần kiểm tra cuối đạt và trong vòng 12 giờ</td><td>Không ghi được nhật ký (ổ đầy): coi như không đạt</td></tr>
+  <tr><td>5. Xử lý khi DỪNG</td><td>Báo trưởng ca và kỹ thuật; cách ly sản phẩm đo từ lần kiểm tra đạt trước; tìm nguyên nhân theo bảng mục 9; sửa; hiệu chuẩn lại nếu cần; kiểm tra lại từ bước 1</td><td>Chỉ chạy lại khi kiểm tra mới đạt OK; xem xét xu hướng 10 ngày gần nhất</td><td>Không tự ý chỉnh hệ số; quyền bypass chỉ kỹ sư, có ghi lý do</td></tr>
+</table>
+<p>Quy trình tốt viết đủ chi tiết để một người mới làm đúng mà không cần hỏi: dụng cụ, số lần, con số ngưỡng, ai được làm gì khi không đạt. Dán bản tóm tắt cạnh trạm và đưa các ngưỡng vào phần mềm, không để người vận hành tự so sánh.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Trạm chạy 45 sản phẩm/phút, kiểm tra mẫu chuẩn lúc 6:00 và 18:00. Lần kiểm tra 18:00 thất bại (bias +14 µm). Phải cách ly bao nhiêu sản phẩm? Nếu thêm kiểm tra lúc 10:00 và 14:00, trong trường hợp xấu nhất còn phải cách ly bao nhiêu? Nếu dấu chuẩn được kiểm tra ở mọi ảnh và phát hiện sự cố (va chạm) ngay tức thì thì sao?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">toc_do = 45                                   # sản phẩm/phút
+for ten, khoang_gio in (("2 lần/ngày (12 giờ)", 12), ("4 lần/ngày (4 giờ)", 4)):
+    print(f"{ten}: cách ly tối đa {toc_do * 60 * khoang_gio:,} sản phẩm")
+print(f"Phát hiện ở ảnh kế tiếp: chỉ 1–2 sản phẩm vừa đo (mỗi sản phẩm {60 / toc_do:.2f} s)")</code></pre>
+<pre><code class="language-text">2 lần/ngày (12 giờ): cách ly tối đa 32,400 sản phẩm
+4 lần/ngày (4 giờ): cách ly tối đa 10,800 sản phẩm
+Phát hiện ở ảnh kế tiếp: chỉ 1–2 sản phẩm vừa đo (mỗi sản phẩm 1.33 s)</code></pre>
+<p>32 400 sản phẩm là một lô hàng phải đo lại thủ công. Kiểm tra mỗi 4 giờ giảm còn 10 800 trong trường hợp xấu nhất. Dấu chuẩn kiểm tra ở mọi ảnh chỉ bắt được sự cố về vị trí (va chạm), không bắt được trôi tỉ lệ hay biên, nên vẫn cần mẫu chuẩn; nhưng kết hợp với xu hướng (mục 7), phần lớn trôi chậm được xử lý trước khi chạm ngưỡng dừng, nên tình huống cách ly cả ca rất hiếm.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Đổi cột nhôm 300 mm ở mục 1 sang cột thép (α = 12 × 10⁻⁶/°C) và đổi ống kính thường (Z = 150 mm) sang ống kính telecentric có độ thay đổi phóng đại khoảng 0,05% trên mỗi milimét lệch Z (hãy coi đây là số ví dụ; xem datasheet của ống thật). Tính lại sai số cho chi tiết 60 mm khi chênh nhiệt 8 °C.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">L, dT, kich_thuoc = 300.0, 8.0, 60.0
+for ten, alpha in (("nhôm", 23e-6), ("thép", 12e-6)):
+    dZ = alpha * L * dT
+    thuong = kich_thuoc * dZ / 150.0                        # ống kính thường: sai tỉ lệ = ΔZ/Z
+    telecentric = kich_thuoc * 0.0005 * dZ                  # 0,05% mỗi mm lệch Z
+    print(f"cột {ten}: ΔZ = {1000 * dZ:.0f} µm → ống thường {1000 * thuong:.1f} µm, telecentric {1000 * telecentric:.2f} µm")</code></pre>
+<pre><code class="language-text">cột nhôm: ΔZ = 55 µm → ống thường 22.1 µm, telecentric 1.66 µm
+cột thép: ΔZ = 29 µm → ống thường 11.5 µm, telecentric 0.86 µm</code></pre>
+<p>Đổi sang thép giảm sai số khoảng một nửa; đổi sang telecentric giảm hàng trăm lần. Đây là ví dụ tốt cho nguyên tắc: thiết kế trạm để ít trôi luôn rẻ hơn kiểm tra và hiệu chuẩn lại liên tục. Nhưng dù thiết kế tốt đến đâu, kiểm tra mẫu chuẩn đầu ca vẫn bắt buộc, vì nó còn bắt được những lỗi không do nhiệt.</p>
+</details>
+</div>
 
-<h2>Tài liệu hóa</h2>
-<p>Hệ thống quản lý chất lượng thường yêu cầu hồ sơ hiệu chuẩn có thể truy xuất: ngày, người thực hiện, mẫu chuẩn sử dụng, kết quả, phiên bản phần mềm. Thiết kế phần mềm lưu những thông tin này ngay từ đầu sẽ giúp vượt qua các đợt đánh giá dễ dàng hơn nhiều.</p>
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Hiệu chuẩn trôi vì nhiệt, rung, va chạm, lấy nét, đèn và thay đổi cấu hình. Tính bằng số: 8 °C trên cột nhôm 300 mm làm sai 22 µm trên chi tiết 60 mm với ống thường.</li>
+  <li>Mẫu chuẩn: giống sản phẩm, giá trị chứng nhận chính xác hơn hệ đo 4–10 lần, có mã, hộp, hạn hiệu chuẩn. Thêm dấu chuẩn cố định trong khung hình để kiểm tra ở mọi ảnh.</li>
+  <li>Ngưỡng suy ra từ dung sai: ví dụ bias 5%/10% T, 6σ 10%/20% T, cộng độ nét, độ sáng, dịch dấu chuẩn so với "dấu vân tay" lúc hiệu chuẩn; hai mức cảnh báo và dừng.</li>
+  <li>Ghi nhật ký JSON Lines có hash file hiệu chuẩn và phiên bản phần mềm; fit xu hướng để dự báo ngày chạm ngưỡng; phần mềm tự khóa sản xuất khi kiểm tra không đạt, quá hạn, hoặc có bảo trì/thay đổi sau lần kiểm tra.</li>
+  <li>Khi thất bại: cách ly sản phẩm từ lần đạt trước, tìm nguyên nhân theo triệu chứng, chỉ hiệu chuẩn lại khi nguyên nhân là thứ hiệu chuẩn sửa được (tỉ lệ, vị trí, lấy nét), và luôn kiểm tra lại sau đó.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Dự án chặng 8: đo kích thước chi tiết cơ khí</strong>, nơi bạn ghép hiệu chuẩn, đo cạnh và đánh giá độ lặp lại thành một trạm đo hoàn chỉnh.</p>

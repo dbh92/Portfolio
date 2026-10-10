@@ -348,7 +348,7 @@ t2 = time.perf_counter()
 print(f"undistort {1000 * (t1 - t0) / 20:.1f} ms/ảnh, remap với bảng có sẵn {1000 * (t2 - t1) / 20:.1f} ms/ảnh")</code></pre>
 <pre><code class="language-text">alpha = 0: fx mới  1532.6, roi hợp lệ (0, 0, 1279, 959), pixel đen  0.0%
 alpha = 1: fx mới  1494.8, roi hợp lệ (16, 21, 1247, 917), pixel đen  4.4%
-undistort 9.9 ms/ảnh, remap với bảng có sẵn 3.9 ms/ảnh</code></pre>
+undistort 10.2 ms/ảnh, remap với bảng có sẵn 1.8 ms/ảnh</code></pre>
 <p>(Thời gian phụ thuộc máy.) <code>cv2.undistort</code> tính lại bảng ánh xạ mỗi lần gọi; trong vòng lặp sản xuất, luôn tính <code>initUndistortRectifyMap</code> một lần lúc khởi động rồi chỉ <code>remap</code>. Ở đây cả hai giá trị alpha đều cho fx mới nhỏ hơn 1600 (ảnh khử méo "thu nhỏ" lại để chứa phần bị kéo ra); điều cần nhớ là <strong>tỉ lệ mm/pixel trên ảnh đã khử méo khác ảnh gốc</strong>: mọi phép quy đổi sau đó phải dùng K_moi, không dùng K.</p>
 
 <h3>8.2. Khử méo điểm: cách làm của phần mềm đo</h3>
@@ -532,14 +532,14 @@ def hieu_chuan_thu_muc(thu_muc, cot=9, hang=6, o_mm=25.0, file_yaml="camera.yaml
 
 
 K1, dist1, rms1 = hieu_chuan_thu_muc("calib")</code></pre>
-<pre><code class="language-text">BÁO CÁO HIỆU CHUẨN calib  (2026-10-09)
+<pre><code class="language-text">BÁO CÁO HIỆU CHUẨN calib  (2026-10-10)
 Ảnh dùng được: 15/15, cỡ ảnh 1280×960, độ phủ lưới 4×4: 16/16 ô
 RMS reprojection: 0.019 px
 fx = 1600.09 ± 0.13, fy = 1600.09 ± 0.13, cx = 651.96 ± 0.16, cy = 470.72 ± 0.13
 dist (k1 k2 p1 p2 k3) = [-0.2598, 0.10928, 0.00067, -0.00041, 0.0]
 Sai số từng ảnh: nhỏ nhất 0.013, trung vị 0.018, lớn nhất 0.028 px
 Ảnh nên xem lại: không có</code></pre>
-<p>Hàm dùng <code>findChessboardCornersSB</code> nên RMS (0,019 px) thấp hơn bản cổ điển + <code>cornerSubPix</code> ở mục 6 (0,028 px) trên cùng bộ ảnh, và K sát đáp án hơn. Một báo cáo đạt yêu cầu cho ảnh thật nên có: ít nhất 12–15 ảnh dùng được, độ phủ gần đủ 16/16 ô, RMS dưới khoảng 0,3 px với camera công nghiệp (dưới khoảng 0,5–1 px với webcam và bàn cờ giấy), không ảnh nào vượt xa trung vị, độ lệch chuẩn của fx dưới khoảng 0,5% và của cx, cy dưới vài pixel. Nếu có ảnh xấu: xóa ảnh đó, chụp bù ở vị trí tương tự, hiệu chuẩn lại; không xóa ảnh chỉ để RMS đẹp hơn nếu ảnh đó là ảnh duy nhất phủ một góc khung hình.</p>
+<p>(Ngày ở dòng đầu là ngày bạn chạy code.) Hàm dùng <code>findChessboardCornersSB</code> nên RMS (0,019 px) thấp hơn bản cổ điển + <code>cornerSubPix</code> ở mục 6 (0,028 px) trên cùng bộ ảnh, và K sát đáp án hơn. Một báo cáo đạt yêu cầu cho ảnh thật nên có: ít nhất 12–15 ảnh dùng được, độ phủ gần đủ 16/16 ô, RMS dưới khoảng 0,3 px với camera công nghiệp (dưới khoảng 0,5–1 px với webcam và bàn cờ giấy), không ảnh nào vượt xa trung vị, độ lệch chuẩn của fx dưới khoảng 0,5% và của cx, cy dưới vài pixel. Nếu có ảnh xấu: xóa ảnh đó, chụp bù ở vị trí tương tự, hiệu chuẩn lại; không xóa ảnh chỉ để RMS đẹp hơn nếu ảnh đó là ảnh duy nhất phủ một góc khung hình.</p>
 </details>
 </div>
 <div class="ex">
