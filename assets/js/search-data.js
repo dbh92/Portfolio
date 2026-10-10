@@ -1194,17 +1194,18 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "OPC UA cho kỹ sư Vision: khái niệm và client Python",
+  "t": "OPC UA cho kỹ sư Vision: node, đọc ghi, subscription với asyncua",
   "u": "kien-thuc/opc-ua-cho-ky-su-vision.html",
-  "e": "Server, client, node, NodeId, đọc ghi và đăng ký nhận thay đổi với asyncua, so sánh với Modbus TCP.",
+  "e": "Server, client, NodeId, duyệt cây, đọc ghi đúng kiểu, subscription bắt trigger và ghi kết quả bằng asyncua; bảo mật và so sánh với Modbus TCP.",
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "01/10/2026",
-  "m": 3,
+  "m": 22,
   "img": "assets/images/posts/opc-ua-cho-ky-su-vision.webp",
   "tags": [
-   "Industrial Automation",
-   "PLC"
+   "PLC",
+   "Python",
+   "Industrial Vision"
   ]
  },
  {
@@ -1239,19 +1240,18 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Giao tiếp camera vision với PLC: I/O, Modbus TCP, EtherNet/IP, PROFINET",
+  "t": "Chuẩn giao tiếp vision – PLC: Modbus TCP, EtherNet/IP, PROFINET",
   "u": "kien-thuc/giao-tiep-camera-vision-voi-plc.html",
-  "e": "Các cách kết nối trạm vision với PLC, thiết kế bảng dữ liệu, quy trình bắt tay READY/TRIGGER/DONE và gửi dữ liệu qua TCP socket.",
+  "e": "Chọn giao thức theo hãng PLC, cyclic I/O và explicit messaging, GSDML/EDS, bảng dữ liệu trao đổi và thứ tự byte với struct trong Python.",
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "30/09/2026",
-  "m": 5,
+  "m": 27,
   "img": "assets/images/posts/giao-tiep-camera-vision-voi-plc.webp",
   "tags": [
    "PLC",
-   "Industrial Automation",
-   "Machine Vision",
-   "Industrial Vision"
+   "Industrial Vision",
+   "Machine Vision"
   ]
  },
  {
@@ -1284,18 +1284,18 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Vision dẫn hướng robot gắp vật (pick and place)",
+  "t": "Vision dẫn hướng robot gắp vật: tọa độ, góc kẹp, bám băng tải",
   "u": "hoc/vision-dan-huong-robot-gap-vat.html",
-  "e": "Kiến trúc hệ thống, định vị vị trí và góc vật, chuyển sang tọa độ robot, gửi lệnh qua socket và xử lý băng tải đang chạy.",
+  "e": "Định vị tâm và góc chi tiết, đổi sang tọa độ robot bằng ma trận 9 điểm, góc tay kẹp, bù băng tải bằng encoder và gửi tọa độ qua TCP.",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "29/09/2026",
-  "m": 3,
+  "m": 32,
   "img": "assets/images/posts/vision-dan-huong-robot-gap-vat.webp",
   "tags": [
    "Robot",
    "Machine Vision",
-   "Industrial Automation"
+   "Python"
   ]
  },
  {
@@ -1389,17 +1389,18 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "MES và truy xuất nguồn gốc: trạm vision nên gửi gì lên hệ thống?",
+  "t": "MES và truy xuất nguồn gốc: gửi dữ liệu vision không mất bản ghi",
   "u": "kien-thuc/mes-truy-xuat-nguon-goc-vision.html",
-  "e": "MES là gì, dữ liệu kiểm tra cần gửi, các cách tích hợp và thiết kế để không mất dữ liệu khi mạng gián đoạn.",
+  "e": "Dữ liệu kiểm tra MES cần, bản ghi JSON, các cách tích hợp và hàng đợi SQLite gửi lại có backoff, khóa idempotency khi mạng gián đoạn.",
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "26/09/2026",
-  "m": 3,
+  "m": 28,
   "img": "assets/images/posts/mes-truy-xuat-nguon-goc-vision.webp",
   "tags": [
    "MES",
-   "Industrial Automation"
+   "Industrial Vision",
+   "Python"
   ]
  },
  {
@@ -1931,19 +1932,18 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Phân loại ảnh OK/NG bằng transfer learning với PyTorch",
+  "t": "Dự án: phân loại ảnh OK/NG bằng transfer learning PyTorch, xuất ONNX",
   "u": "hoc/phan-loai-anh-ok-ng-transfer-learning-pytorch.html",
-  "e": "Tinh chỉnh ResNet đã huấn luyện trên ImageNet với vài trăm ảnh: augmentation hợp lý, huấn luyện hai giai đoạn và xuất ONNX.",
+  "e": "Tinh chỉnh ResNet18 với ít ảnh: đóng băng rồi mở băng, augmentation an toàn, chọn ngưỡng theo escape, ma trận nhầm lẫn, xuất ONNX và so khớp kết quả.",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "11/09/2026",
-  "m": 3,
+  "m": 28,
   "img": "assets/images/posts/phan-loai-anh-ok-ng-transfer-learning-pytorch.webp",
   "tags": [
    "PyTorch",
    "Deep Learning",
-   "AI Vision",
-   "Computer Vision"
+   "AI Vision"
   ]
  },
  {
@@ -2020,13 +2020,13 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Overfitting và cách chia train/validation/test đúng",
+  "t": "Overfitting và chia train/val/test không rò rỉ: đọc đường loss, tìm ảnh trùng",
   "u": "kien-thuc/overfitting-chia-train-val-test.html",
-  "e": "Nhận biết overfitting, vai trò từng tập dữ liệu, các kiểu rò rỉ dữ liệu phổ biến và cách chống quá khớp trong thực tế.",
+  "e": "Nhận biết quá khớp qua loss train/val, chia dữ liệu theo lô và ngày, tìm ảnh trùng bằng dHash, đo hiệu quả dropout, augmentation, early stopping.",
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "09/09/2026",
-  "m": 3,
+  "m": 29,
   "img": "assets/images/posts/overfitting-chia-train-val-test.webp",
   "tags": [
    "Machine Learning",
@@ -2165,13 +2165,13 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "PyTorch cơ bản: tensor, autograd và vòng lặp huấn luyện",
+  "t": "PyTorch cơ bản: tensor, autograd và vòng lặp huấn luyện 4 bước",
   "u": "hoc/pytorch-co-ban-tensor-autograd.html",
-  "e": "Ba khái niệm nền tảng của PyTorch, định nghĩa một CNN nhỏ và vòng lặp huấn luyện 4 bước dùng trong mọi dự án Deep Learning.",
+  "e": "Tensor trên CPU/GPU, chuyển ảnh OpenCV sang tensor, autograd và zero_grad, nn.Module, vòng lặp 4 bước huấn luyện CNN OK/NG, lưu nạp state_dict an toàn.",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "04/09/2026",
-  "m": 3,
+  "m": 30,
   "img": "assets/images/posts/pytorch-co-ban-tensor-autograd.webp",
   "tags": [
    "PyTorch",
@@ -2282,13 +2282,13 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Gradient descent từ đầu với NumPy: hiểu cách mọi mạng nơ-ron học",
+  "t": "Gradient descent từ đầu với NumPy: loss, gradient và learning rate",
   "u": "hoc/hoi-quy-tuyen-tinh-gradient-descent-numpy.html",
-  "e": "Tự cài đặt hồi quy tuyến tính, hàm mất mát và gradient descent bằng NumPy để hiểu nguyên lý chung của Deep Learning.",
+  "e": "Tự đạo hàm MSE, cài gradient descent bằng NumPy cho bài hiệu chỉnh pixel–mm, thấy learning rate nhỏ, vừa, phân kỳ bằng số và vì sao phải chuẩn hóa.",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "31/08/2026",
-  "m": 3,
+  "m": 27,
   "img": "assets/images/posts/hoi-quy-tuyen-tinh-gradient-descent-numpy.webp",
   "tags": [
    "Machine Learning",
@@ -2497,17 +2497,17 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Machine Learning là gì? Các loại bài toán qua ví dụ nhà máy",
+  "t": "Machine Learning là gì? Luật viết tay, học máy và các loại bài toán nhà máy",
   "u": "kien-thuc/machine-learning-la-gi.html",
-  "e": "Lập trình truyền thống khác học máy thế nào, học có giám sát, không giám sát, tăng cường và quy trình một dự án Machine Learning.",
+  "e": "Phân biệt lập trình truyền thống và học máy qua ví dụ OK/NG chạy được, gọi đúng tên bài toán phân loại, hồi quy, phân cụm, bất thường và quy trình dự án ML.",
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "21/08/2026",
-  "m": 3,
+  "m": 27,
   "img": "assets/images/posts/machine-learning-la-gi.webp",
   "tags": [
    "Machine Learning",
-   "AI/ML"
+   "Python"
   ]
  },
  {
@@ -2531,7 +2531,7 @@ window.HF_TOPICS = [
   "u": "hoc/python.html",
   "s": "Học AI & Lập trình",
   "g": "Programming",
-  "n": 51
+  "n": 55
  },
  {
   "t": "C#",
@@ -2594,7 +2594,7 @@ window.HF_TOPICS = [
   "u": "hoc/computer-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Computer Vision",
-  "n": 13
+  "n": 12
  },
  {
   "t": "OCR",
@@ -2636,7 +2636,7 @@ window.HF_TOPICS = [
   "u": "hoc/industrial-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 24
+  "n": 26
  },
  {
   "t": "Camera & Lens",
@@ -2720,7 +2720,7 @@ window.HF_TOPICS = [
   "u": "kien-thuc/computer-vision.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 13
+  "n": 12
  },
  {
   "t": "Machine Vision",
@@ -2741,7 +2741,7 @@ window.HF_TOPICS = [
   "u": "kien-thuc/industrial-automation.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 12
+  "n": 10
  },
  {
   "t": "Tools & Frameworks",

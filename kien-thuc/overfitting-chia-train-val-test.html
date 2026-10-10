@@ -3,23 +3,23 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Overfitting và cách chia train/validation/test đúng | HọcFree</title>
-<meta name="description" content="Nhận biết overfitting, vai trò từng tập dữ liệu, các kiểu rò rỉ dữ liệu phổ biến và cách chống quá khớp trong thực tế.">
+<title>Overfitting và chia train/val/test không rò rỉ: đọc đường loss, tìm ảnh trùng</title>
+<meta name="description" content="Nhận biết quá khớp qua loss train/val, chia dữ liệu theo lô và ngày, tìm ảnh trùng bằng dHash, đo hiệu quả dropout, augmentation, early stopping.">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <link rel="canonical" href="https://hocfree.vn/kien-thuc/overfitting-chia-train-val-test.html">
 <meta property="og:site_name" content="HọcFree">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Overfitting và cách chia train/validation/test đúng">
-<meta property="og:description" content="Nhận biết overfitting, vai trò từng tập dữ liệu, các kiểu rò rỉ dữ liệu phổ biến và cách chống quá khớp trong thực tế.">
+<meta property="og:title" content="Overfitting và chia train/val/test không rò rỉ: đọc đường loss, tìm ảnh trùng">
+<meta property="og:description" content="Nhận biết quá khớp qua loss train/val, chia dữ liệu theo lô và ngày, tìm ảnh trùng bằng dHash, đo hiệu quả dropout, augmentation, early stopping.">
 <meta property="og:url" content="https://hocfree.vn/kien-thuc/overfitting-chia-train-val-test.html">
 <meta property="og:image" content="https://hocfree.vn/assets/images/posts/overfitting-chia-train-val-test.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="675">
-<meta property="og:image:alt" content="Overfitting và cách chia train/validation/test đúng">
+<meta property="og:image:alt" content="Overfitting và chia train/val/test không rò rỉ: đọc đường loss, tìm ảnh trùng">
 <meta property="og:locale" content="vi_VN">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Overfitting và cách chia train/validation/test đúng">
-<meta name="twitter:description" content="Nhận biết overfitting, vai trò từng tập dữ liệu, các kiểu rò rỉ dữ liệu phổ biến và cách chống quá khớp trong thực tế.">
+<meta name="twitter:title" content="Overfitting và chia train/val/test không rò rỉ: đọc đường loss, tìm ảnh trùng">
+<meta name="twitter:description" content="Nhận biết quá khớp qua loss train/val, chia dữ liệu theo lô và ngày, tìm ảnh trùng bằng dHash, đo hiệu quả dropout, augmentation, early stopping.">
 <meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/overfitting-chia-train-val-test.jpg">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
@@ -36,8 +36,8 @@
 <meta property="article:section" content="Kiến thức">
 <meta property="article:tag" content="Machine Learning">
 <meta property="article:tag" content="Deep Learning">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "Overfitting và cách chia train/validation/test đúng", "description": "Nhận biết overfitting, vai trò từng tập dữ liệu, các kiểu rò rỉ dữ liệu phổ biến và cách chống quá khớp trong thực tế.", "image": ["https://hocfree.vn/assets/images/posts/overfitting-chia-train-val-test.jpg"], "datePublished": "2026-09-09", "dateModified": "2026-09-09", "inLanguage": "vi", "articleSection": "Kiến thức", "keywords": "Machine Learning, Deep Learning", "wordCount": 414, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/kien-thuc/overfitting-chia-train-val-test.html"}, "isPartOf": {"@type": "Course", "name": "Trở thành Vision Engineer", "url": "https://hocfree.vn/lo-trinh/vision-engineer.html"}}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Learning Paths", "item": "https://hocfree.vn/lo-trinh/"}, {"@type": "ListItem", "position": 3, "name": "Trở thành Vision Engineer", "item": "https://hocfree.vn/lo-trinh/vision-engineer.html"}, {"@type": "ListItem", "position": 4, "name": "Chặng 10: Deep Learning", "item": "https://hocfree.vn/lo-trinh/vision-engineer/deep-learning.html"}, {"@type": "ListItem", "position": 5, "name": "Overfitting và cách chia train/validation/test đúng"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "Overfitting và chia train/val/test không rò rỉ: đọc đường loss, tìm ảnh trùng", "description": "Nhận biết quá khớp qua loss train/val, chia dữ liệu theo lô và ngày, tìm ảnh trùng bằng dHash, đo hiệu quả dropout, augmentation, early stopping.", "image": ["https://hocfree.vn/assets/images/posts/overfitting-chia-train-val-test.jpg"], "datePublished": "2026-09-09", "dateModified": "2026-09-09", "inLanguage": "vi", "articleSection": "Kiến thức", "keywords": "Machine Learning, Deep Learning", "wordCount": 5099, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/kien-thuc/overfitting-chia-train-val-test.html"}, "isPartOf": {"@type": "Course", "name": "Trở thành Vision Engineer", "url": "https://hocfree.vn/lo-trinh/vision-engineer.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Learning Paths", "item": "https://hocfree.vn/lo-trinh/"}, {"@type": "ListItem", "position": 3, "name": "Trở thành Vision Engineer", "item": "https://hocfree.vn/lo-trinh/vision-engineer.html"}, {"@type": "ListItem", "position": 4, "name": "Chặng 10: Deep Learning", "item": "https://hocfree.vn/lo-trinh/vision-engineer/deep-learning.html"}, {"@type": "ListItem", "position": 5, "name": "Overfitting và chia train/val/test không rò rỉ: đọc đường loss, tìm ảnh trùng"}]}</script>
 </head>
 <body>
 <a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
@@ -134,61 +134,500 @@
       <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../lo-trinh/">Learning Paths</a><span>/</span><a href="../lo-trinh/vision-engineer.html">Vision Engineer</a><span>/</span><a href="../lo-trinh/vision-engineer/deep-learning.html">Chặng 10: Deep Learning</a></nav>
       <header class="article-head">
         <div class="course-bar" data-course="vision-engineer"><a class="course-chip" href="../lo-trinh/vision-engineer/deep-learning.html">⭐ Vision Engineer · Chặng 10</a><span class="lesson-no">Bài 6/7</span><span class="kind kind-lesson">Bài học</span><span class="lesson-min"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></svg>~45 phút</span></div>
-        <h1>Overfitting và cách chia train/validation/test đúng</h1>
-        <p class="lead">Nhận biết overfitting, vai trò từng tập dữ liệu, các kiểu rò rỉ dữ liệu phổ biến và cách chống quá khớp trong thực tế.</p>
+        <h1>Overfitting và chia train/val/test không rò rỉ: đọc đường loss, tìm ảnh trùng</h1>
+        <p class="lead">Nhận biết quá khớp qua loss train/val, chia dữ liệu theo lô và ngày, tìm ảnh trùng bằng dHash, đo hiệu quả dropout, augmentation, early stopping.</p>
         <div class="article-meta">
           <span class="avatar" aria-hidden="true">HF</span>
-          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-09-09">09/09/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>3 phút đọc</span></div>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-09-09">09/09/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>29 phút đọc</span></div>
         </div>
       </header>
       <figure class="article-cover">
-        <img src="../assets/images/posts/overfitting-chia-train-val-test.webp" alt="Overfitting và cách chia train/validation/test đúng" width="1200" height="675" fetchpriority="high" decoding="async">
+        <img src="../assets/images/posts/overfitting-chia-train-val-test.webp" alt="Overfitting và chia train/val/test không rò rỉ: đọc đường loss, tìm ảnh trùng" width="1200" height="675" fetchpriority="high" decoding="async">
       </figure>
       <section class="lesson-goals" aria-label="Mục tiêu bài học"><h2>Học xong bài này, bạn sẽ</h2><ul><li>Nhận biết overfitting qua đường loss</li><li>Chia dữ liệu không rò rỉ</li><li>Các cách chống quá khớp</li></ul><p class="goals-before">Nên học trước: <a href="../hoc/deep-learning-5-dataset-dataloader-augmentation.html">Dataset, DataLoader và augmentation</a></p></section>
-      <details class="toc" open><summary>Nội dung bài viết</summary><ol><li><a href="#overfitting-va-underfitting">Overfitting và underfitting</a></li><li><a href="#ba-tap-du-lieu-va-vai-tro-cua-tung-tap">Ba tập dữ liệu và vai trò của từng tập</a></li><li><a href="#ro-ri-du-lieu-loi-pho-bien-nhat">Rò rỉ dữ liệu: lỗi phổ biến nhất</a></li><li><a href="#chong-overfitting">Chống overfitting</a></li><li><a href="#kiem-tra-ngoai-phong-thi-nghiem">Kiểm tra &quot;ngoài phòng thí nghiệm&quot;</a></li></ol></details>
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol class="toc-plain"><li><a href="#1-underfitting-vua-khop-overfitting">1. Underfitting, vừa khớp, overfitting</a></li><li><a href="#2-thi-nghiem-mot-mo-hinh-nho-qua-khop">2. Thí nghiệm: một mô hình nhỏ quá khớp</a></li><li><a href="#3-ba-tap-du-lieu-va-vai-tro-cua-tung-tap">3. Ba tập dữ liệu và vai trò của từng tập</a></li><li><a href="#4-ro-ri-du-lieu-chia-theo-nhom-khong-chia-theo-anh">4. Rò rỉ dữ liệu: chia theo nhóm, không chia theo ảnh</a></li><li><a href="#5-tim-anh-trung-va-gan-trung-bang-hash-anh">5. Tìm ảnh trùng và gần trùng bằng hash ảnh</a></li><li><a href="#6-cac-cach-chong-qua-khop-do-bang-so">6. Các cách chống quá khớp: đo bằng số</a></li><li><a href="#7-sai-lam-thuong-gap">7. Sai lầm thường gặp</a></li><li><a href="#8-bai-tap">8. Bài tập</a></li><li><a href="#tom-tat">Tóm tắt</a></li></ol></details>
       <div class="prose">
-<p>Mô hình đạt 99% trên máy của bạn, mang xuống nhà máy chỉ còn 80%. Thủ phạm thường là <strong>overfitting</strong> hoặc <strong>cách chia dữ liệu sai</strong>. Bài này giải thích hai khái niệm quan trọng nhất để mô hình hoạt động được ngoài đời thật.</p>
+<p>Mô hình đạt 99% trên máy của bạn, mang xuống nhà máy chỉ còn 80%. Thủ phạm gần như luôn là một trong hai thứ: <strong>overfitting</strong> (mô hình học thuộc dữ liệu huấn luyện thay vì học quy luật) hoặc <strong>chia dữ liệu sai</strong> (tập kiểm tra chứa ảnh "họ hàng" của ảnh huấn luyện, nên con số đẹp giả tạo). Ở bài "Dataset, DataLoader và augmentation", bạn đã có đường ống nạp ảnh và augmentation an toàn. Bài này dạy cách đọc đường loss để nhận ra overfitting, cách chia train/validation/test theo lô, theo chi tiết, theo ngày để không rò rỉ, cách tìm ảnh trùng và gần trùng bằng hash ảnh, và đo bằng số hiệu quả của các biện pháp chống quá khớp. Đây là bước chuẩn bị trực tiếp cho "Dự án chặng 10: phân loại ảnh OK/NG bằng transfer learning".</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Nhận ra underfitting, overfitting qua bảng loss train/val; hiểu vai trò của từng tập train, validation, test; chia dữ liệu theo nhóm (lô, mã chi tiết, ngày) bằng scikit-learn và đo được mức "lạc quan giả" khi chia ngẫu nhiên; viết script tìm ảnh trùng và gần trùng giữa các tập bằng MD5 và dHash; so sánh bằng số weight decay, dropout, augmentation, thêm dữ liệu và early stopping. Code dùng PyTorch 2.14, scikit-learn 1.9, OpenCV.</div>
 
-<h2 id="overfitting-va-underfitting">Overfitting và underfitting</h2>
-<ul>
-  <li><strong>Underfitting</strong> (chưa khớp): mô hình quá đơn giản, sai nhiều cả trên dữ liệu huấn luyện.</li>
-  <li><strong>Overfitting</strong> (quá khớp): mô hình "học thuộc" dữ liệu huấn luyện, kể cả nhiễu, nên đúng gần tuyệt đối trên train nhưng sai nhiều trên dữ liệu mới.</li>
-</ul>
-<p>Dấu hiệu nhận biết khi huấn luyện mạng nơ-ron: loss trên tập train tiếp tục giảm, còn loss trên tập validation bắt đầu <strong>tăng</strong> trở lại.</p>
-
-<h2 id="ba-tap-du-lieu-va-vai-tro-cua-tung-tap">Ba tập dữ liệu và vai trò của từng tập</h2>
+<h2 id="1-underfitting-vua-khop-overfitting">1. Underfitting, vừa khớp, overfitting</h2>
+<p>Mục tiêu của huấn luyện không phải là đúng trên dữ liệu huấn luyện, mà là <strong>tổng quát hóa</strong>: đúng trên ảnh mô hình chưa từng thấy, chụp ở ca khác, lô khác. Ba trạng thái:</p>
 <table>
-  <tr><th>Tập</th><th>Dùng để</th><th>Tỷ lệ gợi ý</th></tr>
-  <tr><td>Train</td><td>Huấn luyện mô hình</td><td>70%</td></tr>
-  <tr><td>Validation</td><td>Chọn mô hình, chỉnh tham số, chọn ngưỡng, dừng sớm</td><td>15%</td></tr>
-  <tr><td>Test</td><td>Đánh giá cuối cùng, <strong>chỉ dùng một lần</strong></td><td>15%</td></tr>
+  <tr><th>Trạng thái</th><th>Loss train</th><th>Loss val</th><th>Nguyên nhân thường gặp</th><th>Hướng xử lý</th></tr>
+  <tr><td>Underfitting (chưa khớp)</td><td>Cao</td><td>Cao, gần bằng train</td><td>Mô hình quá nhỏ, học quá ít epoch, learning rate sai, đầu vào chưa chuẩn hóa, ROI không chứa lỗi</td><td>Mô hình lớn hơn, huấn luyện lâu hơn, sửa dữ liệu</td></tr>
+  <tr><td>Vừa khớp</td><td>Thấp</td><td>Thấp, gần train</td><td></td><td>Giữ checkpoint này</td></tr>
+  <tr><td>Overfitting (quá khớp)</td><td>Rất thấp, tiến về 0</td><td>Giảm rồi <strong>tăng trở lại</strong>; khoảng cách với train ngày càng lớn</td><td>Ít dữ liệu so với độ phức tạp mô hình, nhãn nhiễu, học quá lâu</td><td>Thêm dữ liệu, augmentation, regularization, early stopping</td></tr>
 </table>
-<p>Nếu bạn nhìn kết quả tập test rồi quay lại chỉnh mô hình, tập test đã "bị rò rỉ" và không còn khách quan.</p>
+<p>Overfitting đặc biệt dễ xảy ra ở nhà máy vì hai lý do: ảnh NG ít (vài chục ảnh mỗi loại lỗi), và nhãn có nhiễu (hai QC đánh giá khác nhau với vết "lưng chừng"). Mạng nơ-ron có đủ tham số để học thuộc cả hai.</p>
 
-<h2 id="ro-ri-du-lieu-loi-pho-bien-nhat">Rò rỉ dữ liệu: lỗi phổ biến nhất</h2>
+<h2 id="2-thi-nghiem-mot-mo-hinh-nho-qua-khop">2. Thí nghiệm: một mô hình nhỏ quá khớp</h2>
+<p>Dùng lại bộ ảnh xám 32×32 của bài "PyTorch cơ bản: tensor, autograd, vòng lặp huấn luyện": bề mặt kim loại có vân, ảnh NG có một vết xước tối. Lần này mô phỏng điều kiện nhà máy thật: chỉ có <strong>60 ảnh train</strong> (thêm 180 ảnh dự phòng để thử nghiệm "thêm dữ liệu" ở mục 6), và khoảng <strong>10% nhãn train bị gán nhầm</strong> (tính trên cả 240 ảnh; riêng 60 ảnh đầu có 2 ảnh nhầm). Tập val 300 ảnh có nhãn đúng.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+import torch
+
+rng = np.random.default_rng(0)
+
+
+def tao_anh(ng, rng):
+    van = rng.normal(0, 0.04, (32, 1)) + rng.normal(0, 0.03, (32, 32))   # vân ngang + nhiễu
+    anh = (0.55 + rng.normal(0, 0.03) + van).astype(np.float32)
+    if ng:                                                                # vết xước tối ngẫu nhiên
+        x1, y1 = (int(v) for v in rng.integers(4, 28, 2))
+        goc, dai = rng.uniform(0, np.pi), rng.integers(6, 14)
+        x2, y2 = int(x1 + dai * np.cos(goc)), int(y1 + dai * np.sin(goc))
+        cv2.line(anh, (x1, y1), (x2, y2), float(anh.mean() - 0.18), 1)
+    return np.clip(anh, 0, 1)
+
+
+def tao_bo(n):
+    nhan = rng.permutation(np.arange(n) % 2)
+    anh = np.stack([tao_anh(bool(k), rng) for k in nhan])
+    return torch.from_numpy(anh).unsqueeze(1), torch.from_numpy(nhan).long()
+
+
+X_tr, y_tr = tao_bo(240)                     # 60 ảnh đầu dùng làm train, 180 ảnh sau là "dữ liệu thu thêm"
+X_val, y_val = tao_bo(300)
+nham = torch.from_numpy(rng.random(240) &lt; 0.1)
+y_tr = torch.where(nham, 1 - y_tr, y_tr)     # ~10% nhãn train bị gán nhầm
+mean, std = X_tr.mean(), X_tr.std()          # chuẩn hóa bằng thống kê của train
+torch.save({"X_tr": (X_tr - mean) / std, "y_tr": y_tr, "X_val": (X_val - mean) / std, "y_val": y_val},
+           "okng_nho.pt")
+print("train:", tuple(X_tr[:60].shape), "| nhãn nhầm trong 60 ảnh đầu:", int(nham[:60].sum()))
+print("val  :", tuple(X_val.shape))</code></pre>
+<pre><code class="language-text">train: (60, 1, 32, 32) | nhãn nhầm trong 60 ảnh đầu: 2
+val  : (300, 1, 32, 32)</code></pre>
+<p>Hàm huấn luyện dưới đây ghi loss train, loss val và độ chính xác val sau <em>mỗi</em> epoch; các tham số cho phép bật từng biện pháp chống quá khớp ở mục 6. Với 60 ảnh, mỗi epoch là một batch duy nhất.</p>
+<pre><code class="language-python">import numpy as np
+import torch
+from torch import nn
+
+torch.set_num_threads(2)
+
+
+class CNNNho(nn.Module):
+    def __init__(self, dropout=0.0):
+        super().__init__()
+        self.dac_trung = nn.Sequential(
+            nn.Conv2d(1, 8, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+            nn.Conv2d(8, 16, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+            nn.Conv2d(16, 32, 3, padding=1), nn.ReLU(), nn.AdaptiveMaxPool2d(1), nn.Flatten())
+        self.dropout = nn.Dropout(dropout)
+        self.dau_ra = nn.Linear(32, 2)
+
+    def forward(self, x):
+        return self.dau_ra(self.dropout(self.dac_trung(x)))
+
+
+def huan_luyen(so_anh=60, weight_decay=0.0, dropout=0.0, augment=False, so_epoch=120):
+    d = torch.load("okng_nho.pt", weights_only=True)
+    X, y = d["X_tr"][:so_anh], d["y_tr"][:so_anh]
+    torch.manual_seed(0)
+    g = torch.Generator().manual_seed(0)
+    model = CNNNho(dropout)
+    toi_uu = torch.optim.AdamW(model.parameters(), lr=3e-3, weight_decay=weight_decay)
+    ham_loss = nn.CrossEntropyLoss()
+    lich_su, tot_nhat = [], (float("inf"), None, 0)
+    for epoch in range(1, so_epoch + 1):
+        model.train()
+        xb = X
+        if augment:                                               # dịch ±4 px và lật ngang ngẫu nhiên
+            dx, dy = torch.randint(-4, 5, (2,), generator=g).tolist()
+            xb = torch.roll(X, (dy, dx), dims=(2, 3))
+            if torch.rand(1, generator=g).item() &lt; 0.5:
+                xb = xb.flip(3)
+        loss = ham_loss(model(xb), y)
+        toi_uu.zero_grad()
+        loss.backward()
+        toi_uu.step()
+        model.eval()
+        with torch.no_grad():
+            loss_tr = ham_loss(model(X), y).item()
+            logit = model(d["X_val"])
+            loss_val = ham_loss(logit, d["y_val"]).item()
+            acc_val = (logit.argmax(1) == d["y_val"]).float().mean().item()
+        lich_su.append((epoch, loss_tr, loss_val, acc_val))
+        if loss_val &lt; tot_nhat[0]:                                # nhớ checkpoint tốt nhất theo loss val
+            tot_nhat = (loss_val, {k: v.clone() for k, v in model.state_dict().items()}, epoch)
+    return np.array(lich_su), tot_nhat
+
+
+ls, (best_loss, best_state, best_epoch) = huan_luyen()
+print("epoch | loss train | loss val | val đúng")
+for e, ltr, lv, av in ls[[0, 9, 19, 29, 39, 49, 59, 79, 99, 119]]:
+    print(f"{int(e):5d} | {ltr:10.4f} | {lv:8.3f} | {av:7.1%}")
+print(f"loss val thấp nhất {best_loss:.3f} ở epoch {best_epoch}")</code></pre>
+<pre><code class="language-text">epoch | loss train | loss val | val đúng
+    1 |     0.6819 |    0.693 |   50.0%
+   10 |     0.5884 |    0.642 |   84.7%
+   20 |     0.3076 |    0.461 |   89.7%
+   30 |     0.0963 |    0.274 |   91.3%
+   40 |     0.0249 |    0.211 |   92.3%
+   50 |     0.0068 |    0.236 |   90.7%
+   60 |     0.0029 |    0.224 |   92.0%
+   80 |     0.0012 |    0.246 |   91.3%
+  100 |     0.0008 |    0.258 |   91.0%
+  120 |     0.0006 |    0.266 |   90.3%
+loss val thấp nhất 0.206 ở epoch 46</code></pre>
+<p>Đọc bảng như đọc một biểu đồ:</p>
 <ul>
-  <li><strong>Ảnh gần như trùng nhau</strong> ở cả train và test: chụp liên tiếp cùng một sản phẩm, cắt từ cùng một video.</li>
-  <li><strong>Chia ngẫu nhiên theo ảnh</strong> khi một sản phẩm có nhiều ảnh: hãy chia theo <em>mã sản phẩm</em>.</li>
-  <li><strong>Dữ liệu tương lai</strong>: dự đoán hỏng máy mà tập train chứa dữ liệu sau thời điểm tập test. Với chuỗi thời gian, chia theo thời gian.</li>
-  <li><strong>Chuẩn hóa trên toàn bộ dữ liệu</strong> trước khi chia: tính mean/std chỉ trên tập train.</li>
+  <li><strong>Epoch 1–30</strong>: cả hai loss cùng giảm, độ chính xác val tăng nhanh. Mô hình đang học đặc trưng thật (vết xước).</li>
+  <li><strong>Quanh epoch 40–50</strong>: loss val chạm đáy. Đây là checkpoint tốt nhất.</li>
+  <li><strong>Sau đó</strong>: loss train tiếp tục lao về gần 0, tức là mô hình đã đúng cả 2 ảnh bị gán nhãn nhầm (trái với vết xước thật trên ảnh), nghĩa là nó đã <em>học thuộc</em> chúng cùng với nhiễu của từng ảnh. Loss val tăng trở lại và độ chính xác val giảm dần. Đó là chữ ký của overfitting.</li>
 </ul>
-<pre><code>from sklearn.model_selection import GroupShuffleSplit
+<p>Lưu ý loss val tăng mạnh hơn độ chính xác val giảm: mô hình quá khớp trở nên <strong>quá tự tin</strong>, khi sai thì sai với xác suất 0,99. Với nhà máy, đây là điều tệ: điểm số kém tin cậy làm việc chọn ngưỡng OK/NG khó hơn. Vì vậy hãy theo dõi loss val, không chỉ độ chính xác.</p>
+<div class="tip"><strong>Đọc nhanh các dạng đường loss</strong>Loss val dao động mạnh từ epoch này sang epoch khác: tập val quá nhỏ hoặc learning rate lớn. Loss val thấp hơn loss train: thường do dropout/augmentation chỉ bật lúc train (bình thường), nhưng nếu chênh nhiều hãy nghi tập val dễ hơn hoặc bị rò rỉ. Cả hai đứng yên ở ln 2 ≈ 0,693 với hai lớp cân bằng: mô hình đang đoán mò (xem lại chuẩn hóa, learning rate, nhãn).</div>
 
-# groups: mã sản phẩm hoặc mã lô của từng ảnh
-gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
-train_idx, test_idx = next(gss.split(X, y, groups=groups))</code></pre>
+<h2 id="3-ba-tap-du-lieu-va-vai-tro-cua-tung-tap">3. Ba tập dữ liệu và vai trò của từng tập</h2>
+<table>
+  <tr><th>Tập</th><th>Dùng để</th><th>Tỉ lệ gợi ý</th><th>Không được</th></tr>
+  <tr><td>Train</td><td>Cập nhật trọng số (gradient chỉ tính trên tập này)</td><td>60–80%</td><td></td></tr>
+  <tr><td>Validation (val)</td><td>Chọn checkpoint, so sánh kiến trúc, chỉnh learning rate, augmentation, <strong>chọn ngưỡng</strong> OK/NG, early stopping</td><td>10–20%</td><td>Dùng để báo cáo kết quả cuối cùng: bạn đã "tối ưu theo" nó nên nó lạc quan</td></tr>
+  <tr><td>Test</td><td>Đánh giá cuối cùng, một lần, trước khi nghiệm thu</td><td>10–20%</td><td>Nhìn kết quả rồi quay lại chỉnh mô hình. Làm thế thì tập test trở thành tập val thứ hai</td></tr>
+</table>
+<p>Tỉ lệ phần trăm ít quan trọng hơn <strong>số ảnh NG tuyệt đối</strong> trong val và test. Với 20 ảnh NG trong test, mỗi ảnh lọt làm recall NG giảm 5 điểm phần trăm: con số 95% hay 90% chỉ cách nhau một ảnh. Nếu NG hiếm, hãy ưu tiên dồn đủ NG cho val/test (ví dụ tối thiểu 30–50 ảnh mỗi loại lỗi quan trọng) và bù cho train bằng augmentation. Bài "Chọn ngưỡng và đánh giá theo escape, overkill, cycle time" ở chặng 11 tính khoảng tin cậy cho những con số này.</p>
+<p>Ngoài ba tập trên, hãy giữ một tập <strong>"ngoài phòng thí nghiệm"</strong>: ảnh chụp vào ngày khác, ca khác, lô vật liệu khác so với mọi ảnh huấn luyện. Đó là thước đo gần nhất với hiệu năng thật trên dây chuyền, và về sau trở thành bộ ảnh vàng (golden set) để nghiệm thu mọi phiên bản mô hình.</p>
 
-<h2 id="chong-overfitting">Chống overfitting</h2>
+<h2 id="4-ro-ri-du-lieu-chia-theo-nhom-khong-chia-theo-anh">4. Rò rỉ dữ liệu: chia theo nhóm, không chia theo ảnh</h2>
+<p><strong>Rò rỉ dữ liệu</strong> (data leakage) là khi tập val/test chứa thông tin mà mô hình sẽ không có khi chạy thật. Dạng phổ biến nhất trong vision: một chi tiết được chụp nhiều lần (nhiều góc, chụp lại khi kiểm tra lại, nhiều khung hình liên tiếp từ video), rồi các ảnh được <em>chia ngẫu nhiên từng ảnh</em>. Ảnh của cùng một chi tiết rơi vào cả train lẫn test; mô hình chỉ cần "nhớ mặt" chi tiết là đoán đúng.</p>
+<p>Thí nghiệm sau đo mức lạc quan giả đó. 80 chi tiết, mỗi chi tiết chụp 5 lần (lệch 1 px, độ sáng và nhiễu khác nhau). Mỗi chi tiết có vân bề mặt riêng (như dấu vân tay), còn lỗi là một chấm mờ khó thấy. Bộ phân loại 1-NN (láng giềng gần nhất) là mô hình "học thuộc" cực đoan: nó trả lời nhãn của ảnh train giống nhất.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+from sklearn.model_selection import GroupShuffleSplit, ShuffleSplit
+from sklearn.neighbors import KNeighborsClassifier
+
+rng = np.random.default_rng(1)
+anh, nhan, ma_ct = [], [], []
+for ct in range(80):                                            # 80 chi tiết
+    van = cv2.GaussianBlur(rng.normal(0, 1, (36, 36)).astype(np.float32), (0, 0), 2)
+    van = van / van.std() * 20                                  # vân bề mặt riêng của chi tiết
+    ng = ct % 2
+    for lan in range(5):                                        # 5 lần chụp mỗi chi tiết
+        dx, dy = rng.integers(0, 3, 2)
+        a = 120 + van[dy:dy + 32, dx:dx + 32] + rng.normal(0, 4) + rng.normal(0, 2, (32, 32))
+        if ng:
+            cv2.circle(a, (16 + int(dx), 16 + int(dy)), 3, float(a.mean() - 6), -1)   # lỗi mờ
+        anh.append(a.ravel())
+        nhan.append(ng)
+        ma_ct.append(ct)
+X, y, nhom = np.array(anh), np.array(nhan), np.array(ma_ct)
+
+
+def thu(bo_chia, ten):
+    kq = []
+    nhom_arg = {"groups": nhom} if "Group" in type(bo_chia).__name__ else {}
+    for tr, te in bo_chia.split(X, y, **nhom_arg):
+        knn = KNeighborsClassifier(n_neighbors=1).fit(X[tr], y[tr])
+        kq.append(knn.score(X[te], y[te]))
+        chung = len(set(nhom[tr]) &amp; set(nhom[te]))
+    print(f"{ten:24s}: đúng {np.mean(kq):.1%} | số chi tiết có ảnh ở cả train và test (lần chia cuối): {chung}")
+
+
+thu(ShuffleSplit(n_splits=5, test_size=0.3, random_state=0), "Chia ngẫu nhiên theo ảnh")
+thu(GroupShuffleSplit(n_splits=5, test_size=0.3, random_state=0), "Chia theo mã chi tiết")</code></pre>
+<pre><code class="language-text">Chia ngẫu nhiên theo ảnh: đúng 100.0% | số chi tiết có ảnh ở cả train và test (lần chia cuối): 69
+Chia theo mã chi tiết   : đúng 53.8% | số chi tiết có ảnh ở cả train và test (lần chia cuối): 0</code></pre>
+<p>Cùng dữ liệu, cùng mô hình: chia ngẫu nhiên báo một con số rất đẹp, chia theo chi tiết cho thấy sự thật là mô hình gần như đoán mò với loại lỗi mờ này. Mạng nơ-ron sâu không phải 1-NN, nhưng với ít dữ liệu nó cũng học thuộc rất giỏi, và hiện tượng giống hệt. Quy tắc: <strong>mọi ảnh có chung nguồn gốc phải nằm cùng một tập</strong>.</p>
+<table>
+  <tr><th>Nguồn rò rỉ</th><th>Ví dụ</th><th>Chia theo</th></tr>
+  <tr><td>Nhiều ảnh cùng một chi tiết</td><td>Chụp 4 mặt, chụp lại khi kiểm tra lại, khung hình liên tiếp của video</td><td>Mã chi tiết (số seri)</td></tr>
+  <tr><td>Cùng lô vật liệu, cùng khuôn</td><td>Vân bề mặt, màu sắc đặc trưng của lô; lỗi đặc trưng của một khuôn</td><td>Mã lô, mã khuôn</td></tr>
+  <tr><td>Thời gian</td><td>Đèn lão hóa, camera được chỉnh lại; mô hình phải chạy trên dữ liệu <em>tương lai</em></td><td>Ngày: train là dữ liệu cũ, test là dữ liệu mới nhất</td></tr>
+  <tr><td>Augmentation lưu ra đĩa trước khi chia</td><td>Biến thể của cùng ảnh nằm ở cả hai tập</td><td>Chia trước, augment sau (chỉ train)</td></tr>
+  <tr><td>Thống kê tính trên toàn bộ dữ liệu</td><td>Mean/std chuẩn hóa, ngưỡng chọn trên cả test</td><td>Chỉ tính trên train (ngưỡng: trên val)</td></tr>
+</table>
+<p>Trong code, giữ một bảng metadata cho từng ảnh (đường dẫn, nhãn, mã lô, ngày) và chia theo nhóm. <code>StratifiedGroupKFold</code> vừa giữ nhóm nguyên vẹn vừa cố giữ tỉ lệ OK/NG giữa các phần; chia theo thời gian thì chỉ cần sắp theo ngày:</p>
+<pre><code class="language-python">import numpy as np
+from sklearn.model_selection import StratifiedGroupKFold
+
+rng = np.random.default_rng(2)
+n = 600
+lo = rng.integers(0, 20, n)                                  # 20 lô sản xuất
+ngay = np.sort(rng.integers(0, 60, n))                       # ngày chụp 0..59
+nhan = (rng.random(n) &lt; 0.15 + 0.02 * (lo % 5)).astype(int) # tỉ lệ NG khác nhau giữa các lô
+
+# Cách 1: chia theo lô, giữ tỉ lệ NG gần nhau. 5 phần: 1 phần test, 1 phần val, 3 phần train
+skf = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=0)
+phan = [te for _, te in skf.split(np.zeros(n), nhan, groups=lo)]
+test, val = phan[0], phan[1]
+train = np.concatenate(phan[2:])
+for ten, idx in (("train", train), ("val", val), ("test", test)):
+    print(f"{ten:5s}: {len(idx):3d} ảnh, NG {nhan[idx].mean():.1%}, lô {sorted(set(lo[idx].tolist()))}")
+assert not set(lo[train]) &amp; set(lo[test]) and not set(lo[val]) &amp; set(lo[test])
+
+# Cách 2: chia theo thời gian: 40 ngày đầu train, 10 ngày tiếp val, 10 ngày cuối test
+tr_t, va_t, te_t = ngay &lt; 40, (ngay &gt;= 40) &amp; (ngay &lt; 50), ngay &gt;= 50
+print("theo ngày:", int(tr_t.sum()), int(va_t.sum()), int(te_t.sum()), "ảnh")</code></pre>
+<pre><code class="language-text">train: 360 ảnh, NG 17.2%, lô [0, 1, 2, 3, 7, 8, 10, 12, 13, 15, 16, 18]
+val  : 118 ảnh, NG 16.9%, lô [6, 9, 14, 19]
+test : 122 ảnh, NG 15.6%, lô [4, 5, 11, 17]
+theo ngày: 386 108 106 ảnh</code></pre>
+<p>Khi có cả thông tin lô và thời gian, cách an toàn nhất cho tập test là "lô mới, ngày mới": đúng tình huống mô hình sẽ gặp sau khi triển khai.</p>
+
+<h2 id="5-tim-anh-trung-va-gan-trung-bang-hash-anh">5. Tìm ảnh trùng và gần trùng bằng hash ảnh</h2>
+<p>Dù đã chia theo nhóm, bộ dữ liệu thật vẫn hay có ảnh trùng: cùng một file được chép vào hai thư mục, ảnh được lưu lại dưới tên khác, ảnh chụp lại cùng chi tiết nhưng mất thông tin mã. Hai công cụ:</p>
 <ul>
-  <li><strong>Thêm dữ liệu đa dạng</strong>: cách hiệu quả nhất.</li>
-  <li><strong>Data augmentation</strong>: xoay, lật, đổi độ sáng, nhiễu nhẹ, nhưng chỉ những biến đổi có thể xảy ra thật.</li>
-  <li><strong>Mô hình nhỏ hơn</strong> hoặc dùng transfer learning thay vì huấn luyện từ đầu.</li>
-  <li><strong>Regularization</strong>: weight decay, dropout.</li>
-  <li><strong>Dừng sớm (early stopping)</strong> khi loss validation không cải thiện.</li>
+  <li><strong>MD5 (hoặc SHA-256) của file</strong>: phát hiện file giống hệt từng byte. Nhanh, chắc chắn, nhưng chỉ cần lưu lại JPEG hoặc đổi một pixel là khác hash.</li>
+  <li><strong>Hash cảm nhận</strong> (perceptual hash) như <strong>dHash</strong>: thu nhỏ ảnh xám về 9×8 pixel, so sánh từng pixel với pixel bên phải, được 64 bit. Ảnh nhìn giống nhau cho hash gần nhau; khoảng cách Hamming (số bit khác nhau) nhỏ nghĩa là gần trùng.</li>
+</ul>
+<p>Tạo bộ dữ liệu thử: 20 ảnh train; 10 ảnh test gồm 2 bản sao y hệt, 3 ảnh gần trùng (dịch 1 px, sáng hơn, lưu lại JPEG) và 5 ảnh mới.</p>
+<pre><code class="language-python">from pathlib import Path
+
+import cv2
+import numpy as np
+
+rng = np.random.default_rng(3)
+
+
+def anh_chi_tiet(rng):
+    nen = cv2.GaussianBlur(rng.normal(0, 1, (96, 128)).astype(np.float32), (0, 0), 12)
+    a = 60 + nen / nen.std() * 12 + rng.normal(0, 4, (96, 128))     # nền chiếu sáng không đều + nhiễu
+    c = (int(rng.integers(30, 98)), int(rng.integers(30, 66)))
+    cv2.ellipse(a, c, (int(rng.integers(15, 30)), int(rng.integers(10, 25))), float(rng.uniform(0, 180)),
+                0, 360, 170, -1)                               # chi tiết sáng trên nền tối
+    cv2.circle(a, (int(rng.integers(10, 118)), int(rng.integers(10, 86))), 6, 110, -1)
+    return np.clip(a, 0, 255).astype(np.uint8)
+
+
+for p in ("trung/train", "trung/test"):
+    Path(p).mkdir(parents=True, exist_ok=True)
+goc = [anh_chi_tiet(rng) for _ in range(20)]
+for i, a in enumerate(goc):
+    cv2.imwrite(f"trung/train/tr_{i:02d}.png", a)
+
+cv2.imwrite("trung/test/te_00.png", goc[3])                    # bản sao y hệt
+cv2.imwrite("trung/test/te_01.png", goc[7])
+cv2.imwrite("trung/test/te_02.png", np.roll(goc[11], 1, axis=1))                     # dịch 1 px
+cv2.imwrite("trung/test/te_03.png", cv2.add(goc[15], 12))                            # sáng hơn
+cv2.imwrite("trung/test/te_04.jpg", goc[18], [cv2.IMWRITE_JPEG_QUALITY, 80])        # lưu lại JPEG
+for i in range(5, 10):
+    cv2.imwrite(f"trung/test/te_{i:02d}.png", anh_chi_tiet(rng))                    # ảnh mới
+print(len(list(Path("trung/train").iterdir())), "ảnh train,", len(list(Path("trung/test").iterdir())), "ảnh test")</code></pre>
+<pre><code class="language-text">20 ảnh train, 10 ảnh test</code></pre>
+<p>Hai hàm hash và phép so sánh mọi cặp train–test:</p>
+<pre><code class="language-python">import hashlib
+from pathlib import Path
+
+import cv2
+import numpy as np
+
+
+def md5_file(p):
+    return hashlib.md5(Path(p).read_bytes()).hexdigest()
+
+
+def dhash(p, kich_thuoc=8):
+    xam = cv2.imread(str(p), cv2.IMREAD_GRAYSCALE)
+    nho = cv2.resize(xam, (kich_thuoc + 1, kich_thuoc), interpolation=cv2.INTER_AREA)
+    return (nho[:, 1:] &gt; nho[:, :-1]).ravel()                  # 64 giá trị True/False
+
+
+train = sorted(Path("trung/train").iterdir())
+test = sorted(Path("trung/test").iterdir())
+md5_train = {md5_file(p): p.name for p in train}
+H_train = np.array([dhash(p) for p in train])                   # (20, 64)
+
+for p in test:
+    kc = np.count_nonzero(H_train != dhash(p), axis=1)          # khoảng cách Hamming tới mọi ảnh train
+    j = int(kc.argmin())
+    if md5_file(p) in md5_train:
+        ket_luan = f"TRÙNG Y HỆT {md5_train[md5_file(p)]}"
+    elif kc[j] &lt;= 10:
+        ket_luan = f"gần trùng {train[j].name}"
+    else:
+        ket_luan = "mới"
+    print(f"{p.name}: Hamming nhỏ nhất {kc[j]:2d} ({train[j].name}) → {ket_luan}")</code></pre>
+<pre><code class="language-text">te_00.png: Hamming nhỏ nhất  0 (tr_03.png) → TRÙNG Y HỆT tr_03.png
+te_01.png: Hamming nhỏ nhất  0 (tr_07.png) → TRÙNG Y HỆT tr_07.png
+te_02.png: Hamming nhỏ nhất  0 (tr_11.png) → gần trùng tr_11.png
+te_03.png: Hamming nhỏ nhất  0 (tr_15.png) → gần trùng tr_15.png
+te_04.jpg: Hamming nhỏ nhất  1 (tr_18.png) → gần trùng tr_18.png
+te_05.png: Hamming nhỏ nhất 22 (tr_18.png) → mới
+te_06.png: Hamming nhỏ nhất 19 (tr_09.png) → mới
+te_07.png: Hamming nhỏ nhất 18 (tr_00.png) → mới
+te_08.png: Hamming nhỏ nhất 22 (tr_18.png) → mới
+te_09.png: Hamming nhỏ nhất 16 (tr_16.png) → mới</code></pre>
+<p>MD5 chỉ bắt được 2 bản sao y hệt; dHash bắt thêm 3 ảnh gần trùng, trong khi các ảnh mới cách xa (khoảng cách Hamming lớn). Ngưỡng khoảng cách phải chọn theo dữ liệu của bạn: in phân bố khoảng cách của các cặp chắc chắn khác nhau, chọn ngưỡng nằm dưới hẳn phần lớn các cặp đó, rồi <strong>mở ảnh ra xem</strong> các cặp bị đánh dấu. Ảnh công nghiệp rất giống nhau (cùng chi tiết, cùng nền), nên có thể hai chi tiết khác nhau cũng có hash gần nhau; khi đó hãy tính hash trên ROI vùng lỗi, hoặc dùng kích thước hash lớn hơn (16 cho 256 bit).</p>
+<div class="warn"><strong>Ảnh gần trùng trong cùng tập train cũng có hại</strong>Chúng không làm sai số đo, nhưng làm tập train "nhỏ hơn bạn tưởng" và khuyến khích học thuộc. Khi thu thập từ video hoặc camera chụp liên tục, hãy lọc các khung hình gần trùng trước khi gán nhãn: vừa đỡ công gán nhãn, vừa tránh rò rỉ.</div>
+
+<h2 id="6-cac-cach-chong-qua-khop-do-bang-so">6. Các cách chống quá khớp: đo bằng số</h2>
+<p>Quay lại thí nghiệm mục 2. Bật lần lượt từng biện pháp, giữ nguyên mọi thứ khác, ghi loss val tốt nhất, epoch đạt được, và kết quả ở epoch cuối (nếu không có early stopping):</p>
+<pre><code class="language-python">cau_hinh = {
+    "Gốc (60 ảnh)": {},
+    "Weight decay 0.5": {"weight_decay": 0.5},
+    "Dropout 0.5": {"dropout": 0.5},
+    "Augmentation dịch + lật": {"augment": True},
+    "Thêm dữ liệu (240 ảnh)": {"so_anh": 240},
+}
+print(f"{'cấu hình':26s}| loss val tốt nhất (epoch) | đúng tại đó | loss val cuối | đúng cuối")
+for ten, tham_so in cau_hinh.items():
+    ls, (best_loss, _, best_ep) = huan_luyen(**tham_so)
+    print(f"{ten:26s}| {best_loss:6.3f} ({best_ep:3d})            | {ls[best_ep - 1, 3]:10.1%} "
+          f"| {ls[-1, 2]:13.3f} | {ls[-1, 3]:8.1%}")</code></pre>
+<pre><code class="language-text">cấu hình                  | loss val tốt nhất (epoch) | đúng tại đó | loss val cuối | đúng cuối
+Gốc (60 ảnh)              |  0.206 ( 46)            |      92.7% |         0.266 |    90.3%
+Weight decay 0.5          |  0.205 ( 44)            |      93.3% |         0.238 |    90.7%
+Dropout 0.5               |  0.107 (119)            |      96.7% |         0.118 |    95.0%
+Augmentation dịch + lật   |  0.119 ( 92)            |      95.7% |         0.120 |    95.7%
+Thêm dữ liệu (240 ảnh)    |  0.146 ( 80)            |      96.0% |         0.153 |    95.7%</code></pre>
+<p>Kết quả cụ thể có thể lệch đôi chút trên máy khác, và mỗi cấu hình chỉ chạy một lần với một seed, nên chênh lệch một hai điểm phần trăm chưa có ý nghĩa. Xu hướng rõ ràng:</p>
+<table>
+  <tr><th>Biện pháp</th><th>Cơ chế</th><th>Trong thí nghiệm</th><th>Ghi chú thực tế</th></tr>
+  <tr><td>Thêm dữ liệu đa dạng</td><td>Khó học thuộc nhiều ảnh; nhãn nhầm bị "pha loãng"</td><td>Loss val thấp, độ chính xác cao</td><td>Hiệu quả nhất và bền nhất. Thu thêm ảnh ở các lô, ca còn thiếu, đặc biệt ảnh NG</td></tr>
+  <tr><td>Augmentation an toàn</td><td>Mỗi epoch mô hình thấy biến thể khác, không học thuộc được từng pixel</td><td>Gần bằng thêm dữ liệu; loss train không về 0</td><td>Chỉ biến đổi có thể xảy ra thật. Ở đây vân ngang không có hướng trái–phải nên lật ngang an toàn; với chi tiết có hướng thì không (bài "Dataset, DataLoader và augmentation")</td></tr>
+  <tr><td>Dropout</td><td>Tắt ngẫu nhiên neuron khi train, mạng không dựa vào một vài đặc trưng</td><td>Cải thiện rõ ở bài này</td><td>Hay đặt trước lớp fully-connected cuối; nhớ <code>model.eval()</code> khi đánh giá</td></tr>
+  <tr><td>Weight decay</td><td>Phạt trọng số lớn, mô hình "trơn" hơn</td><td>Tác dụng nhỏ với mạng nhỏ này</td><td>Giá trị phổ biến với AdamW: 0,01–0,1; thử trên val</td></tr>
+  <tr><td>Early stopping</td><td>Dừng và giữ checkpoint tại loss val thấp nhất</td><td>Lấy được cột "tốt nhất" thay vì cột "cuối"</td><td>Gần như miễn phí; luôn dùng</td></tr>
+  <tr><td>Transfer learning</td><td>Bắt đầu từ đặc trưng đã học trên hàng triệu ảnh</td><td>(dự án cuối chặng)</td><td>Cách chuẩn khi chỉ có vài trăm ảnh</td></tr>
+</table>
+<p>Không có biện pháp nào sửa được <strong>nhãn sai</strong>. Nếu nghi ngờ nhãn, lọc ra những ảnh train mà mô hình (huấn luyện có early stopping) tự tin trả lời ngược nhãn, đưa QC xem lại.</p>
+
+<h3 id="early-stopping-trong-vong-lap-huan-luyen">Early stopping trong vòng lặp huấn luyện</h3>
+<p>Hàm <code>huan_luyen</code> ở mục 2 đã lưu checkpoint tốt nhất nhưng vẫn chạy đủ 120 epoch. Trong dự án thật, dừng sớm khi loss val không cải thiện sau <code>kien_nhan</code> epoch (patience) để tiết kiệm thời gian, rồi nạp lại checkpoint tốt nhất:</p>
+<pre><code class="language-python">import copy
+
+import torch
+from torch import nn
+
+d = torch.load("okng_nho.pt", weights_only=True)
+torch.manual_seed(0)
+model = CNNNho(dropout=0.5)
+toi_uu = torch.optim.AdamW(model.parameters(), lr=3e-3)
+ham_loss = nn.CrossEntropyLoss()
+X, y = d["X_tr"][:60], d["y_tr"][:60]
+
+KIEN_NHAN = 20
+best, best_state, best_epoch, cho = float("inf"), None, 0, 0
+for epoch in range(1, 301):
+    model.train()
+    loss = ham_loss(model(X), y)
+    toi_uu.zero_grad()
+    loss.backward()
+    toi_uu.step()
+    model.eval()
+    with torch.no_grad():
+        loss_val = ham_loss(model(d["X_val"]), d["y_val"]).item()
+    if loss_val &lt; best - 1e-4:                     # cải thiện đáng kể
+        best, best_epoch, cho = loss_val, epoch, 0
+        best_state = copy.deepcopy(model.state_dict())
+    else:
+        cho += 1
+        if cho &gt;= KIEN_NHAN:
+            print(f"dừng ở epoch {epoch}: {KIEN_NHAN} epoch không cải thiện")
+            break
+model.load_state_dict(best_state)                 # quay về checkpoint tốt nhất
+torch.save(best_state, "tot_nhat.pt")
+with torch.no_grad():
+    acc = (model(d["X_val"]).argmax(1) == d["y_val"]).float().mean().item()
+print(f"checkpoint tốt nhất: epoch {best_epoch}, loss val {best:.3f}, đúng {acc:.1%}")</code></pre>
+<pre><code class="language-text">dừng ở epoch 139: 20 epoch không cải thiện
+checkpoint tốt nhất: epoch 119, loss val 0.107, đúng 96.3%</code></pre>
+<p>Early stopping dùng tập val để quyết định, nên tập val đã bị "dùng". Đây chính là lý do cần tập test riêng để báo cáo kết quả cuối.</p>
+
+<h2 id="7-sai-lam-thuong-gap">7. Sai lầm thường gặp</h2>
+<ul>
+  <li><strong>Chia ngẫu nhiên theo ảnh</strong> khi một chi tiết, một lô có nhiều ảnh. Kết quả val/test lạc quan giả, có thể chênh hàng chục điểm phần trăm.</li>
+  <li><strong>Chọn ngưỡng, chọn epoch, chọn augmentation trên tập test</strong>, rồi báo cáo kết quả test như kết quả độc lập.</li>
+  <li><strong>Chỉ nhìn độ chính xác val</strong>, bỏ qua loss val đang tăng: mô hình đang mất độ tin cậy của điểm số.</li>
+  <li><strong>Lưu checkpoint epoch cuối</strong> thay vì checkpoint tốt nhất theo val.</li>
+  <li><strong>Tính mean/std, chọn ngưỡng hoặc lọc dữ liệu trên toàn bộ dữ liệu</strong> trước khi chia.</li>
+  <li><strong>Không kiểm tra trùng lặp</strong> khi gộp dữ liệu từ nhiều nguồn (nhiều đợt thu thập, nhiều người gán nhãn).</li>
+  <li><strong>Tập test cùng ngày, cùng lô với train</strong>: con số không nói gì về tuần sau.</li>
 </ul>
 
-<h2 id="kiem-tra-ngoai-phong-thi-nghiem">Kiểm tra "ngoài phòng thí nghiệm"</h2>
-<p>Trước khi triển khai, hãy có một tập test được chụp <strong>vào ngày khác, ca khác, lô vật liệu khác</strong> so với dữ liệu huấn luyện. Đó mới là thước đo gần nhất với hiệu năng thật trên dây chuyền.</p>
+<h2 id="8-bai-tap">8. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Kiểm tra bộ dữ liệu của bạn: có ảnh trùng hoặc gần trùng giữa train và test không? Viết script nhận hai thư mục (duyệt cả thư mục con, mọi đuôi ảnh phổ biến), tính MD5 và dHash, in ra mọi cặp có khoảng cách Hamming ≤ ngưỡng, ghi kết quả ra CSV để mở ảnh kiểm tra, và in phân bố khoảng cách để chọn ngưỡng.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import csv
+import hashlib
+from pathlib import Path
+
+import cv2
+import numpy as np
+
+DUOI_ANH = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}
+
+
+def liet_ke(thu_muc):
+    return sorted(p for p in Path(thu_muc).rglob("*") if p.suffix.lower() in DUOI_ANH)
+
+
+def dhash(p, kich_thuoc=8):
+    du_lieu = np.fromfile(str(p), np.uint8)                 # đọc được cả đường dẫn có dấu tiếng Việt trên Windows
+    xam = cv2.imdecode(du_lieu, cv2.IMREAD_GRAYSCALE)
+    if xam is None:
+        return None
+    nho = cv2.resize(xam, (kich_thuoc + 1, kich_thuoc), interpolation=cv2.INTER_AREA)
+    return (nho[:, 1:] &gt; nho[:, :-1]).ravel()
+
+
+def kiem_tra_trung(thu_muc_a, thu_muc_b, nguong=10, file_csv="cap_trung.csv"):
+    A, B = liet_ke(thu_muc_a), liet_ke(thu_muc_b)
+    md5 = {p: hashlib.md5(p.read_bytes()).hexdigest() for p in A + B}
+    ha = {p: dhash(p) for p in A + B}
+    hong = [p for p, h in ha.items() if h is None]
+    A = [p for p in A if ha[p] is not None]
+    B = [p for p in B if ha[p] is not None]
+    HA = np.array([ha[p] for p in A])
+    HB = np.array([ha[p] for p in B])
+    kc = np.count_nonzero(HA[:, None, :] != HB[None, :, :], axis=2)   # ma trận (len A, len B)
+    cap = []
+    for i, j in zip(*np.nonzero(kc &lt;= nguong)):
+        loai = "y hệt" if md5[A[i]] == md5[B[j]] else "gần trùng"
+        cap.append((str(A[i]), str(B[j]), int(kc[i, j]), loai))
+    cap.sort(key=lambda c: c[2])
+    with open(file_csv, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["anh_a", "anh_b", "hamming", "loai"])
+        w.writerows(cap)
+    print(f"{len(A)} ảnh × {len(B)} ảnh, {len(hong)} file không đọc được, {len(cap)} cặp ≤ {nguong} → {file_csv}")
+    print("phân bố khoảng cách nhỏ nhất của mỗi ảnh B:", np.bincount(kc.min(axis=0) // 8, minlength=9).tolist(),
+          "(nhóm 0-7, 8-15, ...)")
+    for c in cap:
+        print(f"  {Path(c[0]).name} ↔ {Path(c[1]).name}: {c[2]:2d} ({c[3]})")
+    return cap
+
+
+cap = kiem_tra_trung("trung/train", "trung/test")</code></pre>
+<pre><code class="language-text">20 ảnh × 10 ảnh, 0 file không đọc được, 5 cặp ≤ 10 → cap_trung.csv
+phân bố khoảng cách nhỏ nhất của mỗi ảnh B: [5, 0, 5, 0, 0, 0, 0, 0, 0] (nhóm 0-7, 8-15, ...)
+  tr_03.png ↔ te_00.png:  0 (y hệt)
+  tr_07.png ↔ te_01.png:  0 (y hệt)
+  tr_11.png ↔ te_02.png:  0 (gần trùng)
+  tr_15.png ↔ te_03.png:  0 (gần trùng)
+  tr_18.png ↔ te_04.jpg:  1 (gần trùng)</code></pre>
+<p>Với hàng chục nghìn ảnh, ma trận khoảng cách vẫn nhỏ (10.000 × 2.000 × 64 bit ≈ 1,3 GB dạng bool nên hãy chia theo khối, hoặc đóng gói bit bằng <code>np.packbits</code>). Cách dùng thực tế: chạy cho train–val, train–test và val–test; với mỗi cặp bị đánh dấu, quyết định xóa ảnh khỏi val/test hoặc chuyển cả nhóm (chi tiết, lô) về một tập. Chạy thêm với <code>thu_muc_a = thu_muc_b = train</code> để tìm trùng lặp bên trong train (bỏ qua cặp một ảnh với chính nó).</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Bốn lần huấn luyện cho các bảng sau (loss train / loss val ở epoch 5, 20, 50). Chẩn đoán mỗi trường hợp và đề xuất việc làm tiếp: (A) 0,69/0,69 → 0,69/0,69 → 0,69/0,69; (B) 0,40/0,42 → 0,15/0,18 → 0,08/0,11; (C) 0,30/0,35 → 0,05/0,40 → 0,001/0,90; (D) 0,30/0,05 → 0,20/0,03 → 0,15/0,02.</p>
+<details><summary>Xem đáp án</summary>
+<table>
+  <tr><th></th><th>Chẩn đoán</th><th>Việc làm tiếp</th></tr>
+  <tr><td>A</td><td>Không học gì: 0,69 ≈ ln 2, đoán mò hai lớp</td><td>Kiểm tra chuẩn hóa đầu vào, learning rate, nhãn có khớp ảnh không, ROI có chứa lỗi không; thử overfit một batch nhỏ để chắc vòng lặp đúng</td></tr>
+  <tr><td>B</td><td>Học tốt, chưa quá khớp, vẫn đang giảm</td><td>Huấn luyện thêm epoch với early stopping</td></tr>
+  <tr><td>C</td><td>Overfitting rõ từ khoảng epoch 5–20</td><td>Lấy checkpoint tốt nhất (early stopping), thêm dữ liệu, augmentation an toàn, dropout; kiểm tra nhãn train</td></tr>
+  <tr><td>D</td><td>Loss val thấp hơn hẳn train và gần 0: đáng ngờ</td><td>Kiểm tra rò rỉ (ảnh trùng, chia theo ảnh), tập val có quá dễ hay quá nhỏ không; augmentation quá mạnh cũng làm loss train cao hơn val</td></tr>
+</table>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Nhà máy có 3 dây chuyền, dữ liệu 4 tháng, 25 lô. Tháng thứ 3, camera dây chuyền 2 được thay. Mô hình sẽ chạy trên cả 3 dây chuyền từ tháng thứ 5. Đề xuất cách chia train/val/test.</p>
+<details><summary>Xem đáp án</summary>
+<p>Test phải mô phỏng "tương lai": lấy các lô của <strong>tháng 4</strong> trên cả 3 dây chuyền (chia theo lô, không lấy ảnh lẻ). Val: một số lô của tháng 3–4 không nằm trong test, có đủ cả 3 dây chuyền. Train: phần còn lại. Bắt buộc có ảnh dây chuyền 2 <em>sau khi thay camera</em> trong cả train, val và test, vì đó là điều kiện mô hình sẽ gặp; ảnh trước khi thay camera vẫn giữ trong train nhưng báo cáo kết quả val/test <strong>tách theo dây chuyền</strong> để thấy dây chuyền nào yếu. Chạy script tìm trùng ở Bài 1 giữa các tập trước khi huấn luyện.</p>
+</details>
+</div>
+
+<h2 id="tom-tat">Tóm tắt</h2>
+<ul>
+  <li>Overfitting: loss train tiến về 0 trong khi loss val chạm đáy rồi tăng lại; mô hình học thuộc, kể cả nhãn nhầm, và trở nên quá tự tin. Theo dõi loss val, không chỉ độ chính xác.</li>
+  <li>Train để học, val để chọn (checkpoint, siêu tham số, ngưỡng), test chỉ để báo cáo cuối một lần. Số ảnh NG tuyệt đối trong val/test quyết định độ tin cậy của con số.</li>
+  <li>Chia theo nhóm (chi tiết, lô, khuôn) và theo thời gian, không chia ngẫu nhiên từng ảnh; tính chuẩn hóa chỉ trên train. Chia sai có thể làm con số đẹp giả tạo hàng chục điểm phần trăm.</li>
+  <li>MD5 tìm file trùng y hệt, dHash (64 bit, khoảng cách Hamming) tìm ảnh gần trùng; luôn mở ảnh kiểm tra các cặp bị đánh dấu.</li>
+  <li>Chống quá khớp: thêm dữ liệu, augmentation an toàn, dropout, weight decay, early stopping (giữ checkpoint tốt nhất), transfer learning. Không biện pháp nào sửa được nhãn sai.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Dự án chặng 10: phân loại ảnh OK/NG bằng transfer learning</strong>, nơi bạn ghép mọi thứ của chặng thành một mô hình hoàn chỉnh.</p>
 
       </div>
       <section class="practice"><h2><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <circle cx="12" cy="12" r="6" /> <circle cx="12" cy="12" r="2" /></svg>Bài tập thực hành</h2><ol><li>Kiểm tra bộ dữ liệu của bạn: có ảnh trùng hoặc gần trùng giữa train và test không? Viết script tìm bằng hash ảnh.</li></ol><p>Làm xong bài tập mới chuyển sang bài tiếp theo: tự viết code là cách duy nhất để nhớ lâu.</p></section><div class="lesson-done" data-course="vision-engineer"><button type="button" class="lesson-done-btn" data-lesson-done="overfitting-chia-train-val-test" aria-pressed="false"><span class="box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></span><span class="off">Đánh dấu đã học xong</span><span class="on">Đã học xong bài này</span></button><a class="btn lg" href="../hoc/phan-loai-anh-ok-ng-transfer-learning-pytorch.html">Bài tiếp theo<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a></div>
