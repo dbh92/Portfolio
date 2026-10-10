@@ -932,17 +932,18 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Xây portfolio dự án AI/Vision để xin việc",
+  "t": "Xây portfolio Vision Engineer: 3 dự án, README thuyết phục, phỏng vấn",
   "u": "kien-thuc/xay-portfolio-du-an-ai-vision.html",
-  "e": "Chọn dự án, cấu trúc README thuyết phục, điều nhà tuyển dụng thật sự tìm và lưu ý với dự án làm cho công ty.",
+  "e": "Chọn 3 capstone, README có escape/overkill/p99/%GRR, GIF demo, repo sạch, dòng CV có số liệu và câu hỏi phỏng vấn Vision Engineer kèm đáp án mẫu.",
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "07/10/2026",
-  "m": 3,
+  "m": 28,
   "img": "assets/images/posts/xay-portfolio-du-an-ai-vision.webp",
   "tags": [
    "Kinh nghiệm",
-   "Tips"
+   "Machine Vision",
+   "Industrial Vision"
   ]
  },
  {
@@ -975,17 +976,18 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Tăng tốc suy luận: ONNX Runtime, OpenVINO, TensorRT, FP16, INT8",
+  "t": "Tăng tốc suy luận: đo đúng cách, ONNX Runtime, INT8, TensorRT, OpenVINO",
   "u": "hoc/toi-uu-toc-do-suy-luan-onnx-tensorrt-openvino.html",
-  "e": "Đo đúng cách, chọn runtime theo phần cứng, giảm độ chính xác số và tối ưu đường ống để mô hình kịp cycle time dây chuyền.",
+  "e": "Đo p50/p99 đúng cách, chỉnh luồng và tối ưu đồ thị, lượng tử hóa INT8 bằng ONNX Runtime và đánh giá bằng escape/overkill, chọn runtime theo phần cứng.",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "06/10/2026",
-  "m": 4,
+  "m": 31,
   "img": "assets/images/posts/toi-uu-toc-do-suy-luan-onnx-tensorrt-openvino.webp",
   "tags": [
    "Deployment",
-   "Deep Learning"
+   "Deep Learning",
+   "Python"
   ]
  },
  {
@@ -1091,20 +1093,18 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Object Detection với YOLO26: huấn luyện mô hình đầu tiên",
+  "t": "Object Detection với YOLO26: chuẩn bị dữ liệu, huấn luyện và xuất mô hình",
   "u": "hoc/yolo26-object-detection-nhap-mon.html",
-  "e": "YOLO26 có gì mới, cách chạy dự đoán, chuẩn bị dữ liệu định dạng YOLO, huấn luyện trên dữ liệu riêng và xuất ONNX để triển khai.",
+  "e": "Nhãn YOLO, script kiểm tra nhãn, data.yaml, huấn luyện và kiểm tra YOLO26 bằng Ultralytics, từ hộp bao đến quyết định OK/NG, letterbox và xuất ONNX.",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "03/10/2026",
-  "m": 4,
+  "m": 34,
   "img": "assets/images/posts/yolo26-object-detection-nhap-mon.webp",
   "tags": [
    "Object Detection",
    "YOLO",
-   "Deep Learning",
-   "PyTorch",
-   "Deployment"
+   "AI Vision"
   ]
  },
  {
@@ -1271,16 +1271,17 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Viết tài liệu cho dự án Vision: README, đặc tả, hướng dẫn vận hành",
+  "t": "Viết tài liệu dự án Vision: README, đặc tả, SOP, phiên bản mô hình",
   "u": "tai-nguyen/viet-tai-lieu-ky-thuat-du-an-vision.html",
-  "e": "Những tài liệu cần có để người khác hiểu, vận hành và bảo trì hệ thống, kèm mẫu README và changelog.",
+  "e": "README, đặc tả đo được, SOP cho người vận hành, hướng dẫn bảo trì, model card, changelog theo SemVer và checklist bàn giao, kèm script kiểm tra tài liệu.",
   "c": "tai-nguyen",
   "cn": "Tài nguyên",
   "d": "30/09/2026",
-  "m": 3,
+  "m": 26,
   "img": "assets/images/posts/viet-tai-lieu-ky-thuat-du-an-vision.webp",
   "tags": [
    "Documentation",
+   "Industrial Vision",
    "Kinh nghiệm"
   ]
  },
@@ -1330,34 +1331,33 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Dự án: phát hiện lỗi bề mặt bằng Anomaly Detection (PatchCore)",
+  "t": "Dự án: phát hiện lỗi bề mặt bằng PatchCore, chỉ học từ ảnh OK",
   "u": "projects/phat-hien-loi-be-mat-anomaly-detection.html",
-  "e": "Khi có rất ít ảnh lỗi: huấn luyện PatchCore với Anomalib chỉ từ ảnh sản phẩm tốt, chọn ngưỡng OK/NG và đưa vào sản xuất.",
+  "e": "PatchCore hoàn chỉnh trên dữ liệu kiểu MVTec AD: ngưỡng từ ảnh OK, AUROC, escape/overkill theo loại lỗi, bản đồ nhiệt và đóng gói mô hình.",
   "c": "projects",
   "cn": "Projects",
   "d": "28/09/2026",
-  "m": 4,
+  "m": 27,
   "img": "assets/images/posts/phat-hien-loi-be-mat-anomaly-detection.webp",
   "tags": [
    "Industrial Project",
    "AI Vision",
-   "Deep Learning",
    "Industrial Vision"
   ]
  },
  {
-  "t": "Phân đoạn vết lỗi với YOLO26-seg và đo kích thước lỗi",
+  "t": "Phân đoạn vết lỗi với YOLO26-seg và đo kích thước lỗi theo mm",
   "u": "hoc/yolo26-seg-phan-doan-vet-loi.html",
-  "e": "Nhãn đa giác định dạng YOLO, huấn luyện instance segmentation và đo chiều dài, diện tích vết lỗi theo milimét.",
+  "e": "Nhãn đa giác YOLO-seg, chuyển mặt nạ sang đa giác, huấn luyện instance segmentation, đo diện tích, chiều dài theo khung xương và sai số đo.",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "27/09/2026",
-  "m": 3,
+  "m": 30,
   "img": "assets/images/posts/yolo26-seg-phan-doan-vet-loi.webp",
   "tags": [
    "Segmentation",
    "YOLO",
-   "AI Vision"
+   "Đo lường"
   ]
  },
  {
@@ -1494,17 +1494,18 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Docker cho kỹ sư AI: đóng gói môi trường chạy giống nhau mọi nơi",
+  "t": "Docker cho kỹ sư AI: đóng gói ứng dụng vision, camera, GPU, compose",
   "u": "kien-thuc/docker-cho-ky-su-ai.html",
-  "e": "Image, container, Dockerfile cho ứng dụng vision, chạy GPU trong container và khi nào nên hoặc không nên dùng Docker.",
+  "e": "Dockerfile chuẩn cho ứng dụng vision Python, chạy với camera USB/GigE, tự khởi động lại, healthcheck, GPU NVIDIA, docker compose và lưu ý Windows/WSL.",
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "23/09/2026",
-  "m": 3,
+  "m": 28,
   "img": "assets/images/posts/docker-cho-ky-su-ai.webp",
   "tags": [
+   "Deployment",
    "Công cụ",
-   "Deployment"
+   "Python"
   ]
  },
  {
@@ -1537,18 +1538,18 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "U-Net: kiến trúc kinh điển cho phân đoạn ảnh",
+  "t": "U-Net cho phân đoạn ảnh: tự cài bằng PyTorch với Dice loss",
   "u": "hoc/unet-phan-doan-anh.html",
-  "e": "Ý tưởng encoder–decoder và skip connection, cài đặt U-Net nhỏ bằng PyTorch và hàm mất mát Dice cho vùng lỗi nhỏ.",
+  "e": "Encoder, decoder, skip connection, U-Net nhỏ bằng PyTorch, vì sao cần Dice loss cho vết lỗi nhỏ, huấn luyện và báo cáo Dice, escape, overkill.",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "22/09/2026",
-  "m": 3,
+  "m": 23,
   "img": "assets/images/posts/unet-phan-doan-anh.webp",
   "tags": [
    "Segmentation",
-   "Deep Learning",
-   "PyTorch"
+   "PyTorch",
+   "Deep Learning"
   ]
  },
  {
@@ -1670,17 +1671,18 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "IoU, mAP50 và mAP50-95: đánh giá mô hình Object Detection",
+  "t": "IoU, mAP50 và mAP50-95: tự tính và chẩn đoán mô hình Object Detection",
   "u": "hoc/iou-map-danh-gia-object-detection.html",
-  "e": "Ý nghĩa các chỉ số mà YOLO báo cáo, cách chẩn đoán mô hình từ chỉ số và chỉ số nào thật sự quan trọng khi triển khai.",
+  "e": "Tự viết IoU, NMS, ghép TP/FP/FN, AP và mAP bằng NumPy, đọc đúng chỉ số Ultralytics, chẩn đoán mô hình và đổi sang escape, overkill.",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "19/09/2026",
-  "m": 3,
+  "m": 28,
   "img": "assets/images/posts/iou-map-danh-gia-object-detection.webp",
   "tags": [
    "Object Detection",
-   "AI Vision"
+   "AI Vision",
+   "Python"
   ]
  },
  {
@@ -1729,19 +1731,18 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Chạy mô hình AI trong C# với ONNX Runtime",
+  "t": "Chạy mô hình ONNX trong C#: tiền xử lý, suy luận, giải mã đầu ra",
   "u": "hoc/onnx-runtime-csharp-chay-mo-hinh-ai.html",
-  "e": "Xuất mô hình PyTorch/YOLO sang ONNX, tiền xử lý đúng như lúc huấn luyện và chạy suy luận trong ứng dụng .NET mà không cần Python.",
+  "e": "Dùng ONNX Runtime và OpenCvSharp trong .NET: tiền xử lý khớp Python tới 1e-6, DenseTensor, giải mã phân loại và YOLO, parity test với bộ ảnh vàng.",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "17/09/2026",
-  "m": 3,
+  "m": 38,
   "img": "assets/images/posts/onnx-runtime-csharp-chay-mo-hinh-ai.webp",
   "tags": [
    "C#",
-   ".NET",
    "Deployment",
-   "Object Detection"
+   ".NET"
   ]
  },
  {
@@ -1905,15 +1906,16 @@ window.HF_POSTS = [
  {
   "t": "Phân đoạn ảnh: semantic, instance và panoptic khác nhau thế nào",
   "u": "kien-thuc/phan-doan-anh-semantic-instance-panoptic.html",
-  "e": "Ba loại phân đoạn, so sánh với phân loại và phát hiện, khi nào cần phân đoạn và các mô hình phổ biến.",
+  "e": "Ba loại phân đoạn qua mảng NumPy, vì sao hộp bao sai khi đo vết lỗi, IoU và Dice trên mặt nạ, cách lưu mặt nạ và chọn mô hình cho trạm kiểm tra.",
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "12/09/2026",
-  "m": 3,
+  "m": 20,
   "img": "assets/images/posts/phan-doan-anh-semantic-instance-panoptic.webp",
   "tags": [
    "Segmentation",
-   "Computer Vision"
+   "AI Vision",
+   "Machine Vision"
   ]
  },
  {
@@ -2532,7 +2534,7 @@ window.HF_TOPICS = [
   "u": "hoc/python.html",
   "s": "Học AI & Lập trình",
   "g": "Programming",
-  "n": 57
+  "n": 60
  },
  {
   "t": "C#",
@@ -2553,14 +2555,14 @@ window.HF_TOPICS = [
   "u": "hoc/deep-learning.html",
   "s": "Học AI & Lập trình",
   "g": "AI & Machine Learning",
-  "n": 20
+  "n": 18
  },
  {
   "t": "PyTorch",
   "u": "hoc/pytorch.html",
   "s": "Học AI & Lập trình",
   "g": "AI & Machine Learning",
-  "n": 13
+  "n": 12
  },
  {
   "t": "Generative AI",
@@ -2595,7 +2597,7 @@ window.HF_TOPICS = [
   "u": "hoc/computer-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Computer Vision",
-  "n": 12
+  "n": 11
  },
  {
   "t": "OCR",
@@ -2609,7 +2611,7 @@ window.HF_TOPICS = [
   "u": "hoc/object-detection.html",
   "s": "Học AI & Lập trình",
   "g": "Computer Vision",
-  "n": 10
+  "n": 9
  },
  {
   "t": "Segmentation",
@@ -2623,21 +2625,21 @@ window.HF_TOPICS = [
   "u": "hoc/machine-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 44
+  "n": 46
  },
  {
   "t": "AI Vision",
   "u": "hoc/ai-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 9
+  "n": 10
  },
  {
   "t": "Industrial Vision",
   "u": "hoc/industrial-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 27
+  "n": 29
  },
  {
   "t": "Camera & Lens",
@@ -2672,7 +2674,7 @@ window.HF_TOPICS = [
   "u": "hoc/vision-deployment.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 8
+  "n": 7
  },
  {
   "t": "AI Projects",
@@ -2714,28 +2716,28 @@ window.HF_TOPICS = [
   "u": "kien-thuc/deep-learning.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 20
+  "n": 18
  },
  {
   "t": "Computer Vision",
   "u": "kien-thuc/computer-vision.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 12
+  "n": 11
  },
  {
   "t": "Machine Vision",
   "u": "kien-thuc/machine-vision.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 44
+  "n": 46
  },
  {
   "t": "AI Vision",
   "u": "kien-thuc/ai-vision.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 9
+  "n": 10
  },
  {
   "t": "Industrial Automation",

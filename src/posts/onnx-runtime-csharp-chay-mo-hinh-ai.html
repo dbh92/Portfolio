@@ -1,71 +1,694 @@
-<p>Huấn luyện mô hình bằng Python nhưng phần mềm trạm kiểm tra viết bằng C#? Cầu nối phổ biến nhất là <strong>ONNX</strong>: xuất mô hình sang định dạng chuẩn, rồi chạy bằng <strong>ONNX Runtime</strong> ngay trong ứng dụng .NET, không cần cài Python trên máy công nghiệp.</p>
+<p>Ở bài trước "Xuất ONNX và kiểm tra kết quả khớp PyTorch", bạn đã có một file <code>.onnx</code> được kiểm chứng trong Python. Nhưng phần mềm trạm kiểm tra ở nhiều nhà máy Việt Nam lại viết bằng C# (WinForms, WPF, hoặc dịch vụ .NET chạy cạnh SDK camera và thư viện PLC). Cầu nối là <strong>ONNX Runtime cho .NET</strong>: cùng lõi C++ với bản Python, gọi trực tiếp từ C#, không cần cài Python trên máy công nghiệp. Khó khăn thật sự không nằm ở dòng gọi mô hình, mà ở chỗ <strong>viết lại tiền xử lý cho giống hệt lúc huấn luyện</strong> và <strong>giải mã đầu ra cho đúng</strong>. Bài này đi trọn đường đó: chuẩn bị bộ ảnh vàng trong Python, viết ứng dụng console C# đọc ảnh bằng OpenCvSharp, chạy suy luận, đo thời gian, tự so với bộ ảnh vàng, rồi giải mã đầu ra phân loại lẫn phát hiện vật. Bài sau "Tăng tốc suy luận: OpenVINO, TensorRT, FP16, INT8" sẽ làm cho đúng chương trình này chạy nhanh hơn.</p>
 
-<h2>Bước 1: xuất mô hình sang ONNX (Python)</h2>
-<pre><code>from ultralytics import YOLO
-YOLO("best.pt").export(format="onnx", imgsz=640)     # tạo best.onnx
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Cài đúng gói NuGet (CPU hay GPU); tạo <code>InferenceSession</code> một lần với <code>SessionOptions</code> phù hợp; tiền xử lý trong C# cho ra tensor trùng với Python tới sai số 10<sup>-6</sup>; chạy suy luận với <code>DenseTensor&lt;float&gt;</code> + <code>NamedOnnxValue</code> (và biết API <code>OrtValue</code> mới hơn); giải phóng tài nguyên đúng cách bằng <code>using</code>; giải mã đầu ra phân loại (softmax, ngưỡng) và phát hiện vật (letterbox, NMS); kiểm tra tương đương (parity test) với bộ ảnh vàng do Python tạo.</div>
 
-# Với mô hình PyTorch tự viết:
-# torch.onnx.export(model, torch.randn(1, 3, 224, 224), "model.onnx",
-#                   input_names=["input"], output_names=["output"])</code></pre>
+<h2>1. Bức tranh tổng thể: Python huấn luyện, C# chạy trên trạm</h2>
+<pre><code class="language-text">PC phát triển (Python)                          PC trạm (C#, .NET)
+──────────────────────                          ─────────────────────────────
+mô hình .pt ──export──► ok_ng_cs.onnx ─────────► InferenceSession (tạo 1 lần)
+tien_xu_ly() (OpenCV-Python)                     TienXuLy.Chay() (OpenCvSharp)  ← phải giống hệt
+golden/  (ảnh PNG + golden.json) ──────────────► chương trình parity test: so logit từng ảnh
+                                                 camera ─► tiền xử lý ─► Run ─► giải mã ─► OK/NG ─► PLC</code></pre>
+<p>Điểm mấu chốt: file ONNX chỉ chứa <strong>mạng</strong>. Mọi bước trước mạng (resize, đổi kênh màu, chia 255, trừ mean chia std, đổi layout) và sau mạng (softmax, ngưỡng, NMS, đổi tọa độ) nằm trong code của bạn, viết hai lần bằng hai ngôn ngữ. Vì vậy cách làm chuyên nghiệp là: Python xuất kèm một <strong>bộ ảnh vàng</strong> (golden set) có đầu ra mong đợi, và chương trình C# phải tái tạo đúng các con số đó trước khi được lắp lên dây chuyền.</p>
 
-<h2>Bước 2: cài ONNX Runtime cho .NET</h2>
-<pre><code>dotnet add package Microsoft.ML.OnnxRuntime          # CPU
-# GPU NVIDIA: Microsoft.ML.OnnxRuntime.Gpu ; Windows mọi GPU: Microsoft.ML.OnnxRuntime.DirectML</code></pre>
+<h3>Chọn gói NuGet</h3>
+<table>
+  <tr><th>Gói NuGet</th><th>Chạy trên</th><th>Ghi chú</th></tr>
+  <tr><td><code>Microsoft.ML.OnnxRuntime</code></td><td>CPU (Windows, Linux, macOS)</td><td>Lựa chọn mặc định, đủ cho đa số mô hình phân loại nhỏ trên PC công nghiệp</td></tr>
+  <tr><td><code>Microsoft.ML.OnnxRuntime.Gpu</code></td><td>GPU NVIDIA qua CUDA (và TensorRT EP)</td><td>Cần driver, CUDA và cuDNN đúng phiên bản mà bản ONNX Runtime đó yêu cầu (xem bảng tương thích trong tài liệu ONNX Runtime); vẫn chạy được CPU</td></tr>
+  <tr><td><code>Microsoft.ML.OnnxRuntime.DirectML</code></td><td>Windows, mọi GPU hỗ trợ DirectX 12 (NVIDIA, AMD, Intel)</td><td>Tiện khi không muốn phụ thuộc CUDA; tốc độ thường kém CUDA/TensorRT trên cùng GPU NVIDIA</td></tr>
+  <tr><td><code>Intel.ML.OnnxRuntime.OpenVino</code></td><td>CPU, GPU tích hợp, NPU của Intel</td><td>Gói do Intel phát hành, dùng OpenVINO Execution Provider</td></tr>
+</table>
+<div class="warn"><strong>Chỉ tham chiếu MỘT gói ONNX Runtime</strong>Các gói trên đều chứa thư viện gốc tên <code>onnxruntime.dll</code>/<code>libonnxruntime.so</code>. Cài cùng lúc <code>Microsoft.ML.OnnxRuntime</code> và <code>Microsoft.ML.OnnxRuntime.Gpu</code> làm hai bản dll đè nhau khi build, và lỗi chỉ lộ ra lúc chạy (không tìm thấy CUDA provider, hoặc sai phiên bản). Muốn chạy GPU thì <em>thay</em> gói CPU bằng gói GPU, không cài thêm.</div>
 
-<h2>Bước 3: xem đầu vào/đầu ra của mô hình</h2>
-<pre><code>using Microsoft.ML.OnnxRuntime;
+<h2>2. Phía Python: mô hình nhỏ và bộ ảnh vàng</h2>
+<p>Để bài tự chạy được, ta dựng lại tình huống của bài trước ở cỡ nhỏ: ảnh camera 120×120 pixel của tấm kim loại; ảnh OK có thể có chấm mực xanh của QC, ảnh NG có vết gỉ màu cam. Mô hình chỉ khác nhau ở màu, nên sai thứ tự kênh màu sẽ lộ ra ngay. Với mô hình thật của bạn, chỉ cần thay mô hình và giữ nguyên hàm <code>tien_xu_ly</code> đã dùng lúc huấn luyện.</p>
+<pre><code class="language-bash">pip install torch onnx onnxruntime onnxscript opencv-python numpy
+# Bài viết chạy với torch 2.14.1 (CPU), onnx 1.23.2, onnxruntime 1.31.0, onnxscript 0.7.2.</code></pre>
+<pre><code class="language-python">import hashlib
+import json
+import shutil
+from pathlib import Path
+
+import cv2
+import numpy as np
+import torch
+import torch.nn as nn
+
+torch.manual_seed(0)
+torch.set_num_threads(4)
+
+KICH_THUOC = 64
+MEAN = np.array([0.485, 0.456, 0.406], np.float32)            # theo thứ tự R, G, B
+STD = np.array([0.229, 0.224, 0.225], np.float32)
+
+
+def tao_anh(ng, rng):
+    """Ảnh 120x120 BGR: tấm kim loại xám; OK có thể có chấm mực xanh, NG có vết gỉ cam."""
+    anh = np.full((120, 120, 3), 128, np.float32) + rng.normal(0, 8, (120, 120, 3))
+    anh += np.linspace(-15, 15, 120)[None, :, None]             # ánh sáng không đều
+    tam = tuple(int(v) for v in rng.integers(25, 95, 2))
+    r = int(rng.integers(6, 12))
+    if ng:
+        cv2.circle(anh, tam, r, (40, 110, 200), -1)              # gỉ: cam (B thấp, R cao)
+    elif rng.random() &lt; 0.6:
+        cv2.circle(anh, tam, r, (200, 120, 40), -1)              # mực QC: xanh dương
+    return np.clip(anh, 0, 255).astype(np.uint8)
+
+
+def tien_xu_ly(anh_bgr):
+    """BGR uint8 (H, W, 3) -&gt; float32 (3, 64, 64): resize INTER_AREA, BGR-&gt;RGB, /255, mean/std, HWC-&gt;CHW."""
+    a = cv2.resize(anh_bgr, (KICH_THUOC, KICH_THUOC), interpolation=cv2.INTER_AREA)
+    a = cv2.cvtColor(a, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
+    a = (a - MEAN) / STD
+    return np.ascontiguousarray(a.transpose(2, 0, 1))
+
+
+rng = np.random.default_rng(0)
+nhan = np.array([i % 2 for i in range(400)])                     # 0 = OK, 1 = NG
+X = torch.from_numpy(np.stack([tien_xu_ly(tao_anh(n, rng)) for n in nhan]))
+y = torch.from_numpy(nhan).long()
+
+model = nn.Sequential(
+    nn.Conv2d(3, 8, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+    nn.Conv2d(8, 16, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+    nn.Conv2d(16, 16, 3, padding=1), nn.ReLU(),
+    nn.AdaptiveAvgPool2d(1), nn.Flatten(), nn.Linear(16, 2))
+opt = torch.optim.Adam(model.parameters(), lr=5e-3)
+for ep in range(4):
+    for i in range(0, 400, 32):
+        loss = nn.functional.cross_entropy(model(X[i:i + 32]), y[i:i + 32])
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+model.eval()
+with torch.no_grad():
+    print("độ chính xác trên tập huấn luyện:", (model(X).argmax(1) == y).float().mean().item())
+
+torch.onnx.export(model, (X[:1],), "ok_ng_cs.onnx", input_names=["images"], output_names=["logits"],
+                  dynamic_shapes={"input": {0: "batch"}},       # "input" = tên tham số forward của nn.Sequential
+                  opset_version=18, external_data=False, verbose=False)
+print("ok_ng_cs.onnx:", Path("ok_ng_cs.onnx").stat().st_size, "byte")</code></pre>
+<pre><code class="language-text">độ chính xác trên tập huấn luyện: 1.0
+ok_ng_cs.onnx: 29948 byte</code></pre>
+<p>Độ chính xác trên dữ liệu giả này dễ đạt 100%; con số có thể khác chút ít trên máy khác. Điều quan trọng là file <code>ok_ng_cs.onnx</code> có đầu vào tên <code>images</code>, shape <code>[batch, 3, 64, 64]</code>, đầu ra <code>logits</code> shape <code>[batch, 2]</code> (lớp 0 = OK, lớp 1 = NG).</p>
+
+<p>Bây giờ tạo bộ ảnh vàng: 6 ảnh PNG (PNG không nén mất dữ liệu, nên hai phía đọc ra cùng pixel), kèm file <code>golden.json</code> ghi đặc tả tiền xử lý, mã băm mô hình và với mỗi ảnh: tổng từng kênh của tensor, giá trị pixel góc trên trái của 3 kênh, logit, xác suất NG và kết luận. Chép nguyên thư mục <code>golden/</code> sang máy có chương trình C#.</p>
+<pre><code class="language-python">import onnxruntime as ort
+
+sess = ort.InferenceSession("ok_ng_cs.onnx", providers=["CPUExecutionProvider"])
+vang = Path("golden")
+vang.mkdir(exist_ok=True)
+shutil.copy("ok_ng_cs.onnx", vang / "ok_ng_cs.onnx")
+
+rng_v = np.random.default_rng(7)
+ds = []
+for i in range(6):
+    ng = i % 2
+    anh = tao_anh(ng, rng_v)
+    ten = f"anh_{i:02d}_{'NG' if ng else 'OK'}.png"
+    cv2.imwrite(str(vang / ten), anh)
+    t = tien_xu_ly(anh)
+    lg = sess.run(["logits"], {"images": t[None]})[0][0]
+    p_ng = float(1.0 / (1.0 + np.exp(lg[0] - lg[1])))           # softmax 2 lớp
+    ds.append({"file": ten,
+               "tong_kenh": [round(float(v), 3) for v in t.sum(axis=(1, 2))],
+               "goc_tren_trai": [round(float(t[c, 0, 0]), 5) for c in range(3)],
+               "logits": [round(float(v), 5) for v in lg],
+               "p_ng": round(p_ng, 5),
+               "ket_qua": "NG" if p_ng &gt;= 0.5 else "OK"})
+
+the = {"model": "ok_ng_cs.onnx",
+       "sha256": hashlib.sha256(Path("ok_ng_cs.onnx").read_bytes()).hexdigest(),
+       "input": {"name": "images", "shape": [1, 3, 64, 64], "layout": "NCHW", "dtype": "float32"},
+       "output": {"name": "logits", "classes": ["OK", "NG"]},
+       "preprocess": {"resize": [64, 64], "interpolation": "INTER_AREA", "color": "BGR-&gt;RGB",
+                      "scale": "1/255", "mean_rgb": [0.485, 0.456, 0.406], "std_rgb": [0.229, 0.224, 0.225]},
+       "threshold_ng": 0.5, "tol_logit": 1e-4, "images": ds}
+(vang / "golden.json").write_text(json.dumps(the, indent=1, ensure_ascii=False), encoding="utf-8")
+
+print("sha256:", the["sha256"][:16], "...")
+for d in ds:
+    print(f"{d['file']}  logits={d['logits']}  p_ng={d['p_ng']:.5f}  {d['ket_qua']}  tong_kenh={d['tong_kenh']}")</code></pre>
+<pre><code class="language-text">sha256: c22e3d19b75e8237 ...
+anh_00_OK.png  logits=[9.98768, -3.35116]  p_ng=0.00000  OK  tong_kenh=[220.793, 796.501, 1747.976]
+anh_01_NG.png  logits=[-19.31605, 24.66094]  p_ng=1.00000  NG  tong_kenh=[391.201, 784.036, 1576.578]
+anh_02_OK.png  logits=[10.46421, -3.50261]  p_ng=0.00000  OK  tong_kenh=[182.964, 801.438, 1783.828]
+anh_03_NG.png  logits=[-15.22198, 20.55314]  p_ng=1.00000  NG  tong_kenh=[349.622, 773.094, 1594.948]
+anh_04_OK.png  logits=[9.03428, -3.04875]  p_ng=0.00001  OK  tong_kenh=[268.194, 809.369, 1714.948]
+anh_05_NG.png  logits=[-23.4325, 28.80084]  p_ng=1.00000  NG  tong_kenh=[410.432, 776.771, 1556.883]</code></pre>
+<p>Đây là "đề thi" cho chương trình C#: với từng ảnh, logit C# tính ra phải lệch không quá <code>tol_logit = 1e-4</code> so với cột <code>logits</code>. Mã băm của bạn sẽ khác nếu trọng số khác; điều quan trọng là phía C# kiểm tra đúng mã băm ghi trong file JSON đi kèm.</p>
+
+<h2>3. Tạo dự án C# và cài gói</h2>
+<pre><code class="language-bash">dotnet new console -n OkNgOnnx -f net8.0          # .NET 8 (LTS) trở lên
+cd OkNgOnnx
+dotnet add package Microsoft.ML.OnnxRuntime       # CPU. GPU NVIDIA: thay bằng Microsoft.ML.OnnxRuntime.Gpu
+dotnet add package OpenCvSharp4                   # API OpenCV cho .NET
+dotnet add package OpenCvSharp4.runtime.win       # thư viện gốc OpenCV cho Windows x64
+# Trên Linux: chọn gói runtime OpenCvSharp phù hợp bản phân phối (tìm "OpenCvSharp4 runtime linux" trên NuGet).
+# Chép thư mục golden/ từ Python vào thư mục dự án.
+dotnet run -c Release -- golden</code></pre>
+<p>Để thư mục <code>golden/</code> được chép sang thư mục build, thêm vào file <code>OkNgOnnx.csproj</code>:</p>
+<pre><code class="language-xml">&lt;ItemGroup&gt;
+  &lt;None Update="golden\**\*" CopyToOutputDirectory="PreserveNewest" /&gt;
+&lt;/ItemGroup&gt;</code></pre>
+<p>Luôn đo và nghiệm thu bằng bản <strong>Release</strong>. Bản Debug chạy chậm hơn rõ rệt ở phần vòng lặp C# (tiền xử lý, giải mã), dù phần suy luận do thư viện gốc đảm nhiệm.</p>
+
+<h2>4. InferenceSession: tạo một lần, đọc "hợp đồng" của mô hình</h2>
+<p><code>InferenceSession</code> nạp file ONNX, tối ưu đồ thị và cấp phát bộ nhớ. Việc này tốn từ vài chục mili giây tới vài giây tùy mô hình, nên chỉ làm <strong>một lần</strong> khi ứng dụng khởi động, rồi dùng lại cho mọi ảnh. <code>InferenceSession</code>, <code>SessionOptions</code> và kết quả của <code>Run</code> đều giữ bộ nhớ gốc (native) ngoài tầm của bộ gom rác .NET, nên đều cài <code>IDisposable</code>: dùng <code>using</code> để giải phóng đúng lúc.</p>
+<pre><code class="language-csharp">using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 
-using var session = new InferenceSession("best.onnx");
+using var options = new SessionOptions
+{
+    GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL,   // gộp phép toán, bỏ nút thừa
+    IntraOpNumThreads = 4,      // số luồng cho MỘT phép toán (Conv, MatMul...)
+    InterOpNumThreads = 1,      // số luồng chạy song song các nhánh đồ thị (chỉ dùng khi ORT_PARALLEL)
+    ExecutionMode = ExecutionMode.ORT_SEQUENTIAL
+};
+using var session = new InferenceSession("golden/ok_ng_cs.onnx", options);
+
 foreach (var (name, meta) in session.InputMetadata)
-    Console.WriteLine($"Input  {name}: [{string.Join(",", meta.Dimensions)}]");
+    Console.WriteLine($"input  {name}: {meta.ElementType.Name} [{string.Join(", ", meta.Dimensions)}]");
 foreach (var (name, meta) in session.OutputMetadata)
-    Console.WriteLine($"Output {name}: [{string.Join(",", meta.Dimensions)}]");</code></pre>
-<p>Luôn in ra kích thước thực tế trước khi viết code giải mã: mỗi họ mô hình (và mỗi phiên bản YOLO) có định dạng đầu ra khác nhau. Ví dụ YOLOv8/YOLO11 xuất mảng dạng <code>[1, 4 + số lớp, số anchor]</code> và cần NMS; YOLO26 thiết kế end-to-end nên đầu ra đã là các khung cuối cùng.</p>
+    Console.WriteLine($"output {name}: {meta.ElementType.Name} [{string.Join(", ", meta.Dimensions)}]");</code></pre>
+<p>Với file của mục 2, chương trình in đầu vào <code>images</code> kiểu <code>Single</code> (tên .NET của <code>float</code>) shape <code>[-1, 3, 64, 64]</code> và đầu ra <code>logits</code> shape <code>[-1, 2]</code>: trục động (batch) hiện là <code>-1</code> trong <code>Dimensions</code>; tên trục (<code>batch</code>) nằm trong <code>SymbolicDimensions</code>. Hãy in metadata này mỗi khi nhận mô hình mới, và so với thẻ mô hình trước khi viết code giải mã.</p>
+<div class="tip"><strong>Một session, nhiều luồng</strong>Gọi <code>session.Run</code> đồng thời từ nhiều luồng là an toàn (ONNX Runtime thiết kế như vậy), nên một trạm hai camera có thể dùng chung một session. Ngược lại, đừng tạo session mới cho mỗi ảnh: vừa chậm, vừa dễ rò bộ nhớ gốc nếu quên Dispose.</div>
 
-<h2>Bước 4: tiền xử lý ảnh đúng như lúc huấn luyện</h2>
-<pre><code>using OpenCvSharp;
+<h2>5. Tiền xử lý trong C#: giống hệt Python, từng bước</h2>
+<p>Hàm <code>tien_xu_ly</code> của Python có 5 bước. Bảng dưới là bản dịch từng bước sang OpenCvSharp, kèm cái bẫy của mỗi bước:</p>
+<table>
+  <tr><th>Bước</th><th>Python (lúc huấn luyện)</th><th>C# (OpenCvSharp)</th><th>Bẫy hay gặp</th></tr>
+  <tr><td>1. Resize</td><td><code>cv2.resize(..., INTER_AREA)</code></td><td><code>Cv2.Resize(..., InterpolationFlags.Area)</code></td><td>Mặc định của Cv2.Resize là <code>Linear</code>: sai khác nhỏ nhưng khác 0</td></tr>
+  <tr><td>2. Đổi kênh</td><td><code>COLOR_BGR2RGB</code></td><td><code>ColorConversionCodes.BGR2RGB</code></td><td>OpenCvSharp đọc ảnh BGR giống OpenCV; quên đổi là lỗi số một</td></tr>
+  <tr><td>3. Chia 255</td><td><code>/ 255.0</code></td><td>gộp vào <code>ConvertTo(alpha, beta)</code></td><td>Chia số nguyên <code>px / 255</code> trong C# cho 0 hoặc 1</td></tr>
+  <tr><td>4. Mean/std</td><td><code>(a - MEAN) / STD</code> theo R, G, B</td><td><code>alpha = 1/(255·std[c])</code>, <code>beta = -mean[c]/std[c]</code></td><td>Áp mean/std theo thứ tự B, G, R</td></tr>
+  <tr><td>5. HWC→CHW</td><td><code>transpose(2, 0, 1)</code></td><td><code>Cv2.Split</code> rồi chép từng kênh liền nhau</td><td>Chép thẳng dữ liệu Mat (đang HWC xen kẽ) vào tensor NCHW</td></tr>
+</table>
+<p>Bước 3 và 4 gộp được thành một phép biến đổi tuyến tính cho mỗi kênh: <code>(x/255 − mean)/std = x · 1/(255·std) + (−mean/std)</code>. OpenCV làm đúng phép này trong <code>ConvertTo(dst, kiểu, alpha, beta)</code>, chạy bằng mã gốc tối ưu thay vì vòng lặp C# trên từng pixel:</p>
+<pre><code class="language-csharp">using System.Runtime.InteropServices;
+using OpenCvSharp;
 
-static DenseTensor&lt;float&gt; ToTensor(Mat bgr, int size)
+/// &lt;summary&gt;Tiền xử lý giống hệt tien_xu_ly() của Python. Ghi kết quả CHW (R, G, B) vào buffer.&lt;/summary&gt;
+sealed class TienXuLy
 {
-    using var resized = new Mat();
-    Cv2.Resize(bgr, resized, new Size(size, size));      // đơn giản; chuẩn hơn là letterbox giữ tỷ lệ
-    using var rgb = new Mat();
-    Cv2.CvtColor(resized, rgb, ColorConversionCodes.BGR2RGB);
+    private readonly int _size;
+    private readonly float[] _meanRgb, _stdRgb;
 
-    var tensor = new DenseTensor&lt;float&gt;(new[] { 1, 3, size, size });
-    var idx = rgb.GetGenericIndexer&lt;Vec3b&gt;();
-    for (int y = 0; y &lt; size; y++)
-        for (int x = 0; x &lt; size; x++)
+    public TienXuLy(int size, float[] meanRgb, float[] stdRgb)
+    {
+        _size = size; _meanRgb = meanRgb; _stdRgb = stdRgb;
+    }
+
+    public int SoPhanTu =&gt; 3 * _size * _size;
+
+    public void Chay(Mat bgr, float[] buffer, int offset = 0)
+    {
+        if (bgr.Empty() || bgr.Type() != MatType.CV_8UC3)
+            throw new ArgumentException("Cần ảnh BGR 8 bit 3 kênh");
+
+        using var nho = new Mat();
+        Cv2.Resize(bgr, nho, new Size(_size, _size), 0, 0, InterpolationFlags.Area);   // bước 1
+        using var rgb = new Mat();
+        Cv2.CvtColor(nho, rgb, ColorConversionCodes.BGR2RGB);                          // bước 2
+
+        Mat[] kenh = Cv2.Split(rgb);            // 3 Mat CV_8UC1 theo thứ tự R, G, B
+        try
         {
-            var px = idx[y, x];
-            tensor[0, 0, y, x] = px.Item0 / 255f;   // R
-            tensor[0, 1, y, x] = px.Item1 / 255f;   // G
-            tensor[0, 2, y, x] = px.Item2 / 255f;   // B
+            int n = _size * _size;
+            using var f = new Mat();
+            for (int c = 0; c &lt; 3; c++)
+            {
+                double alpha = 1.0 / (255.0 * _stdRgb[c]);                             // bước 3 + 4
+                double beta = -_meanRgb[c] / _stdRgb[c];
+                kenh[c].ConvertTo(f, MatType.CV_32FC1, alpha, beta);
+                Marshal.Copy(f.Data, buffer, offset + c * n, n);                       // bước 5: kênh c liền một khối
+            }
         }
-    return tensor;
+        finally
+        {
+            foreach (var k in kenh) k.Dispose();
+        }
+    }
 }</code></pre>
-<p>Sai một chi tiết tiền xử lý (thứ tự kênh RGB/BGR, chia 255, chuẩn hóa mean/std, letterbox) là nguyên nhân số 1 khiến mô hình chạy trong C# cho kết quả khác Python. Hãy so sánh đầu ra của cùng một ảnh trên cả hai phía.</p>
+<p>Vài chi tiết C# đáng chú ý: mọi <code>Mat</code> trung gian đều nằm trong <code>using</code> (mỗi Mat giữ bộ nhớ gốc; quên Dispose trong vòng lặp 30 ảnh/giây là bộ nhớ tăng dần tới khi ứng dụng sập sau vài giờ); <code>Marshal.Copy</code> chép thẳng từ con trỏ dữ liệu của Mat, an toàn vì Mat mới tạo bởi <code>ConvertTo</code> luôn liên tục trong bộ nhớ; tham số <code>offset</code> cho phép ghi nhiều ảnh nối tiếp vào một buffer khi chạy batch.</p>
+<p>Đừng tin bảng trên chỉ vì nó "nhìn đúng". Đoạn Python sau mô phỏng y hệt các phép của lớp C# (tách kênh, <code>alpha</code>/<code>beta</code> tính bằng số thực 64 bit như <code>ConvertTo</code>, chép từng kênh liền khối) và so với <code>tien_xu_ly</code>:</p>
+<pre><code class="language-python">def tien_xu_ly_kieu_csharp(anh_bgr):
+    """Mô phỏng đúng từng bước của lớp TienXuLy (C#), trả về buffer phẳng như float[] bên C#."""
+    nho = cv2.resize(anh_bgr, (KICH_THUOC, KICH_THUOC), interpolation=cv2.INTER_AREA)
+    rgb = cv2.cvtColor(nho, cv2.COLOR_BGR2RGB)
+    n = KICH_THUOC * KICH_THUOC
+    buffer = np.empty(3 * n, np.float32)
+    for c, kenh in enumerate(cv2.split(rgb)):
+        alpha = 1.0 / (255.0 * float(STD[c]))
+        beta = -float(MEAN[c]) / float(STD[c])
+        f = (kenh.astype(np.float64) * alpha + beta).astype(np.float32)   # ConvertTo: tính double, lưu float
+        buffer[c * n:(c + 1) * n] = f.ravel()                            # Marshal.Copy từng kênh
+    return buffer
 
-<h2>Bước 5: chạy suy luận</h2>
-<pre><code>using var img = Cv2.ImRead("test.png");
-var input = ToTensor(img, 640);
-string inputName = session.InputMetadata.Keys.First();
 
-using var results = session.Run(new List&lt;NamedOnnxValue&gt;
+sai_tensor, sai_logit = 0.0, 0.0
+for d in ds:
+    anh = cv2.imread(str(vang / d["file"]))
+    buf = tien_xu_ly_kieu_csharp(anh)
+    chuan = tien_xu_ly(anh)
+    sai_tensor = max(sai_tensor, float(np.abs(buf - chuan.ravel()).max()))
+    lg = sess.run(None, {"images": buf.reshape(1, 3, KICH_THUOC, KICH_THUOC)})[0][0]
+    sai_logit = max(sai_logit, float(np.abs(lg - np.array(d["logits"])).max()))
+print(f"sai khác tensor lớn nhất: {sai_tensor:.2e}")
+print(f"sai khác logit so với golden.json: {sai_logit:.2e}  (tol_logit = {the['tol_logit']})")</code></pre>
+<pre><code class="language-text">sai khác tensor lớn nhất: 1.49e-07
+sai khác logit so với golden.json: 6.15e-06  (tol_logit = 0.0001)</code></pre>
+<p>Sai khác cỡ 10<sup>-7</sup> chỉ là làm tròn float32 (hai cách tính cho kết quả khác ở chữ số cuối), còn sai khác logit chủ yếu do <code>golden.json</code> làm tròn 5 chữ số. Vậy công thức gộp <code>alpha</code>/<code>beta</code> là đúng; nếu chương trình C# của bạn vẫn lệch, lỗi nằm ở chỗ khác (thứ tự kênh, kiểu nội suy, đọc sai ảnh).</p>
+
+<h2>6. Chạy suy luận: DenseTensor, NamedOnnxValue, đo thời gian</h2>
+<p>Đường gọi lâu đời và phổ biến nhất của ONNX Runtime C#: bọc mảng <code>float[]</code> thành <code>DenseTensor&lt;float&gt;</code> có shape NCHW, đặt tên bằng <code>NamedOnnxValue.CreateFromTensor</code>, gọi <code>session.Run</code>. <code>DenseTensor</code> tạo từ một mảng sẽ <strong>dùng chung bộ nhớ</strong> với mảng đó (không chép), nên ta cấp phát buffer một lần, mỗi ảnh chỉ ghi đè dữ liệu mới vào.</p>
+<pre><code class="language-csharp">using System.Diagnostics;
+using Microsoft.ML.OnnxRuntime;
+using Microsoft.ML.OnnxRuntime.Tensors;
+using OpenCvSharp;
+
+const int S = 64;
+var pre = new TienXuLy(S, new[] { 0.485f, 0.456f, 0.406f }, new[] { 0.229f, 0.224f, 0.225f });
+var buffer = new float[pre.SoPhanTu];
+var tensor = new DenseTensor&lt;float&gt;(buffer, new[] { 1, 3, S, S });       // bọc buffer, không chép
+var inputs = new List&lt;NamedOnnxValue&gt; { NamedOnnxValue.CreateFromTensor("images", tensor) };
+using var session = new InferenceSession("golden/ok_ng_cs.onnx");     // tạo một lần
+
+(float pNg, float[] logits) PhanLoai(Mat bgr)
 {
-    NamedOnnxValue.CreateFromTensor(inputName, input)
-});
-var output = results.First().AsTensor&lt;float&gt;();
-Console.WriteLine($"Output shape: [{string.Join(",", output.Dimensions.ToArray())}]");
-// Giải mã theo định dạng đầu ra của mô hình: khung, lớp, điểm tin cậy...</code></pre>
+    pre.Chay(bgr, buffer);                                   // ghi đè buffer =&gt; tensor có dữ liệu mới
+    using var results = session.Run(inputs);                 // IDisposableReadOnlyCollection: phải Dispose
+    float[] lg = results.First().AsEnumerable&lt;float&gt;().ToArray();   // [logit_OK, logit_NG]
+    float p = 1f / (1f + MathF.Exp(lg[0] - lg[1]));          // softmax 2 lớp = sigmoid(lg1 - lg0)
+    return (p, lg);
+}
 
-<h2>Hiệu năng</h2>
+using var img = Cv2.ImRead("golden/anh_01_NG.png", ImreadModes.Color);
+for (int i = 0; i &lt; 10; i++) PhanLoai(img);                 // khởi động nóng: lần đầu luôn chậm
+
+var sw = new Stopwatch();
+var ms = new List&lt;double&gt;();
+for (int i = 0; i &lt; 200; i++)
+{
+    sw.Restart();
+    var (p, _) = PhanLoai(img);
+    sw.Stop();
+    ms.Add(sw.Elapsed.TotalMilliseconds);
+}
+ms.Sort();
+var (pNg, logits) = PhanLoai(img);
+Console.WriteLine($"logits = [{logits[0]:F5}, {logits[1]:F5}]  P(NG) = {pNg:F5}  =&gt; {(pNg &gt;= 0.5f ? "NG" : "OK")}");
+Console.WriteLine($"tiền xử lý + suy luận: p50 {ms[ms.Count / 2]:F3} ms, p99 {ms[(int)(ms.Count * 0.99)]:F3} ms");</code></pre>
+<p>Kết quả phân loại của ảnh này phải trùng dòng <code>anh_01_NG.png</code> trong bảng ở mục 2 tới 4–5 chữ số. Thời gian thì tùy máy; với mô hình 64×64 cỡ này, tiền xử lý cộng suy luận thường dưới 1 ms trên CPU máy tính để bàn.</p>
+<p>Những điểm dễ sai trong đoạn trên:</p>
 <ul>
-  <li>Tạo <code>InferenceSession</code> <strong>một lần</strong> khi khởi động, dùng lại cho mọi ảnh.</li>
-  <li>Chạy "khởi động nóng" vài ảnh trước khi đo tốc độ: lần chạy đầu luôn chậm.</li>
-  <li>Truy cập <code>DenseTensor</code> theo chỉ số nhiều chiều khá chậm; với đầu ra lớn, làm việc trên mảng phẳng sẽ nhanh hơn.</li>
-  <li>Với GPU NVIDIA, cân nhắc TensorRT; với CPU Intel, cân nhắc OpenVINO Execution Provider.</li>
+  <li><strong>Tên đầu vào phải khớp</strong> chính xác <code>"images"</code>. Nếu không chắc, dùng <code>session.InputMetadata.Keys.First()</code>, nhưng tốt hơn là kiểm tra tên với thẻ mô hình và báo lỗi rõ ràng khi khác.</li>
+  <li><strong>Thứ tự đầu ra</strong>: <code>results</code> trả theo thứ tự đầu ra của mô hình; với mô hình nhiều đầu ra, lấy theo tên (<code>results.First(r =&gt; r.Name == "logits")</code>).</li>
+  <li><strong>Kết quả Run phải Dispose</strong>: các giá trị đầu ra giữ bộ nhớ gốc. Chép số cần dùng ra mảng .NET (<code>ToArray()</code>) <em>trước</em> khi khối <code>using</code> kết thúc.</li>
+  <li><strong>Đo thời gian</strong> bằng <code>Stopwatch</code>, sau vài lần chạy khởi động nóng, báo p50 và p99 chứ không chỉ trung bình. Bài sau đi sâu vào cách đo.</li>
 </ul>
-<p>Đây là kỹ năng cốt lõi của chặng <a href="../lo-trinh/vision-engineer.html#step-deployment">Deployment</a> trong lộ trình Vision Engineer.</p>
-<p class="note">Tham khảo: <a href="https://onnxruntime.ai/docs/get-started/with-csharp" rel="noopener" target="_blank">ONNX Runtime: Get started with C#</a>.</p>
+
+<h2>7. Chương trình parity test với bộ ảnh vàng</h2>
+<p>Đây là chương trình bạn chạy mỗi khi đổi mô hình, đổi phiên bản ONNX Runtime/OpenCvSharp, hoặc sửa code tiền xử lý. Nó đọc <code>golden.json</code>, kiểm tra mã băm mô hình, chạy từng ảnh, so logit với dung sai, và khi lệch thì in thêm tổng từng kênh để khoanh vùng lỗi (tiền xử lý hay mô hình). Mã thoát khác 0 khi không đạt, để dùng được trong script build tự động.</p>
+<pre><code class="language-csharp">// Program.cs (lớp TienXuLy của mục 5 đặt trong file TienXuLy.cs): dotnet run -c Release -- golden
+using System.Security.Cryptography;
+using System.Text.Json;
+using Microsoft.ML.OnnxRuntime;
+using Microsoft.ML.OnnxRuntime.Tensors;
+using OpenCvSharp;
+
+string dir = args.Length &gt; 0 ? args[0] : "golden";
+using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "golden.json")));
+JsonElement root = doc.RootElement;
+
+// 1) Đúng file mô hình?
+string modelPath = Path.Combine(dir, root.GetProperty("model").GetString()!);
+string sha = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(modelPath))).ToLowerInvariant();
+if (sha != root.GetProperty("sha256").GetString())
+{
+    Console.WriteLine($"SAI MÔ HÌNH: sha256 {sha[..16]}... khác golden.json");
+    return 2;
+}
+
+// 2) Tiền xử lý theo đặc tả trong JSON, không gõ tay hằng số
+JsonElement pp = root.GetProperty("preprocess");
+float[] mean = pp.GetProperty("mean_rgb").EnumerateArray().Select(e =&gt; e.GetSingle()).ToArray();
+float[] std = pp.GetProperty("std_rgb").EnumerateArray().Select(e =&gt; e.GetSingle()).ToArray();
+int size = pp.GetProperty("resize")[0].GetInt32();
+var pre = new TienXuLy(size, mean, std);
+
+string inName = root.GetProperty("input").GetProperty("name").GetString()!;
+float tol = root.GetProperty("tol_logit").GetSingle();
+using var session = new InferenceSession(modelPath);
+var buffer = new float[pre.SoPhanTu];
+var inputs = new List&lt;NamedOnnxValue&gt;
+{
+    NamedOnnxValue.CreateFromTensor(inName, new DenseTensor&lt;float&gt;(buffer, new[] { 1, 3, size, size }))
+};
+
+// 3) Chạy từng ảnh và so
+int loi = 0;
+foreach (JsonElement item in root.GetProperty("images").EnumerateArray())
+{
+    string file = item.GetProperty("file").GetString()!;
+    using Mat img = Cv2.ImRead(Path.Combine(dir, file), ImreadModes.Color);
+    if (img.Empty()) { Console.WriteLine($"{file}: không đọc được ảnh"); loi++; continue; }
+
+    pre.Chay(img, buffer);
+    float[] lg;
+    using (var results = session.Run(inputs))
+        lg = results.First().AsEnumerable&lt;float&gt;().ToArray();
+
+    float[] mong = item.GetProperty("logits").EnumerateArray().Select(e =&gt; e.GetSingle()).ToArray();
+    float lech = lg.Zip(mong, (a, b) =&gt; MathF.Abs(a - b)).Max();
+    bool dat = lech &lt;= tol;
+    Console.WriteLine($"{file}: lệch logit {lech:E2} {(dat ? "ĐẠT" : "KHÔNG ĐẠT")}");
+    if (!dat)
+    {
+        loi++;
+        int n = size * size;                       // in tổng từng kênh để so với "tong_kenh"
+        var tong = Enumerable.Range(0, 3).Select(c =&gt; buffer.Skip(c * n).Take(n).Sum());
+        Console.WriteLine($"   tổng kênh C#: [{string.Join(", ", tong.Select(v =&gt; v.ToString("F3")))}]"
+                        + $"  golden: {item.GetProperty("tong_kenh")}");
+    }
+}
+Console.WriteLine(loi == 0 ? "PARITY: ĐẠT" : $"PARITY: {loi} ảnh lệch");
+return loi == 0 ? 0 : 1;</code></pre>
+<p>Cách đọc kết quả khi không đạt (đúng mẹo "tổng từng kênh" của bài trước):</p>
+<table>
+  <tr><th>Triệu chứng</th><th>Nguyên nhân khả dĩ</th></tr>
+  <tr><td>Tổng kênh 0 và 2 tráo nhau gần đúng, kênh 1 khớp</td><td>Quên BGR→RGB, hoặc mean/std áp theo thứ tự B, G, R</td></tr>
+  <tr><td>Tổng các kênh lệch rất ít (phần trăm nhỏ), logit lệch 10<sup>-3</sup>–10<sup>-1</sup></td><td>Sai kiểu nội suy khi resize (Linear thay Area), hoặc resize hai lần</td></tr>
+  <tr><td>Tổng kênh lệch hàng nghìn lần</td><td>Quên chia 255 hoặc quên mean/std</td></tr>
+  <tr><td>Tổng kênh khớp mà logit lệch</td><td>Sai file mô hình, sai tên đầu vào/đầu ra, đọc nhầm đầu ra, hoặc buffer chưa được ghi trước khi Run</td></tr>
+</table>
+
+<h2>8. SessionOptions và Execution Provider</h2>
+<p><strong>Execution Provider</strong> (EP) là "phần phụ trợ phần cứng" mà ONNX Runtime giao việc tính toán: CPU, CUDA, TensorRT, DirectML, OpenVINO… Bạn đăng ký EP trong <code>SessionOptions</code> theo thứ tự ưu tiên; phép toán nào EP không hỗ trợ sẽ rơi về CPU.</p>
+<pre><code class="language-csharp">using Microsoft.ML.OnnxRuntime;
+
+static InferenceSession TaoSession(string modelPath, string thietBi)
+{
+    using var opt = new SessionOptions
+    {
+        GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL,
+        IntraOpNumThreads = Math.Max(1, Environment.ProcessorCount / 2),   // chừa CPU cho camera, PLC, giao diện
+        LogSeverityLevel = OrtLoggingLevel.ORT_LOGGING_LEVEL_WARNING
+    };
+    switch (thietBi)
+    {
+        case "cuda": opt.AppendExecutionProvider_CUDA(0); break;    // cần gói Microsoft.ML.OnnxRuntime.Gpu
+        case "dml":  opt.AppendExecutionProvider_DML(0);  break;    // cần gói Microsoft.ML.OnnxRuntime.DirectML
+        default: break;                                             // chỉ CPU
+    }
+    return new InferenceSession(modelPath, opt);   // các tùy chọn đã được chép vào session
+}</code></pre>
+<table>
+  <tr><th>Tùy chọn</th><th>Ý nghĩa</th><th>Gợi ý cho trạm vision</th></tr>
+  <tr><td><code>GraphOptimizationLevel</code></td><td>Mức tối ưu đồ thị: tắt, cơ bản, mở rộng, tất cả</td><td><code>ORT_ENABLE_ALL</code> (mặc định đã là mức cao nhất)</td></tr>
+  <tr><td><code>IntraOpNumThreads</code></td><td>Số luồng song song bên trong một phép toán</td><td>Đo với 1, 2, 4… luồng; đừng chiếm hết lõi CPU nếu cùng máy còn chạy SDK camera</td></tr>
+  <tr><td><code>InterOpNumThreads</code>, <code>ExecutionMode</code></td><td>Chạy song song các nhánh độc lập của đồ thị</td><td>CNN phân loại gần như tuần tự: để <code>ORT_SEQUENTIAL</code></td></tr>
+  <tr><td><code>AppendExecutionProvider_*</code></td><td>Đăng ký EP phần cứng</td><td>Gọi trong khối try/catch; ghi log EP thực sự được dùng lúc khởi động</td></tr>
+</table>
+<div class="warn"><strong>EP GPU lỗi thì sao?</strong>Nếu thiếu CUDA/cuDNN đúng phiên bản, <code>AppendExecutionProvider_CUDA</code> ném exception. Đừng nuốt lỗi rồi im lặng chạy CPU: thời gian xử lý tăng gấp nhiều lần và PLC bắt đầu báo timeout mà không ai hiểu vì sao. Hoặc dừng hẳn với thông báo rõ ràng, hoặc chạy CPU nhưng ghi cảnh báo lên log và màn hình.</div>
+
+<h2>9. Giải mã đầu ra phát hiện vật: letterbox, NMS, đổi tọa độ</h2>
+<p>Mô hình phát hiện vật (YOLO và tương tự) cần hai việc mà phân loại không có. <strong>Letterbox</strong>: thu nhỏ ảnh giữ nguyên tỉ lệ rồi đệm viền cho đủ hình vuông (ví dụ 640×640), để vật không bị méo. Sau suy luận phải làm ngược lại: trừ phần đệm, chia tỉ lệ, để tọa độ khung về ảnh gốc. <strong>NMS</strong> (Non-Maximum Suppression, loại bỏ khung trùng): mô hình đề xuất nhiều khung chồng lên cùng một vật, chỉ giữ khung điểm cao nhất trong mỗi nhóm có IoU lớn.</p>
+<p>Định dạng đầu ra khác nhau giữa các đời mô hình, nên luôn in shape trước (mục 4). Hai dạng hay gặp:</p>
+<table>
+  <tr><th>Dạng</th><th>Shape ví dụ</th><th>Nội dung</th><th>Cần làm</th></tr>
+  <tr><td>Thô (YOLOv8, YOLO11 xuất mặc định)</td><td><code>[1, 4 + số lớp, số đề xuất]</code>, ví dụ <code>[1, 84, 8400]</code></td><td>Mỗi cột: cx, cy, w, h (tọa độ trong ảnh letterbox), rồi điểm từng lớp</td><td>Lọc điểm, đổi cx-cy-w-h sang x1-y1-x2-y2, NMS, bỏ letterbox</td></tr>
+  <tr><td>End-to-end (YOLO26, YOLOv10)</td><td><code>[1, số khung tối đa, 6]</code>, ví dụ <code>[1, 300, 6]</code></td><td>Mỗi hàng: x1, y1, x2, y2, điểm, lớp</td><td>Lọc điểm, bỏ letterbox (không cần NMS)</td></tr>
+</table>
+<p>Viết giải mã bằng Python trước (dễ kiểm tra), rồi dịch sang C#. Đoạn sau dựng một đầu ra "giả" có đáp án biết trước cho ảnh camera 1280×960: vật A (lớp 0) ở (300, 200)–(500, 400) với hai đề xuất trùng nhau, vật B (lớp 1) ở (800, 500)–(1000, 560), và một đề xuất điểm thấp phải bị loại.</p>
+<pre><code class="language-python">import numpy as np
+
+
+def letterbox_thong_so(w, h, dich=640):
+    r = min(dich / w, dich / h)
+    nw, nh = round(w * r), round(h * r)
+    return r, (dich - nw) // 2, (dich - nh) // 2                 # tỉ lệ, đệm trái, đệm trên
+
+
+def iou(a, b):
+    rong = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
+    cao = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    giao = rong * cao
+    return giao / ((a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - giao)
+
+
+def giai_ma_tho(out, r, pad_x, pad_y, conf=0.25, iou_max=0.45):
+    """out: (1, 4 + nc, N). Trả về [(x1, y1, x2, y2, diem, lop)] theo tọa độ ảnh gốc."""
+    p = out[0]
+    diem_lop = p[4:]                                               # (nc, N)
+    lop = diem_lop.argmax(0)
+    diem = diem_lop.max(0)
+    ung_vien = []
+    for i in np.flatnonzero(diem &gt;= conf):
+        cx, cy, w, h = p[:4, i]
+        ung_vien.append([cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2, float(diem[i]), int(lop[i])])
+    ung_vien.sort(key=lambda k: -k[4])
+    giu = []
+    for k in ung_vien:                                             # NMS theo từng lớp
+        if all(k[5] != g[5] or iou(k, g) &lt; iou_max for g in giu):
+            giu.append(k)
+    print(f"đề xuất {p.shape[1]}, qua ngưỡng điểm {len(ung_vien)}, sau NMS {len(giu)}")
+    return [((x1 - pad_x) / r, (y1 - pad_y) / r, (x2 - pad_x) / r, (y2 - pad_y) / r, d, c)
+            for x1, y1, x2, y2, d, c in giu]
+
+
+r, pad_x, pad_y = letterbox_thong_so(1280, 960)
+print(f"r = {r}, đệm trái = {pad_x}, đệm trên = {pad_y}")
+
+rng = np.random.default_rng(0)
+out = np.zeros((1, 6, 100), np.float32)
+out[0, :4] = rng.uniform(50, 600, (4, 100))
+out[0, 4:] = rng.uniform(0, 0.1, (2, 100))                         # nền: điểm thấp
+for j, (x1, y1, x2, y2, lop, d) in enumerate([(300, 200, 500, 400, 0, 0.91), (306, 204, 504, 402, 0, 0.85),
+                                               (800, 500, 1000, 560, 1, 0.77), (100, 700, 160, 760, 0, 0.20)]):
+    a = np.array([x1, y1, x2, y2]) * r + [pad_x, pad_y, pad_x, pad_y]   # ảnh gốc -&gt; ảnh letterbox
+    out[0, :4, j] = [(a[0] + a[2]) / 2, (a[1] + a[3]) / 2, a[2] - a[0], a[3] - a[1]]
+    out[0, 4 + lop, j] = d
+
+for k in giai_ma_tho(out, r, pad_x, pad_y):
+    print("lớp", k[5], "điểm", round(k[4], 2), "khung", [round(float(v), 1) for v in k[:4]])
+
+# Dạng end-to-end (1, 300, 6): x1, y1, x2, y2, điểm, lớp trong ảnh letterbox; không cần NMS
+e2e = np.zeros((1, 300, 6), np.float32)
+e2e[0, 0] = [150, 180, 250, 280, 0.91, 0]
+e2e[0, 1] = [400, 330, 500, 360, 0.77, 1]
+for x1, y1, x2, y2, d, c in e2e[0][e2e[0, :, 4] &gt;= 0.25]:
+    print("e2e lớp", int(c), "khung", [round(float(v), 1) for v in
+                                     ((x1 - pad_x) / r, (y1 - pad_y) / r, (x2 - pad_x) / r, (y2 - pad_y) / r)])</code></pre>
+<pre><code class="language-text">r = 0.5, đệm trái = 0, đệm trên = 80
+đề xuất 100, qua ngưỡng điểm 3, sau NMS 2
+lớp 0 điểm 0.91 khung [300.0, 200.0, 500.0, 400.0]
+lớp 1 điểm 0.77 khung [800.0, 500.0, 1000.0, 560.0]
+e2e lớp 0 khung [300.0, 200.0, 500.0, 400.0]
+e2e lớp 1 khung [800.0, 500.0, 1000.0, 560.0]</code></pre>
+<p>Hai khung đúng vị trí ban đầu (sai khác dưới 0,1 pixel do làm tròn float32), khung trùng của vật A bị NMS loại, khung điểm 0,20 bị ngưỡng loại. Bản C# tương đương, làm việc trực tiếp trên mảng phẳng (truy cập <code>Tensor</code> theo chỉ số nhiều chiều chậm hơn nhiều với 8400 cột):</p>
+<pre><code class="language-csharp">record struct Khung(float X1, float Y1, float X2, float Y2, float Diem, int Lop);
+
+static float IoU(Khung a, Khung b)
+{
+    float w = MathF.Max(0, MathF.Min(a.X2, b.X2) - MathF.Max(a.X1, b.X1));
+    float h = MathF.Max(0, MathF.Min(a.Y2, b.Y2) - MathF.Max(a.Y1, b.Y1));
+    float giao = w * h;
+    return giao / ((a.X2 - a.X1) * (a.Y2 - a.Y1) + (b.X2 - b.X1) * (b.Y2 - b.Y1) - giao);
+}
+
+/// out: mảng phẳng của tensor [1, 4 + nc, n]; phần tử (kênh k, đề xuất i) nằm ở out[k * n + i]
+static List&lt;Khung&gt; GiaiMaTho(float[] o, int nc, int n, float r, int padX, int padY,
+                             float conf = 0.25f, float iouMax = 0.45f)
+{
+    var ungVien = new List&lt;Khung&gt;();
+    for (int i = 0; i &lt; n; i++)
+    {
+        int lop = 0; float diem = o[4 * n + i];
+        for (int c = 1; c &lt; nc; c++)
+            if (o[(4 + c) * n + i] &gt; diem) { diem = o[(4 + c) * n + i]; lop = c; }
+        if (diem &lt; conf) continue;
+        float cx = o[i], cy = o[n + i], w = o[2 * n + i], h = o[3 * n + i];
+        ungVien.Add(new Khung(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2, diem, lop));
+    }
+    ungVien.Sort((a, b) =&gt; b.Diem.CompareTo(a.Diem));
+    var giu = new List&lt;Khung&gt;();
+    foreach (var k in ungVien)
+        if (giu.All(g =&gt; g.Lop != k.Lop || IoU(k, g) &lt; iouMax)) giu.Add(k);
+    return giu.Select(k =&gt; k with
+    {
+        X1 = (k.X1 - padX) / r, Y1 = (k.Y1 - padY) / r,
+        X2 = (k.X2 - padX) / r, Y2 = (k.Y2 - padY) / r
+    }).ToList();
+}
+
+// Letterbox phía C#: phải giống phía huấn luyện (màu đệm, cách làm tròn, nội suy)
+static (Mat anh, float r, int padX, int padY) Letterbox(Mat bgr, int dich = 640)
+{
+    float r = MathF.Min((float)dich / bgr.Width, (float)dich / bgr.Height);
+    int nw = (int)MathF.Round(bgr.Width * r), nh = (int)MathF.Round(bgr.Height * r);
+    int padX = (dich - nw) / 2, padY = (dich - nh) / 2;
+    using var nho = new Mat();
+    Cv2.Resize(bgr, nho, new Size(nw, nh), 0, 0, InterpolationFlags.Linear);
+    var ra = new Mat();
+    Cv2.CopyMakeBorder(nho, ra, padY, dich - nh - padY, padX, dich - nw - padX,
+                       BorderTypes.Constant, new Scalar(114, 114, 114));
+    return (ra, r, padX, padY);
+}</code></pre>
+<div class="warn"><strong>Letterbox của thư viện huấn luyện có thể khác của bạn</strong>Ultralytics đệm màu xám 114 và làm tròn phần đệm theo cách riêng; các thư viện khác có thể đặt ảnh ở góc trên trái thay vì giữa. Lệch 1 pixel đệm làm mọi khung lệch 1 pixel, đủ để một phép đo vị trí bị sai. Cách chắc chắn: đưa vài ảnh phát hiện vật vào bộ ảnh vàng, ghi khung mong đợi, và so khung bằng ghép cặp IoU như bài trước.</div>
+
+<h2>10. API OrtValue (ONNX Runtime 1.16 trở lên)</h2>
+<p>Các phiên bản ONNX Runtime gần đây bổ sung API dựa trên <code>OrtValue</code>, giảm cấp phát và chép dữ liệu, được khuyến nghị cho mã mới cần hiệu năng cao. <code>NamedOnnxValue</code> vẫn hoạt động; chọn một kiểu và dùng nhất quán. Kiểm tra lại tên hàm với tài liệu của đúng phiên bản bạn cài.</p>
+<pre><code class="language-csharp">long[] shape = { 1, 3, 64, 64 };
+var buffer = new float[3 * 64 * 64];
+using var inputOrt = OrtValue.CreateTensorValueFromMemory(buffer, shape);   // dùng chung bộ nhớ với buffer
+var inputs = new Dictionary&lt;string, OrtValue&gt; { ["images"] = inputOrt };
+using var runOptions = new RunOptions();
+
+pre.Chay(img, buffer);
+using var outputs = session.Run(runOptions, inputs, session.OutputNames);
+ReadOnlySpan&lt;float&gt; logits = outputs.First().GetTensorDataAsSpan&lt;float&gt;();   // đọc trực tiếp, không chép
+Console.WriteLine($"logit OK {logits[0]:F5}, logit NG {logits[1]:F5}");</code></pre>
+
+<h2>11. Lỗi thường gặp</h2>
+<table>
+  <tr><th>Triệu chứng</th><th>Nguyên nhân</th><th>Cách xử lý</th></tr>
+  <tr><td><code>DllNotFoundException: onnxruntime</code> hoặc <code>OpenCvSharpExtern</code></td><td>Thiếu gói runtime gốc cho nền tảng; chạy 32-bit</td><td>Cài gói runtime đúng hệ điều hành; chạy tiến trình 64-bit</td></tr>
+  <tr><td>Lỗi "invalid dimensions" hoặc "unexpected input data type"</td><td>Sai shape (thiếu trục batch, HWC thay NCHW) hoặc dùng <code>double</code></td><td>Shape <code>{1, 3, H, W}</code>, kiểu <code>float</code></td></tr>
+  <tr><td>Kết quả C# khác Python nhưng không lỗi</td><td>Tiền xử lý khác (kênh màu, nội suy, mean/std)</td><td>Chạy parity test mục 7, so tổng từng kênh</td></tr>
+  <tr><td>Bộ nhớ tăng dần sau vài giờ</td><td>Quên Dispose <code>Mat</code>, kết quả <code>Run</code>, hoặc tạo session mỗi ảnh</td><td><code>using</code> cho mọi đối tượng giữ bộ nhớ gốc; session tạo một lần</td></tr>
+  <tr><td>Lần chạy đầu 300 ms, sau đó 3 ms</td><td>Khởi tạo lười, cấp phát lần đầu</td><td>Chạy khởi động nóng vài ảnh lúc mở ứng dụng, trước khi báo sẵn sàng cho PLC</td></tr>
+  <tr><td>Bật GPU nhưng không nhanh hơn</td><td>EP GPU không nạp được và rơi về CPU, hoặc mô hình quá nhỏ (thời gian chép dữ liệu lớn hơn thời gian tính)</td><td>Ghi log EP đang dùng; đo cả hai</td></tr>
+</table>
+
+<h2>12. Bài tập</h2>
+<div class="ex"><p><strong>Bài 1 (thực hành chính).</strong> Viết ứng dụng console C# chạy mô hình phân loại OK/NG trên mọi ảnh PNG trong một thư mục, in cho mỗi ảnh: tên file, P(NG), kết luận OK/NG và thời gian xử lý (tiền xử lý + suy luận, mili giây); cuối cùng in p50/p99. Viết thêm một script Python làm đúng việc đó để có "đáp số" so sánh.</p><details><summary>Xem đáp án</summary>
+<pre><code class="language-csharp">// Program.cs (cùng dự án với lớp TienXuLy ở mục 5): dotnet run -c Release -- golden
+using System.Diagnostics;
+using Microsoft.ML.OnnxRuntime;
+using Microsoft.ML.OnnxRuntime.Tensors;
+using OpenCvSharp;
+
+string dir = args.Length &gt; 0 ? args[0] : "golden";
+const int S = 64;
+var pre = new TienXuLy(S, new[] { 0.485f, 0.456f, 0.406f }, new[] { 0.229f, 0.224f, 0.225f });
+var buffer = new float[pre.SoPhanTu];
+var inputs = new List&lt;NamedOnnxValue&gt;
+{
+    NamedOnnxValue.CreateFromTensor("images", new DenseTensor&lt;float&gt;(buffer, new[] { 1, 3, S, S }))
+};
+using var opt = new SessionOptions { IntraOpNumThreads = 2 };
+using var session = new InferenceSession(Path.Combine(dir, "ok_ng_cs.onnx"), opt);
+
+string[] files = Directory.GetFiles(dir, "*.png").OrderBy(f =&gt; f).ToArray();
+using (var warm = Cv2.ImRead(files[0])) for (int i = 0; i &lt; 10; i++)   // khởi động nóng
+{
+    pre.Chay(warm, buffer);
+    using var _ = session.Run(inputs);
+}
+
+var thoiGian = new List&lt;double&gt;();
+foreach (string f in files)
+{
+    using Mat img = Cv2.ImRead(f, ImreadModes.Color);       // đọc file không tính vào thời gian
+    var sw = Stopwatch.StartNew();
+    pre.Chay(img, buffer);
+    float[] lg;
+    using (var res = session.Run(inputs)) lg = res.First().AsEnumerable&lt;float&gt;().ToArray();
+    float p = 1f / (1f + MathF.Exp(lg[0] - lg[1]));
+    sw.Stop();
+    thoiGian.Add(sw.Elapsed.TotalMilliseconds);
+    Console.WriteLine($"{Path.GetFileName(f)}  P(NG)={p:F5}  {(p &gt;= 0.5f ? "NG" : "OK")}  {sw.Elapsed.TotalMilliseconds:F3} ms");
+}
+thoiGian.Sort();
+Console.WriteLine($"p50 {thoiGian[thoiGian.Count / 2]:F3} ms, p99 {thoiGian[(int)(thoiGian.Count * 0.99)]:F3} ms");</code></pre>
+<p>Bản Python tham chiếu (chạy trong cùng thư mục làm việc của bài):</p>
+<pre><code class="language-python">import time
+from pathlib import Path
+
+import cv2
+import numpy as np
+import onnxruntime as ort
+
+so = ort.SessionOptions()
+so.intra_op_num_threads = 2
+s = ort.InferenceSession("golden/ok_ng_cs.onnx", so, providers=["CPUExecutionProvider"])
+files = sorted(Path("golden").glob("*.png"))
+x0 = tien_xu_ly(cv2.imread(str(files[0])))[None]
+for _ in range(10):
+    s.run(None, {"images": x0})                                 # khởi động nóng
+
+tg = []
+for f in files:
+    img = cv2.imread(str(f))
+    t0 = time.perf_counter()
+    lg = s.run(None, {"images": tien_xu_ly(img)[None]})[0][0]
+    p = 1.0 / (1.0 + np.exp(lg[0] - lg[1]))
+    tg.append((time.perf_counter() - t0) * 1000)
+    print(f"{f.name}  P(NG)={p:.5f}  {'NG' if p &gt;= 0.5 else 'OK'}")
+print(f"p50 {np.percentile(tg, 50):.3f} ms, p99 {np.percentile(tg, 99):.3f} ms (tùy máy)")</code></pre>
+<pre><code class="language-text">anh_00_OK.png  P(NG)=0.00000  OK
+anh_01_NG.png  P(NG)=1.00000  NG
+anh_02_OK.png  P(NG)=0.00000  OK
+anh_03_NG.png  P(NG)=1.00000  NG
+anh_04_OK.png  P(NG)=0.00001  OK
+anh_05_NG.png  P(NG)=1.00000  NG
+p50 0.540 ms, p99 4.446 ms (tùy máy)</code></pre>
+<p>Cột P(NG) và kết luận của C# phải trùng Python tới 4–5 chữ số. Thời gian của bạn sẽ khác (dòng p50/p99 ở trên tùy máy). Vì hai bên dùng chung lõi ONNX Runtime, thời gian suy luận gần như bằng nhau; chênh lệch nếu có thường nằm ở tiền xử lý. Với 6 ảnh, p99 chính là ảnh chậm nhất; khi nghiệm thu thật hãy đo hàng trăm chu kỳ.</p>
+</details></div>
+
+<div class="ex"><p><strong>Bài 2.</strong> Chuẩn bị sẵn "chữ ký lỗi" để chẩn đoán nhanh phía C#: với ảnh <code>anh_01_NG.png</code>, tính tổng từng kênh và logit khi tiền xử lý mắc từng lỗi: resize <code>INTER_LINEAR</code> (mặc định của <code>Cv2.Resize</code>), quên BGR→RGB, mean/std theo thứ tự B-G-R, quên chia 255. Lỗi nào khó phát hiện nhất nếu chỉ nhìn kết luận OK/NG?</p><details><summary>Xem đáp án</summary>
+<pre><code class="language-python">anh = cv2.imread("golden/anh_01_NG.png")
+
+
+def bien_the(anh_bgr, loi):
+    noi_suy = cv2.INTER_LINEAR if loi == "resize Linear" else cv2.INTER_AREA
+    a = cv2.resize(anh_bgr, (KICH_THUOC, KICH_THUOC), interpolation=noi_suy)
+    if loi != "quên BGR-&gt;RGB":
+        a = cv2.cvtColor(a, cv2.COLOR_BGR2RGB)
+    a = a.astype(np.float32)
+    if loi != "quên chia 255":
+        a = a / 255.0
+    m, s = (MEAN[::-1], STD[::-1]) if loi == "mean/std B-G-R" else (MEAN, STD)
+    return np.ascontiguousarray(((a - m) / s).transpose(2, 0, 1), dtype=np.float32)
+
+
+for loi in ["đúng", "resize Linear", "quên BGR-&gt;RGB", "mean/std B-G-R", "quên chia 255"]:
+    t = bien_the(anh, loi)
+    lg = sess.run(None, {"images": t[None]})[0][0]
+    p = 1.0 / (1.0 + np.exp(lg[0] - lg[1]))
+    tong = ", ".join(f"{v:.1f}" for v in t.sum(axis=(1, 2)))
+    print(f"{loi:16s} tổng kênh [{tong}]  logits {np.round(lg, 3)}  P(NG) {p:.3f}")</code></pre>
+<pre><code class="language-text">đúng             tổng kênh [391.2, 784.0, 1576.6]  logits [-19.316  24.661]  P(NG) 1.000
+resize Linear    tổng kênh [384.9, 774.3, 1571.9]  logits [-19.474  25.076]  P(NG) 1.000
+quên BGR-&gt;RGB    tổng kênh [136.0, 784.0, 1836.3]  logits [11.111 -3.708]  P(NG) 0.000
+mean/std B-G-R   tổng kênh [1836.3, 784.0, 136.0]  logits [-117.915  119.247]  P(NG) 1.000
+quên chia 255    tổng kênh [2303189.5, 2317853.5, 2279342.5]  logits [ 443.799 1196.359]  P(NG) 1.000</code></pre>
+<p>Nhìn kết luận thì chỉ lỗi <strong>quên BGR→RGB</strong> lộ ra trên ảnh này (ảnh NG thành OK, vì vết gỉ cam biến thành "mực xanh"). <strong>Mean/std B-G-R</strong> và <strong>quên chia 255</strong> vẫn ra NG nhưng logit vọt lên hàng trăm và tổng kênh lệch rất xa, nên parity test bắt được ngay; trên ảnh OK chúng sẽ cho kết luận sai. Khó phát hiện nhất là <strong>resize Linear</strong>: tổng kênh chỉ lệch khoảng 1–2%, kết luận vẫn đúng, chạy thử vài ảnh "thấy đúng" là dễ bỏ qua. Nhưng logit đã lệch tới 0,4, gấp hàng chục nghìn lần sai số làm tròn, và với ảnh sát ngưỡng nó đủ đổi quyết định. Lưu ý chữ ký của hai lỗi đổi kênh: kênh 1 (G) giữ nguyên 784,0, kênh 0 và 2 thay đổi, đúng như bảng ở mục 7.</p>
+</details></div>
+
+<div class="ex"><p><strong>Bài 3.</strong> Camera 5 MP cho ảnh 2448×2048, mô hình phát hiện vật đầu vào 640×640 dùng letterbox như mục 9. (a) Tính tỉ lệ <code>r</code>, kích thước ảnh sau thu nhỏ, phần đệm. (b) Mô hình end-to-end trả khung (100, 200, 180, 260) trong ảnh letterbox; khung đó ở đâu trên ảnh gốc? (c) Một pixel trên ảnh 640 tương ứng bao nhiêu pixel ảnh gốc, và điều đó nói gì về việc dùng khung phát hiện để đo kích thước?</p><details><summary>Xem đáp án</summary>
+<pre><code class="language-python">r, pad_x, pad_y = letterbox_thong_so(2448, 2048)
+print(f"r = {r:.5f}, ảnh thu nhỏ {round(2448 * r)}x{round(2048 * r)}, đệm trái {pad_x}, đệm trên {pad_y}")
+x1, y1, x2, y2 = 100, 200, 180, 260
+goc = [(x1 - pad_x) / r, (y1 - pad_y) / r, (x2 - pad_x) / r, (y2 - pad_y) / r]
+print("khung trên ảnh gốc:", [round(v, 1) for v in goc])
+print(f"1 pixel ảnh 640 = {1 / r:.2f} pixel ảnh gốc")</code></pre>
+<pre><code class="language-text">r = 0.26144, ảnh thu nhỏ 640x535, đệm trái 0, đệm trên 52
+khung trên ảnh gốc: [382.5, 566.1, 688.5, 795.6]
+1 pixel ảnh 640 = 3.82 pixel ảnh gốc</code></pre>
+<p>(c) Mỗi pixel đầu vào mô hình ứng với gần 4 pixel ảnh gốc, nên khung phát hiện chỉ chính xác cỡ vài pixel ảnh gốc. Dùng khung để <em>định vị</em> vùng quan tâm, rồi đo kích thước bằng công cụ đo subpixel trên ảnh gốc độ phân giải đầy đủ (như chặng Measurement), không đo trực tiếp trên khung của mô hình.</p>
+</details></div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Gói <code>Microsoft.ML.OnnxRuntime</code> cho CPU; GPU NVIDIA dùng <code>Microsoft.ML.OnnxRuntime.Gpu</code> (thay thế, không cài cùng); Windows mọi GPU dùng <code>.DirectML</code>; Intel dùng gói OpenVINO EP.</li>
+  <li><code>InferenceSession</code> tạo một lần, dùng chung (Run an toàn đa luồng); <code>SessionOptions</code> đặt mức tối ưu đồ thị, số luồng, EP. Mọi đối tượng giữ bộ nhớ gốc (session, options, kết quả Run, Mat) phải nằm trong <code>using</code>.</li>
+  <li>Tiền xử lý C# phải giống hệt Python: nội suy <code>Area</code>, BGR→RGB, <code>ConvertTo(alpha = 1/(255·std), beta = −mean/std)</code> từng kênh, chép từng kênh liền khối để có NCHW.</li>
+  <li><code>DenseTensor&lt;float&gt;</code> bọc một <code>float[]</code> dùng lại cho mọi ảnh; <code>NamedOnnxValue.CreateFromTensor</code> + <code>session.Run</code>; chép đầu ra ra mảng trước khi Dispose. API <code>OrtValue</code> là lựa chọn mới hơn.</li>
+  <li>Phân loại: softmax/sigmoid rồi ngưỡng. Phát hiện vật: in shape đầu ra, giải mã đúng dạng (thô cần NMS, end-to-end không cần), bỏ letterbox để về tọa độ ảnh gốc.</li>
+  <li>Parity test với bộ ảnh vàng (mã băm mô hình, logit trong dung sai, tổng từng kênh khi lệch) là điều kiện để lắp chương trình lên trạm.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Tăng tốc suy luận: OpenVINO, TensorRT, FP16, INT8</strong>, đo tốc độ đúng cách và chọn runtime theo phần cứng.</p>
+<p class="note">Tham khảo: <a href="https://onnxruntime.ai/docs/get-started/with-csharp.html" rel="noopener" target="_blank">ONNX Runtime: Get started with C#</a>.</p>
