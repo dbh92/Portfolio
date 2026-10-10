@@ -1,49 +1,508 @@
-<p>Vấn đề kinh điển của AI Vision trong nhà máy: dây chuyền tốt hiếm khi sinh lỗi, nên bạn có hàng nghìn ảnh OK nhưng chỉ vài chục ảnh NG. <strong>Dữ liệu tổng hợp</strong> (synthetic data) là cách tạo thêm ảnh lỗi để mô hình có đủ ví dụ mà học.</p>
+<p>Vấn đề kinh điển của AI Vision trong nhà máy: dây chuyền tốt hiếm khi sinh lỗi, nên bạn có hàng nghìn ảnh OK nhưng chỉ vài chục ảnh NG. Bài "Tự xây dataset ảnh công nghiệp" cho thấy lỗi hiếm nhất quyết định lịch thu thập, có khi vài tháng; bài "Công cụ gán nhãn miễn phí" cho bạn định dạng nhãn YOLO và script kiểm tra. Bài này dạy cách <strong>tạo thêm mẫu lỗi</strong> trong lúc chờ: augmentation an toàn, <strong>cắt dán lỗi thật lên ảnh OK</strong> bằng trộn alpha và Poisson blending (<code>cv2.seamlessClone</code>) với nhãn khung bao sinh tự động, <strong>lỗi thủ tục</strong> (procedural) vẽ bằng thuật toán, và quan trọng nhất: <strong>đánh giá trung thực chỉ trên ảnh thật</strong>. Một thí nghiệm nhỏ sẽ cho bạn thấy dữ liệu tổng hợp giúp được đến đâu, và giới hạn của nó. Bài sau, "Chọn ngưỡng và đánh giá theo escape, overkill, cycle time", dạy cách biến điểm số mô hình thành quyết định nghiệm thu.</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Biết thứ tự các lựa chọn khi thiếu ảnh lỗi; cắt mảnh lỗi từ ảnh NG thật theo mặt nạ, xoay, lật rồi dán lên ảnh OK bằng alpha blending và <code>cv2.seamlessClone</code>, tránh hai bẫy của hàm này; sinh 200 ảnh kèm nhãn YOLO và tự kiểm tra số lượng, vị trí nhãn; vẽ lỗi thủ tục (xước, đốm); hiểu domain gap; huấn luyện lại một CNN nhỏ và so recall trên ảnh lỗi thật. Code dùng NumPy, OpenCV 5.0 và PyTorch 2.14 (CPU).</div>
 
-<h2>Ba mức độ tạo dữ liệu tổng hợp</h2>
+<h2>1. Khi thiếu ảnh lỗi: các lựa chọn theo thứ tự</h2>
+<table>
+  <tr><th>Lựa chọn</th><th>Tạo được gì</th><th>Chi phí</th><th>Rủi ro chính</th></tr>
+  <tr><td>Thu thêm ảnh thật (tủ NG, hàng tồn, mẫu từ phòng thí nghiệm)</td><td>Lỗi thật, đúng phân bố</td><td>Thời gian</td><td>Chậm</td></tr>
+  <tr><td>Anomaly detection (chỉ học từ ảnh OK)</td><td>Không cần ảnh lỗi để huấn luyện</td><td>Thấp</td><td>Không phân loại được loại lỗi, khó đo theo tiêu chí kích thước</td></tr>
+  <tr><td>Augmentation ảnh NG có sẵn</td><td>Biến thể vị trí, hướng, độ sáng của <em>cùng</em> vết lỗi</td><td>Rất thấp</td><td>Không tạo kiểu lỗi mới; augmentation sai làm sai nhãn</td></tr>
+  <tr><td>Cắt dán lỗi thật lên ảnh OK</td><td>Vết lỗi thật trên nền mới, vị trí mới, nhãn tự động</td><td>Thấp</td><td>Viền dán, độ sáng không khớp; mô hình học "dấu vết dán"</td></tr>
+  <tr><td>Lỗi thủ tục (vẽ bằng thuật toán)</td><td>Số lượng không giới hạn, kiểm soát kích thước</td><td>Thấp đến trung bình</td><td>Domain gap lớn nếu mô phỏng không giống lỗi thật</td></tr>
+  <tr><td>Render 3D, mô hình sinh (diffusion, inpainting)</td><td>Lỗi đa dạng, ảnh chân thực hơn</td><td>Cao (công sức, GPU, chuyên môn)</td><td>Khó kiểm soát, khó xác nhận nhãn; vẫn cần đánh giá trên ảnh thật</td></tr>
+</table>
+<p>Nguyên tắc chung: dữ liệu tổng hợp <strong>bổ sung</strong> cho dữ liệu thật trong tập train, không thay thế, và <strong>không bao giờ</strong> xuất hiện trong val, test hay golden set.</p>
 
-<h3>1. Augmentation cơ bản</h3>
-<p>Xoay, lật, dịch, đổi sáng, thêm nhiễu cho ảnh lỗi có sẵn. Rẻ, nhanh, nhưng không tạo được <em>kiểu</em> lỗi mới.</p>
-
-<h3>2. Cắt dán lỗi (copy-paste)</h3>
-<p>Cắt vùng lỗi từ ảnh NG thật rồi dán lên nhiều ảnh OK ở vị trí, kích thước, góc khác nhau. Kỹ thuật đơn giản mà rất hiệu quả cho object detection và segmentation.</p>
-<pre><code>import cv2
+<h2>2. Dữ liệu thật mô phỏng cho bài này</h2>
+<p>Để mọi đoạn code chạy được, ta mô phỏng một tình huống thực tế: bề mặt kim loại chải xước (brushed metal) 64×64; tập train có 400 ảnh OK nhưng chỉ <strong>12 ảnh NG thật</strong> (kèm mặt nạ vết lỗi, như sau khi gán nhãn đa giác); tập test thật từ các lô khác có 300 OK và 100 NG. "Lỗi thật" được mô phỏng có những đặc điểm khó bắt chước: vết cong, lõi tối, viền sáng phản xạ một bên, đậm nhạt dọc theo vết, hơi nhòe. Ngoài đời, đây là ảnh camera của bạn.</p>
+<pre><code class="language-python">import cv2
 import numpy as np
 
 rng = np.random.default_rng(0)
+S = 64
 
-def paste_defect(ok_img, defect, mask):
-    """Dán vùng lỗi (defect + mask nhị phân) lên ảnh OK, trả về ảnh và khung bao."""
-    h, w = defect.shape[:2]
-    angle = rng.uniform(0, 360)
-    M = cv2.getRotationMatrix2D((w / 2, h / 2), angle, rng.uniform(0.7, 1.3))
-    d = cv2.warpAffine(defect, M, (w, h))
-    m = cv2.warpAffine(mask, M, (w, h))
 
-    H, W = ok_img.shape[:2]
-    x, y = rng.integers(0, W - w), rng.integers(0, H - h)
-    out = ok_img.copy()
-    roi = out[y:y + h, x:x + w]
-    # pha trộn mềm ở biên để vết dán tự nhiên hơn
-    alpha = cv2.GaussianBlur(m.astype(np.float32) / 255, (7, 7), 0)[..., None]
-    roi[:] = (alpha * d + (1 - alpha) * roi).astype(np.uint8)
-    return out, (x, y, w, h)</code></pre>
-<p>Dùng <code>cv2.seamlessClone</code> nếu cần vùng dán hòa màu tự nhiên hơn với nền.</p>
+def anh_ok(sang):
+    """Kim loại chải xước: vân ngang mảnh + nhiễu."""
+    van = cv2.GaussianBlur(rng.normal(0, 25, (S, S)), (0, 0), sigmaX=6, sigmaY=0.6)
+    return np.clip(sang + van + rng.normal(0, 3, (S, S)), 0, 255).astype(np.uint8)
 
-<h3>3. Sinh ảnh bằng Generative AI</h3>
+
+def vet_xuoc_that(img):
+    """'Lỗi thật': đường cong Bézier, lõi tối, viền sáng một bên, đậm nhạt dọc vết, hơi nhòe."""
+    tam = rng.uniform(18, S - 18, 2)
+    p0, p1, p2 = tam + rng.uniform(-14, 14, (3, 2))
+    t = np.linspace(0, 1, 60)[:, None]
+    duong = (1 - t) ** 2 * p0 + 2 * (1 - t) * t * p1 + t ** 2 * p2
+    loi = np.zeros((S, S), np.float32)
+    sang = np.zeros((S, S), np.float32)
+    w, pha = int(rng.integers(1, 3)), rng.uniform(0, 6)
+    for k in range(len(duong) - 1):
+        a, b = duong[k].astype(int), duong[k + 1].astype(int)
+        d = 0.6 + 0.4 * np.sin(k / 9 + pha)
+        cv2.line(loi, (int(a[0]), int(a[1])), (int(b[0]), int(b[1])), float(d), w)
+        cv2.line(sang, (int(a[0]) + 1, int(a[1]) + 1), (int(b[0]) + 1, int(b[1]) + 1), float(d), 1)
+    loi = cv2.GaussianBlur(loi, (0, 0), 0.7)
+    sang = cv2.GaussianBlur(sang, (0, 0), 0.7) * (loi &lt; 0.2)
+    out = img.astype(np.float32) - rng.uniform(35, 60) * loi + rng.uniform(15, 30) * sang
+    return np.clip(out, 0, 255).astype(np.uint8), (loi &gt; 0.25).astype(np.uint8)
+
+
+def tao(n_ok, n_ng, khoang_sang):
+    ok = [anh_ok(rng.uniform(*khoang_sang)) for _ in range(n_ok)]
+    ng, mk = zip(*[vet_xuoc_that(anh_ok(rng.uniform(*khoang_sang))) for _ in range(n_ng)])
+    return np.array(ok), np.array(ng), np.array(mk)
+
+
+ok_tr, ng_tr, mask_tr = tao(400, 12, (120, 160))     # lô cũ: 400 OK, chỉ 12 NG thật
+ok_te, ng_te, mask_te = tao(300, 100, (110, 170))    # lô mới: tập test thật
+np.savez_compressed("that.npz", ok_tr=ok_tr, ng_tr=ng_tr, mask_tr=mask_tr,
+                    ok_te=ok_te, ng_te=ng_te, mask_te=mask_te)
+cv2.imwrite("anh_that.png", cv2.resize(cv2.hconcat(list(ok_tr[:2]) + list(ng_tr[:6])), None, fx=3, fy=3,
+                                        interpolation=cv2.INTER_NEAREST))
+print(f"train: {len(ok_tr)} OK, {len(ng_tr)} NG thật | test thật: {len(ok_te)} OK, {len(ng_te)} NG")
+print("diện tích vết (px) của 12 NG train:", mask_tr.sum(axis=(1, 2)).tolist())</code></pre>
+<pre><code class="language-text">train: 400 OK, 12 NG thật | test thật: 300 OK, 100 NG
+diện tích vết (px) của 12 NG train: [17, 38, 4, 4, 36, 14, 54, 50, 13, 55, 56, 50]</code></pre>
+
+<h2>3. Augmentation an toàn: bước rẻ nhất</h2>
+<p>Bài "Dataset, DataLoader và augmentation" ở chặng 10 đã có bảng augmentation an toàn và nguy hiểm cho ảnh công nghiệp; nhắc lại cho bề mặt chải xước ở đây:</p>
 <ul>
-  <li><strong>Diffusion + inpainting</strong>: tô một vùng trên ảnh OK và yêu cầu mô hình "vẽ vết xước" vào đó.</li>
-  <li><strong>Mô phỏng 3D / render</strong>: dựng mô hình CAD sản phẩm, render với ánh sáng, vật liệu, lỗi khác nhau. Mạnh cho bài toán định vị, gắp vật.</li>
-  <li><strong>Mô hình sinh huấn luyện trên chính dữ liệu của bạn</strong>: cần nhiều công sức hơn, dành cho dự án lớn.</li>
+  <li><strong>An toàn</strong>: lật ngang, lật dọc (vân chải vẫn nằm ngang); thay đổi độ sáng ±10 mức xám (biên độ đã đo giữa các lô); nhiễu nhẹ.</li>
+  <li><strong>Nguy hiểm</strong>: xoay 90° (vân chải thành dọc, không bao giờ có trên dây chuyền); crop ngẫu nhiên (cắt mất vết lỗi mà nhãn vẫn NG); phóng to (vết OK nhỏ thành cỡ NG); làm mờ mạnh (xóa vết mảnh).</li>
+</ul>
+<p>Augmentation chỉ tạo biến thể của <em>12 vết lỗi đã có</em>. Mô hình vẫn chỉ thấy 12 hình dạng vết, trên 12 nền. Hai kỹ thuật sau tạo ra tổ hợp mới: vết thật trên nền mới, hoặc vết mới hoàn toàn.</p>
+
+<h2>4. Cắt dán lỗi thật lên ảnh OK</h2>
+<p>Quy trình: (1) từ ảnh NG thật <strong>của tập train</strong>, cắt mảnh chứa vết theo khung bao của mặt nạ, chừa lề; (2) biến đổi mảnh: xoay góc bất kỳ (vết xước trên bề mặt chải có thể theo mọi hướng), lật; (3) dán lên một ảnh OK ở vị trí ngẫu nhiên; (4) nhãn YOLO lấy từ mặt nạ đã biến đổi, không cần gán tay.</p>
+<p>Hai cách dán:</p>
+<ul>
+  <li><strong>Alpha blending</strong>: lấy <em>độ chênh</em> giữa vết và nền của mảnh (vết tối hơn nền bao nhiêu), cộng vào nền mới với trọng số alpha là mặt nạ làm mềm biên. Vết giữ đúng độ sâu, nền mới giữ đúng độ sáng của nó.</li>
+  <li><strong>Poisson blending</strong> (<code>cv2.seamlessClone</code>): giải phương trình Poisson để vùng dán có <em>gradient</em> của mảnh nhưng biên khớp liên tục với nền mới. Chế độ <code>NORMAL_CLONE</code> chép gradient của mảnh; <code>MIXED_CLONE</code> lấy gradient mạnh hơn giữa mảnh và nền, thường hợp với vết mảnh trên nền có kết cấu.</li>
+</ul>
+<div class="warn"><strong>Hai bẫy của cv2.seamlessClone</strong>(1) Tham số <code>p</code> là vị trí đặt <strong>tâm khung bao của mặt nạ</strong>, không phải góc trên trái của mảnh. Nếu mặt nạ không nằm giữa mảnh, vết bị dán lệch khỏi chỗ bạn tưởng và nhãn sinh tự động sai vị trí. Tính tâm từ <code>cv2.boundingRect(mask)</code> như trong code. (2) Mặt nạ quá sát vết mảnh: trong thử nghiệm với OpenCV 5.0, mặt nạ chỉ nới 2 pixel quanh vết xước mảnh làm vết gần như biến mất sau khi dán; nới mặt nạ khoảng 4 pixel mỗi phía (giãn nở 9×9) thì vết hiện đúng. (3) Trong môi trường thử của bài (OpenCV 5.0.0), hàm <strong>sửa trực tiếp mảng mặt nạ</strong> truyền vào (vùng mặt nạ bị co lại), nên gọi lại với cùng mảng cho kết quả khác, có lần vết không được dán; hãy luôn truyền <code>mask.copy()</code> hoặc tạo mặt nạ mới mỗi lần gọi (bài tập 2 cho bạn kiểm tra trên máy mình). Bài học chung: <strong>luôn kiểm tra ảnh sau khi dán bằng ảnh hiệu</strong> (mục 5), đừng tin hàm đã làm đúng.</div>
+<p>Đoạn code sau định nghĩa các hàm cắt, biến đổi, dán, rồi sinh <strong>200 ảnh tổng hợp</strong>, mỗi ảnh 1–2 vết, nửa dán alpha nửa dán Poisson, kèm nhãn YOLO (lớp 0 = xước) và file ghi nguồn gốc từng ảnh. Nền chỉ lấy từ ảnh OK của tập train; mảnh lỗi chỉ lấy từ 12 ảnh NG train.</p>
+<pre><code class="language-python">import csv
+import os
+import shutil
+
+import cv2
+import numpy as np
+
+rng = np.random.default_rng(1)
+d = np.load("that.npz")
+ok_tr, ng_tr, mask_tr = d["ok_tr"], d["ng_tr"], d["mask_tr"]
+S = 64
+NOI = 4                                          # nới mặt nạ 4 px mỗi phía
+
+
+def cat_manh(img, mask, le=8):
+    x, y, w, h = cv2.boundingRect(mask)
+    x0, y0, x1, y1 = max(x - le, 0), max(y - le, 0), min(x + w + le, S), min(y + h + le, S)
+    return img[y0:y1, x0:x1].copy(), mask[y0:y1, x0:x1].copy()
+
+
+def bien_doi(manh, mk, le=6):
+    """Xoay góc bất kỳ trên khung đủ lớn, cắt sát lại quanh vết, lật ngẫu nhiên."""
+    h, w = mk.shape
+    n = int(np.ceil(np.hypot(h, w))) + 2
+    M = cv2.getRotationMatrix2D((w / 2, h / 2), rng.uniform(0, 360), 1.0)
+    M[:, 2] += (n - w) / 2, (n - h) / 2
+    m2 = (cv2.warpAffine(mk * 255, M, (n, n)) &gt; 127).astype(np.uint8)
+    p2 = cv2.warpAffine(manh, M, (n, n), borderMode=cv2.BORDER_REFLECT)
+    x, y, w2, h2 = cv2.boundingRect(m2)
+    x0, y0, x1, y1 = max(x - le, 0), max(y - le, 0), min(x + w2 + le, n), min(y + h2 + le, n)
+    m2, p2 = m2[y0:y1, x0:x1], p2[y0:y1, x0:x1]
+    if rng.random() &lt; 0.5:
+        m2, p2 = m2[:, ::-1].copy(), p2[:, ::-1].copy()
+    return p2, m2
+
+
+def dan_alpha(nen, manh, mk, x, y):
+    h, w = mk.shape
+    alpha = cv2.GaussianBlur(cv2.dilate(mk, np.ones((3, 3), np.uint8)).astype(np.float32), (0, 0), 1.0)
+    chenh = manh.astype(np.float32) - np.median(manh[mk == 0])      # vết = độ chênh so với nền của mảnh
+    out = nen.copy()
+    vung = out[y:y + h, x:x + w].astype(np.float32)
+    out[y:y + h, x:x + w] = np.clip(vung + alpha * chenh, 0, 255).astype(np.uint8)
+    return out
+
+
+def dan_poisson(nen, manh, mk, x, y):
+    m = cv2.dilate(mk, np.ones((2 * NOI + 1, 2 * NOI + 1), np.uint8)) * 255
+    m[0, :] = m[-1, :] = m[:, 0] = m[:, -1] = 0
+    bx, by, bw, bh = cv2.boundingRect(m)
+    tam = (x + bx + bw // 2, y + by + bh // 2)                    # tâm khung bao MẶT NẠ
+    out = cv2.seamlessClone(cv2.cvtColor(manh, cv2.COLOR_GRAY2BGR), cv2.cvtColor(nen, cv2.COLOR_GRAY2BGR),
+                            m, tam, cv2.MIXED_CLONE)
+    return cv2.cvtColor(out, cv2.COLOR_BGR2GRAY)
+
+
+MANH = [cat_manh(a, m) for a, m in zip(ng_tr, mask_tr)]
+shutil.rmtree("synth", ignore_errors=True)
+os.makedirs("synth/images")
+os.makedirs("synth/labels")
+nguon, bi_loai = [], 0
+i = 0
+while len(os.listdir("synth/images")) &lt; 200:
+    i += 1
+    k_nen = int(rng.integers(len(ok_tr)))
+    cach = "alpha" if i % 2 == 0 else "poisson"
+    img, dong = ok_tr[k_nen].copy(), []
+    for _ in range(int(rng.integers(1, 3))):
+        k_manh = int(rng.integers(len(MANH)))
+        p, m = bien_doi(*MANH[k_manh])
+        h, w = m.shape
+        if max(h, w) &gt; S - 4:                                     # mảnh quá lớn so với ảnh: bỏ qua lần này
+            continue
+        x, y = int(rng.integers(2, S - w - 1)), int(rng.integers(2, S - h - 1))
+        moi = dan_alpha(img, p, m, x, y) if cach == "alpha" else dan_poisson(img, p, m, x, y)
+        bx, by, bw, bh = cv2.boundingRect(m)                      # nhãn từ mặt nạ đã biến đổi
+        bx, by = bx + x, by + y
+        hieu = np.abs(moi.astype(int) - img.astype(int))[by:by + bh, bx:bx + bw]
+        if hieu.max() &lt; 12:                                       # vết quá mờ sau khi dán: không gắn nhãn NG
+            bi_loai += 1
+            continue
+        img = moi
+        dong.append(f"0 {(bx + bw / 2) / S:.6f} {(by + bh / 2) / S:.6f} {bw / S:.6f} {bh / S:.6f}")
+        nguon.append({"anh": f"syn_{i:03d}", "nen_ok": k_nen, "manh_ng": k_manh, "cach": cach})
+    if not dong:                                                  # không dán được vết nào: tạo lại
+        continue
+    cv2.imwrite(f"synth/images/syn_{i:03d}.png", img)
+    with open(f"synth/labels/syn_{i:03d}.txt", "w") as f:
+        f.write("\n".join(dong) + "\n")
+with open("synth/nguon.csv", "w", newline="") as f:
+    wr = csv.DictWriter(f, fieldnames=["anh", "nen_ok", "manh_ng", "cach"])
+    wr.writeheader()
+    wr.writerows(nguon)
+print("đã sinh", len(os.listdir("synth/images")), "ảnh,", len(nguon), "vết; loại", bi_loai, "lần dán quá mờ")</code></pre>
+<pre><code class="language-text">đã sinh 200 ảnh, 296 vết; loại 21 lần dán quá mờ</code></pre>
+<p>File <code>nguon.csv</code> ghi mỗi vết lấy từ ảnh NG nào, dán lên nền OK nào, bằng cách nào. Đây là "phả hệ" của dữ liệu tổng hợp: khi phát hiện một mảnh lỗi bị gán nhãn sai hoặc thuộc tập test, bạn biết ngay những ảnh nào phải xóa.</p>
+
+<h2>5. Kiểm tra bộ sinh: đếm, vị trí nhãn, ảnh hiệu</h2>
+<p>Bộ sinh dữ liệu là code, và code có lỗi. Mỗi lần sinh, kiểm tra tự động: số ảnh bằng số file nhãn, số dòng nhãn bằng số vết trong nhật ký, mọi khung nằm trong ảnh, và quan trọng nhất là <strong>ảnh hiệu</strong> giữa ảnh tổng hợp và nền OK gốc: bên trong mỗi khung phải có thay đổi rõ (vết thật sự được dán), bên ngoài mọi khung (đã nới vài pixel) không được thay đổi.</p>
+<pre><code class="language-python">import csv
+import glob
+import os
+
+import cv2
+import numpy as np
+
+d = np.load("that.npz")
+ok_tr = d["ok_tr"]
+S = 64
+with open("synth/nguon.csv") as f:
+    nguon = list(csv.DictReader(f))
+anh = sorted(glob.glob("synth/images/*.png"))
+nhan = sorted(glob.glob("synth/labels/*.txt"))
+so_dong = sum(len(open(p).read().split()) // 5 for p in nhan)
+print(f"ảnh {len(anh)} | file nhãn {len(nhan)} | dòng nhãn {so_dong} | vết trong nhật ký {len(nguon)}")
+assert len(anh) == len(nhan) == 200 and so_dong == len(nguon)
+
+nen_cua = {r["anh"]: int(r["nen_ok"]) for r in nguon}
+khung_yeu, thay_doi_ngoai, do_sau = 0, 0, {"alpha": [], "poisson": []}
+cach_cua = {r["anh"]: r["cach"] for r in nguon}
+for p in anh:
+    ten = os.path.basename(p)[:-4]
+    img = cv2.imread(p, cv2.IMREAD_GRAYSCALE).astype(int)
+    hieu = np.abs(img - ok_tr[nen_cua[ten]].astype(int))
+    ngoai = np.ones((S, S), bool)
+    for dong in open(f"synth/labels/{ten}.txt").read().strip().split("\n"):
+        c, cx, cy, w, h = map(float, dong.split())
+        x0, y0 = int(round((cx - w / 2) * S)), int(round((cy - h / 2) * S))
+        x1, y1 = int(round((cx + w / 2) * S)), int(round((cy + h / 2) * S))
+        assert 0 &lt;= x0 &lt; x1 &lt;= S and 0 &lt;= y0 &lt; y1 &lt;= S, (ten, dong)
+        dau = hieu[y0:y1, x0:x1].max()
+        khung_yeu += dau &lt; 10
+        do_sau[cach_cua[ten]].append(dau)
+        ngoai[max(y0 - 6, 0):y1 + 6, max(x0 - 6, 0):x1 + 6] = False
+    thay_doi_ngoai += int((hieu[ngoai] &gt; 3).sum())
+print(f"khung có thay đổi &lt; 10 mức xám (vết không hiện): {khung_yeu}")
+print(f"pixel thay đổi &gt; 3 mức xám nằm ngoài mọi khung: {thay_doi_ngoai}")
+for cach, v in do_sau.items():
+    print(f"{cach:7s}: thay đổi lớn nhất trong khung, trung vị {np.median(v):.0f} mức xám")
+# độ sâu vết lỗi thật (để so): nền trung vị trừ điểm tối nhất trên vết
+that = [np.median(a) - a[m &gt; 0].min() for a, m in zip(d["ng_te"], d["mask_te"])]
+print(f"vết thật (test): độ sâu trung vị {np.median(that):.0f} mức xám")</code></pre>
+<pre><code class="language-text">ảnh 200 | file nhãn 200 | dòng nhãn 296 | vết trong nhật ký 296
+khung có thay đổi &lt; 10 mức xám (vết không hiện): 0
+pixel thay đổi &gt; 3 mức xám nằm ngoài mọi khung: 0
+alpha  : thay đổi lớn nhất trong khung, trung vị 35 mức xám
+poisson: thay đổi lớn nhất trong khung, trung vị 33 mức xám
+vết thật (test): độ sâu trung vị 37 mức xám</code></pre>
+<p>Bộ sinh ở mục 4 đã tự loại các lần dán làm vết quá mờ (một số mảnh lỗi thật vốn rất nhạt, chỉ vài pixel); nếu bỏ bước loại đó, kiểm tra này báo hơn chục khung "không có vết", tức bộ sinh gắn nhãn NG cho ảnh gần như sạch, loại nhãn sai tệ nhất. Thay đổi lớn nhất trong khung của cả hai cách dán cũng nằm cùng khoảng với độ sâu vết thật, dấu hiệu tốt đầu tiên về độ giống. Hãy thử đổi <code>NOI = 1</code> ở đoạn code trước rồi chạy lại phần kiểm tra để thấy bẫy thứ hai của <code>seamlessClone</code> hiện ra bằng con số. Cuối cùng, mở vài ảnh và vẽ nhãn lên bằng script của bài "Công cụ gán nhãn miễn phí": kiểm tra bằng mắt vẫn bắt buộc.</p>
+
+<h2>6. Lỗi thủ tục: vẽ vết xước và đốm bằng thuật toán</h2>
+<p>Khi không có mảnh lỗi thật nào (hoặc muốn kiểm soát kích thước), vẽ lỗi bằng thuật toán: vết xước là đường gấp khúc ngẫu nhiên với độ rộng, độ tối thay đổi; đốm là hình elip mờ. Mặt nạ có sẵn từ chính lúc vẽ, nên nhãn tự động. Đoạn code dưới cố tình dùng mô hình vết <em>đơn giản</em> (đường thẳng gấp khúc, không viền sáng, không nhòe) như cách nhiều người làm lần đầu, để thí nghiệm ở mục 7 cho thấy khoảng cách miền:</p>
+<pre><code class="language-python">import os
+import shutil
+
+import cv2
+import numpy as np
+
+rng = np.random.default_rng(2)
+d = np.load("that.npz")
+ok_tr = d["ok_tr"]
+S = 64
+
+
+def ve_xuoc(img):
+    mk = np.zeros((S, S), np.uint8)
+    diem = [rng.uniform(10, S - 10, 2)]
+    goc = rng.uniform(0, np.pi)
+    for _ in range(int(rng.integers(2, 5))):                    # 2-4 đoạn gấp khúc
+        goc += rng.normal(0, 0.3)
+        diem.append(np.clip(diem[-1] + rng.uniform(4, 9) * np.array([np.cos(goc), np.sin(goc)]), 2, S - 3))
+    pts = np.array(diem, np.int32)
+    cv2.polylines(mk, [pts], False, 1, int(rng.integers(1, 3)))
+    out = img.astype(np.float32) - rng.uniform(30, 60) * mk
+    return np.clip(out, 0, 255).astype(np.uint8), mk
+
+
+def ve_dom(img):
+    mk = np.zeros((S, S), np.uint8)
+    c = (int(rng.integers(8, S - 8)), int(rng.integers(8, S - 8)))
+    cv2.ellipse(mk, c, (int(rng.integers(2, 5)), int(rng.integers(2, 5))), float(rng.uniform(0, 180)),
+                0, 360, 1, -1)
+    mem = cv2.GaussianBlur(mk.astype(np.float32), (0, 0), 1.0)
+    return np.clip(img - rng.uniform(25, 50) * mem, 0, 255).astype(np.uint8), mk
+
+
+shutil.rmtree("synth_thu_tuc", ignore_errors=True)
+os.makedirs("synth_thu_tuc/images")
+os.makedirs("synth_thu_tuc/labels")
+dem = {"xuoc": 0, "dom": 0}
+for i in range(200):
+    img, dong = ok_tr[int(rng.integers(len(ok_tr)))].copy(), []
+    for _ in range(int(rng.integers(1, 3))):
+        loai = "xuoc" if rng.random() &lt; 0.8 else "dom"
+        img, mk = ve_xuoc(img) if loai == "xuoc" else ve_dom(img)
+        x, y, w, h = cv2.boundingRect(mk)
+        dong.append(f"{0 if loai == 'xuoc' else 1} {(x + w / 2) / S:.6f} {(y + h / 2) / S:.6f} {w / S:.6f} {h / S:.6f}")
+        dem[loai] += 1
+    cv2.imwrite(f"synth_thu_tuc/images/tt_{i:03d}.png", img)
+    with open(f"synth_thu_tuc/labels/tt_{i:03d}.txt", "w") as f:
+        f.write("\n".join(dong) + "\n")
+print("đã sinh", len(os.listdir("synth_thu_tuc/images")), "ảnh; số vết:", dem)</code></pre>
+<pre><code class="language-text">đã sinh 200 ảnh; số vết: {'xuoc': 234, 'dom': 71}</code></pre>
+<p>Lỗi thủ tục tốt cần được "hiệu chỉnh" theo lỗi thật: đo phân bố chiều dài, độ rộng, độ sâu, hướng của vết thật đã gán nhãn rồi lấy mẫu theo đúng phân bố đó; mô phỏng hiệu ứng quang học (viền sáng phản xạ ở đèn góc thấp, độ nhòe của ống kính); cho chuyên gia QC xem trộn ảnh thật và tổng hợp, nếu họ dễ dàng chỉ ra ảnh nào giả thì mô hình cũng sẽ phân biệt được.</p>
+
+<h2>7. Thí nghiệm: dữ liệu tổng hợp giúp được bao nhiêu?</h2>
+<p>Bài tập thực hành của bài này: huấn luyện lại với 200 ảnh lỗi tổng hợp và so recall trên ảnh lỗi <strong>thật</strong>. Bốn cấu hình huấn luyện, cùng một CNN nhỏ (như bài "Rule-based hay Deep Learning?"), cùng 300 bước cập nhật, mỗi batch cân bằng OK/NG, augmentation lật ngang/dọc:</p>
+<ul>
+  <li><strong>A</strong>: 400 OK + 12 NG thật.</li>
+  <li><strong>B</strong>: A + 200 ảnh cắt dán (mục 4).</li>
+  <li><strong>C</strong>: A + 200 ảnh lỗi thủ tục (mục 6).</li>
+  <li><strong>D</strong>: 400 OK + chỉ 200 ảnh cắt dán, không có NG thật nào trong train.</li>
+</ul>
+<p>Đánh giá trên 300 OK + 100 NG thật của các lô khác. Ngưỡng được chọn theo yêu cầu thường gặp "overkill ≤ 2%" trên ảnh OK của train (chọn trên train để không nhìn vào test), rồi báo recall và overkill trên test thật. Ta cũng đánh giá mô hình C trên chính ảnh thủ tục để thấy con số "đánh giá trên ảnh tổng hợp" nói gì.</p>
+<pre><code class="language-python">import glob
+import time
+
+import cv2
+import numpy as np
+import torch
+from torch import nn
+
+torch.set_num_threads(4)
+d = np.load("that.npz")
+doc_thu_muc = lambda pat: np.array([cv2.imread(p, cv2.IMREAD_GRAYSCALE) for p in sorted(glob.glob(pat))])
+cat_dan = doc_thu_muc("synth/images/*.png")
+thu_tuc = doc_thu_muc("synth_thu_tuc/images/*.png")
+t = lambda X: (torch.from_numpy(np.asarray(X)).float().unsqueeze(1) / 255.0 - 0.5) / 0.25
+
+
+def huan_luyen(ok, ng, so_buoc=300, seed=0):
+    torch.manual_seed(seed)
+    g = np.random.default_rng(seed)
+    mo_hinh = nn.Sequential(
+        nn.Conv2d(1, 8, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+        nn.Conv2d(8, 16, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+        nn.Conv2d(16, 16, 3, padding=1), nn.ReLU(),
+        nn.AdaptiveMaxPool2d(1), nn.Flatten(), nn.Linear(16, 1))
+    toi_uu = torch.optim.Adam(mo_hinh.parameters(), lr=3e-3)
+    Xok, Xng = t(ok), t(ng)
+    y = torch.cat([torch.zeros(16), torch.ones(16)])                  # 16 OK + 16 NG mỗi batch
+    for _ in range(so_buoc):
+        xb = torch.cat([Xok[g.integers(0, len(Xok), 16)], Xng[g.integers(0, len(Xng), 16)]])  # batch cân bằng
+        if g.random() &lt; 0.5:
+            xb = xb.flip(3)
+        if g.random() &lt; 0.5:
+            xb = xb.flip(2)
+        loss = nn.functional.binary_cross_entropy_with_logits(mo_hinh(xb).squeeze(1), y)
+        toi_uu.zero_grad()
+        loss.backward()
+        toi_uu.step()
+    mo_hinh.eval()
+    return mo_hinh
+
+
+def diem(mo_hinh, X):
+    with torch.no_grad():
+        return torch.sigmoid(mo_hinh(t(X)).squeeze(1)).numpy()
+
+
+ok_tr, ng_tr, ok_te, ng_te = d["ok_tr"], d["ng_tr"], d["ok_te"], d["ng_te"]
+CAU_HINH = {
+    "A: 12 NG thật": ng_tr,
+    "B: 12 thật + 200 cắt dán": np.concatenate([ng_tr, cat_dan]),
+    "C: 12 thật + 200 thủ tục": np.concatenate([ng_tr, thu_tuc]),
+    "D: chỉ 200 cắt dán": cat_dan[:200],
+}
+t0 = time.time()
+print("cấu hình                  | ngưỡng | recall thật | overkill thật | AUROC thật")
+mo_hinh_C = None
+for ten, ng in CAU_HINH.items():
+    m = huan_luyen(ok_tr, ng)
+    T = float(np.quantile(diem(m, ok_tr), 0.98))                 # overkill 2% trên OK train
+    s_ok, s_ng = diem(m, ok_te), diem(m, ng_te)
+    auc = np.mean(s_ng[:, None] &gt; s_ok[None, :]) + 0.5 * np.mean(s_ng[:, None] == s_ok[None, :])  # AUROC
+    print(f"{ten:25s} | {T:6.3f} | {np.mean(s_ng &gt;= T):11.0%} | {np.mean(s_ok &gt;= T):13.1%} | {auc:10.3f}")
+    if ten.startswith("C"):
+        mo_hinh_C, T_C = m, T
+# đánh giá "sai cách": mô hình C trên chính kiểu ảnh thủ tục nó đã học
+print(f"mô hình C trên 200 ảnh thủ tục (đánh giá sai cách): recall {np.mean(diem(mo_hinh_C, thu_tuc) &gt;= T_C):.0%}")
+print(f"thời gian: {time.time() - t0:.0f} s (thay đổi theo máy)")</code></pre>
+<pre><code class="language-text">cấu hình                  | ngưỡng | recall thật | overkill thật | AUROC thật
+A: 12 NG thật             |  0.127 |         86% |          1.3% |      0.928
+B: 12 thật + 200 cắt dán  |  0.055 |         99% |          3.0% |      0.998
+C: 12 thật + 200 thủ tục  |  0.022 |         97% |          1.3% |      0.992
+D: chỉ 200 cắt dán        |  0.294 |         97% |          4.0% |      0.995
+mô hình C trên 200 ảnh thủ tục (đánh giá sai cách): recall 100%
+thời gian: 40 s (thay đổi theo máy)</code></pre>
+<p>Đọc kết quả (con số có thể lệch đôi chút giữa các máy và phiên bản thư viện): với chỉ 12 ảnh NG thật, mô hình bắt được 86% vết xước thật ở mức overkill khoảng 1%. Thêm 200 ảnh cắt dán đưa recall thật lên 99% và AUROC từ 0,93 lên gần 1: mô hình đã thấy cùng các vết thật đó ở nhiều hướng, trên nhiều nền, nên học được "vết xước" thay vì học thuộc 12 ảnh. Lỗi thủ tục cũng giúp (97%), dù hình dạng vết đơn giản hơn lỗi thật. Cấu hình D không có ảnh NG thật nào trong train vẫn đạt 97%, vì mảnh dán vốn là lỗi thật. Bây giờ là phần <strong>giới hạn</strong>, cũng quan trọng không kém:</p>
+<ul>
+  <li><strong>Mô phỏng này dễ hơn đời thật.</strong> "Lỗi thật" ở đây sinh từ một quy trình đơn giản, nên cả cắt dán lẫn vẽ thủ tục đều khá giống nó. Với lỗi thật đa dạng (xước sâu nông, phản xạ thay đổi theo góc đèn, lỗi chưa từng có trong 12 mẫu), mức cải thiện thường nhỏ hơn và phải đo lại trên dữ liệu của bạn. Cắt dán không tạo ra <em>kiểu</em> lỗi mới: loại lỗi không có trong 12 ảnh gốc thì mô hình vẫn không biết.</li>
+  <li><strong>Overkill trên test cao hơn mục tiêu 2%</strong> ở B và D (3–4%), dù ngưỡng được chọn để overkill 2% trên OK của train. Ảnh OK của lô mới có dải độ sáng rộng hơn; ngưỡng phải được chọn và xác nhận trên ảnh thật của lô khác (bài sau).</li>
+  <li><strong>Đánh giá trên ảnh tổng hợp nói quá</strong>: mô hình C đạt 100% trên ảnh thủ tục, cao hơn 97% trên ảnh thật. Ở đây chênh lệch nhỏ vì mô phỏng dễ; với dữ liệu thật, chênh lệch có thể rất lớn và che giấu hoàn toàn domain gap.</li>
+  <li><strong>Mọi kết luận dựa trên 100 NG thật của test</strong>: 99% và 97% chênh nhau 2 ảnh, nằm trong mức dao động giữa các lần huấn luyện (xem bài tập 1). Đừng chọn phương án dựa trên chênh lệch cỡ đó.</li>
 </ul>
 
-<h2>Nguyên tắc để dữ liệu tổng hợp thật sự có ích</h2>
+<div class="warn"><strong>Quy tắc vàng: chỉ đánh giá trên ảnh thật</strong>Mô hình luôn đạt điểm cao trên chính kiểu dữ liệu tổng hợp nó được huấn luyện, vì nó học được cả "chữ ký" của bộ sinh (viền dán, độ sắc nét, kiểu nhiễu). Val, test, golden set: 100% ảnh thật, từ lô và thời gian khác với ảnh nguồn của mảnh lỗi. Mảnh lỗi cắt dán cũng chỉ được lấy từ ảnh NG thuộc tập train: dán một vết của tập test lên ảnh train là rò rỉ, và con số test sẽ đẹp giả tạo.</div>
+
+<h2>8. Domain gap và cách thu hẹp</h2>
+<p><strong>Domain gap</strong> (khoảng cách miền) là sự khác biệt có hệ thống giữa dữ liệu tổng hợp và dữ liệu thật. Mô hình học trên miền này rồi chạy trên miền kia sẽ kém hơn con số đo trên miền tổng hợp; trong thí nghiệm trên khoảng cách còn nhỏ vì "lỗi thật" mô phỏng khá đơn giản, ngoài đời nó thường lớn hơn nhiều. Các dấu hiệu và cách kiểm tra:</p>
+<table>
+  <tr><th>Nguồn khác biệt</th><th>Kiểm tra</th><th>Cách thu hẹp</th></tr>
+  <tr><td>Hình dạng vết (cong, đứt đoạn, độ dài)</td><td>So phân bố chiều dài, độ cong, độ rộng của vết thật và tổng hợp</td><td>Lấy mẫu tham số theo phân bố đo từ vết thật</td></tr>
+  <tr><td>Quang học (viền sáng, nhòe, phản xạ)</td><td>So profile cắt ngang vết thật và tổng hợp</td><td>Cắt dán vết thật thay vì vẽ; mô phỏng viền sáng, làm nhòe theo PSF ống kính</td></tr>
+  <tr><td>Biên vùng dán</td><td>Ảnh hiệu, gradient quanh biên mặt nạ</td><td>Làm mềm alpha, Poisson blending, chừa lề rộng</td></tr>
+  <tr><td>Thống kê toàn ảnh</td><td>Histogram, độ nét, nhiễu của ảnh tổng hợp so với ảnh thật</td><td>Dùng nền OK thật, thêm nhiễu cảm biến sau khi dán</td></tr>
+  <tr><td>"Chữ ký" bộ sinh</td><td>Huấn luyện một bộ phân loại "thật hay tổng hợp": nếu nó phân biệt dễ dàng thì domain gap lớn</td><td>Thêm biến thể, trộn nhiều cách sinh</td></tr>
+</table>
+<p>Mô hình sinh (diffusion, inpainting) và render 3D từ CAD là các bước tiếp theo khi cắt dán không đủ, ví dụ cần loại lỗi chưa từng có ảnh thật nào hoặc bài toán định vị nhiều tư thế. Chúng đòi hỏi công sức và chuyên môn cao hơn nhiều, nhãn sinh ra cũng phải được kiểm tra, và quy tắc vàng giữ nguyên: đánh giá trên ảnh thật.</p>
+<p>Chiến lược thực tế cho dự án mới: triển khai sớm bằng anomaly detection (chỉ cần ảnh OK, chặng 12), thu ảnh NG thật trong lúc chạy, bổ sung cắt dán từ các NG thật đã có cho tập train, rồi chuyển dần sang mô hình có giám sát khi đủ ảnh thật; theo dõi recall trên golden set thật ở mỗi phiên bản.</p>
+
+<h2>9. Sai lầm thường gặp</h2>
 <ul>
-  <li><strong>Tập test chỉ dùng ảnh thật.</strong> Đánh giá trên ảnh tổng hợp sẽ cho kết quả đẹp giả tạo.</li>
-  <li><strong>Trộn với dữ liệu thật</strong>, không thay thế hoàn toàn. Thử nhiều tỷ lệ thật/tổng hợp và đo trên tập test thật.</li>
-  <li><strong>Hỏi chuyên gia chất lượng</strong>: lỗi tổng hợp có giống lỗi thật không? Vết xước thật có hướng, độ sâu, ánh phản xạ đặc trưng.</li>
-  <li><strong>Cẩn thận "dấu vết" tổng hợp</strong>: nếu mọi lỗi dán có viền mờ giống nhau, mô hình có thể học viền mờ thay vì học lỗi.</li>
+  <li><strong>Đánh giá trên ảnh tổng hợp</strong> hoặc trộn ảnh tổng hợp vào val/test: con số đẹp vô nghĩa.</li>
+  <li><strong>Cắt mảnh lỗi từ ảnh NG của tập test</strong> rồi dán vào ảnh train: rò rỉ.</li>
+  <li><strong>Không kiểm tra ảnh hiệu</strong>: <code>seamlessClone</code> dán lệch hoặc làm biến mất vết, nhãn NG gắn cho ảnh sạch.</li>
+  <li><strong>Dán lên nền không thể có lỗi đó</strong> (vết xước ra ngoài chi tiết, lên vùng nền băng tải) hoặc với kích thước không thực tế.</li>
+  <li><strong>Tỉ lệ tổng hợp quá cao</strong> so với thật mà không thử nhiều tỉ lệ: mô hình chuyên về "lỗi giả". Thử 0×, 1×, 5×, 20× số NG thật và chọn theo recall trên val thật.</li>
+  <li><strong>Mọi vết dán có cùng một kiểu viền</strong>: mô hình học viền dán thay vì học lỗi; dấu hiệu là recall trên ảnh tổng hợp cao nhưng trên ảnh thật thấp.</li>
+  <li><strong>Augmentation làm sai nhãn</strong> (crop mất lỗi, xoay 90° nền có hướng) cho cả ảnh thật và tổng hợp.</li>
 </ul>
 
-<h2>Kết hợp với anomaly detection</h2>
-<p>Một chiến lược thực tế: bắt đầu bằng <a href="../projects/phat-hien-loi-be-mat-anomaly-detection.html">anomaly detection</a> (chỉ cần ảnh OK) để triển khai sớm, thu thập ảnh NG thật trong quá trình chạy, dùng dữ liệu tổng hợp để bổ sung, rồi dần chuyển sang mô hình phát hiện/phân đoạn có giám sát khi đủ dữ liệu.</p>
+<h2>10. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Lặp lại thí nghiệm mục 7 với số ảnh cắt dán thêm vào là 0, 50 và 200 (luôn giữ 12 NG thật), mỗi cấu hình huấn luyện với 2 seed, báo recall trung bình trên test thật. Kết luận gì về việc chọn tỉ lệ?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import glob
+
+import cv2
+import numpy as np
+import torch
+from torch import nn
+
+torch.set_num_threads(4)
+d = np.load("that.npz")
+cat_dan = np.array([cv2.imread(p, cv2.IMREAD_GRAYSCALE) for p in sorted(glob.glob("synth/images/*.png"))])
+t = lambda X: (torch.from_numpy(np.asarray(X)).float().unsqueeze(1) / 255.0 - 0.5) / 0.25
+
+
+def huan_luyen_va_do(ok, ng, seed, so_buoc=300):
+    torch.manual_seed(seed)
+    g = np.random.default_rng(seed)
+    m = nn.Sequential(nn.Conv2d(1, 8, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+                      nn.Conv2d(8, 16, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+                      nn.Conv2d(16, 16, 3, padding=1), nn.ReLU(),
+                      nn.AdaptiveMaxPool2d(1), nn.Flatten(), nn.Linear(16, 1))
+    opt = torch.optim.Adam(m.parameters(), lr=3e-3)
+    Xok, Xng, y = t(ok), t(ng), torch.cat([torch.zeros(16), torch.ones(16)])
+    for _ in range(so_buoc):
+        xb = torch.cat([Xok[g.integers(0, len(Xok), 16)], Xng[g.integers(0, len(Xng), 16)]])
+        xb = xb.flip(3) if g.random() &lt; 0.5 else xb
+        xb = xb.flip(2) if g.random() &lt; 0.5 else xb
+        loss = nn.functional.binary_cross_entropy_with_logits(m(xb).squeeze(1), y)
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+    m.eval()
+    with torch.no_grad():
+        s_tr = torch.sigmoid(m(t(ok)).squeeze(1)).numpy()
+        s_ng = torch.sigmoid(m(t(d["ng_te"])).squeeze(1)).numpy()
+    return np.mean(s_ng &gt;= np.quantile(s_tr, 0.98))
+
+
+for n_syn in (0, 50, 200):
+    ng = np.concatenate([d["ng_tr"], cat_dan[:n_syn]])
+    r = [huan_luyen_va_do(d["ok_tr"], ng, s) for s in (0, 1)]
+    print(f"12 thật + {n_syn:3d} cắt dán: recall thật {np.mean(r):.0%} (seed: {', '.join(f'{v:.0%}' for v in r)})")</code></pre>
+<pre><code class="language-text">12 thật +   0 cắt dán: recall thật 85% (seed: 86%, 84%)
+12 thật +  50 cắt dán: recall thật 98% (seed: 98%, 97%)
+12 thật + 200 cắt dán: recall thật 98% (seed: 99%, 97%)</code></pre>
+<p>Từ 0 lên 50 ảnh cắt dán, recall thật tăng mạnh (khoảng 85% lên 98%); từ 50 lên 200 gần như không thêm gì, và hai seed lệch nhau 1–2 điểm, cỡ bằng chính mức "cải thiện". Kết luận: lợi ích của dữ liệu tổng hợp bão hòa nhanh; chọn tỉ lệ bằng recall và overkill trên <strong>val thật</strong>, lặp vài seed, và ưu tiên thời gian cho việc thu thêm lỗi thật đa dạng hơn là sinh thêm hàng nghìn ảnh từ cùng 12 mảnh.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Đồng nghiệp gọi <code>cv2.seamlessClone(src, dst, mask, (x + w // 2, y + h // 2), cv2.NORMAL_CLONE)</code> với (x, y) là góc trên trái nơi muốn đặt mảnh kích thước w × h, và ghi nhãn khung bao từ mặt nạ cộng (x, y). Mặt nạ của mảnh 40×40 chỉ chiếm vùng (2, 2) đến (21, 21) trong mảnh, vết tối nằm ở (8, 8) đến (16, 16). Vết thật sự nằm ở đâu so với nhãn? Sửa thế nào?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+nen = np.full((120, 120, 3), 140, np.uint8)
+manh = np.full((40, 40, 3), 140, np.uint8)
+mask = np.zeros((40, 40), np.uint8)
+mask[2:22, 2:22] = 255                                     # mặt nạ lệch về góc trên trái của mảnh
+manh[8:17, 8:17] = 40                                      # vết tối nằm giữa mặt nạ
+x, y, w, h = 30, 30, 40, 40
+for ten, tam in (("sai: tâm của mảnh", (x + w // 2, y + h // 2)),
+                 ("đúng: tâm khung bao mặt nạ", None)):
+    if tam is None:
+        bx, by, bw, bh = cv2.boundingRect(mask)
+        tam = (x + bx + bw // 2, y + by + bh // 2)
+    out = cv2.seamlessClone(manh, nen, mask.copy(), tam, cv2.NORMAL_CLONE)    # luôn truyền bản sao mask
+    ys, xs = np.where(out[..., 0] &lt; 100)
+    print(f"{ten:28s}: vết thật ở x {xs.min()}-{xs.max()}, y {ys.min()}-{ys.max()} | nhãn ghi x 38-46, y 38-46")
+truoc = mask.copy()
+cv2.seamlessClone(manh, nen, mask, tam, cv2.NORMAL_CLONE)                   # truyền thẳng mask
+print(f"OpenCV {cv2.__version__}: số pixel mask bị hàm sửa sau một lần gọi: {int((mask != truoc).sum())}")</code></pre>
+<pre><code class="language-text">sai: tâm của mảnh           : vết thật ở x 46-54, y 46-54 | nhãn ghi x 38-46, y 38-46
+đúng: tâm khung bao mặt nạ  : vết thật ở x 38-46, y 38-46 | nhãn ghi x 38-46, y 38-46
+OpenCV 5.0.0: số pixel mask bị hàm sửa sau một lần gọi: 196</code></pre>
+<p>Với tâm của mảnh, OpenCV đặt tâm khung bao <em>mặt nạ</em> (20×20) vào điểm (50, 50), nên vết bị dịch 8 pixel về phía phải dưới so với nhãn. Sửa: tính tâm từ <code>cv2.boundingRect(mask)</code> như dòng thứ hai, và luôn kiểm tra bằng ảnh hiệu. Dòng cuối cho thấy vì sao code truyền <code>mask.copy()</code>: nếu số pixel bị sửa khác 0 trên phiên bản OpenCV của bạn, dùng lại cùng một mảng mặt nạ cho nhiều lần dán sẽ cho kết quả sai.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Dự án có 30 ảnh NG thật của lỗi "hở lớp phủ" thu trong 2 tháng. Bạn định cắt dán để có 600 ảnh huấn luyện. Lập kế hoạch chia 30 ảnh thật và cách đánh giá để báo cáo recall trung thực cho khách hàng.</p>
+<details><summary>Xem đáp án</summary>
+<ul>
+  <li>Chia 30 ảnh thật <strong>theo chi tiết và theo thời gian</strong> trước mọi thao tác: ví dụ 18 train, 12 test (các chi tiết thu gần đây nhất). Không dùng val riêng vì quá ít; chọn tham số bằng kiểm định chéo theo nhóm trên 18 ảnh train nếu cần.</li>
+  <li>Mảnh lỗi để cắt dán chỉ lấy từ 18 ảnh train; nền OK lấy từ ảnh OK của tập train. Ghi phả hệ (ảnh nào sinh từ mảnh nào).</li>
+  <li>Huấn luyện với 18 thật + 600 tổng hợp; thử vài tỉ lệ, so trên kiểm định chéo thật.</li>
+  <li>Đánh giá cuối trên 12 NG thật + vài trăm OK thật của lô mới. Báo recall kèm số mẫu và cận trên tin cậy: 12/12 bắt được vẫn chỉ chứng minh escape dưới khoảng 22% ở độ tin cậy 95% (bài "Chọn ngưỡng và đánh giá theo escape, overkill, cycle time").</li>
+  <li>Cam kết tiếp tục thu ảnh thật trong sản xuất, bổ sung golden set và đánh giá lại mỗi phiên bản.</li>
+</ul>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Khi thiếu ảnh lỗi: thu thêm ảnh thật, anomaly detection, augmentation an toàn, cắt dán lỗi thật, lỗi thủ tục, rồi mới đến render 3D hay mô hình sinh.</li>
+  <li>Cắt dán: mảnh lỗi theo mặt nạ từ ảnh NG train, xoay/lật, dán bằng alpha (cộng độ chênh) hoặc <code>cv2.seamlessClone</code>; nhãn YOLO lấy từ mặt nạ đã biến đổi; ghi phả hệ từng ảnh.</li>
+  <li><code>seamlessClone</code>: điểm đặt là tâm khung bao mặt nạ; mặt nạ quá sát vết mảnh có thể làm vết biến mất. Luôn kiểm tra bằng ảnh hiệu: thay đổi trong khung, không thay đổi ngoài khung.</li>
+  <li>Lỗi thủ tục cần được hiệu chỉnh theo phân bố lỗi thật; mô phỏng thô tạo domain gap lớn.</li>
+  <li>Chỉ đánh giá trên ảnh thật của lô khác; dữ liệu tổng hợp chỉ ở trong tập train và không bao giờ thay thế hoàn toàn dữ liệu thật.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Chọn ngưỡng và đánh giá theo escape, overkill, cycle time</strong>, biến điểm số của mô hình thành quyết định OK/NG và tiêu chí nghiệm thu.</p>

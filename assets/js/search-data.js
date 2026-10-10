@@ -1136,17 +1136,18 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Công cụ gán nhãn dữ liệu ảnh miễn phí: CVAT, Label Studio, X-AnyLabeling",
+  "t": "Công cụ gán nhãn ảnh miễn phí: CVAT, Label Studio, X-AnyLabeling",
   "u": "tai-nguyen/cong-cu-gan-nhan-du-lieu-anh-mien-phi.html",
-  "e": "So sánh các công cụ gán nhãn phổ biến, quy trình gán nhãn hiệu quả và các định dạng nhãn YOLO, COCO, Pascal VOC.",
+  "e": "Chọn công cụ, hiểu định dạng YOLO, COCO, VOC, chuyển đổi có kiểm tra, script QA nhãn, hướng dẫn gán nhãn và đo mức thống nhất bằng IoU.",
   "c": "tai-nguyen",
   "cn": "Tài nguyên",
   "d": "03/10/2026",
-  "m": 4,
+  "m": 33,
   "img": "assets/images/posts/cong-cu-gan-nhan-du-lieu-anh-mien-phi.webp",
   "tags": [
+   "Dataset",
    "AI Tools",
-   "Dataset"
+   "Python"
   ]
  },
  {
@@ -1480,17 +1481,16 @@ window.HF_POSTS = [
  {
   "t": "Rule-based hay Deep Learning: chọn cách nào cho bài toán kiểm tra lỗi?",
   "u": "kien-thuc/rule-based-hay-deep-learning-kiem-tra-loi.html",
-  "e": "So sánh hai trường phái, 5 câu hỏi để quyết định và vì sao hệ thống tốt nhất trong nhà máy thường kết hợp cả hai.",
+  "e": "Bảng tiêu chí và hàm chấm điểm, thí nghiệm luật phân ngưỡng so với CNN nhỏ, thiết kế hybrid có cổng kiểm tra và cách ước lượng chi phí dữ liệu.",
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "23/09/2026",
-  "m": 4,
+  "m": 31,
   "img": "assets/images/posts/rule-based-hay-deep-learning-kiem-tra-loi.webp",
   "tags": [
-   "AI Vision",
    "Machine Vision",
-   "Deep Learning",
-   "Industrial Vision"
+   "Industrial Vision",
+   "Deep Learning"
   ]
  },
  {
@@ -1802,18 +1802,18 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Dữ liệu tổng hợp (synthetic data) khi thiếu ảnh lỗi",
+  "t": "Khi thiếu ảnh lỗi: augmentation, cắt dán lỗi và dữ liệu tổng hợp",
   "u": "hoc/du-lieu-tong-hop-synthetic-data-ai-vision.html",
-  "e": "Augmentation, cắt dán lỗi lên ảnh tốt và sinh ảnh bằng Generative AI: cách tạo thêm dữ liệu lỗi hiếm mà vẫn đánh giá trung thực.",
+  "e": "Cắt dán lỗi thật lên ảnh OK bằng alpha và seamlessClone, sinh nhãn YOLO tự động, lỗi thủ tục, domain gap và đánh giá trung thực trên ảnh thật.",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "15/09/2026",
-  "m": 3,
+  "m": 33,
   "img": "assets/images/posts/du-lieu-tong-hop-synthetic-data-ai-vision.webp",
   "tags": [
-   "Generative AI",
-   "AI Vision",
-   "Dataset"
+   "Dataset",
+   "OpenCV",
+   "Deep Learning"
   ]
  },
  {
@@ -2454,17 +2454,18 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Tự xây dataset ảnh công nghiệp: quy trình từ A đến Z",
+  "t": "Tự xây dataset ảnh công nghiệp: kế hoạch, phiên bản, chia tập chống rò rỉ",
   "u": "tai-nguyen/tu-xay-dataset-anh-cong-nghiep.html",
-  "e": "Lên kế hoạch thu thập, tổ chức thư mục, gán nhãn nhất quán, chia tập đúng cách và quản lý phiên bản dataset.",
+  "e": "Lập kế hoạch thu thập theo lô và ca, đặt tên file, manifest SHA-256, dataset card, tìm ảnh trùng bằng pHash và chia tập theo nhóm không rò rỉ.",
   "c": "tai-nguyen",
   "cn": "Tài nguyên",
   "d": "24/08/2026",
-  "m": 4,
+  "m": 35,
   "img": "assets/images/posts/tu-xay-dataset-anh-cong-nghiep.webp",
   "tags": [
    "Dataset",
-   "AI Vision"
+   "Industrial Vision",
+   "Python"
   ]
  },
  {
@@ -2531,7 +2532,7 @@ window.HF_TOPICS = [
   "u": "hoc/python.html",
   "s": "Học AI & Lập trình",
   "g": "Programming",
-  "n": 55
+  "n": 57
  },
  {
   "t": "C#",
@@ -2552,7 +2553,7 @@ window.HF_TOPICS = [
   "u": "hoc/deep-learning.html",
   "s": "Học AI & Lập trình",
   "g": "AI & Machine Learning",
-  "n": 19
+  "n": 20
  },
  {
   "t": "PyTorch",
@@ -2566,7 +2567,7 @@ window.HF_TOPICS = [
   "u": "hoc/generative-ai.html",
   "s": "Học AI & Lập trình",
   "g": "AI & Machine Learning",
-  "n": 7
+  "n": 6
  },
  {
   "t": "LLM / AI Agents",
@@ -2580,7 +2581,7 @@ window.HF_TOPICS = [
   "u": "hoc/opencv.html",
   "s": "Học AI & Lập trình",
   "g": "Computer Vision",
-  "n": 31
+  "n": 32
  },
  {
   "t": "Image Processing",
@@ -2629,14 +2630,14 @@ window.HF_TOPICS = [
   "u": "hoc/ai-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 12
+  "n": 9
  },
  {
   "t": "Industrial Vision",
   "u": "hoc/industrial-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 26
+  "n": 27
  },
  {
   "t": "Camera & Lens",
@@ -2713,7 +2714,7 @@ window.HF_TOPICS = [
   "u": "kien-thuc/deep-learning.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 19
+  "n": 20
  },
  {
   "t": "Computer Vision",
@@ -2734,7 +2735,7 @@ window.HF_TOPICS = [
   "u": "kien-thuc/ai-vision.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 12
+  "n": 9
  },
  {
   "t": "Industrial Automation",

@@ -1,54 +1,559 @@
-<p>Dataset công khai giúp học tập, nhưng mô hình chạy trên dây chuyền của bạn cần <strong>dữ liệu từ chính dây chuyền đó</strong>. Bài này hướng dẫn quy trình xây dựng một dataset ảnh công nghiệp chất lượng, từ lên kế hoạch thu thập đến quản lý phiên bản.</p>
+<p>Dataset công khai giúp học, nhưng mô hình chạy trên dây chuyền của bạn cần <strong>ảnh từ chính dây chuyền đó</strong>: đúng camera, đúng đèn, đúng vật liệu, đủ các lô và các ca. Ở bài "Rule-based hay Deep Learning?", bạn đã ước lượng cần bao nhiêu ảnh lỗi và mất bao lâu để có. Bài này biến ước lượng đó thành quy trình làm việc thật: lập <strong>kế hoạch thu thập</strong> có bảng phủ điều kiện, tổ chức <strong>thư mục và quy ước đặt tên</strong> kiểm tra được bằng máy, quản lý <strong>phiên bản</strong> bằng manifest SHA-256 và dataset card, phát hiện <strong>ảnh trùng</strong> bằng perceptual hash, và <strong>chia tập không rò rỉ</strong> theo chi tiết, lô, thời gian. Một thí nghiệm nhỏ sẽ cho bạn thấy chia ngẫu nhiên từng ảnh có thể biến một mô hình vô dụng thành "chính xác 99%" trên giấy. Bài sau, "Công cụ gán nhãn miễn phí", tiếp nhận thư mục ảnh này để gán nhãn.</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Viết kế hoạch thu thập gồm số chi tiết mỗi lớp, ma trận điều kiện (mã sản phẩm, ca, lô), lịch thu thập và người gán nhãn; dựng cấu trúc thư mục, quy ước tên file và metadata kiểm tra tự động; tạo manifest SHA-256, dataset card và phát hiện file bị sửa; tìm ảnh trùng và gần trùng bằng pHash; chia train/val/test theo nhóm bằng <code>GroupShuffleSplit</code> hoặc theo thời gian, kiểm tra rò rỉ và độ phủ lớp. Code chạy được với NumPy, OpenCV và scikit-learn trên bộ ảnh mô phỏng.</div>
 
-<h2>1. Xác định yêu cầu trước khi chụp</h2>
+<h2>1. Bắt đầu từ danh mục lỗi, không từ máy ảnh</h2>
+<p>Trước khi chụp tấm ảnh đầu tiên, thống nhất với bộ phận chất lượng (QA/QC) một <strong>danh mục lỗi</strong> (defect catalog). Mỗi lớp nhãn phải có định nghĩa đo được, mức nghiêm trọng và ảnh mẫu; nếu không, hai người gán nhãn sẽ gán khác nhau và mô hình học theo người gán ẩu nhất.</p>
+<table>
+  <tr><th>Mã</th><th>Tên lớp</th><th>Định nghĩa (theo tiêu chí khách hàng)</th><th>Mức</th><th>Ghi chú gán nhãn</th></tr>
+  <tr><td>OK</td><td>Đạt</td><td>Không có lỗi nào vượt tiêu chí; bụi, vân tay lau được là OK</td><td>-</td><td>Gắn thẻ "OK khó" nếu có bụi, vết gia công cho phép</td></tr>
+  <tr><td>D01</td><td>Xước</td><td>Vết dài ≥ 2,0 mm ở vùng A, ≥ 4,0 mm ở vùng B</td><td>Chính</td><td>Xước đứt đoạn cách nhau &lt; 0,5 mm tính là một vết</td></tr>
+  <tr><td>D02</td><td>Đốm, rỗ</td><td>Đường kính tương đương ≥ 0,5 mm</td><td>Chính</td><td>Không gán bóng phản xạ quanh đốm</td></tr>
+  <tr><td>D03</td><td>Hở lớp phủ</td><td>Mọi vùng lộ nền ≥ 0,2 mm</td><td>Nghiêm trọng</td><td>Không chắc thì gắn thẻ "cần QA", không tự quyết</td></tr>
+</table>
+<p>Tiêu chí bằng mm, mm² giúp bạn quyết định luôn độ phân giải và kiểu nhãn: lỗi nhỏ nhất 0,2 mm cần ít nhất 3–5 pixel (chặng 6), và tiêu chí theo kích thước đòi nhãn đa giác hoặc mặt nạ để đo được, không chỉ nhãn OK/NG cấp ảnh.</p>
+
+<h2>2. Kế hoạch thu thập</h2>
+<h3>Bao nhiêu ảnh mỗi lớp?</h3>
+<p>Không có con số chuẩn; các khoảng sau là điểm xuất phát theo kinh nghiệm, bạn sẽ điều chỉnh bằng đường cong học (huấn luyện với 25%, 50%, 100% dữ liệu và xem chỉ số còn tăng không):</p>
+<table>
+  <tr><th>Bài toán</th><th>Điểm xuất phát cho phiên bản đầu</th></tr>
+  <tr><td>Phân loại ROI đã căn chỉnh</td><td>200–500 chi tiết mỗi lớp lỗi, vài nghìn chi tiết OK</td></tr>
+  <tr><td>Phát hiện, phân đoạn</td><td>200–500 vết mỗi loại lỗi, nhiều hơn khi lỗi đa dạng về hình dạng, kích thước</td></tr>
+  <tr><td>Anomaly detection</td><td>Vài trăm ảnh OK đại diện mọi lô và ca; vài chục đến vài trăm ảnh NG thật chỉ để <em>đánh giá</em></td></tr>
+  <tr><td>Tập val + test</td><td>Mỗi loại lỗi tối thiểu vài chục chi tiết ở <em>mỗi</em> tập, nếu không con số escape không có ý nghĩa thống kê</td></tr>
+</table>
+<p>Đếm theo <strong>chi tiết vật lý</strong>, không theo số ảnh. Chụp một chi tiết 10 lần cho 10 ảnh nhưng gần như chỉ một mẫu thông tin. Chụp lặp có ích (đặt lại, xoay) để mô hình chịu được sai số định vị, nhưng các ảnh đó luôn là <strong>một nhóm</strong> khi chia tập (mục 7).</p>
+<h3>Ma trận điều kiện</h3>
+<p>Dataset phải phủ mọi nguồn biến thiên sẽ gặp khi chạy thật: mã sản phẩm, lô nguyên liệu, ca (nhiệt độ, người vận hành), máy gia công, tuổi đèn, độ bẩn kính. Cách đơn giản nhất là lập bảng các ô điều kiện và đặt chỉ tiêu tối thiểu cho mỗi ô:</p>
+<pre><code class="language-python">import math
+
+SAN_LUONG_NGAY = 12_000                    # sản phẩm/ngày, 2 ca
+MA_SP = ["TS-120", "TS-150", "TS-200"]     # tỉ trọng sản lượng 50% / 30% / 20%
+TI_TRONG = [0.5, 0.3, 0.2]
+CA = ["A", "B"]
+GIU_LAI = 0.7                              # tỉ lệ chi tiết NG QC giữ lại được để chụp
+LOP = {                                    # lớp: (tỉ lệ trên sản phẩm, số CHI TIẾT mục tiêu cho v1)
+    "D01_xuoc": (0.0020, 300),
+    "D02_dom": (0.0010, 200),
+    "D03_ho_phu": (0.0002, 120),
+}
+N_OK, LAN_CHUP = 3000, 2                   # chi tiết OK; mỗi chi tiết chụp 2 lần (đặt lại)
+O_TOI_THIEU = 10                           # chỉ tiêu tối thiểu mỗi ô (mã SP × ca) cho mỗi lớp lỗi
+
+print(f"{'lớp':11s} {'chi tiết/ngày':&gt;13s} {'ngày':&gt;5s}  ô (mã SP × ca) ít nhất")
+lich = {}
+for lop, (p, muc_tieu) in LOP.items():
+    moi_ngay = SAN_LUONG_NGAY * p * GIU_LAI
+    ngay = math.ceil(muc_tieu / moi_ngay)
+    lich[lop] = ngay
+    # ô hiếm nhất: mã sản phẩm có tỉ trọng nhỏ nhất, chia đều 2 ca
+    o_it_nhat = muc_tieu * min(TI_TRONG) / len(CA)
+    canh_bao = "" if o_it_nhat &gt;= O_TOI_THIEU else f"  ← thiếu, cần chủ động gom mã {MA_SP[-1]}"
+    print(f"{lop:11s} {moi_ngay:13.1f} {ngay:5d}  {o_it_nhat:5.0f}{canh_bao}")
+n_ng = sum(m for _, m in LOP.values())
+print(f"Tổng: {n_ng} chi tiết NG + {N_OK} chi tiết OK = {(n_ng + N_OK) * LAN_CHUP} ảnh "
+      f"({LAN_CHUP} lần chụp/chi tiết)")
+print(f"Đủ v1 sau {max(lich.values())} ngày sản xuất; nên đóng băng v0 (thử nghiệm) sau "
+      f"{min(lich.values())} ngày")</code></pre>
+<pre><code class="language-text">lớp         chi tiết/ngày  ngày  ô (mã SP × ca) ít nhất
+D01_xuoc             16.8    18     30
+D02_dom               8.4    24     20
+D03_ho_phu            1.7    72     12
+Tổng: 620 chi tiết NG + 3000 chi tiết OK = 7240 ảnh (2 lần chụp/chi tiết)
+Đủ v1 sau 72 ngày sản xuất; nên đóng băng v0 (thử nghiệm) sau 18 ngày</code></pre>
+<p>Kế hoạch lộ ra hai vấn đề ngay trên giấy: lỗi hở lớp phủ cần 72 ngày, và ô "TS-200 × một ca" của lỗi hiếm chỉ có khoảng 12 chi tiết. Các cách xử lý: xin QC gom hàng NG tồn kho, nhờ phòng thí nghiệm của khách hàng cung cấp mẫu lỗi, chủ động chạy thử mã TS-200 khi có lô mới, và chấp nhận phiên bản đầu (v0) thiếu một số ô nhưng ghi rõ trong dataset card.</p>
+<h3>Mẫu kế hoạch thu thập (một trang)</h3>
+<table>
+  <tr><th>Mục</th><th>Nội dung cần điền</th></tr>
+  <tr><td>Mục tiêu</td><td>Bài toán, đầu ra mô hình (phân loại / phát hiện / phân đoạn), tiêu chí lỗi đính kèm</td></tr>
+  <tr><td>Lớp và số lượng</td><td>Bảng lớp × số chi tiết mục tiêu cho v0, v1; tỉ lệ lỗi thực tế; nguồn mẫu NG (tủ cách ly, hàng tồn)</td></tr>
+  <tr><td>Ma trận điều kiện</td><td>Mã sản phẩm, lô, ca, máy, mùa; chỉ tiêu tối thiểu mỗi ô</td></tr>
+  <tr><td>Điều kiện chụp</td><td>Camera, ống kính, đèn, phơi sáng, gain, khoảng cách làm việc: <strong>giống hệt trạm thật</strong>; định dạng PNG/TIFF không nén mất dữ liệu; số lần chụp mỗi chi tiết</td></tr>
+  <tr><td>Metadata</td><td>Danh sách cột bắt buộc (mục 3); ai ghi, ghi bằng gì (tự động từ phần mềm trạm)</td></tr>
+  <tr><td>Người gán nhãn</td><td>Ai gán, ai kiểm (QA ký), tỉ lệ kiểm chéo, hướng dẫn gán nhãn phiên bản mấy</td></tr>
+  <tr><td>Lịch</td><td>Ngày bắt đầu, mốc đóng băng v0, v1; ai chịu trách nhiệm từng việc</td></tr>
+  <tr><td>Bảo mật</td><td>Nơi lưu, ai được truy cập, có được đưa ảnh ra khỏi nhà máy không (hợp đồng)</td></tr>
+</table>
+
+<h2>3. Thu thập đúng cách</h2>
 <ul>
-  <li><strong>Danh sách lớp / loại lỗi</strong> với định nghĩa rõ ràng và ảnh ví dụ, thống nhất với bộ phận chất lượng.</li>
-  <li><strong>Điều kiện thực tế cần bao phủ</strong>: các mã sản phẩm, màu sắc, lô nguyên liệu, ca ngày/đêm, mức độ bẩn của ống kính.</li>
-  <li><strong>Mục tiêu số lượng</strong>: ví dụ tối thiểu 200 ảnh mỗi loại lỗi, 2.000 ảnh tốt.</li>
+  <li><strong>Đúng phần cứng và cấu hình chạy thật</strong>: camera, ống kính, đèn, phơi sáng, khoảng cách. Ảnh chụp "tạm" bằng điện thoại hoặc ở bàn thí nghiệm khác đèn sẽ tạo khoảng cách miền (domain gap) và mô hình kém khi triển khai.</li>
+  <li><strong>Ảnh gốc không nén mất dữ liệu</strong> (PNG, BMP, TIFF). JPEG tạo khối 8×8 và làm mờ lỗi vài pixel. Camera 10/12 bit thì lưu 16 bit (PNG/TIFF 16 bit) nếu pipeline dùng dải động đó.</li>
+  <li><strong>Thư mục <code>raw/</code> là bất biến</strong>: không ai sửa, xóa, ghi đè ảnh gốc. Cắt ROI, đổi kích thước, cân bằng sáng là bước xử lý tạo thư mục khác, có script tái tạo được.</li>
+  <li><strong>Metadata ghi tự động</strong> từ phần mềm trạm, không chép tay: thời gian, trạm, mã sản phẩm, lô, mã chi tiết, lần chụp, phơi sáng, gain, nhiệt độ nếu có.</li>
+  <li><strong>Chụp chủ động mẫu lỗi</strong>: QC giữ hàng NG trong tủ cách ly có dán mã; mỗi tuần mang ra chụp ở nhiều vị trí và hướng.</li>
+  <li><strong>Đừng chỉ chụp OK "đẹp"</strong>: gom các chi tiết OK khó (bụi, vết gia công cho phép, sắc độ ở biên dung sai). Đó là nguồn overkill chính khi chạy thật.</li>
 </ul>
 
-<h2>2. Thu thập đúng cách</h2>
+<h2>4. Cấu trúc thư mục và quy ước đặt tên</h2>
+<pre><code class="language-text">dataset-tam-thep/
+  raw/                       # ảnh gốc, bất biến, chia theo ngày chụp
+    2026-09-15/20260915_081502_L2C1_LOT0915A_P0007_s1.png
+    ...
+  metadata.csv               # một dòng cho mỗi ảnh, ghi tự động
+  labels/labels.csv          # nhãn tách khỏi tên file (nhãn có thể được sửa)
+  splits/v1/train.txt        # danh sách đường dẫn ảnh theo tập
+  splits/v1/val.txt
+  splits/v1/test.txt
+  manifest_v1.csv            # đường dẫn, kích thước, SHA-256 từng file
+  DATASET_CARD.md            # mô tả, định nghĩa lớp, số liệu, lịch sử phiên bản</code></pre>
+<p>Quy ước tên: <code>&lt;ngày&gt;_&lt;giờ&gt;_&lt;trạm&gt;_&lt;lô&gt;_&lt;chi tiết&gt;_s&lt;lần chụp&gt;.png</code>. Tên file phải <strong>duy nhất toàn cục</strong> (có ngày giờ và trạm), sắp xếp được theo thời gian, chỉ dùng chữ không dấu, số, gạch dưới, và <strong>không chứa nhãn</strong>: nhãn sẽ được sửa nhiều lần, đổi tên file theo nhãn làm mất dấu vết và phá manifest.</p>
+<p>Đoạn code sau dựng một dataset mô phỏng theo đúng cấu trúc: 8 lô trong 8 ngày, mỗi lô 16 chi tiết, mỗi chi tiết chụp 2 lần (lần 2 lệch 1 pixel và nhiễu khác). Mỗi chi tiết có vân bề mặt riêng; lỗi xước và đốm khá mờ. Ta cũng cố tình gây hai sự cố hay gặp ngoài đời: một ảnh bị chép trùng sang thư mục ngày khác, và một chi tiết bị chụp lại ở lô sau với mã chi tiết mới.</p>
+<pre><code class="language-python">import csv
+import os
+import shutil
+
+import cv2
+import numpy as np
+
+rng = np.random.default_rng(1)
+GOC = "dataset-tam-thep"
+shutil.rmtree(GOC, ignore_errors=True)
+LOP = ["OK", "D01_xuoc", "D02_dom"]
+
+
+def van_be_mat(seed):
+    """Vân thép cán riêng của từng chi tiết: sọc ngang ngẫu nhiên + hạt."""
+    r = np.random.default_rng(seed)
+    soc = cv2.resize(r.normal(0, 14, (18, 1)), (72, 72), interpolation=cv2.INTER_CUBIC)
+    vet_loang = cv2.GaussianBlur(r.normal(0, 70, (72, 72)), (0, 0), 3.0)
+    return 140 + soc + vet_loang + cv2.GaussianBlur(r.normal(0, 10, (72, 72)), (0, 0), 1.0)
+
+
+def chup(van, nhan, seed_loi, lan, sang_lo):
+    img = van.copy() + sang_lo
+    r = np.random.default_rng(seed_loi)                     # lỗi nằm cố định trên chi tiết
+    if nhan == "D01_xuoc":
+        x, y = r.integers(16, 56, 2)
+        cv2.line(img, (int(x) - 7, int(y) - 3), (int(x) + 7, int(y) + 3), float(img.mean() - 22), 1)
+    elif nhan == "D02_dom":
+        x, y = r.integers(16, 56, 2)
+        cv2.circle(img, (int(x), int(y)), 2, float(img.mean() - 22), -1)
+    dx, dy = (0, 0) if lan == 1 else rng.integers(-1, 2, 2)  # lần 2: đặt lại, lệch 1 pixel
+    img = img[4 + dy:68 + dy, 4 + dx:68 + dx] + rng.normal(0, 3, (64, 64))
+    return np.clip(img, 0, 255).astype(np.uint8)
+
+
+dong = []
+for k in range(8):                                           # 8 lô, mỗi lô một ngày
+    ngay = f"2026-09-{15 + k:02d}"
+    lo = f"LOT{9}{15 + k:02d}A"
+    sang_lo = rng.uniform(-10, 10)                           # mỗi lô thép sáng tối khác nhau
+    os.makedirs(f"{GOC}/raw/{ngay}", exist_ok=True)
+    for p in range(16):
+        ma_ct = f"P{k * 100 + p:04d}"
+        nhan = LOP[p % 3] if p &lt; 12 else "OK"
+        van = van_be_mat(1000 * k + p)
+        for lan in (1, 2):
+            gio = f"{8 + p // 4:02d}{(p * 7) % 60:02d}{10 * lan:02d}"
+            ten = f"{ngay.replace('-', '')}_{gio}_L2C1_{lo}_{ma_ct}_s{lan}.png"
+            cv2.imwrite(f"{GOC}/raw/{ngay}/{ten}", chup(van, nhan, 1000 * k + p, lan, sang_lo))
+            dong.append({"file": f"raw/{ngay}/{ten}", "ngay": ngay, "ca": "A" if p &lt; 8 else "B",
+                         "tram": "L2C1", "lo": lo, "chi_tiet": ma_ct, "lan": lan, "nhan": nhan,
+                         "exposure_us": 800, "gain_db": 0})
+
+# sự cố 1: một file bị chép trùng sang thư mục ngày khác (người dùng kéo thả nhầm)
+nguon = dong[5]
+dich = f"raw/2026-09-22/20260922_150000_L2C1_LOT922A_P0799_s1.png"
+shutil.copy(f"{GOC}/{nguon['file']}", f"{GOC}/{dich}")
+dong.append({**nguon, "file": dich, "ngay": "2026-09-22", "lo": "LOT922A", "chi_tiet": "P0799", "lan": 1})
+# sự cố 2: chi tiết P0103 (lô 16/9) bị đưa vào lô 21/9 và chụp lại với mã mới P0699
+van = van_be_mat(1000 * 1 + 3)
+ten = "20260921_163000_L2C1_LOT921A_P0699_s1.png"
+cv2.imwrite(f"{GOC}/raw/2026-09-21/{ten}", chup(van, LOP[3 % 3], 1003, 2, 0.0))
+dong.append({**dong[0], "file": f"raw/2026-09-21/{ten}", "ngay": "2026-09-21", "ca": "B",
+             "lo": "LOT921A", "chi_tiet": "P0699", "lan": 1, "nhan": LOP[3 % 3]})
+
+with open(f"{GOC}/metadata.csv", "w", newline="", encoding="utf-8") as f:
+    w = csv.DictWriter(f, fieldnames=list(dong[0].keys()))
+    w.writeheader()
+    w.writerows(dong)
+print(f"{len(dong)} ảnh, {len({d['lo'] for d in dong})} lô, "
+      f"{len({d['chi_tiet'] for d in dong})} mã chi tiết")
+for lop in LOP:
+    print(f"  {lop:9s}: {sum(d['nhan'] == lop for d in dong)} ảnh")</code></pre>
+<pre><code class="language-text">258 ảnh, 8 lô, 130 mã chi tiết
+  OK       : 129 ảnh
+  D01_xuoc : 64 ảnh
+  D02_dom  : 65 ảnh</code></pre>
+
+<h3>Kiểm tra tên file và metadata bằng máy</h3>
+<p>Quy ước chỉ có giá trị khi được kiểm tra tự động mỗi lần thêm ảnh. Script dưới dùng biểu thức chính quy (regex) để tách các trường trong tên, so với metadata, và kiểm tra file tồn tại, đọc được, đúng kích thước:</p>
+<pre><code class="language-python">import csv
+import os
+import re
+
+import cv2
+
+GOC = "dataset-tam-thep"
+MAU_TEN = re.compile(r"^(?P&lt;ngay&gt;\d{8})_(?P&lt;gio&gt;\d{6})_(?P&lt;tram&gt;[A-Z0-9]+)_"
+                     r"(?P&lt;lo&gt;LOT\d{3}[A-Z])_(?P&lt;chi_tiet&gt;P\d{4})_s(?P&lt;lan&gt;\d)\.png$")
+LOP_HOP_LE = {"OK", "D01_xuoc", "D02_dom"}
+
+with open(f"{GOC}/metadata.csv", encoding="utf-8") as f:
+    dong = list(csv.DictReader(f))
+loi = []
+for d in dong:
+    ten = os.path.basename(d["file"])
+    m = MAU_TEN.match(ten)
+    if not m:
+        loi.append((ten, "tên sai quy ước"))
+        continue
+    if m["lo"] != d["lo"] or m["chi_tiet"] != d["chi_tiet"] or m["ngay"] != d["ngay"].replace("-", ""):
+        loi.append((ten, "tên và metadata không khớp"))
+    if d["nhan"] not in LOP_HOP_LE:
+        loi.append((ten, f"nhãn lạ {d['nhan']}"))
+    img = cv2.imread(f"{GOC}/{d['file']}", cv2.IMREAD_UNCHANGED)
+    if img is None or img.shape != (64, 64):
+        loi.append((ten, "không đọc được hoặc sai kích thước"))
+trong_thu_muc = {os.path.relpath(os.path.join(r, n), GOC).replace(os.sep, "/")
+                 for r, _, fs in os.walk(f"{GOC}/raw") for n in fs}
+khong_co_metadata = trong_thu_muc - {d["file"] for d in dong}
+print(f"kiểm tra {len(dong)} dòng metadata: {len(loi)} lỗi, {len(khong_co_metadata)} file không có metadata")
+for ten, ly_do in loi:
+    print("  ", ten, "→", ly_do)</code></pre>
+<pre><code class="language-text">kiểm tra 258 dòng metadata: 0 lỗi, 0 file không có metadata</code></pre>
+<p>Bộ dữ liệu sạch về mặt quy ước, nhưng hai sự cố đã gây vẫn chưa bị phát hiện: tên file và metadata đều "hợp lệ". Cần hai công cụ khác: hash nội dung SHA-256 (mục 5–6) và perceptual hash cho ảnh gần trùng (mục 6).</p>
+
+<h2>5. Phiên bản: manifest SHA-256 và dataset card</h2>
+<p>"Mô hình v3 được huấn luyện trên dữ liệu nào?" phải trả lời được bằng một mã duy nhất, kể cả sau một năm. Cách tối giản không cần công cụ ngoài:</p>
 <ul>
-  <li>Chụp bằng <strong>đúng phần cứng và cấu hình</strong> sẽ dùng khi chạy thật (camera, ống kính, đèn, phơi sáng). Ảnh chụp bằng điện thoại để "tạm" thường làm mô hình kém khi triển khai.</li>
-  <li><strong>Lưu ảnh gốc không nén mất dữ liệu</strong> (PNG, BMP, TIFF), giữ độ sâu bit gốc nếu camera là 10/12 bit.</li>
-  <li><strong>Lưu metadata</strong> cùng mỗi ảnh: thời gian, trạm, mã sản phẩm, lô, tham số camera.</li>
-  <li><strong>Thu thập mẫu lỗi chủ động</strong>: phối hợp với bộ phận chất lượng giữ lại hàng NG, chụp ở nhiều vị trí và hướng.</li>
+  <li><strong>Manifest</strong>: bảng mọi file kèm kích thước và <strong>SHA-256</strong> (hàm băm mật mã: chỉ đổi 1 bit trong file, mã băm đổi hoàn toàn).</li>
+  <li><strong>Mã phiên bản dữ liệu</strong>: SHA-256 của chính file manifest. Hai người có cùng mã này chắc chắn có cùng dữ liệu.</li>
+  <li><strong>Dataset card</strong>: file mô tả cho con người: nguồn, thời gian, lớp, số lượng, cách chia, vấn đề đã biết, lịch sử thay đổi.</li>
+</ul>
+<pre><code class="language-python">import csv
+import datetime
+import hashlib
+import os
+
+GOC = "dataset-tam-thep"
+
+
+def sha256_file(duong_dan, khoi=1 &lt;&lt; 20):
+    h = hashlib.sha256()
+    with open(duong_dan, "rb") as f:
+        while chunk := f.read(khoi):                     # đọc từng khối, không nạp cả file lớn
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def tao_manifest(goc, ten_file):
+    files = sorted(os.path.relpath(os.path.join(r, n), goc).replace(os.sep, "/")
+                   for r, _, fs in os.walk(f"{goc}/raw") for n in fs)
+    with open(f"{goc}/{ten_file}", "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["file", "bytes", "sha256"])
+        for p in files:
+            w.writerow([p, os.path.getsize(f"{goc}/{p}"), sha256_file(f"{goc}/{p}")])
+    return sha256_file(f"{goc}/{ten_file}")
+
+
+def kiem_tra_manifest(goc, ten_file):
+    with open(f"{goc}/{ten_file}", encoding="utf-8") as f:
+        ghi = {d["file"]: d["sha256"] for d in csv.DictReader(f)}
+    hien_tai = {os.path.relpath(os.path.join(r, n), goc).replace(os.sep, "/")
+                for r, _, fs in os.walk(f"{goc}/raw") for n in fs}
+    bi_sua = [p for p in ghi if p in hien_tai and sha256_file(f"{goc}/{p}") != ghi[p]]
+    return bi_sua, sorted(set(ghi) - hien_tai), sorted(hien_tai - set(ghi))
+
+
+ma_v1 = tao_manifest(GOC, "manifest_v1.csv")
+print("mã phiên bản dữ liệu v1:", ma_v1[:16])
+
+with open(f"{GOC}/metadata.csv", encoding="utf-8") as f:
+    meta = list(csv.DictReader(f))
+dem = {}
+for d in meta:
+    dem[d["nhan"]] = dem.get(d["nhan"], 0) + 1
+the = f"""# Dataset tấm thép cán, trạm L2C1 — v1
+- Mã phiên bản (SHA-256 của manifest_v1.csv): {ma_v1}
+- Ngày đóng băng: {datetime.date(2026, 9, 23)}; người chịu trách nhiệm: kỹ sư vision trạm L2
+- Nguồn: camera trạm L2C1, ảnh xám 8 bit, PNG; phơi sáng 800 µs, gain 0 dB
+- Khoảng thời gian: 2026-09-15 đến 2026-09-22, {len({d['lo'] for d in meta})} lô, ca A và B
+- Lớp: {", ".join(f"{k} ({v} ảnh)" for k, v in sorted(dem.items()))}
+- Định nghĩa lớp: danh mục lỗi DM-07 rev.B (QA ký 2026-09-10)
+- Chia tập: theo nhóm chi tiết, xem splits/v1/
+- Vấn đề đã biết: chưa có mã TS-200; chưa có ảnh ca đêm
+- Lịch sử: v1 = bản đầu tiên
+"""
+with open(f"{GOC}/DATASET_CARD.md", "w", encoding="utf-8") as f:
+    f.write(the)
+
+# Ai đó "chỉnh sáng" một ảnh gốc rồi lưu đè, và xóa một ảnh khác (cố tình phá để thử)
+p_sua, p_xoa = meta[10]["file"], meta[11]["file"]
+sao_luu = {p: open(f"{GOC}/{p}", "rb").read() for p in (p_sua, p_xoa)}   # "bản sao lưu"
+with open(f"{GOC}/{p_sua}", "r+b") as f:
+    f.seek(-20, os.SEEK_END)
+    b = f.read(1)
+    f.seek(-20, os.SEEK_END)
+    f.write(bytes([b[0] ^ 1]))                            # đổi đúng 1 bit
+os.remove(f"{GOC}/{p_xoa}")
+bi_sua, bi_mat, moi_them = kiem_tra_manifest(GOC, "manifest_v1.csv")
+print("bị sửa:", [os.path.basename(x) for x in bi_sua])
+print("bị mất:", [os.path.basename(x) for x in bi_mat], "| mới thêm:", moi_them)
+
+for p, noi_dung in sao_luu.items():                       # khôi phục từ sao lưu rồi kiểm tra lại
+    with open(f"{GOC}/{p}", "wb") as f:
+        f.write(noi_dung)
+print("sau khôi phục:", kiem_tra_manifest(GOC, "manifest_v1.csv"))</code></pre>
+<pre><code class="language-text">mã phiên bản dữ liệu v1: 97e3e263b71e6359
+bị sửa: ['20260915_093510_L2C1_LOT915A_P0005_s1.png']
+bị mất: ['20260915_093520_L2C1_LOT915A_P0005_s2.png'] | mới thêm: []
+sau khôi phục: ([], [], [])</code></pre>
+<p>Chỉ một bit thay đổi cũng bị phát hiện, kể cả khi ảnh nhìn bằng mắt không khác gì. Trong thực tế bạn không bao giờ sửa ảnh gốc; khi kiểm tra báo lỗi, khôi phục từ bản sao lưu và chạy lại kiểm tra cho đến khi cả ba danh sách rỗng, như dòng cuối.</p>
+<div class="tip"><strong>Khi dataset lớn: DVC và kho lưu trữ đối tượng</strong>Git không hợp để chứa hàng chục GB ảnh. Các công cụ như DVC lưu file lớn ở kho riêng (ổ mạng, máy chủ lưu trữ đối tượng) và chỉ đưa vào Git một file mô tả nhỏ chứa hash, nên mỗi commit mã nguồn trỏ đúng tới một phiên bản dữ liệu (bài "Git cho dự án AI Vision"). Ý tưởng giống hệt manifest ở trên; bắt đầu bằng manifest là đủ cho dự án nhỏ.</div>
+<p>Quy tắc phiên bản: <strong>đóng băng</strong> một phiên bản thì không sửa nữa; mọi thay đổi (thêm lô, sửa nhãn, bỏ ảnh hỏng) tạo phiên bản mới với dòng ghi chú trong lịch sử của dataset card, và mỗi mô hình ghi rõ mã phiên bản dữ liệu đã dùng.</p>
+
+<h2>6. Phát hiện ảnh trùng và gần trùng</h2>
+<p>Ảnh trùng gây hai tác hại: làm lệch phân bố (một ảnh được "đếm" hai lần) và nguy hiểm hơn, <strong>rò rỉ</strong> khi hai bản nằm ở train và test. Có hai loại:</p>
+<ul>
+  <li><strong>Trùng tuyệt đối</strong> (cùng byte): so SHA-256, đã có sẵn trong manifest.</li>
+  <li><strong>Gần trùng</strong>: cùng chi tiết chụp lại, lệch vài pixel, nhiễu khác, lưu lại sang định dạng khác. SHA-256 khác hoàn toàn, cần <strong>perceptual hash</strong> (pHash): thu ảnh về 32×32, lấy biến đổi cosine rời rạc (DCT), giữ khối 8×8 tần số thấp, so mỗi hệ số với trung vị được 64 bit. Ảnh giống nhau về cấu trúc cho mã gần nhau; độ khác nhau đo bằng <strong>khoảng cách Hamming</strong> (số bit khác).</li>
+</ul>
+<pre><code class="language-python">import csv
+import hashlib
+import os
+
+import cv2
+import numpy as np
+
+GOC = "dataset-tam-thep"
+with open(f"{GOC}/metadata.csv", encoding="utf-8") as f:
+    meta = list(csv.DictReader(f))
+
+
+def phash(img):
+    nho = cv2.resize(img, (32, 32), interpolation=cv2.INTER_AREA).astype(np.float32)
+    dct = cv2.dct(nho)[:8, :8].flatten()
+    return dct[1:] &gt; np.median(dct[1:])                    # 63 bit, bỏ hệ số DC (độ sáng trung bình)
+
+
+anh = [cv2.imread(f"{GOC}/{d['file']}", cv2.IMREAD_GRAYSCALE) for d in meta]
+H = np.array([phash(a) for a in anh])
+sha = [hashlib.sha256(open(f"{GOC}/{d['file']}", "rb").read()).hexdigest() for d in meta]
+
+# trùng tuyệt đối
+theo_sha = {}
+for i, h in enumerate(sha):
+    theo_sha.setdefault(h, []).append(i)
+for ds in theo_sha.values():
+    if len(ds) &gt; 1:
+        print("TRÙNG TUYỆT ĐỐI:", [os.path.basename(meta[i]["file"]) for i in ds])
+
+# gần trùng: khoảng cách Hamming giữa mọi cặp
+D = (H[:, None, :] != H[None, :, :]).sum(axis=2)
+cung_ct = np.array([[a["chi_tiet"] == b["chi_tiet"] for b in meta] for a in meta])
+tren = np.triu(np.ones_like(D, bool), 1)
+print(f"Hamming, 2 lần chụp cùng chi tiết: trung vị {np.median(D[tren &amp; cung_ct]):.0f}, "
+      f"lớn nhất {D[tren &amp; cung_ct].max()}")
+print(f"Hamming, khác chi tiết: trung vị {np.median(D[tren &amp; ~cung_ct]):.0f}, "
+      f"5 giá trị nhỏ nhất {np.sort(D[tren &amp; ~cung_ct])[:5]}")
+NGUONG = 10
+for i, j in zip(*np.where(tren &amp; ~cung_ct &amp; (D &lt;= NGUONG))):
+    print(f"GẦN TRÙNG (Hamming {D[i, j]}): {meta[i]['chi_tiet']} ({meta[i]['lo']}) "
+          f"~ {meta[j]['chi_tiet']} ({meta[j]['lo']})")</code></pre>
+<pre><code class="language-text">TRÙNG TUYỆT ĐỐI: ['20260915_081420_L2C1_LOT915A_P0002_s2.png', '20260922_150000_L2C1_LOT922A_P0799_s1.png']
+Hamming, 2 lần chụp cùng chi tiết: trung vị 6, lớn nhất 14
+Hamming, khác chi tiết: trung vị 32, 5 giá trị nhỏ nhất [ 0  2 10 14 16]
+GẦN TRÙNG (Hamming 0): P0002 (LOT915A) ~ P0799 (LOT922A)
+GẦN TRÙNG (Hamming 2): P0103 (LOT916A) ~ P0699 (LOT921A)
+GẦN TRÙNG (Hamming 10): P0103 (LOT916A) ~ P0699 (LOT921A)</code></pre>
+<p>Hai sự cố đều lộ ra: file chép trùng (SHA-256 giống hệt, Hamming 0) và chi tiết P0103 bị chụp lại dưới mã P0699 ở lô khác (Hamming 2 và 10 với hai lần chụp của P0103, trong khi các chi tiết khác nhau có trung vị 32 bit). Ngưỡng Hamming phải chọn từ chính dữ liệu của bạn: hai lần chụp cùng chi tiết ở đây cách nhau tới 14 bit, còn cặp chi tiết khác nhau gần nhất cũng 14 bit, nên hai phân bố chạm nhau. Chọn ngưỡng thấp hơn (10) để ít báo nhầm, và <strong>luôn mở từng cặp bị gắn cờ ra xem</strong> trước khi gộp. Với bề mặt rất đồng nhất (kính, nhựa trơn) mọi ảnh đều gần nhau và pHash kém tác dụng; khi đó so trên ROI có kết cấu, hoặc dựa vào mã chi tiết trong metadata.</p>
+<p>Xử lý: xóa bản chép trùng khỏi metadata (giữ file gốc), và <strong>gộp</strong> các ảnh gần trùng vào cùng một nhóm trước khi chia tập. Với dataset lớn (hàng trăm nghìn ảnh), so mọi cặp tốn O(n²); khi đó chia theo tiền tố hash hoặc dùng thư viện tìm kiếm láng giềng gần, nhưng nguyên lý không đổi.</p>
+
+<h2>7. Chia tập không rò rỉ</h2>
+<p>Bài "Overfitting và chia train/val/test" đã nêu nguyên tắc; ở đây ta đo tác hại bằng con số. Thí nghiệm: một bộ phân loại láng giềng gần nhất (1-NN) trên ảnh thu nhỏ 16×16, một "mô hình" chỉ biết học thuộc. Nếu chia ngẫu nhiên từng ảnh, lần chụp thứ hai của cùng chi tiết thường nằm ở tập kia, và 1-NN chỉ cần tìm ra "anh em sinh đôi" của ảnh test. Nếu chia theo nhóm, nó phải thật sự nhận ra lỗi.</p>
+<pre><code class="language-python">import csv
+import os
+
+import cv2
+import numpy as np
+from sklearn.model_selection import GroupShuffleSplit, train_test_split
+from sklearn.neighbors import KNeighborsClassifier
+
+GOC = "dataset-tam-thep"
+with open(f"{GOC}/metadata.csv", encoding="utf-8") as f:
+    meta = list(csv.DictReader(f))
+# gộp nhóm theo kết quả mục 6: bỏ bản chép trùng, P0699 chính là P0103
+meta = [d for d in meta if d["chi_tiet"] != "P0799"]
+for d in meta:
+    d["nhom"] = "P0103" if d["chi_tiet"] == "P0699" else d["chi_tiet"]
+
+# đặc trưng đơn giản: ảnh thu nhỏ 16×16 (chịu được lệch vài pixel giữa hai lần chụp)
+X = np.array([cv2.resize(cv2.imread(f"{GOC}/{d['file']}", cv2.IMREAD_GRAYSCALE), (16, 16),
+                         interpolation=cv2.INTER_AREA).ravel() for d in meta], np.float32)
+X -= X.mean(axis=1, keepdims=True)                        # bỏ khác biệt độ sáng giữa các lô
+y = np.array([d["nhan"] != "OK" for d in meta], int)       # 1 = NG
+nhom = np.array([d["nhom"] for d in meta])
+lo = np.array([d["lo"] for d in meta])
+
+
+def chay(cach_chia, so_lan=10):
+    acc, acc_co_anh_em, acc_khong, ro_ri = [], [], [], []
+    for seed in range(so_lan):
+        tr, te = cach_chia(seed)
+        dung = KNeighborsClassifier(n_neighbors=1).fit(X[tr], y[tr]).predict(X[te]) == y[te]
+        co_anh_em = np.isin(nhom[te], nhom[tr])           # ảnh test có "anh em" cùng chi tiết ở train
+        acc.append(dung.mean())
+        ro_ri.append(co_anh_em.mean())
+        if co_anh_em.any():
+            acc_co_anh_em.append(dung[co_anh_em].mean())
+        if (~co_anh_em).any():
+            acc_khong.append(dung[~co_anh_em].mean())
+    tach = lambda v: f"{np.mean(v):6.1%}" if v else "     -"
+    return np.mean(acc), np.mean(ro_ri), tach(acc_co_anh_em), tach(acc_khong)
+
+
+chi_so = np.arange(len(meta))
+CACH = {
+    "ngẫu nhiên từng ảnh": lambda s: train_test_split(chi_so, test_size=0.25, random_state=s, stratify=y),
+    "theo chi tiết (nhóm)": lambda s: next(GroupShuffleSplit(1, test_size=0.25, random_state=s).split(X, y, nhom)),
+    "theo lô": lambda s: next(GroupShuffleSplit(1, test_size=0.25, random_state=s).split(X, y, lo)),
+}
+print("cách chia (10 lần)    | accuracy | ảnh test có anh em ở train | acc. nhóm đó | acc. còn lại")
+for ten, cach in CACH.items():
+    acc, ro_ri, a1, a2 = chay(cach)
+    print(f"{ten:21s} | {acc:8.1%} | {ro_ri:26.1%} | {a1:&gt;12s} | {a2:&gt;12s}")
+print(f"tỉ lệ NG trong dữ liệu: {y.mean():.1%} (đoán 'luôn OK' đạt {1 - y.mean():.1%})")</code></pre>
+<pre><code class="language-text">cách chia (10 lần)    | accuracy | ảnh test có anh em ở train | acc. nhóm đó | acc. còn lại
+ngẫu nhiên từng ảnh   |    85.8% |                      72.3% |       100.0% |        48.5%
+theo chi tiết (nhóm)  |    50.4% |                       0.0% |            - |        50.4%
+theo lô               |    45.4% |                       0.8% |       100.0% |        44.9%
+tỉ lệ NG trong dữ liệu: 49.8% (đoán 'luôn OK' đạt 50.2%)</code></pre>
+<p>Đọc bảng: với chia ngẫu nhiên, khoảng 3/4 ảnh test có "anh em" (lần chụp kia của cùng chi tiết) trong train, và trên nhóm này 1-NN đúng gần như tuyệt đối chỉ nhờ nhận ra chi tiết, không phải nhận ra lỗi. Trên các ảnh không có anh em, nó chỉ ngang đoán mò (khoảng 50%, vì dữ liệu có một nửa là NG). Chia theo chi tiết hoặc theo lô cho thấy sự thật: bộ phân loại này vô dụng. Chú ý cột "theo lô" vẫn còn một ít ảnh có anh em: đó là chi tiết P0103 được chụp lại ở lô khác, lý do phải gộp nhóm bằng phát hiện trùng trước khi chia. Mạng sâu học thuộc mạnh hơn 1-NN rất nhiều, nên cái bẫy này áp dụng nguyên vẹn cho CNN: nhiều báo cáo "99% trên tập test" sụp đổ đúng vì lý do này</p>
+<h3>Chia ba tập theo nhóm và theo thời gian</h3>
+<p>Thứ tự ưu tiên cho khóa nhóm: <strong>chi tiết</strong> (bắt buộc), rồi <strong>lô</strong> nếu lô có đặc trưng riêng (sắc độ, kiểu vân), rồi <strong>thời gian</strong> nếu muốn mô phỏng đúng việc mô hình gặp dữ liệu tương lai. Cách làm phổ biến: tập test là các lô <em>mới nhất</em>, phần còn lại chia train/val theo nhóm. Với scikit-learn, <code>GroupShuffleSplit</code> chia một lần; <code>StratifiedGroupKFold</code> cố giữ tỉ lệ lớp khi chia theo nhóm (hữu ích khi lỗi hiếm).</p>
+<pre><code class="language-python">import csv
+import os
+
+import numpy as np
+from sklearn.model_selection import GroupShuffleSplit
+
+GOC = "dataset-tam-thep"
+with open(f"{GOC}/metadata.csv", encoding="utf-8") as f:
+    meta = list(csv.DictReader(f))
+meta = [d for d in meta if d["chi_tiet"] != "P0799"]       # bỏ bản chép trùng
+for d in meta:
+    d["nhom"] = "P0103" if d["chi_tiet"] == "P0699" else d["chi_tiet"]
+
+# 1) test = 2 lô mới nhất (theo thời gian); nhóm nào có ảnh trong lô test thì cả nhóm về test
+cac_lo = sorted({d["lo"] for d in meta})
+lo_test = set(cac_lo[-2:])
+nhom_test = {d["nhom"] for d in meta if d["lo"] in lo_test}
+con_lai = [d for d in meta if d["nhom"] not in nhom_test]
+test = [d for d in meta if d["nhom"] in nhom_test]
+# 2) train/val từ phần còn lại, theo nhóm chi tiết
+gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=0)
+tr, va = next(gss.split(con_lai, groups=[d["nhom"] for d in con_lai]))
+tap = {"train": [con_lai[i] for i in tr], "val": [con_lai[i] for i in va], "test": test}
+
+os.makedirs(f"{GOC}/splits/v1", exist_ok=True)
+for ten, ds in tap.items():
+    with open(f"{GOC}/splits/v1/{ten}.txt", "w", encoding="utf-8") as f:
+        f.write("\n".join(sorted(d["file"] for d in ds)) + "\n")
+
+# kiểm tra bắt buộc: rò rỉ theo nhóm, theo lô, độ phủ lớp
+nhom_cua = {ten: {d["nhom"] for d in ds} for ten, ds in tap.items()}
+print("nhóm chung train-val:", len(nhom_cua["train"] &amp; nhom_cua["val"]),
+      "| train-test:", len(nhom_cua["train"] &amp; nhom_cua["test"]),
+      "| val-test:", len(nhom_cua["val"] &amp; nhom_cua["test"]))
+print(f"{'tập':5s} {'ảnh':&gt;4s} {'lô':&gt;3s}  " + "  ".join(f"{l:&gt;8s}" for l in ("OK", "D01_xuoc", "D02_dom")))
+for ten, ds in tap.items():
+    print(f"{ten:5s} {len(ds):4d} {len({d['lo'] for d in ds}):3d}  " +
+          "  ".join(f"{sum(d['nhan'] == l for d in ds):8d}" for l in ("OK", "D01_xuoc", "D02_dom")))
+print("lô của test:", sorted({d["lo"] for d in test}))</code></pre>
+<pre><code class="language-text">nhóm chung train-val: 0 | train-test: 0 | val-test: 0
+tập    ảnh  lô        OK  D01_xuoc   D02_dom
+train  152   6        74        38        40
+val     38   6        20        10         8
+test    67   3        35        16        16
+lô của test: ['LOT916A', 'LOT921A', 'LOT922A']</code></pre>
+<p>Chú ý chi tiết P0103: nó thuộc lô 16/9 nhưng bản chụp lại nằm trong lô 21/9 (lô test), nên cả nhóm phải về test, kéo theo một lô thứ ba xuất hiện trong test. Đây là kiểu ngoại lệ chỉ được xử lý đúng khi bạn chia theo <strong>nhóm đã gộp trùng</strong>, không phải theo cột "lô" trong metadata. Hai kiểm tra cuối (không nhóm nào ở hai tập, mỗi lớp có mặt ở mọi tập với số lượng đủ dùng) phải chạy mỗi lần tạo phiên bản dữ liệu; với dataset thật, val và test cần nhiều mẫu lỗi hơn nhiều so với ví dụ này.</p>
+<div class="warn"><strong>Tập test là để dành</strong>Không xem ảnh test để chỉnh tham số, không thêm ảnh test vào train khi "mô hình sai mấy ảnh này". Một khi bạn đã tối ưu theo tập test, nó thành tập val và bạn mất thước đo trung thực. Khi muốn dùng các ảnh đó, hãy thu tập test mới cho phiên bản sau.</div>
+
+<h2>8. Cải thiện liên tục sau triển khai</h2>
+<p>Dataset không kết thúc ở v1. Sau triển khai, lưu lại ảnh mô hình không chắc chắn (điểm gần ngưỡng), ảnh người vận hành đánh giá lại khác với máy, và mọi ảnh của loại lỗi mới. Gán nhãn, đưa vào phiên bản kế tiếp theo đúng quy trình: thêm vào <code>raw/</code>, cập nhật metadata, chạy kiểm tra tên, manifest mới, kiểm tra trùng, chia lại theo nhóm (giữ nguyên các nhóm đã ở test cũ trong test), ghi lịch sử vào dataset card. Đây là cách hiệu quả nhất để mô hình tốt dần theo thời gian.</p>
+<p><strong>Pháp lý và bảo mật</strong>: ảnh sản phẩm của khách hàng thường là thông tin mật. Thỏa thuận rõ quyền sử dụng dữ liệu trong hợp đồng (được dùng cho dự án nào, có được giữ sau dự án không), lưu trữ có phân quyền, sao lưu định kỳ, và không tải lên dịch vụ công cộng (kể cả công cụ gán nhãn trên mây) khi chưa được phép.</p>
+
+<h2>9. Sai lầm thường gặp</h2>
+<ul>
+  <li><strong>Đếm ảnh thay vì đếm chi tiết</strong>: 1.000 ảnh từ 50 chi tiết NG là 50 mẫu, không phải 1.000.</li>
+  <li><strong>Chụp bằng cấu hình khác trạm thật</strong> (điện thoại, đèn khác, JPEG) rồi ngạc nhiên vì mô hình kém khi triển khai.</li>
+  <li><strong>Nhãn nằm trong tên file hoặc tên thư mục</strong> rồi đổi tên khi sửa nhãn: mất dấu vết, manifest vô nghĩa.</li>
+  <li><strong>Sửa ảnh gốc tại chỗ</strong> (crop, chỉnh sáng, lưu đè): không tái tạo được, không biết mô hình cũ học trên ảnh nào.</li>
+  <li><strong>Chia ngẫu nhiên từng ảnh</strong> khi có nhiều ảnh mỗi chi tiết hoặc ảnh gần trùng: chỉ số đẹp giả tạo.</li>
+  <li><strong>Chỉ thu dữ liệu một ca, một lô</strong>: mô hình hỏng khi đổi lô nguyên liệu hoặc ca đêm.</li>
+  <li><strong>Không ghi phiên bản dữ liệu cho mô hình</strong>: ba tháng sau không ai trả lời được vì sao mô hình mới kém hơn.</li>
 </ul>
 
-<h2>3. Tổ chức thư mục và đặt tên</h2>
-<pre><code>dataset-nap-chai/
-  raw/2026-09-15_line2_shiftA/IMG_000123.png
-  raw/...
-  labels/            # nhãn theo định dạng công cụ gán nhãn
-  splits/train.txt   # danh sách file theo từng tập
-  splits/val.txt
-  splits/test.txt
-  metadata.csv       # một dòng cho mỗi ảnh
-  README.md          # mô tả, định nghĩa lớp, lịch sử phiên bản</code></pre>
+<h2>10. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Viết kế hoạch thu thập ảnh cho bài toán kiểm tra lỗi của bạn (hoặc bài toán sau nếu chưa có: kiểm tra mặt nắp nhôm in logo, 20.000 nắp/ngày, 2 ca, 2 mã màu; lỗi móp 0,15%, trầy sơn 0,3%, in thiếu 0,05%; khách muốn chạy thử sau 6 tuần). Nêu số chi tiết mỗi lớp, điều kiện chụp, ma trận điều kiện, người gán nhãn và lịch.</p>
+<details><summary>Xem đáp án</summary>
+<table>
+  <tr><th>Mục</th><th>Kế hoạch mẫu</th></tr>
+  <tr><td>Lớp và số lượng v1</td><td>Trầy sơn 300, móp 250, in thiếu 150 chi tiết NG; 3.000 chi tiết OK trong đó ≥ 300 "OK khó" (bụi, vân tay, sắc độ ở biên). Mỗi chi tiết chụp 2 lần (đặt lại, xoay 90°)</td></tr>
+  <tr><td>Lịch (giữ lại 70% NG)</td><td>Trầy: 20.000 × 0,3% × 0,7 = 42/ngày → 8 ngày; móp: 21/ngày → 12 ngày; in thiếu: 7/ngày → 22 ngày. Đủ v1 sau khoảng 22 ngày sản xuất, kịp mốc 6 tuần; đóng băng v0 sau 1 tuần để thử pipeline</td></tr>
+  <tr><td>Ma trận điều kiện</td><td>2 mã màu × 2 ca × ≥ 10 lô sơn; mỗi ô ≥ 20 chi tiết cho mỗi lớp lỗi; ghi máy dập và lô sơn trong metadata</td></tr>
+  <tr><td>Điều kiện chụp</td><td>Camera, ống kính, đèn của trạm thật (đèn vòm khuếch tán cho mặt nắp cong); phơi sáng và gain cố định, ghi trong metadata; PNG 8 bit; kiểm tra độ sáng mẫu chuẩn mỗi đầu ca</td></tr>
+  <tr><td>Người gán nhãn</td><td>2 kỹ thuật viên gán khung bao trong công cụ tự cài trên máy chủ nội bộ; QA khách hàng duyệt danh mục lỗi và 100 ảnh đầu; kiểm chéo 20% ảnh; hướng dẫn gán nhãn v1.0 có ảnh mẫu từng lớp</td></tr>
+  <tr><td>Chia tập</td><td>Nhóm = mã chi tiết (gộp ảnh gần trùng); test = các lô sơn của tuần cuối; train/val chia theo nhóm 80/20; kiểm tra rò rỉ và độ phủ lớp tự động</td></tr>
+  <tr><td>Phiên bản, bảo mật</td><td>Manifest SHA-256 + dataset card cho mỗi phiên bản; dữ liệu lưu trên máy chủ nhà máy, sao lưu hằng tuần, không đưa ra ngoài</td></tr>
+</table>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Viết hàm <code>dhash(img)</code> (difference hash): thu ảnh về 9×8, so sánh mỗi pixel với pixel bên phải, được 64 bit. Áp dụng cho hai lần chụp cùng một chi tiết và cho hai chi tiết khác nhau của dataset mô phỏng; so khoảng cách Hamming.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import csv
+import os
 
-<h2>4. Gán nhãn nhất quán</h2>
+import cv2
+import numpy as np
+
+GOC = "dataset-tam-thep"
+
+
+def dhash(img):
+    nho = cv2.resize(img, (9, 8), interpolation=cv2.INTER_AREA).astype(np.int16)
+    return (nho[:, 1:] &gt; nho[:, :-1]).flatten()            # 8 × 8 = 64 bit
+
+
+with open(f"{GOC}/metadata.csv", encoding="utf-8") as f:
+    meta = list(csv.DictReader(f))
+theo_ct = {}
+for d in meta:
+    theo_ct.setdefault(d["chi_tiet"], []).append(d["file"])
+a, b = [cv2.imread(f"{GOC}/{p}", cv2.IMREAD_GRAYSCALE) for p in theo_ct["P0200"]]
+c = cv2.imread(f"{GOC}/{theo_ct['P0305'][0]}", cv2.IMREAD_GRAYSCALE)
+print("cùng chi tiết P0200:", int((dhash(a) != dhash(b)).sum()), "bit khác")
+print("P0200 và P0305   :", int((dhash(a) != dhash(c)).sum()), "bit khác")</code></pre>
+<pre><code class="language-text">cùng chi tiết P0200: 7 bit khác
+P0200 và P0305   : 36 bit khác</code></pre>
+<p>dHash rất nhanh và đủ dùng cho ảnh chụp lại; pHash (DCT) bền hơn với thay đổi độ sáng, nén và làm mờ. Cả hai đều không bền với xoay lớn: chi tiết xoay 90° cho hash khác hẳn, nên vẫn cần mã chi tiết trong metadata.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Một đồng nghiệp báo: "Mô hình phân loại đạt 99,2% trên test, nhưng chạy thử trên dây chuyền tuần này lọt rất nhiều." Dataset có 4.000 ảnh từ 800 chi tiết (mỗi chi tiết 5 ảnh, xoay 72°), chia ngẫu nhiên 80/10/10 theo ảnh, chụp trong 3 ngày của tháng trước. Liệt kê các nguyên nhân có thể và cách kiểm chứng từng nguyên nhân.</p>
+<details><summary>Xem đáp án</summary>
 <ul>
-  <li>Viết <strong>hướng dẫn gán nhãn</strong> có ảnh minh họa cho các trường hợp khó: lỗi rất nhỏ, lỗi nằm ở mép, hai lỗi chồng nhau.</li>
-  <li>Cho hai người gán cùng một tập nhỏ, đo mức độ thống nhất; bàn bạc và cập nhật hướng dẫn ở các điểm bất đồng.</li>
-  <li>Dùng công cụ hỗ trợ AI để tăng tốc (xem <a href="cong-cu-gan-nhan-du-lieu-anh-mien-phi.html">công cụ gán nhãn miễn phí</a>, <a href="sam-gan-nhan-phan-doan-nhanh.html">SAM</a>).</li>
+  <li><strong>Rò rỉ theo chi tiết</strong>: gần như mọi chi tiết test có 4 "anh em" trong train. Kiểm chứng: đếm số mã chi tiết chung giữa train và test; chia lại theo chi tiết và đánh giá lại, chỉ số sẽ giảm.</li>
+  <li><strong>Thiếu đa dạng thời gian, lô</strong>: 3 ngày tháng trước không phủ lô nguyên liệu, ca, tuổi đèn tuần này. Kiểm chứng: so độ sáng trung bình, histogram, sắc độ ảnh tuần này với dataset; đánh giá trên một tập test mới chụp tuần này.</li>
+  <li><strong>Accuracy che escape</strong>: nếu NG chỉ chiếm 2%, đoán toàn OK đã đạt 98%. Kiểm chứng: tính escape và overkill riêng, theo từng loại lỗi, kèm số mẫu.</li>
+  <li><strong>Loại lỗi mới</strong> chưa có trong dataset. Kiểm chứng: xem ảnh bị lọt, so với danh mục lỗi.</li>
+  <li><strong>Khác cấu hình chụp</strong> giữa lúc thu thập và trạm thật (phơi sáng, đèn, vị trí). Kiểm chứng: so metadata phơi sáng/gain và ảnh mẫu chuẩn.</li>
 </ul>
+</details>
+</div>
 
-<h2>5. Chia tập đúng cách</h2>
+<h2>Tóm tắt</h2>
 <ul>
-  <li>Chia theo <strong>lô, ngày hoặc mã sản phẩm</strong>, không chia ngẫu nhiên từng ảnh, để tránh ảnh gần giống nhau nằm ở cả train và test.</li>
-  <li>Tập test nên chứa dữ liệu từ <strong>khoảng thời gian khác</strong> với tập train.</li>
-  <li>Đảm bảo mỗi loại lỗi có mặt trong cả ba tập.</li>
+  <li>Bắt đầu từ danh mục lỗi có định nghĩa đo được và ảnh mẫu được QA ký; nó quyết định độ phân giải và kiểu nhãn.</li>
+  <li>Kế hoạch thu thập: số chi tiết (không phải số ảnh) mỗi lớp, ma trận điều kiện mã SP × lô × ca, lịch theo lỗi hiếm nhất, điều kiện chụp giống trạm thật, người gán và người duyệt.</li>
+  <li>Thư mục <code>raw/</code> bất biến, tên file duy nhất theo quy ước và không chứa nhãn, metadata ghi tự động, kiểm tra quy ước bằng script.</li>
+  <li>Phiên bản: manifest SHA-256 từng file, mã phiên bản là hash của manifest, dataset card mô tả và lịch sử; đóng băng rồi không sửa.</li>
+  <li>Trùng tuyệt đối tìm bằng SHA-256, gần trùng bằng pHash và khoảng cách Hamming; gộp ảnh gần trùng vào một nhóm.</li>
+  <li>Chia theo nhóm chi tiết, lô, thời gian (<code>GroupShuffleSplit</code>, <code>StratifiedGroupKFold</code>, test = lô mới nhất); chia ngẫu nhiên từng ảnh tạo độ chính xác giả tạo.</li>
 </ul>
-
-<h2>6. Quản lý phiên bản</h2>
-<ul>
-  <li>Đánh số phiên bản dataset (v1, v2...), ghi rõ thay đổi: thêm ảnh lô nào, sửa nhãn nào.</li>
-  <li>Mỗi mô hình ghi rõ được huấn luyện từ phiên bản dataset nào.</li>
-  <li>Công cụ như DVC giúp quản lý phiên bản dataset lớn cùng với Git (xem <a href="../kien-thuc/git-cho-du-an-ai-vision.html">Git cho dự án AI Vision</a>).</li>
-</ul>
-
-<h2>7. Cải thiện liên tục sau triển khai</h2>
-<p>Lưu lại các ảnh mô hình không chắc chắn hoặc bị người vận hành đánh giá lại, gán nhãn và bổ sung vào dataset. Đây là cách hiệu quả nhất để mô hình tốt dần theo thời gian.</p>
-
-<h2>Lưu ý pháp lý và bảo mật</h2>
-<p>Ảnh sản phẩm của khách hàng thường là thông tin mật. Thỏa thuận rõ quyền sử dụng dữ liệu trong hợp đồng, lưu trữ an toàn, không tải lên dịch vụ công cộng khi chưa được phép.</p>
+<p>Bài tiếp theo: <strong>Công cụ gán nhãn miễn phí</strong>, chọn CVAT, Label Studio hay X-AnyLabeling, xuất nhãn đúng định dạng và kiểm tra chất lượng nhãn bằng script.</p>
