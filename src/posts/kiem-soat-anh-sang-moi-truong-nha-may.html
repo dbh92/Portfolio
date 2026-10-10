@@ -1,39 +1,345 @@
-<p>Hệ thống chạy hoàn hảo khi nghiệm thu buổi sáng, nhưng đến chiều thì tỷ lệ NG tăng vọt. Thủ phạm quen thuộc: <strong>ánh sáng môi trường</strong>, như nắng chiếu qua cửa sổ, đèn nhà xưởng, đèn xe nâng. Bài này tổng hợp cách làm cho trạm vision "miễn nhiễm" với ánh sáng bên ngoài.</p>
+<p>Một kịch bản quen thuộc: hệ thống chạy hoàn hảo lúc nghiệm thu buổi sáng, đến khoảng hai giờ chiều tỉ lệ NG tăng vọt, tối lại bình thường. Không ai sửa gì trên máy. Thủ phạm là <strong>ánh sáng môi trường</strong>: nắng chiếu xiên qua cửa sổ theo giờ, đèn trần nhà xưởng nhấp nháy theo điện lưới, đèn xe nâng, áo phản quang của công nhân đi ngang. Ở bài <em>Màu đèn, kính lọc và phân cực</em> bạn đã tính kính lọc dải thông chặn được bao nhiêu ánh sáng xưởng; bài này ghép mọi biện pháp lại thành một <strong>ngân sách ánh sáng</strong> có số liệu, mô phỏng hiện tượng nhấp nháy 100 Hz theo thời gian phơi sáng, và xây phần giám sát độ sáng chạy suốt đời trạm. Đây là mảnh cuối trước <em>Bài tập chặng 6: chọn camera, ống kính, đèn cho bài toán thật</em>.</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>(1) Nhận ra và đo được ảnh hưởng của nắng, đèn xưởng, nhấp nháy lưới điện; (2) chọn và tính hiệu quả của che chắn, kính lọc, đèn chớp cường độ cao bằng tỉ số đèn/môi trường; (3) viết hàm giám sát độ sáng vùng chuẩn có ngưỡng cảnh báo, báo động và xu hướng, đúng như trạm thật cần.</div>
 
-<h2>Nhận diện vấn đề</h2>
-<ul>
-  <li>Kết quả thay đổi theo <strong>giờ trong ngày</strong> hoặc theo thời tiết.</li>
-  <li>Độ sáng trung bình của ROI chuẩn dao động dù không có gì thay đổi trên máy.</li>
-  <li>Lỗi xuất hiện khi có người đứng gần, xe nâng đi qua (bóng che hoặc phản xạ).</li>
-</ul>
-<p>Ghi log độ sáng trung bình của một vùng nền cố định mỗi lần chụp; vẽ theo thời gian là thấy ngay ảnh hưởng của môi trường.</p>
+<h2>1. Nhận diện ảnh hưởng của ánh sáng môi trường</h2>
+<table>
+  <tr><th>Nguồn</th><th>Đặc điểm</th><th>Triệu chứng trên trạm</th></tr>
+  <tr><td>Nắng qua cửa sổ, mái lấy sáng</td><td>Rất mạnh, đổi chậm theo giờ, theo mùa, theo mây; chứa nhiều hồng ngoại</td><td>Kết quả thay đổi theo giờ trong ngày, khác nhau giữa ngày nắng và ngày mưa</td></tr>
+  <tr><td>Đèn trần (huỳnh quang, LED, cao áp)</td><td>Ổn định theo giờ nhưng có thể <strong>nhấp nháy 100 Hz</strong> (điện lưới 50 Hz)</td><td>Độ sáng ảnh dao động ngẫu nhiên từ ảnh này sang ảnh khác; sọc ngang với cảm biến rolling shutter</td></tr>
+  <tr><td>Xe nâng, người đi qua, áo phản quang</td><td>Đột ngột, ngắn (bóng che hoặc phản xạ)</td><td>Vài ảnh NG lẻ tẻ không giải thích được, không lặp lại khi chụp lại</td></tr>
+  <tr><td>Đèn của trạm bên cạnh, đèn chớp của máy khác</td><td>Theo nhịp máy khác</td><td>Lỗi chỉ xuất hiện khi máy bên cạnh chạy</td></tr>
+  <tr><td>Hàn hồ quang, laser đánh dấu</td><td>Cực mạnh, có UV/IR</td><td>Ảnh cháy sáng; cần che chắn riêng, vì lý do an toàn nữa</td></tr>
+</table>
+<p>Hai phép đo chẩn đoán làm ngay trong ngày đầu tiên tại hiện trường:</p>
+<ol>
+  <li><strong>Ảnh "tắt đèn trạm"</strong>: giữ nguyên phơi sáng, gain, tắt đèn của trạm, chụp vài ảnh ở các giờ khác nhau (sáng, trưa, chiều nắng, ca đêm). Mức xám còn lại chính là đóng góp của ánh sáng môi trường. Tỉ số (ảnh có đèn − ảnh tắt đèn) / ảnh tắt đèn là <strong>tỉ số đèn/môi trường</strong>, con số trung tâm của cả bài.</li>
+  <li><strong>Log độ sáng vùng chuẩn</strong>: mỗi lần chụp, ghi mức xám trung bình của một vùng cố định không có sản phẩm (mục 5). Vẽ theo thời gian vài ngày là thấy ngay quy luật theo giờ, theo ca, hay đột biến.</li>
+</ol>
 
-<h2>Năm biện pháp, xếp theo hiệu quả</h2>
-<h3>1. Che chắn vật lý</h3>
-<p>Vỏ che (hood, tủ che sáng) bằng tấm nhựa đen hoặc kim loại sơn mờ bao quanh vùng chụp. Rẻ, hiệu quả nhất, nhưng phải tính tới việc bảo trì và an toàn khi thiết kế.</p>
-<h3>2. Đèn mạnh hơn hẳn môi trường</h3>
-<p>Khi đèn của hệ thống mạnh hơn ánh sáng môi trường nhiều lần, ảnh hưởng bên ngoài chỉ còn là phần nhỏ. Kết hợp <strong>đèn chớp và phơi sáng ngắn</strong>: phơi sáng vài chục micro giây thì ánh sáng môi trường gần như không kịp tác động (xem <a href="den-strobe-dong-bo-trigger-camera.html">đèn strobe</a>).</p>
-<h3>3. Kính lọc bandpass</h3>
-<p>Dùng đèn đơn sắc (đỏ, xanh, IR) và kính lọc chỉ cho đúng bước sóng đó đi qua: chặn phần lớn ánh sáng trắng của môi trường.</p>
-<h3>4. Thuật toán bền vững</h3>
-<ul>
-  <li>Ngưỡng thích nghi hoặc Otsu thay vì ngưỡng cố định.</li>
-  <li>Chuẩn hóa độ sáng theo một vùng tham chiếu trong ảnh.</li>
-  <li>Đo dựa trên cạnh và gradient (ít phụ thuộc mức sáng tuyệt đối) thay vì dựa trên mức xám.</li>
-</ul>
-<h3>5. Giám sát và cảnh báo</h3>
-<p>Nếu độ sáng vùng tham chiếu vượt ngoài dải cho phép, hệ thống báo cảnh báo hoặc dừng thay vì tiếp tục đưa ra kết quả không tin cậy.</p>
-<pre><code>REF_ROI = (20, 20, 60, 60)        # vùng nền cố định (x, y, w, h)
-def check_lighting(gray, lo=110, hi=150):
-    x, y, w, h = REF_ROI
-    m = float(gray[y:y + h, x:x + w].mean())
-    return lo &lt;= m &lt;= hi, m</code></pre>
+<h2>2. Đèn xưởng nhấp nháy 100 Hz và thời gian phơi sáng</h2>
+<p>Điện lưới Việt Nam là 220 V, <strong>50 Hz</strong>. Đèn huỳnh quang dùng chấn lưu sắt từ và nhiều đèn LED giá rẻ (bộ nguồn chỉ chỉnh lưu, lọc kém) sáng mạnh nhất ở cả đỉnh dương và đỉnh âm của điện áp, nên cường độ dao động với tần số <strong>100 Hz</strong>, chu kỳ 10 ms. Độ sâu dao động có thể từ vài phần trăm (bộ nguồn LED tốt, chấn lưu điện tử tần số cao) tới vài chục phần trăm hoặc hơn. Mắt người không thấy, nhưng camera phơi sáng ngắn thì thấy rõ, vì mỗi ảnh "lấy mẫu" một pha khác nhau của chu kỳ. Mô phỏng với độ sâu điều biến 35%, camera được trigger ngẫu nhiên so với lưới điện:</p>
+<pre><code class="language-python">import numpy as np
 
-<h2>Đừng quên các nguồn thay đổi khác</h2>
+F = 100.0          # Hz: điện lưới 50 Hz → cường độ đèn dao động 100 Hz (2 lần mỗi chu kỳ điện)
+M = 0.35           # độ sâu điều biến: ánh sáng = trung bình · (1 + M·cos(2π·F·t))
+rng = np.random.default_rng(0)
+pha = rng.uniform(0, 1 / F, 20000)          # camera được trigger ở thời điểm ngẫu nhiên so với lưới điện
+
+
+def phoi_sang(t0, T, n=200):
+    """Năng lượng ánh sáng xưởng thu được trong [t0, t0 + T], chuẩn hóa theo giá trị trung bình."""
+    t = t0[:, None] + (np.arange(n)[None, :] + 0.5) * T / n      # tích phân điểm giữa
+    return (1 + M * np.cos(2 * np.pi * F * t)).mean(axis=1)
+
+
+print("Phơi sáng | dao động đỉnh-đỉnh (mô phỏng) | công thức 2M·|sin(πFT)/(πFT)|")
+for T in (20e-6, 100e-6, 1e-3, 2.5e-3, 5e-3, 7.5e-3, 10e-3, 15e-3, 20e-3):
+    e = phoi_sang(pha, T)
+    x = np.pi * F * T
+    print(f"{T * 1e3:7.2f} ms | {100 * (e.max() - e.min()):6.1f} %"
+          f"                      | {200 * M * abs(np.sin(x) / x):6.1f} %")
+
+# Ảnh thật = đèn trạm + ánh sáng xưởng. Đèn chớp: xung 40 µs cho mức xám 150 (không đổi);
+# ánh sáng xưởng cho trung bình 30 mức xám nếu phơi sáng 2 ms (tỉ lệ thuận với thời gian phơi sáng).
+print("\nĐèn chớp 150 + ánh sáng xưởng nhấp nháy, theo thời gian phơi sáng của camera:")
+for T in (60e-6, 1e-3, 5e-3, 10e-3):
+    xuong = 30 * (T / 2e-3) * phoi_sang(pha, T)
+    tong = 150 + xuong
+    print(f"   {T * 1e3:5.2f} ms: ánh sáng xưởng {xuong.mean():5.1f} ± {(xuong.max() - xuong.min()) / 2:4.1f}"
+          f" mức xám → ảnh dao động {100 * (tong.max() - tong.min()) / tong.mean():4.1f} % đỉnh-đỉnh")</code></pre>
+<pre><code class="language-text">Phơi sáng | dao động đỉnh-đỉnh (mô phỏng) | công thức 2M·|sin(πFT)/(πFT)|
+   0.02 ms |   70.0 %                      |   70.0 %
+   0.10 ms |   70.0 %                      |   70.0 %
+   1.00 ms |   68.9 %                      |   68.9 %
+   2.50 ms |   63.0 %                      |   63.0 %
+   5.00 ms |   44.6 %                      |   44.6 %
+   7.50 ms |   21.0 %                      |   21.0 %
+  10.00 ms |    0.0 %                      |    0.0 %
+  15.00 ms |   14.9 %                      |   14.9 %
+  20.00 ms |    0.0 %                      |    0.0 %
+
+Đèn chớp 150 + ánh sáng xưởng nhấp nháy, theo thời gian phơi sáng của camera:
+    0.06 ms: ánh sáng xưởng   0.9 ±  0.3 mức xám → ảnh dao động  0.4 % đỉnh-đỉnh
+    1.00 ms: ánh sáng xưởng  15.0 ±  5.2 mức xám → ảnh dao động  6.3 % đỉnh-đỉnh
+    5.00 ms: ánh sáng xưởng  75.2 ± 16.7 mức xám → ảnh dao động 14.8 % đỉnh-đỉnh
+   10.00 ms: ánh sáng xưởng 150.0 ±  0.0 mức xám → ảnh dao động  0.0 % đỉnh-đỉnh</code></pre>
+<p>Bảng thứ nhất khớp với công thức giải tích: lấy trung bình cos trên khoảng T cho biên độ còn lại M·|sin(πFT)/(πFT)|. Ba điều rút ra:</p>
 <ul>
-  <li><strong>Đèn LED lão hóa</strong>: cường độ giảm dần theo năm; theo dõi xu hướng và bù bằng cài đặt.</li>
-  <li><strong>Nhiệt độ</strong>: LED nóng thì sáng yếu hơn; đèn cần được tản nhiệt tốt.</li>
-  <li><strong>Bụi, dầu</strong> trên đèn và ống kính: đưa vệ sinh vào lịch bảo trì định kỳ.</li>
-  <li><strong>Đèn nhà xưởng nhấp nháy</strong> theo tần số điện lưới có thể gây sọc sáng khi phơi sáng ngắn; đèn và chế độ phơi sáng của hệ thống phải lấn át được nguồn này.</li>
+  <li><strong>Phơi sáng ngắn (dưới khoảng 1 ms)</strong> lấy mẫu "tức thời": độ sáng phần ánh sáng xưởng dao động trọn ±35% giữa các ảnh.</li>
+  <li><strong>Phơi sáng đúng bội số của 10 ms</strong> (10, 20 ms…) tích phân trọn chu kỳ nên hết dao động. Ở nước dùng điện 60 Hz, con số tương ứng là bội số của 8,33 ms. Đây là chế độ "chống nhấp nháy" (anti-flicker) của webcam và camera an ninh. Nhưng 15 ms (1,5 chu kỳ) vẫn dao động 15%: lệch khỏi bội số là mất tác dụng.</li>
+  <li>Trong máy công nghiệp, phơi sáng 10 ms thường không dùng được vì nhòe chuyển động. Bảng thứ hai cho cách tiếp cận đúng: <strong>làm cho ánh sáng xưởng nhỏ không đáng kể</strong>. Với đèn chớp và phơi sáng 60 µs, ánh sáng xưởng chỉ còn khoảng 1 mức xám, ảnh dao động 0,4% dù đèn trần nhấp nháy mạnh. Phơi sáng 10 ms hết nhấp nháy nhưng ánh sáng xưởng bằng cả đèn trạm (150): nắng chiều vào là ảnh đổi gấp đôi.</li>
 </ul>
-<p>Nguyên tắc vàng: <strong>giải quyết bằng phần cứng trước, thuật toán sau</strong>. Một tấm che sáng vài trăm nghìn đồng thường hiệu quả hơn nhiều tuần tinh chỉnh phần mềm.</p>
+<div class="warn"><strong>Sọc ngang với rolling shutter</strong>Cảm biến rolling shutter đọc từng dòng lệch nhau một khoảng thời gian dòng (line time). Dưới đèn nhấp nháy, mỗi dòng nhận một pha khác nhau nên ảnh có <strong>sọc ngang sáng tối</strong>. Một chu kỳ sọc dài 1 / (100 Hz × line time) dòng: line time 15 µs cho chu kỳ khoảng 667 dòng. Sọc này trôi lên xuống giữa các ảnh và làm hỏng ngưỡng cố định. Cách xử lý giống nhau: đèn trạm mạnh, phơi sáng ngắn, che chắn; hoặc dùng global shutter (bài <em>Chọn camera và ống kính</em>).</div>
+
+<h2>3. Ba biện pháp phần cứng và ngân sách ánh sáng</h2>
+<h3>3.1. Che chắn (shroud, hộp che sáng)</h3>
+<p>Hộp hoặc vách bằng tấm nhựa đen, nhôm sơn đen mờ bao quanh vùng chụp. Rẻ và thường hiệu quả nhất. Khi thiết kế:</p>
+<ul>
+  <li>Mặt trong <strong>đen mờ</strong> (không bóng) để không phản xạ đèn trạm thành chói phụ.</li>
+  <li>Chỗ băng tải đi vào/ra: làm khe vừa đủ chiều cao sản phẩm, thêm rèm cao su đen hoặc chổi; kéo dài "đường hầm" ở hai đầu để ánh sáng phải phản xạ nhiều lần mới vào tới vùng chụp.</li>
+  <li>Cửa thăm để vệ sinh, chỉnh ống kính; nếu cửa che bộ phận chuyển động thì phải có công tắc liên động an toàn theo yêu cầu của máy.</li>
+  <li>Đèn và camera trong hộp kín nóng hơn: chừa đường tản nhiệt, nhất là với đèn chớp công suất lớn.</li>
+  <li>Ưu tiên chặn hướng cửa sổ, mái lấy sáng; một tấm che nghiêng đúng hướng nắng chiều đôi khi đủ.</li>
+</ul>
+<h3>3.2. Kính lọc dải thông</h3>
+<p>Đèn đơn sắc + kính lọc dải thông đúng bước sóng giữ phần lớn ánh sáng đèn, chặn phần lớn ánh sáng trắng (bài trước: BP625 FWHM 25 nm giữ 76% đèn, chỉ cho lọt khoảng 6–7% nắng và đèn LED trần). Với trạm cạnh cửa sổ, nhớ rằng nắng có nhiều hồng ngoại: đèn IR 850 nm không thoát được nắng.</p>
+<h3>3.3. Đèn chớp cường độ cao và phơi sáng ngắn</h3>
+<p>Ánh sáng xưởng rơi vào cảm biến trong <em>toàn bộ</em> thời gian phơi sáng, còn đèn chớp dồn toàn bộ năng lượng vào một xung ngắn. Rút phơi sáng từ 2 ms xuống 60 µs, đồng thời chạy đèn ở chế độ xung (overdrive) để giữ nguyên mức xám của đèn, thì phần ánh sáng xưởng giảm 33 lần. Chi tiết về dòng overdrive, duty cycle, nối dây có ở bài <em>Đèn strobe và đồng bộ trigger camera</em>.</p>
+<h3>3.4. Ngân sách ánh sáng: tính hiệu quả từng biện pháp</h3>
+<p>Số đo ví dụ tại một trạm gần cửa sổ: đèn trạm một mình cho mức xám 160 (phơi sáng 2 ms); ánh sáng xưởng một mình cho 30 vào ban đêm và tới 150 vào buổi chiều có nắng. Các biện pháp tác động dạng <strong>nhân</strong> nên kết hợp chúng rất hiệu quả:</p>
+<pre><code class="language-python"># Số đo tại hiện trường (mức xám, phơi sáng 2 ms, chưa có kính lọc, chưa che):
+DEN = 160.0                          # chỉ đèn trạm (đèn xưởng tắt, che kín tạm bằng vải đen)
+XUONG_MIN, XUONG_MAX = 30.0, 150.0   # chỉ ánh sáng xưởng: ban đêm (đèn trần) / buổi chiều có nắng
+
+LOC_DEN, LOC_XUONG = 0.76, 0.07      # kính lọc BP625 FWHM 25 nm (số liệu bài trước)
+CHE = 0.05                           # hộp che hở hai đầu băng tải: ánh sáng xưởng còn ~5% (đo thực tế)
+
+
+def tinh(ten, che=False, loc=False, phoi_sang_us=2000):
+    """Đèn chớp được chỉnh để cho cùng mức xám như đèn liên tục ở 2 ms (overdrive, xung ngắn)."""
+    den = DEN * (LOC_DEN if loc else 1)
+    k = (CHE if che else 1) * (LOC_XUONG if loc else 1) * phoi_sang_us / 2000
+    lo, hi = XUONG_MIN * k, XUONG_MAX * k
+    print(f"{ten:30s} | {den:4.0f} | {lo:7.2f} – {hi:7.2f} | {den / hi:8.1f} | {100 * (hi - lo) / (den + lo):5.1f} %")
+
+
+print(f"{'Cấu hình':30s} | {'đèn':&gt;4s} | {'xưởng đêm – chiều':&gt;17s} | {'tỉ số':&gt;8s} | ảnh đổi")
+tinh("Ban đầu (liên tục 2 ms)")
+tinh("Chỉ kính lọc", loc=True)
+tinh("Chỉ đèn chớp, phơi sáng 60 µs", phoi_sang_us=60)
+tinh("Chỉ hộp che", che=True)
+tinh("Kính lọc + đèn chớp", loc=True, phoi_sang_us=60)
+tinh("Che + lọc + chớp", che=True, loc=True, phoi_sang_us=60)</code></pre>
+<pre><code class="language-text">Cấu hình                       |  đèn | xưởng đêm – chiều |    tỉ số | ảnh đổi
+Ban đầu (liên tục 2 ms)        |  160 |   30.00 –  150.00 |      1.1 |  63.2 %
+Chỉ kính lọc                   |  122 |    2.10 –   10.50 |     11.6 |   6.8 %
+Chỉ đèn chớp, phơi sáng 60 µs  |  160 |    0.90 –    4.50 |     35.6 |   2.2 %
+Chỉ hộp che                    |  160 |    1.50 –    7.50 |     21.3 |   3.7 %
+Kính lọc + đèn chớp            |  122 |    0.06 –    0.32 |    386.0 |   0.2 %
+Che + lọc + chớp               |  122 |    0.00 –    0.02 |   7720.6 |   0.0 %</code></pre>
+<ul>
+  <li>Ban đầu, tỉ số đèn/môi trường xấu nhất chỉ 1,1: ảnh đổi 63% giữa đêm và chiều, không ngưỡng nào sống được.</li>
+  <li>Từng biện pháp riêng lẻ đưa mức thay đổi xuống 2–7%; tùy thuật toán, như vậy có thể vẫn chưa đủ (ngưỡng cố định cho vết lỗi mờ thường cần dưới 2–3%).</li>
+  <li>Kết hợp kính lọc và đèn chớp đã đủ (0,2%) ngay cả khi không che được; thêm hộp che thì ánh sáng xưởng thực tế bằng 0. Quy tắc kinh nghiệm: thiết kế để tỉ số đèn/môi trường trong trường hợp xấu nhất <strong>trên khoảng 50–100</strong>, rồi kiểm chứng bằng ảnh tắt đèn trạm.</li>
+  <li>Hệ số 5% của hộp che là ví dụ; nó phụ thuộc thiết kế khe hở và phải đo, không đoán.</li>
+</ul>
+
+<h2>4. Thuật toán bền vững: tuyến phòng thủ thứ hai</h2>
+<p>Phần cứng giải quyết phần lớn, nhưng thuật toán nên chịu được dao động còn lại (LED lão hóa, bụi bám). Các cách phổ biến:</p>
+<ul>
+  <li><strong>Đo dựa trên cạnh và gradient</strong> (vị trí cạnh, khớp mẫu chuẩn hóa) thay vì mức xám tuyệt đối: vị trí cạnh ít phụ thuộc độ sáng chung.</li>
+  <li><strong>Ngưỡng thích nghi hoặc Otsu</strong> thay vì ngưỡng cố định, khi ảnh có hai lớp rõ ràng.</li>
+  <li><strong>Chuẩn hóa theo vùng chuẩn</strong>: nhân ảnh với hệ số REF0 / mức xám hiện tại của miếng chuẩn, nhưng <strong>chỉ trong giới hạn</strong>. Vượt giới hạn là có chuyện bất thường (đèn hỏng, nắng chiếu thẳng), phải báo động chứ không được âm thầm bù.</li>
+</ul>
+<pre><code class="language-python">import numpy as np
+import cv2
+
+ROI_CHUAN, REF0 = (5, 5, 30, 30), 180.0       # miếng chuẩn xám: mức xám lúc cài đặt
+NGUONG = 100                                  # ngưỡng cố định chọn lúc cài đặt
+
+
+def tao_anh(do_sang, seed=0):
+    """Nền sáng 200, chi tiết tối 60 (vết lỗi 8×8 mức 112), miếng chuẩn 180; nhân hệ số độ sáng."""
+    img = np.full((120, 160), 200.0)
+    img[5:35, 5:35] = 180
+    cv2.circle(img, (100, 70), 30, 60, -1)
+    img[60:68, 92:100] = 112                  # vết lỗi sáng hơn chi tiết, tối hơn nền
+    img = img * do_sang + np.random.default_rng(seed).normal(0, 2, img.shape)
+    return np.clip(img, 0, 255).astype(np.uint8)
+
+
+def dien_tich_toi(img, chuan_hoa):
+    g = img.astype(np.float64)
+    if chuan_hoa:
+        x, y, w, h = ROI_CHUAN
+        k = REF0 / g[y:y + h, x:x + w].mean()
+        if not 0.85 &lt;= k &lt;= 1.15:
+            return None                       # lệch &gt; 15%: không bù, báo động
+        g = g * k
+    return int((g[40:110, 60:150] &lt; NGUONG).sum())
+
+
+print("Diện tích đúng = diện tích chi tiết, KHÔNG gồm vết lỗi 64 px")
+for ds in (1.0, 0.95, 0.88, 1.12, 0.75):
+    img = tao_anh(ds)
+    a, b = dien_tich_toi(img, False), dien_tich_toi(img, True)
+    print(f"độ sáng ×{ds:4.2f}: ngưỡng cố định {a:5d} px | chuẩn hóa "
+          + (f"{b:5d} px" if b is not None else "từ chối, BÁO ĐỘNG"))</code></pre>
+<pre><code class="language-text">Diện tích đúng = diện tích chi tiết, KHÔNG gồm vết lỗi 64 px
+độ sáng ×1.00: ngưỡng cố định  2757 px | chuẩn hóa  2757 px
+độ sáng ×0.95: ngưỡng cố định  2757 px | chuẩn hóa  2757 px
+độ sáng ×0.88: ngưỡng cố định  2810 px | chuẩn hóa  2757 px
+độ sáng ×1.12: ngưỡng cố định  2757 px | chuẩn hóa  2757 px
+độ sáng ×0.75: ngưỡng cố định  2821 px | chuẩn hóa từ chối, BÁO ĐỘNG</code></pre>
+<p>Ở độ sáng ×0,88, vết lỗi mức 112 tụt xuống dưới ngưỡng 100 và bị đếm nhầm vào vùng tối (ngưỡng cố định: 2810 px thay vì 2757): đúng kiểu sai lệch kết quả đo theo giờ. Chuẩn hóa theo miếng chuẩn cho kết quả đúng ở mọi mức trong ±15%, và ở ×0,75 thì <strong>từ chối</strong> thay vì trả về một con số sai. Chuẩn hóa chỉ bù được thay đổi đều trên cả ảnh; nắng chiếu một góc ảnh thì miếng chuẩn ở góc kia không thấy gì, nên vẫn cần phần cứng.</p>
+
+<h2>5. Giám sát độ sáng trong sản xuất</h2>
+<h3>5.1. Miếng chuẩn (reference patch)</h3>
+<ul>
+  <li>Một miếng vật liệu xám mờ, bền màu (gốm, nhôm anod xám, tấm nhựa kỹ thuật) gắn cố định trên đồ gá hoặc khung, <strong>luôn nằm trong FOV</strong> và không bị sản phẩm che. Tránh giấy trắng (ố vàng), vật bóng (chói theo góc).</li>
+  <li>Mức xám lúc cài đặt nên ở khoảng giữa thang (100–180) để thấy được cả tăng lẫn giảm, không bão hòa.</li>
+  <li>Nếu không có chỗ trong FOV: dùng một vùng nền cố định của đồ gá, hoặc chụp ảnh kiểm tra định kỳ khi băng tải trống.</li>
+  <li>Lưu giá trị cài đặt (μ0) cùng cấu hình trạm (phơi sáng, dòng đèn, ngày nghiệm thu) để đối chiếu khi thay đèn.</li>
+</ul>
+<h3>5.2. Ba tầng phản ứng</h3>
+<table>
+  <tr><th>Tầng</th><th>Điều kiện</th><th>Hành động</th></tr>
+  <tr><td>Ảnh không tin cậy</td><td>Một ảnh lệch quá ngưỡng báo động (ví dụ ±15%) hoặc vùng chuẩn bão hòa</td><td>Không trả OK cho ảnh đó; chụp lại hoặc gửi PLC mã "không đánh giá được" để tách sản phẩm ra kiểm tra lại</td></tr>
+  <tr><td>Báo động, dừng trạm</td><td>Lệch quá ngưỡng N ảnh liên tiếp (ví dụ 3)</td><td>Bật bit báo động cho PLC, dừng trạm, gọi bảo trì</td></tr>
+  <tr><td>Cảnh báo xu hướng</td><td>Trung bình trượt EWMA lệch quá ±5% (hoặc ±3σ lúc nghiệm thu nếu lớn hơn)</td><td>Hiện cảnh báo vàng trên HMI, ghi log, lên lịch vệ sinh, kiểm tra đèn, kiểm tra che chắn</td></tr>
+</table>
+<p>EWMA (exponentially weighted moving average, trung bình trượt hàm mũ) cập nhật E ← λ·x + (1 − λ)·E với λ nhỏ (0,05): lọc nhiễu từng ảnh, phản ứng với thay đổi kéo dài, nên bắt được nắng chiều hay đèn yếu dần mà không báo nhầm vì một bóng xe nâng. Mô phỏng 3 ngày sản xuất, mỗi phút một ảnh: bụi và lão hóa làm tối 1,5%/ngày, nắng chiều tăng tới 9%, xe nâng che sáng vài ảnh, và 10:00 ngày thứ ba một dải LED hỏng (−20%):</p>
+<pre><code class="language-python">import numpy as np
+
+rng = np.random.default_rng(3)
+# --- Mô phỏng 3 ngày sản xuất, 1 ảnh mỗi phút: mức xám trung bình của vùng chuẩn
+phut = np.arange(3 * 24 * 60)
+gio = (phut / 60) % 24
+ngay = phut // (24 * 60)
+y = 150 * (1 - 0.015 * phut / (24 * 60))                      # bụi bám + LED lão hóa: −1,5%/ngày
+y *= 1 + 0.09 * np.clip(np.cos((gio - 15) / 2.0 * np.pi / 2), 0, None) * ((gio &gt; 13) &amp; (gio &lt; 17))  # nắng chiều
+y[[570, 2070, 2071]] *= 0.75                                  # xe nâng che sáng (1–2 ảnh)
+y[(ngay == 2) &amp; (gio &gt;= 10)] *= 0.80                          # ngày 3, 10:00: hỏng một dải LED
+y = y + rng.normal(0, 0.8, y.size)
+
+# --- Giới hạn từ 60 ảnh lúc nghiệm thu
+mu0, s0 = y[:60].mean(), y[:60].std()
+canh_bao = max(3 * s0, 0.05 * mu0)          # vàng: lệch &gt; 5% (hoặc 3σ nếu lớn hơn)
+bao_dong = 0.15 * mu0                       # đỏ: lệch &gt; 15% (theo dung sai của thuật toán)
+print(f"Nghiệm thu: μ0 = {mu0:.1f}, σ0 = {s0:.2f} → cảnh báo ±{canh_bao:.1f}, báo động ±{bao_dong:.1f}")
+
+ewma, lam_e, lien_tiep, dang_lech = mu0, 0.05, 0, False
+for i, v in enumerate(y):
+    ewma = lam_e * v + (1 - lam_e) * ewma
+    t = f"ngày {ngay[i] + 1} {int(gio[i]):02d}:{int(phut[i] % 60):02d}"
+    if abs(v - mu0) &gt; bao_dong:
+        lien_tiep += 1
+        if lien_tiep == 1:
+            print(f"{t}: ảnh lệch {100 * (v - mu0) / mu0:+.0f}% → kết quả ảnh này KHÔNG TIN CẬY, chụp lại")
+        if lien_tiep == 3:
+            print(f"{t}: 3 ảnh liên tiếp lệch &gt; 15% → DỪNG TRẠM, gọi bảo trì")
+            break
+    else:
+        lien_tiep = 0
+    if abs(ewma - mu0) &gt; canh_bao and not dang_lech:
+        print(f"{t}: xu hướng EWMA {100 * (ewma - mu0) / mu0:+.1f}% → CẢNH BÁO (vàng)")
+        dang_lech = True
+    elif abs(ewma - mu0) &lt; 0.8 * canh_bao and dang_lech:     # trễ 20% để không bật/tắt liên tục
+        print(f"{t}: xu hướng EWMA {100 * (ewma - mu0) / mu0:+.1f}% → hết cảnh báo")
+        dang_lech = False
+
+lech = np.abs(y[:i + 1] - mu0)
+for d in range(3):
+    m = ngay[:i + 1] == d
+    print(f"Ngày {d + 1}: {m.sum():4d} ảnh, vượt vàng {np.sum(lech[m] &gt; canh_bao):4d}, vượt đỏ {np.sum(lech[m] &gt; bao_dong):3d}")</code></pre>
+<pre><code class="language-text">Nghiệm thu: μ0 = 149.9, σ0 = 0.86 → cảnh báo ±7.5, báo động ±22.5
+ngày 1 09:30: ảnh lệch -25% → kết quả ảnh này KHÔNG TIN CẬY, chụp lại
+ngày 1 14:16: xu hướng EWMA +5.1% → CẢNH BÁO (vàng)
+ngày 1 16:33: xu hướng EWMA +4.0% → hết cảnh báo
+ngày 2 10:30: ảnh lệch -27% → kết quả ảnh này KHÔNG TIN CẬY, chụp lại
+ngày 2 14:40: xu hướng EWMA +5.0% → CẢNH BÁO (vàng)
+ngày 2 16:12: xu hướng EWMA +4.0% → hết cảnh báo
+ngày 3 10:00: ảnh lệch -23% → kết quả ảnh này KHÔNG TIN CẬY, chụp lại
+ngày 3 10:01: xu hướng EWMA -5.4% → CẢNH BÁO (vàng)
+ngày 3 10:02: 3 ảnh liên tiếp lệch &gt; 15% → DỪNG TRẠM, gọi bảo trì
+Ngày 1: 1440 ảnh, vượt vàng  132, vượt đỏ   1
+Ngày 2: 1440 ảnh, vượt vàng   86, vượt đỏ   2
+Ngày 3:  603 ảnh, vượt vàng    4, vượt đỏ   3</code></pre>
+<ul>
+  <li>Bóng xe nâng (1–2 ảnh) chỉ làm vài ảnh bị đánh dấu "không tin cậy", không dừng máy.</li>
+  <li>Nắng chiều kéo EWMA vượt +5% khoảng 14–16 giờ mỗi ngày: cảnh báo vàng lặp lại đúng giờ là dấu hiệu rõ ràng cần che chắn hướng cửa sổ. Cảnh báo tự tắt khi EWMA về dưới 80% ngưỡng (vùng trễ, hysteresis, để không bật tắt liên tục).</li>
+  <li>Khi dải LED hỏng, sau 3 ảnh trạm dừng: không một sản phẩm nào được đánh giá bằng ảnh tối sai, trong khi một trạm không giám sát sẽ âm thầm tăng overkill (hoặc escape) cho tới khi có người phát hiện.</li>
+  <li>Đếm số ảnh vượt vàng theo ngày là chỉ số đơn giản để báo cáo tình trạng trạm hàng tuần.</li>
+</ul>
+<div class="tip"><strong>Giám sát thêm vài chỉ số rẻ</strong>Cùng chỗ tính độ sáng vùng chuẩn, ghi thêm: tỉ lệ pixel bão hòa toàn ảnh, độ sắc nét (phương sai Laplacian trên vùng có cạnh, xem bài <em>Độ sâu trường ảnh, khẩu độ, lấy nét</em>), nhiệt độ camera nếu đọc được. Ba con số này phát hiện sớm ống kính bị xoay nét, kính bảo vệ bám dầu, đèn quá nhiệt.</div>
+
+<h2>6. Đừng quên các nguồn thay đổi "bên trong"</h2>
+<ul>
+  <li><strong>LED lão hóa</strong>: quang thông giảm dần theo giờ chạy (nhanh hơn khi chạy nóng, dòng cao). Đèn chớp chạy duty thấp lão hóa chậm hơn đèn liên tục. Xu hướng EWMA và log hàng tháng cho biết khi nào cần tăng dòng hoặc thay đèn.</li>
+  <li><strong>Nhiệt độ</strong>: LED nóng lên thì sáng yếu đi; sau khi bật máy, độ sáng còn trôi trong vài chục phút tới khi ổn định nhiệt. Khởi động trạm, chờ ổn định rồi mới chụp ảnh mẫu chuẩn đầu ca.</li>
+  <li><strong>Bụi, dầu</strong> trên đèn, kính bảo vệ, ống kính: đưa vệ sinh vào lịch bảo trì định kỳ và kiểm tra lại vùng chuẩn sau khi vệ sinh.</li>
+  <li><strong>Bộ điều khiển đèn</strong>: dùng nguồn dòng không đổi (constant current) chuyên dụng; nguồn áp rẻ tiền làm độ sáng đổi theo điện áp và nhiệt độ.</li>
+</ul>
+
+<h2>7. Sai lầm thường gặp</h2>
+<ul>
+  <li><strong>Nghiệm thu một buổi rồi về</strong>: không chụp ảnh tắt đèn trạm ở các giờ khác nhau, không biết buổi chiều có nắng chiếu vào.</li>
+  <li><strong>Phơi sáng dài "cho chắc"</strong>: phơi sáng dài hơn xung đèn chớp chỉ đón thêm ánh sáng xưởng.</li>
+  <li><strong>Giải quyết bằng phần mềm trước</strong>: tinh chỉnh ngưỡng hàng tuần cho một vấn đề mà tấm che vài trăm nghìn đồng xử lý dứt điểm. Nguyên tắc: phần cứng trước, thuật toán sau.</li>
+  <li><strong>Tự động bù sáng không giới hạn</strong>: auto-exposure hoặc chuẩn hóa không giới hạn che giấu đèn hỏng, ảnh tối nhiễu cao, rồi trạm vẫn trả OK.</li>
+  <li><strong>Vùng chuẩn đặt trên sản phẩm</strong>: màu sản phẩm thay đổi theo lô làm báo động giả.</li>
+  <li><strong>Mặt trong hộp che bóng</strong>: hộp che thành nguồn chói mới.</li>
+</ul>
+
+<h2>8. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Viết hàm cảnh báo khi độ sáng trung bình của vùng chuẩn lệch quá 15% so với giá trị lúc cài đặt. Hàm nhận ảnh xám, ROI (x, y, w, h), giá trị cài đặt; trả về trạng thái, mức xám hiện tại và độ lệch. Xử lý thêm trường hợp vùng chuẩn bị bão hòa. Thử với 5 tình huống.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import numpy as np
+
+
+def canh_bao_do_sang(gray, roi, gia_tri_cai_dat, nguong=0.15):
+    """Kiểm tra độ sáng trung bình vùng chuẩn so với giá trị lúc cài đặt.
+    gray: ảnh xám uint8; roi: (x, y, w, h) của vùng chuẩn cố định trong ảnh;
+    gia_tri_cai_dat: mức xám trung bình của vùng chuẩn khi nghiệm thu.
+    Trả về (trạng thái, mức xám hiện tại, độ lệch tương đối)."""
+    x, y, w, h = roi
+    vung = gray[y:y + h, x:x + w]
+    if vung.size == 0:
+        raise ValueError("ROI nằm ngoài ảnh")
+    m = float(vung.mean())
+    lech = (m - gia_tri_cai_dat) / gia_tri_cai_dat
+    if (vung &gt;= 255).mean() &gt; 0.01:
+        return "CẢNH BÁO: vùng chuẩn bão hòa", m, lech
+    if abs(lech) &gt; nguong:
+        return ("CẢNH BÁO: quá sáng" if lech &gt; 0 else "CẢNH BÁO: quá tối"), m, lech
+    return "OK", m, lech
+
+
+# Thử với ảnh tổng hợp: miếng chuẩn xám ở góc trái trên, mức cài đặt 128
+ROI = (10, 10, 40, 40)
+rng = np.random.default_rng(0)
+for ten, he_so in (("bình thường", 1.00), ("đèn yếu 10%", 0.90), ("nắng chiếu +18%", 1.18),
+                   ("đèn hỏng một nửa", 0.55), ("cháy sáng", 2.20)):
+    img = np.clip(rng.normal(128 * he_so, 3, (240, 320)), 0, 255).astype(np.uint8)
+    tt, m, lech = canh_bao_do_sang(img, ROI, gia_tri_cai_dat=128.0)
+    print(f"{ten:18s}: trung bình {m:6.1f}, lệch {100 * lech:+6.1f}% → {tt}")</code></pre>
+<pre><code class="language-text">bình thường       : trung bình  127.5, lệch   -0.4% → OK
+đèn yếu 10%       : trung bình  114.7, lệch  -10.4% → OK
+nắng chiếu +18%   : trung bình  150.5, lệch  +17.6% → CẢNH BÁO: quá sáng
+đèn hỏng một nửa  : trung bình   69.9, lệch  -45.4% → CẢNH BÁO: quá tối
+cháy sáng         : trung bình  255.0, lệch  +99.2% → CẢNH BÁO: vùng chuẩn bão hòa</code></pre>
+<p>Lưu ý: kiểm tra bão hòa đứng trước kiểm tra độ lệch, vì khi vùng chuẩn bão hòa thì mức xám trung bình không còn phản ánh độ sáng thật (ảnh có thể sáng gấp 3 mà vẫn đọc là 255). Đèn yếu 10% vẫn "OK" theo ngưỡng 15%: đó là việc của cảnh báo xu hướng EWMA ở mục 5. Trong trạm thật, hàm này được gọi cho mọi ảnh trước khi đánh giá sản phẩm, và trạng thái khác "OK" chặn việc gửi kết quả OK cho PLC.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Một trạm chụp sản phẩm đứng yên (băng tải bước) dưới đèn trần nhấp nháy 100 Hz độ sâu 35%, không có đèn trạm riêng, phơi sáng 4 ms. Độ sáng ảnh dao động bao nhiêu? Đổi phơi sáng thành bao nhiêu để hết dao động? Vì sao đó vẫn không phải giải pháp tốt?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import math
+
+M, F = 0.35, 100.0
+for T in (4e-3, 10e-3, 20e-3):
+    x = math.pi * F * T
+    print(f"phơi sáng {T * 1e3:4.1f} ms: dao động đỉnh-đỉnh {200 * M * abs(math.sin(x) / x):5.1f} %")</code></pre>
+<pre><code class="language-text">phơi sáng  4.0 ms: dao động đỉnh-đỉnh  53.0 %
+phơi sáng 10.0 ms: dao động đỉnh-đỉnh   0.0 %
+phơi sáng 20.0 ms: dao động đỉnh-đỉnh   0.0 %</code></pre>
+<p>Phơi sáng 4 ms: dao động khoảng 53% đỉnh-đỉnh giữa các ảnh. Đổi sang 10 ms (hoặc 20 ms) là hết nhấp nháy, vì vật đứng yên nên không lo nhòe. Nhưng trạm vẫn phụ thuộc hoàn toàn vào đèn trần: nắng, đèn bị thay loại khác, một bóng đèn hỏng, người đứng che đều làm ảnh đổi. Giải pháp đúng là đèn trạm riêng, che chắn, kính lọc; khi đó phơi sáng 10 ms chỉ còn là biện pháp phụ.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Dùng bảng ngân sách ánh sáng ở mục 3.4. Thuật toán yêu cầu độ sáng ảnh đổi không quá 2% giữa ban đêm và buổi chiều nắng. Khách hàng không cho làm hộp che vì vướng robot. Phương án nào đạt? Nếu khách đổi ý cho che nhưng không cho thay đèn (không dùng được đèn chớp), có đạt không?</p>
+<details><summary>Xem đáp án</summary>
+<p>Không che: chỉ kính lọc (6,8%) hoặc chỉ đèn chớp (2,2%) đều không đạt; <strong>kính lọc + đèn chớp</strong> cho 0,2%, đạt với dư địa 10 lần. Có che nhưng không có đèn chớp: che + kính lọc cho ánh sáng xưởng 30–150 × 0,05 × 0,07 = 0,105–0,525 mức xám trên tín hiệu 122, thay đổi khoảng 0,34%, <strong>đạt</strong>. Hai phương án khác nhau đều đạt vì các biện pháp nhân với nhau; chọn theo chi phí và ràng buộc cơ khí, rồi kiểm chứng bằng ảnh tắt đèn trạm lúc nắng gắt nhất.</p>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Chẩn đoán bằng ảnh tắt đèn trạm ở nhiều giờ khác nhau và log độ sáng vùng chuẩn theo thời gian. Con số trung tâm: tỉ số đèn/môi trường trong trường hợp xấu nhất.</li>
+  <li>Điện 50 Hz → đèn nhấp nháy 100 Hz. Dao động còn lại sau phơi sáng T: 2M·|sin(πFT)/(πFT)|; hết khi T là bội số 10 ms, nhưng cách bền vững là làm ánh sáng xưởng nhỏ không đáng kể.</li>
+  <li>Che chắn, kính lọc dải thông, đèn chớp + phơi sáng ngắn tác động dạng nhân: kết hợp hai biện pháp thường đưa thay đổi ảnh từ hàng chục phần trăm xuống dưới 1%. Mục tiêu tỉ số đèn/môi trường &gt; 50–100.</li>
+  <li>Thuật toán bền vững (cạnh, Otsu, chuẩn hóa theo miếng chuẩn có giới hạn) là tuyến thứ hai, không thay phần cứng.</li>
+  <li>Giám sát ba tầng: ảnh không tin cậy (lệch &gt; 15%), dừng trạm (N ảnh liên tiếp), cảnh báo xu hướng (EWMA &gt; 5%). Miếng chuẩn xám mờ, bền màu, luôn trong FOV.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Bài tập chặng 6: chọn camera, ống kính, đèn cho bài toán thật</strong>, nơi bạn ghép toàn bộ chặng 6 thành một cấu hình hoàn chỉnh có bảng vật tư và lý do bằng số.</p>

@@ -1317,16 +1317,17 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Kiểm soát ánh sáng môi trường trong nhà máy",
+  "t": "Kiểm soát ánh sáng môi trường: nắng, đèn xưởng nhấp nháy, giám sát độ sáng",
   "u": "kien-thuc/kiem-soat-anh-sang-moi-truong-nha-may.html",
-  "e": "Nhận diện ảnh hưởng của nắng, đèn xưởng và năm biện pháp giúp trạm vision ổn định suốt ngày đêm.",
+  "e": "Mô phỏng nhấp nháy 100 Hz theo thời gian phơi sáng, ngân sách che chắn – kính lọc – đèn chớp bằng số và hàm giám sát vùng chuẩn có cảnh báo, dừng trạm, xu hướng EWMA.",
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "28/09/2026",
-  "m": 3,
+  "m": 29,
   "img": "assets/images/posts/kiem-soat-anh-sang-moi-truong-nha-may.webp",
   "tags": [
-   "Lighting",
+   "Chiếu sáng",
+   "Industrial Vision",
    "Machine Vision"
   ]
  },
@@ -1760,17 +1761,18 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "7 kiểu chiếu sáng trong Machine Vision và khi nào dùng",
+  "t": "7 kiểu chiếu sáng Machine Vision: chọn đèn theo bề mặt và loại lỗi",
   "u": "kien-thuc/7-kieu-chieu-sang-machine-vision.html",
-  "e": "Backlight, ring light, dark-field, coaxial, dome, bar light, structured light cùng cách chọn màu đèn, kính lọc và phân cực.",
+  "e": "Backlight, đồng trục, vòm, dark field góc thấp, đèn thanh, laser: hình học bright/dark field, mô phỏng CNR từng loại lỗi và quy trình thử đèn có chấm điểm.",
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "16/09/2026",
-  "m": 4,
+  "m": 37,
   "img": "assets/images/posts/7-kieu-chieu-sang-machine-vision.webp",
   "tags": [
+   "Chiếu sáng",
    "Machine Vision",
-   "Lighting"
+   "Industrial Vision"
   ]
  },
  {
@@ -1847,17 +1849,18 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Màu đèn, kính lọc và phân cực: tăng tương phản cho Machine Vision",
+  "t": "Màu đèn, kính lọc và phân cực: tăng tương phản, chặn ánh sáng xưởng",
   "u": "kien-thuc/mau-den-kinh-loc-phan-cuc.html",
-  "e": "Chọn màu đèn theo màu bù, đặc tính từng bước sóng, kính lọc bandpass và phân cực để xóa chói.",
+  "e": "Chọn màu đèn theo màu bù có mô phỏng phổ, bẫy cvtColor với camera màu, kính lọc bandpass chặn ánh sáng môi trường và phân cực chéo xóa chói theo định luật Malus.",
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "14/09/2026",
-  "m": 4,
+  "m": 34,
   "img": "assets/images/posts/mau-den-kinh-loc-phan-cuc.webp",
   "tags": [
-   "Lighting",
-   "Machine Vision"
+   "Chiếu sáng",
+   "Machine Vision",
+   "Camera"
   ]
  },
  {
@@ -2639,21 +2642,21 @@ window.HF_TOPICS = [
   "u": "hoc/industrial-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 29
+  "n": 31
  },
  {
   "t": "Camera & Lens",
   "u": "hoc/camera-lens.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 11
+  "n": 12
  },
  {
   "t": "Lighting",
   "u": "hoc/lighting.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 3
+  "n": 0
  },
  {
   "t": "Calibration",
