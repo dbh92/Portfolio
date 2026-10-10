@@ -1,61 +1,459 @@
-<p>Mô hình chạy 200 ms mỗi ảnh trên laptop, nhưng dây chuyền yêu cầu xử lý xong trong 50 ms. Bài này tổng hợp các cách <strong>tăng tốc suy luận</strong> khi triển khai mô hình AI Vision: từ chọn định dạng, runtime, đến lượng tử hóa và tối ưu cả đường ống xử lý.</p>
+<p>Mô hình chạy 40 ms mỗi ảnh trên laptop của bạn, nhưng trên PC công nghiệp của trạm thì p99 lên 140 ms và PLC bắt đầu báo timeout. Hoặc ngược lại: bạn đọc trên mạng "INT8 nhanh gấp 4 lần", lượng tử hóa xong thì mô hình chậm hơn và lọt thêm lỗi. Cả hai tình huống đều đến từ cùng một gốc: <strong>tối ưu mà không đo, hoặc đo sai</strong>. Bài này tiếp nối "Chạy mô hình ONNX trong C#": trước hết học cách đo tốc độ đúng (khởi động nóng, p50/p95/p99, batch và độ trễ), sau đó thử các nút vặn của ONNX Runtime ngay trên CPU, rồi lượng tử hóa INT8 thật bằng ONNX Runtime và so kích thước, tốc độ, độ khớp với FP32. Cuối bài là cách dùng TensorRT và OpenVINO cùng bảng chọn runtime theo phần cứng. Bài sau "Đo latency, logging và giám sát mô hình" mở rộng phép đo ra cả pipeline khi trạm đã chạy thật.</p>
 
-<h2>Đo trước khi tối ưu</h2>
-<pre><code>import time
-import numpy as np
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Đo được thời gian suy luận đúng cách (tách thời gian tạo session và lần chạy đầu, khởi động nóng, báo p50/p95/p99/max); hiểu đánh đổi batch với độ trễ; chỉnh mức tối ưu đồ thị và số luồng; hiểu FP16 và INT8 (scale, zero point, per-channel, hiệu chuẩn); lượng tử hóa dynamic và static bằng <code>onnxruntime.quantization</code>, đánh giá bằng escape/overkill chứ không chỉ bằng tốc độ; dùng được <code>trtexec</code> và OpenVINO; chọn runtime theo phần cứng.</div>
 
-def bench(fn, x, warmup=10, n=100):
-    for _ in range(warmup):            # lần chạy đầu luôn chậm (khởi tạo, cấp phát)
-        fn(x)
-    t = []
-    for _ in range(n):
-        t0 = time.perf_counter(); fn(x); t.append(time.perf_counter() - t0)
-    t = np.array(t) * 1000
-    print(f"trung bình {t.mean():.1f} ms, p99 {np.percentile(t, 99):.1f} ms")</code></pre>
-<p>Đo <strong>toàn bộ chu trình</strong>: chụp ảnh, tiền xử lý, suy luận, hậu xử lý, gửi kết quả. Thường tiền xử lý viết chưa tốt còn chậm hơn cả mô hình. Quan tâm cả giá trị p99 (trường hợp chậm nhất), vì dây chuyền cần đảm bảo mọi sản phẩm đều kịp xử lý.</p>
-
-<h2>Chọn runtime phù hợp phần cứng</h2>
+<h2>1. Bắt đầu từ ngân sách thời gian, không phải từ mô hình</h2>
+<p>Tốc độ "đủ nhanh" do dây chuyền quyết định. Ví dụ trạm kiểm tra 120 sản phẩm/phút: mỗi chu kỳ 500 ms. Trong 500 ms đó còn phải chụp ảnh, truyền ảnh, gửi kết quả cho PLC và chừa biên an toàn:</p>
 <table>
-  <tr><th>Phần cứng</th><th>Lựa chọn phổ biến</th></tr>
-  <tr><td>CPU bất kỳ</td><td>ONNX Runtime</td></tr>
-  <tr><td>CPU / GPU tích hợp / NPU Intel</td><td>OpenVINO</td></tr>
-  <tr><td>GPU NVIDIA, Jetson</td><td>TensorRT</td></tr>
-  <tr><td>Windows, nhiều loại GPU</td><td>ONNX Runtime với DirectML</td></tr>
+  <tr><th>Hạng mục</th><th>Thời gian (ví dụ)</th><th>Ghi chú</th></tr>
+  <tr><td>Phơi sáng + truyền ảnh 5 MP qua GigE</td><td>~60 ms</td><td>Phụ thuộc camera, băng thông</td></tr>
+  <tr><td>Tiền xử lý (cắt ROI, resize, chuẩn hóa)</td><td>5–15 ms</td><td>Hay bị bỏ quên khi đo</td></tr>
+  <tr><td><strong>Suy luận mô hình</strong></td><td>?</td><td>Thứ ta tối ưu trong bài này</td></tr>
+  <tr><td>Hậu xử lý, lưu ảnh NG, ghi log</td><td>5–20 ms</td><td>Lưu ảnh nên làm ở luồng khác</td></tr>
+  <tr><td>Gửi kết quả PLC, bắt tay</td><td>10–20 ms</td><td>Theo chu kỳ quét PLC</td></tr>
+  <tr><td>Biên an toàn</td><td>≥ 30% chu kỳ</td><td>Cho lúc máy bận, Windows cập nhật, nhiệt độ cao</td></tr>
 </table>
-<pre><code>from ultralytics import YOLO
-m = YOLO("best.pt")
-m.export(format="onnx")        # ONNX Runtime
-m.export(format="openvino")    # Intel
-m.export(format="engine")      # TensorRT, phải chạy trên máy có GPU NVIDIA đích</code></pre>
-<p>File TensorRT engine gắn với phiên bản TensorRT và loại GPU cụ thể; hãy build trên đúng máy (hoặc cùng cấu hình) sẽ chạy thật.</p>
+<p>Còn lại cho suy luận khoảng 150–200 ms, và con số phải đạt là <strong>p99 trên đúng PC của trạm</strong>, không phải trung bình trên laptop của bạn. Nếu mô hình FP32 đã đạt với biên rộng, đừng lượng tử hóa: mỗi bước tối ưu là một rủi ro mới cho độ chính xác.</p>
 
-<h2>Giảm độ chính xác số: FP16 và INT8</h2>
+<h2>2. Chuẩn bị: mô hình kiểm tra vết xước</h2>
+<p>Bài toán giả: ảnh 96×96 bề mặt xám có ánh sáng không đều; ảnh NG có một vết xước mảnh, tối. Mô hình CNN 4 khối Conv-BatchNorm-ReLU, huấn luyện 3 epoch trên 700 ảnh, giữ 300 ảnh làm tập kiểm tra.</p>
+<pre><code class="language-bash">pip install torch onnx onnxruntime onnxscript opencv-python numpy
+# Bài viết chạy với torch 2.14.1 (CPU), onnx 1.23.2, onnxruntime 1.31.0, trên CPU Intel Xeon 4 lõi.</code></pre>
+<pre><code class="language-python">import time
+from pathlib import Path
+
+import cv2
+import numpy as np
+import torch
+import torch.nn as nn
+
+torch.manual_seed(0)
+torch.set_num_threads(4)
+S = 96
+MEAN = np.array([0.485, 0.456, 0.406], np.float32)
+STD = np.array([0.229, 0.224, 0.225], np.float32)
+
+
+def tao_anh(ng, rng):
+    """Bề mặt xám 96x96, sáng không đều; NG có vết xước tối dày 2 px."""
+    anh = np.full((S, S), 120, np.float32) + rng.normal(0, 6, (S, S))
+    anh += np.linspace(-20, 20, S)[None, :]
+    if ng:
+        x0, y0 = rng.integers(10, S - 30, 2)
+        dx = int(rng.integers(-20, 21))
+        cv2.line(anh, (int(x0), int(y0)), (int(x0) + dx, int(y0) + 20), float(rng.uniform(60, 90)), 2)
+    return cv2.cvtColor(np.clip(anh, 0, 255).astype(np.uint8), cv2.COLOR_GRAY2BGR)
+
+
+def tien_xu_ly(anh_bgr):
+    a = cv2.cvtColor(anh_bgr, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
+    return np.ascontiguousarray(((a - MEAN) / STD).transpose(2, 0, 1))
+
+
+rng = np.random.default_rng(0)
+nhan = np.array([i % 2 for i in range(1000)])                   # 0 = OK, 1 = NG
+X = np.stack([tien_xu_ly(tao_anh(n, rng)) for n in nhan])
+X_test, y_test = X[700:], nhan[700:]
+Xt, yt = torch.from_numpy(X[:700]), torch.from_numpy(nhan[:700]).long()
+
+
+def khoi(vao, ra):
+    return [nn.Conv2d(vao, ra, 3, padding=1), nn.BatchNorm2d(ra), nn.ReLU()]
+
+
+model = nn.Sequential(*khoi(3, 16), nn.MaxPool2d(2), *khoi(16, 32), nn.MaxPool2d(2),
+                      *khoi(32, 64), nn.MaxPool2d(2), *khoi(64, 64),
+                      nn.AdaptiveAvgPool2d(1), nn.Flatten(), nn.Linear(64, 2))
+opt = torch.optim.Adam(model.parameters(), lr=2e-3)
+for ep in range(3):
+    model.train()
+    perm = torch.randperm(700)
+    for i in range(0, 700, 32):
+        idx = perm[i:i + 32]
+        loss = nn.functional.cross_entropy(model(Xt[idx]), yt[idx])
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+    model.eval()
+    with torch.no_grad():
+        acc = (model(torch.from_numpy(X_test)).argmax(1).numpy() == y_test).mean()
+    print(f"epoch {ep + 1}: loss {loss.item():.3f}, test acc {acc:.3f}")
+
+torch.onnx.export(model, (Xt[:1],), "fp32.onnx", input_names=["images"], output_names=["logits"],
+                  dynamic_shapes={"input": {0: "batch"}}, opset_version=18,
+                  external_data=False, verbose=False)
+print("fp32.onnx:", Path("fp32.onnx").stat().st_size // 1024, "KB")</code></pre>
+<pre><code class="language-text">epoch 1: loss 0.276, test acc 0.500
+epoch 2: loss 0.156, test acc 0.763
+epoch 3: loss 0.067, test acc 0.980
+fp32.onnx: 256 KB</code></pre>
+<p>Loss và độ chính xác có thể lệch chút ít trên máy khác. Độ chính xác 98% (6 ảnh NG bị bỏ sót, xem mục 6) là có chủ ý: với một mô hình còn ảnh sát ngưỡng, ta mới thấy lượng tử hóa làm đổi quyết định ở đâu.</p>
+
+<h2>3. Đo tốc độ đúng cách</h2>
+<p>Năm lỗi đo hay gặp: (1) tính cả thời gian tạo session vào thời gian mỗi ảnh; (2) tính lần chạy đầu (khởi tạo lười, cấp phát bộ nhớ, tối ưu đồ thị) vào trung bình; (3) chỉ báo trung bình, trong khi PLC timeout vì những lần chậm nhất; (4) đo bằng <code>time.time()</code> (độ phân giải kém trên một số hệ điều hành) thay vì <code>time.perf_counter()</code>; (5) đo trên laptop cắm sạc rồi áp cho PC trạm. Hàm đo dưới đây tránh bốn lỗi đầu; lỗi thứ năm chỉ tránh được bằng cách đo trên đúng phần cứng đích.</p>
+<pre><code class="language-python">import onnxruntime as ort
+
+
+def do_toc_do(duong_dan, x, so_lan=300, khoi_dong=20, luong=4,
+              muc=ort.GraphOptimizationLevel.ORT_ENABLE_ALL):
+    """Đo một mô hình ONNX trên CPU. Trả về dict thời gian (ms)."""
+    so = ort.SessionOptions()
+    so.intra_op_num_threads = luong
+    so.graph_optimization_level = muc
+    t0 = time.perf_counter()
+    sess = ort.InferenceSession(duong_dan, so, providers=["CPUExecutionProvider"])
+    t_tao = time.perf_counter() - t0
+    vao = {sess.get_inputs()[0].name: x}
+
+    t0 = time.perf_counter()
+    sess.run(None, vao)                                  # lần chạy đầu: đo riêng
+    t_dau = time.perf_counter() - t0
+    for _ in range(khoi_dong):                           # khởi động nóng, không tính
+        sess.run(None, vao)
+
+    ts = np.empty(so_lan)
+    for i in range(so_lan):
+        t0 = time.perf_counter()
+        sess.run(None, vao)
+        ts[i] = time.perf_counter() - t0
+    ts *= 1000
+    p50, p95, p99 = np.percentile(ts, [50, 95, 99])
+    return {"tao_session": t_tao * 1000, "lan_dau": t_dau * 1000, "tb": ts.mean(),
+            "p50": p50, "p95": p95, "p99": p99, "max": ts.max()}
+
+
+kq = do_toc_do("fp32.onnx", X_test[:1])
+print(" | ".join(f"{k} {v:.2f}" for k, v in kq.items()), "(ms)")</code></pre>
+<pre><code class="language-text">tao_session 4.20 | lan_dau 0.92 | tb 0.38 | p50 0.36 | p95 0.46 | p99 0.54 | max 0.95 (ms)</code></pre>
+<p>Mọi con số thời gian trong bài phụ thuộc máy (CPU, tải nền, nhiệt độ) và thay đổi giữa các lần chạy; hãy nhìn tỉ lệ và xu hướng, không nhìn chữ số thập phân. Đọc kết quả:</p>
 <ul>
-  <li><strong>FP16</strong> (nửa độ chính xác): trên GPU hiện đại thường tăng tốc đáng kể, mất mát độ chính xác rất nhỏ.</li>
-  <li><strong>INT8</strong> (lượng tử hóa): nhanh hơn nữa và nhẹ hơn, nhưng cần <strong>dữ liệu hiệu chuẩn</strong> (vài trăm ảnh đại diện) và phải đánh giá lại kỹ, đặc biệt với lỗi nhỏ, tương phản thấp.</li>
+  <li><strong>Tạo session</strong> và <strong>lần đầu</strong> lớn hơn nhiều so với một lần chạy ổn định. Trên trạm: tạo session lúc khởi động, chạy vài ảnh mồi, rồi mới báo "sẵn sàng" cho PLC.</li>
+  <li><strong>p50</strong> (trung vị) là thời gian "thường gặp"; <strong>p95/p99</strong> là thời gian mà 95%/99% lần chạy nhanh hơn; <strong>max</strong> là lần tệ nhất trong lần đo. Khoảng cách p99 so với p50 cho thấy độ "giật": do luồng khác chiếm CPU, bộ thu gom rác, hệ điều hành lập lịch. Với 300 lần đo, p99 chỉ dựa trên khoảng 3 lần chậm nhất; nghiệm thu thật nên đo hàng nghìn chu kỳ.</li>
+  <li><strong>Trung bình</strong> bị kéo bởi vài lần rất chậm, nên không đại diện cho cả "thường gặp" lẫn "tệ nhất". Báo p50 và p99 (hoặc max) cùng nhau.</li>
 </ul>
-<p>Luôn so sánh kết quả trên tập test trước và sau khi tối ưu. Tốc độ tăng gấp đôi mà tỷ lệ lọt lỗi tăng là không chấp nhận được.</p>
+<div class="warn"><strong>Đo trên GPU</strong>Lời gọi GPU thường bất đồng bộ: hàm trả về khi công việc mới được xếp hàng. Với PyTorch phải gọi <code>torch.cuda.synchronize()</code> trước khi dừng đồng hồ; với ONNX Runtime, <code>run()</code> trả về khi đầu ra đã sẵn sàng trên CPU nên đo được trực tiếp. Ngoài ra GPU cần thời gian "làm nóng" lâu hơn CPU (tối ưu kernel, build engine TensorRT có thể mất vài phút ở lần đầu).</div>
 
-<h2>Tối ưu ở cấp mô hình và dữ liệu</h2>
+<h2>4. Ba nút vặn của ONNX Runtime trên CPU</h2>
+<h3>4.1. Mức tối ưu đồ thị và số luồng</h3>
+<p><code>graph_optimization_level</code> quyết định ONNX Runtime biến đổi đồ thị đến đâu trước khi chạy: gộp Conv với phép cộng bias và ReLU, bỏ nút thừa, chọn bố cục bộ nhớ tốt cho CPU. <code>intra_op_num_threads</code> là số luồng chia nhau tính <em>một</em> phép toán (ví dụ một lớp Conv); <code>inter_op_num_threads</code> chỉ có tác dụng khi bật chế độ chạy song song các nhánh (<code>ExecutionMode.ORT_PARALLEL</code>), ít có lợi cho CNN tuần tự. Đo cả lưới:</p>
+<pre><code class="language-python">GOL = ort.GraphOptimizationLevel
+x8 = X_test[:8]                                    # lô 8 ảnh (ví dụ 8 ROI cắt từ một ảnh lớn)
+print(f"{'mức tối ưu':18s} {'1 luồng':&gt;9s} {'2 luồng':&gt;9s} {'4 luồng':&gt;9s}   (p50, ms)")
+for muc in [GOL.ORT_DISABLE_ALL, GOL.ORT_ENABLE_BASIC, GOL.ORT_ENABLE_ALL]:
+    hang = [do_toc_do("fp32.onnx", x8, so_lan=150, luong=n, muc=muc)["p50"] for n in (1, 2, 4)]
+    print(f"{muc.name:18s} " + " ".join(f"{v:9.2f}" for v in hang))</code></pre>
+<pre><code class="language-text">mức tối ưu           1 luồng   2 luồng   4 luồng   (p50, ms)
+ORT_DISABLE_ALL         9.57      4.86      3.18
+ORT_ENABLE_BASIC        9.32      4.82      2.83
+ORT_ENABLE_ALL          4.98      2.68      1.43</code></pre>
+<p>Thời gian tùy máy. Xu hướng thường thấy: tắt tối ưu đồ thị chậm hơn rõ rệt; tăng luồng giúp nhanh hơn nhưng không tuyến tính (4 luồng không nhanh gấp 4 lần 1 luồng) vì có chi phí chia việc và đồng bộ. Trên trạm, CPU còn phải chạy SDK camera, giao tiếp PLC, giao diện: đặt số luồng bằng khoảng một nửa số lõi vật lý và đo lại p99 khi <em>toàn bộ</em> ứng dụng đang chạy, đừng để mặc định (ONNX Runtime mặc định dùng số lõi vật lý).</p>
+
+<h3>4.2. Batch: thông lượng tăng, độ trễ cũng tăng</h3>
+<pre><code class="language-python">print(f"{'batch':&gt;5s} {'p50/lần gọi':&gt;12s} {'ms/ảnh':&gt;8s} {'ảnh/giây':&gt;9s}")
+for b in (1, 4, 16):
+    p50 = do_toc_do("fp32.onnx", X_test[:b], so_lan=150)["p50"]
+    print(f"{b:5d} {p50:10.2f}ms {p50 / b:8.3f} {1000 * b / p50:9.0f}")</code></pre>
+<pre><code class="language-text">batch  p50/lần gọi   ms/ảnh  ảnh/giây
+    1       0.26ms    0.258      3879
+    4       0.85ms    0.213      4691
+   16       3.06ms    0.191      5233</code></pre>
+<p>Batch lớn giảm thời gian tính trên mỗi ảnh (thông lượng tăng), nhưng mỗi lần gọi lâu hơn, và ảnh đầu tiên của lô phải chờ đủ lô mới được xử lý. Quy tắc cho trạm kiểm tra:</p>
 <ul>
-  <li><strong>Mô hình nhỏ hơn</strong>: YOLO cỡ n hoặc s thay vì l, x nếu độ chính xác vẫn đạt.</li>
-  <li><strong>Ảnh đầu vào nhỏ hơn</strong>: cắt ROI thay vì đưa cả ảnh lớn; giảm <code>imgsz</code> nếu vật đủ lớn.</li>
-  <li><strong>Batch</strong>: gom nhiều ảnh (nhiều camera) xử lý một lần trên GPU.</li>
+  <li>Một camera, một sản phẩm mỗi chu kỳ: batch 1, tối ưu <strong>độ trễ</strong>.</li>
+  <li>Một ảnh lớn cắt thành nhiều ROI/ô, hoặc nhiều camera chụp cùng lúc: gom các ROI của <em>cùng một chu kỳ</em> thành một lô. Không chờ gom ảnh của các chu kỳ khác nhau.</li>
+  <li>Xử lý hậu kiểm, phân tích dữ liệu ngoài dây chuyền: batch lớn, tối ưu <strong>thông lượng</strong>.</li>
 </ul>
 
-<h2>Tối ưu đường ống</h2>
+<h2>5. FP16 và INT8: giảm độ chính xác số an toàn</h2>
+<p>Mô hình huấn luyện ở <strong>FP32</strong> (số thực 32 bit). Có hai cách giảm:</p>
 <ul>
-  <li><strong>Song song hóa</strong>: luồng chụp ảnh, luồng suy luận, luồng ghi kết quả chạy độc lập qua hàng đợi.</li>
-  <li><strong>Tránh copy dữ liệu thừa</strong> giữa CPU và GPU, giữa các thư viện.</li>
-  <li><strong>Tạo session một lần</strong>, không khởi tạo lại mô hình cho mỗi ảnh.</li>
-  <li><strong>Cố định tần số CPU/GPU</strong> và tắt chế độ tiết kiệm điện trên máy công nghiệp để thời gian xử lý ổn định.</li>
+  <li><strong>FP16</strong> (số thực 16 bit): khoảng 3 chữ số thập phân có nghĩa, giá trị lớn nhất 65504. Kích thước giảm một nửa. Tăng tốc rõ trên GPU có nhân Tensor (NVIDIA từ thế hệ Volta/Turing trở đi), GPU tích hợp Intel; trên CPU phổ thông thường <em>không</em> nhanh hơn vì CPU không có lệnh tính FP16 gốc.</li>
+  <li><strong>INT8</strong> (lượng tử hóa, quantization): mỗi tensor được ánh xạ về số nguyên 8 bit bằng công thức <code>x ≈ scale × (q − zero_point)</code>. Trọng số thường lượng tử hóa đối xứng (zero_point = 0, q ∈ [−127, 127]), có thể theo từng kênh ra (<strong>per-channel</strong>, mỗi bộ lọc Conv một scale riêng). Activation (đầu ra các lớp) thay đổi theo ảnh, nên cần chọn dải giá trị: hoặc đo khi chạy (<strong>dynamic</strong>), hoặc đo trước trên bộ ảnh hiệu chuẩn (<strong>static</strong>, calibration).</li>
+</ul>
+<p>Hãy tự tay lượng tử hóa vài con số để thấy sai số đến từ đâu:</p>
+<pre><code class="language-python">w = np.array([-0.82, -0.31, 0.004, 0.07, 0.44, 1.27], np.float32)
+
+
+def luong_tu_doi_xung(v):
+    scale = np.abs(v).max() / 127                        # 127 bậc cho phần dương
+    q = np.clip(np.round(v / scale), -127, 127).astype(np.int8)
+    return q, scale, q.astype(np.float32) * scale
+
+
+q, scale, w_hat = luong_tu_doi_xung(w)
+print("scale =", round(float(scale), 5), "| q =", q.tolist())
+print("khôi phục:", [round(float(v), 4) for v in w_hat], "| sai số lớn nhất", round(float(np.abs(w_hat - w).max()), 4))
+
+w_ngoai_lai = np.append(w, 12.0)                         # một giá trị ngoại lai
+q2, scale2, w_hat2 = luong_tu_doi_xung(w_ngoai_lai)
+print("có ngoại lai 12.0: scale =", round(float(scale2), 5), "| q =", q2.tolist())
+print("khôi phục:", [round(float(v), 4) for v in w_hat2])
+
+print("FP16:", np.float16(0.1234567), np.float16(1000.37), np.float16(70000.0))</code></pre>
+<pre><code class="language-text">scale = 0.01 | q = [-82, -31, 0, 7, 44, 127]
+khôi phục: [-0.82, -0.31, 0.0, 0.07, 0.44, 1.27] | sai số lớn nhất 0.004
+có ngoại lai 12.0: scale = 0.09449 | q = [-9, -3, 0, 1, 5, 13, 127]
+khôi phục: [-0.8504, -0.2835, 0.0, 0.0945, 0.4724, 1.2283, 12.0]
+FP16: 0.1235 1.0005e+03 inf</code></pre>
+<p>Ba bài học: (1) sai số lượng tử hóa tối đa bằng nửa <code>scale</code>; (2) chỉ một giá trị ngoại lai đã làm <code>scale</code> lớn gần 10 lần, các giá trị nhỏ chỉ còn 0 hoặc 1 bậc (0,004 thành 0; 0,07 thành 0,0945; sai số tăng hơn chục lần). Đó là lý do bộ ảnh hiệu chuẩn phải đại diện, và có các phương pháp hiệu chuẩn bỏ bớt đuôi (Percentile, Entropy) thay cho MinMax; (3) FP16 làm tròn sau khoảng 3–4 chữ số (1000,37 thành 1000,5, vì quanh 1000 hai số FP16 liền nhau cách nhau 0,5) và tràn thành <code>inf</code> khi vượt 65504, nên phép cộng dồn lớn trong mô hình là chỗ cần cẩn thận.</p>
+<table>
+  <tr><th>Cách</th><th>Cần gì</th><th>Phù hợp</th><th>Rủi ro</th></tr>
+  <tr><td>FP16</td><td>Không cần dữ liệu</td><td>GPU NVIDIA, Intel iGPU/NPU; bước đầu tiên nên thử</td><td>Thấp; vẫn phải kiểm tra lại trên tập test</td></tr>
+  <tr><td>INT8 dynamic</td><td>Không cần dữ liệu; activation lượng tử hóa lúc chạy</td><td>Mô hình nhiều MatMul/Linear (Transformer, RNN)</td><td>Với CNN thường chậm hơn FP32 trên CPU (xem mục 6)</td></tr>
+  <tr><td>INT8 static (PTQ)</td><td>Vài trăm ảnh hiệu chuẩn đại diện</td><td>CNN trên CPU có lệnh VNNI/AMX, TensorRT, OpenVINO</td><td>Lỗi nhỏ, tương phản thấp có thể bị "làm tròn mất"; bắt buộc đánh giá lại escape</td></tr>
+  <tr><td>INT8 QAT</td><td>Huấn luyện lại có mô phỏng lượng tử hóa</td><td>Khi PTQ làm giảm độ chính xác không chấp nhận được</td><td>Tốn công huấn luyện</td></tr>
+</table>
+
+<h2>6. Lượng tử hóa bằng ONNX Runtime và so sánh với FP32</h2>
+<p><code>onnxruntime.quantization</code> có sẵn trong gói <code>onnxruntime</code>. Bước đầu nên chạy <code>quant_pre_process</code> (suy luận shape, tối ưu đồ thị) theo khuyến nghị của tài liệu ONNX Runtime, rồi tạo hai bản INT8:</p>
+<pre><code class="language-python">from onnxruntime.quantization import (CalibrationDataReader, QuantFormat, QuantType,
+                                      quantize_dynamic, quantize_static)
+from onnxruntime.quantization.shape_inference import quant_pre_process
+
+quant_pre_process("fp32.onnx", "fp32_pre.onnx")
+
+# 1) Dynamic: chỉ cần mô hình, không cần dữ liệu
+quantize_dynamic("fp32_pre.onnx", "int8_dynamic.onnx", weight_type=QuantType.QInt8)
+
+
+# 2) Static: cần bộ đọc dữ liệu hiệu chuẩn trả về từng dict {tên đầu vào: mảng}
+class BoDocHieuChuan(CalibrationDataReader):
+    def __init__(self, ds_tensor):
+        self._it = iter([{"images": t[None]} for t in ds_tensor])
+
+    def get_next(self):
+        return next(self._it, None)                     # None = hết dữ liệu
+
+
+quantize_static("fp32_pre.onnx", "int8_static.onnx", BoDocHieuChuan(X[:100]),   # 100 ảnh của tập train
+                quant_format=QuantFormat.QDQ, per_channel=True,
+                activation_type=QuantType.QUInt8, weight_type=QuantType.QInt8)
+
+import onnx
+from collections import Counter
+
+for f in ["fp32.onnx", "int8_dynamic.onnx", "int8_static.onnx"]:
+    loai = Counter(n.op_type for n in onnx.load(f).graph.node)
+    print(f"{f:18s} {Path(f).stat().st_size // 1024:4d} KB  ", dict(loai.most_common(4)))</code></pre>
+<pre><code class="language-text">fp32.onnx           256 KB   {'Conv': 4, 'Relu': 4, 'MaxPool': 3, 'ReduceMean': 1}
+int8_dynamic.onnx    76 KB   {'Mul': 10, 'Reshape': 5, 'DynamicQuantizeLinear': 5, 'Cast': 5}
+int8_static.onnx     82 KB   {'DequantizeLinear': 20, 'QuantizeLinear': 10, 'Conv': 4, 'MaxPool': 3}</code></pre>
+<p>Bản dynamic thay Conv bằng <code>ConvInteger</code> và thêm các nút lượng tử hóa activation lúc chạy. Bản static dạng <strong>QDQ</strong> (QuantizeLinear/DequantizeLinear) giữ nguyên Conv nhưng bọc nó bằng các cặp nút Q/DQ mang sẵn scale và zero point đã hiệu chuẩn; runtime (ONNX Runtime, TensorRT, OpenVINO) nhận ra mẫu Q→DQ→Conv và thay bằng kernel INT8. Dạng QDQ là định dạng trao đổi chung nên được khuyến nghị. Kích thước giảm khoảng 3–4 lần vì trọng số lưu 8 bit thay cho 32 bit.</p>
+<p>Thêm bản FP16 (bộ chuyển đổi đi kèm gói <code>onnxruntime</code>; <code>keep_io_types=True</code> giữ đầu vào/ra float32 để ứng dụng không phải đổi):</p>
+<pre><code class="language-python">from onnxruntime.transformers.float16 import convert_float_to_float16
+
+onnx.save(convert_float_to_float16(onnx.load("fp32.onnx"), keep_io_types=True), "fp16.onnx")
+print("fp16.onnx:", Path("fp16.onnx").stat().st_size // 1024, "KB")</code></pre>
+<pre><code class="language-text">fp16.onnx: 138 KB</code></pre>
+<p>Bây giờ là phép so sánh quyết định. Không chỉ tốc độ và độ chính xác: với trạm kiểm tra, con số quan trọng nhất là <strong>escape</strong> (NG bị cho qua) và <strong>overkill</strong> (OK bị loại nhầm), cùng số quyết định bị lật so với FP32:</p>
+<pre><code class="language-python">s_ref = ort.InferenceSession("fp32.onnx", providers=["CPUExecutionProvider"])
+ref = s_ref.run(None, {"images": X_test})[0]
+
+print(f"{'mô hình':18s} {'KB':&gt;4s} {'p50':&gt;6s} {'p99':&gt;6s} {'lệch max':&gt;8s} {'lật':&gt;4s} "
+      f"{'đúng':&gt;6s} {'escape':&gt;6s} {'overkill':&gt;8s}")
+for f in ["fp32.onnx", "fp16.onnx", "int8_dynamic.onnx", "int8_static.onnx"]:
+    s = ort.InferenceSession(f, providers=["CPUExecutionProvider"])
+    out = s.run(None, {"images": X_test})[0]
+    du_doan = out.argmax(1)
+    t = do_toc_do(f, X_test[:1])
+    escape = int(((y_test == 1) &amp; (du_doan == 0)).sum())
+    overkill = int(((y_test == 0) &amp; (du_doan == 1)).sum())
+    print(f"{f:18s} {Path(f).stat().st_size // 1024:4d} {t['p50']:6.2f} {t['p99']:6.2f} "
+          f"{np.abs(out - ref).max():8.4f} {int((du_doan != ref.argmax(1)).sum()):4d} "
+          f"{(du_doan == y_test).mean() * 100:5.1f}% {escape:6d} {overkill:8d}")</code></pre>
+<pre><code class="language-text">mô hình              KB    p50    p99 lệch max  lật   đúng escape overkill
+fp32.onnx           256   0.24   4.31   0.0000    0  98.0%      6        0
+fp16.onnx           138   0.57   2.58   0.0003    0  98.0%      6        0
+int8_dynamic.onnx    76   2.58   5.65   0.0392    1  98.3%      5        0
+int8_static.onnx     82   0.36   1.16   0.7208    0  98.0%      6        0</code></pre>
+<p>Thời gian (cột p50, p99, ms, batch 1) tùy máy; các cột còn lại tái lập được. Trên máy viết bài, kết quả "ngược sách" nhưng rất thật:</p>
+<ul>
+  <li><strong>FP16 trên CPU</strong>: lệch logit chỉ cỡ 10<sup>-4</sup>, không lật quyết định nào, nhưng chậm hơn FP32: CPU phải đổi qua lại FP16/FP32. FP16 dành cho GPU.</li>
+  <li><strong>INT8 dynamic</strong>: chậm hơn FP32 nhiều lần. Với CNN, mỗi lần chạy phải đo dải activation và lượng tử hóa lại, còn <code>ConvInteger</code> không được tối ưu bằng Conv FP32. Nó còn lật một quyết định; lần này tình cờ theo hướng giảm escape, nhưng lật là lật: mô hình không còn hành xử như bản đã nghiệm thu. Dynamic chỉ hợp với mô hình nhiều MatMul.</li>
+  <li><strong>INT8 static</strong>: nhỏ hơn 3 lần nhưng không nhanh hơn, có lần đo còn chậm hơn FP32 chút ít (với mô hình nhỏ thế này, chi phí các nút Q/DQ chiếm tỉ trọng lớn khi mỗi lớp chỉ có 16–64 kênh), không lật quyết định nào trên 300 ảnh. Nhưng nhìn cột "lệch max": có ảnh logit lệch tới hơn 0,7. Ảnh nào nằm sát ngưỡng sẽ đổi quyết định; tập test càng lớn, càng nhiều lỗi nhỏ, càng dễ thấy điều đó.</li>
+</ul>
+<div class="warn"><strong>Đánh giá INT8 bằng escape, trên ảnh lỗi thật</strong>Độ chính xác giảm 0,7% nghe vô hại, nhưng nếu toàn bộ số đó là escape thì trạm đang lọt lỗi nhiều hơn. Quy tắc nghiệm thu: mô hình INT8 phải đạt cùng tiêu chí escape/overkill với FP32 trên tập test có đủ lỗi nhỏ, tương phản thấp. Không đạt thì: hiệu chuẩn bằng bộ ảnh đại diện hơn, thử phương pháp hiệu chuẩn khác (<code>calibrate_method=CalibrationMethod.Percentile</code> hoặc <code>Entropy</code>), giữ vài lớp đầu/cuối ở FP32 (<code>nodes_to_exclude</code>), hoặc ở lại FP32/FP16.</div>
+
+<h3>Khi nào INT8 thật sự nhanh hơn?</h3>
+<p>Tốc độ chỉ phụ thuộc kiến trúc và kích thước đầu vào, không phụ thuộc giá trị trọng số. Vì vậy ta thử nhanh một mô hình rộng hơn (64-128-256-256 kênh) với trọng số chưa huấn luyện, chỉ để so tốc độ:</p>
+<pre><code class="language-python">torch.manual_seed(0)
+mo_hinh_rong = nn.Sequential(*khoi(3, 64), nn.MaxPool2d(2), *khoi(64, 128), nn.MaxPool2d(2),
+                             *khoi(128, 256), nn.MaxPool2d(2), *khoi(256, 256),
+                             nn.AdaptiveAvgPool2d(1), nn.Flatten(), nn.Linear(256, 2)).eval()
+torch.onnx.export(mo_hinh_rong, (Xt[:1],), "rong_fp32.onnx", input_names=["images"],
+                  output_names=["logits"], dynamic_shapes={"input": {0: "batch"}},
+                  opset_version=18, external_data=False, verbose=False)
+quant_pre_process("rong_fp32.onnx", "rong_pre.onnx")
+quantize_static("rong_pre.onnx", "rong_int8.onnx", BoDocHieuChuan(X[:64]),
+                quant_format=QuantFormat.QDQ, per_channel=True)
+
+for b in (1, 8):
+    a = do_toc_do("rong_fp32.onnx", X_test[:b], so_lan=100)["p50"]
+    c = do_toc_do("rong_int8.onnx", X_test[:b], so_lan=100)["p50"]
+    print(f"batch {b}: FP32 {a:6.2f} ms | INT8 static {c:6.2f} ms | nhanh hơn {a / c:.1f} lần")</code></pre>
+<pre><code class="language-text">batch 1: FP32   2.52 ms | INT8 static   0.85 ms | nhanh hơn 2.9 lần
+batch 8: FP32  33.31 ms | INT8 static  22.42 ms | nhanh hơn 1.5 lần</code></pre>
+<p>Với mô hình đủ nặng, INT8 static nhanh hơn rõ rệt trên CPU này (CPU Xeon có lệnh AVX512-VNNI cho phép nhân tích lũy số nguyên 8 bit). Mức tăng tốc phụ thuộc mạnh vào CPU: CPU có VNNI hoặc AMX được lợi nhiều, CPU cũ chỉ có AVX2 được lợi ít hơn (tài liệu ONNX Runtime còn khuyên bật <code>reduce_range=True</code> trên CPU không có VNNI để tránh tràn số). Đó là lý do câu "INT8 nhanh gấp N lần" không có nghĩa gì nếu không kèm phần cứng và mô hình.</p>
+
+<h2>7. Runtime tăng tốc: TensorRT, OpenVINO và Execution Provider</h2>
+<p>Ba runtime dưới đây không cài trong môi trường viết bài, nên các đoạn code chỉ để minh họa cách dùng; trên máy có phần cứng tương ứng, chúng là cách làm tiêu chuẩn.</p>
+<h3>7.1. TensorRT (GPU NVIDIA, Jetson)</h3>
+<p>TensorRT biên dịch file ONNX thành một <strong>engine</strong> tối ưu cho đúng GPU và đúng phiên bản TensorRT đó: gộp lớp, chọn kernel nhanh nhất, chạy FP16/INT8. Công cụ dòng lệnh <code>trtexec</code> đi kèm TensorRT vừa build engine vừa đo tốc độ:</p>
+<pre><code class="language-bash"># Build engine FP16, đầu vào cố định 1x3x640x640, lưu ra file
+trtexec --onnx=model.onnx --saveEngine=model_fp16.engine --fp16 --shapes=images:1x3x640x640
+
+# Đầu vào batch động: khai báo dải nhỏ nhất / tối ưu / lớn nhất
+trtexec --onnx=model.onnx --saveEngine=model_b8.engine --fp16 \
+        --minShapes=images:1x3x640x640 --optShapes=images:4x3x640x640 --maxShapes=images:8x3x640x640
+
+# Mô hình đã lượng tử hóa dạng QDQ (như int8_static.onnx): TensorRT dùng scale có sẵn trong file
+trtexec --onnx=int8_static.onnx --saveEngine=model_int8.engine --int8 --fp16
+
+# Đo engine có sẵn: khởi động nóng 500 ms, đo trong 10 s; kết quả có mean, median và các phân vị
+trtexec --loadEngine=model_fp16.engine --shapes=images:1x3x640x640 --warmUp=500 --duration=10</code></pre>
+<ul>
+  <li>Engine <strong>gắn với GPU và phiên bản TensorRT</strong>: build trên đúng máy trạm (hoặc máy cùng GPU, cùng driver, cùng phiên bản TensorRT), không chép engine giữa các đời GPU.</li>
+  <li>Build có thể mất từ vài chục giây tới vài phút: build một lần khi cài đặt, lưu file engine, không build lúc khởi động mỗi ca.</li>
+  <li>Cờ của <code>trtexec</code> thay đổi theo phiên bản TensorRT; các bản mới khuyến khích lượng tử hóa tường minh (QDQ) thay cho hiệu chuẩn ngầm. Kiểm tra bằng <code>trtexec --help</code> trên máy của bạn.</li>
+</ul>
+<p>Nếu ứng dụng đã dùng ONNX Runtime, có thể gọi TensorRT qua Execution Provider mà không đổi code suy luận (cần gói <code>onnxruntime-gpu</code> bản có TensorRT và thư viện TensorRT trên máy):</p>
+<pre><code class="language-python"># (minh họa) cần GPU NVIDIA, onnxruntime-gpu và TensorRT
+import onnxruntime as ort
+
+sess = ort.InferenceSession("model.onnx", providers=[
+    ("TensorrtExecutionProvider", {"trt_fp16_enable": True,
+                                   "trt_engine_cache_enable": True,       # lưu engine, lần sau nạp nhanh
+                                   "trt_engine_cache_path": "trt_cache"}),
+    "CUDAExecutionProvider",                                              # phép nào TensorRT không nhận
+    "CPUExecutionProvider",
+])
+print(sess.get_providers())          # kiểm tra EP thực sự được dùng</code></pre>
+
+<h3>7.2. OpenVINO (CPU, GPU tích hợp, NPU của Intel)</h3>
+<p>OpenVINO đọc trực tiếp ONNX hoặc chuyển sang định dạng IR riêng (<code>.xml</code> + <code>.bin</code>), rồi biên dịch cho thiết bị chọn bằng tên: <code>"CPU"</code>, <code>"GPU"</code> (GPU tích hợp hoặc rời của Intel), <code>"NPU"</code> (trên các CPU có NPU như dòng Core Ultra), hoặc <code>"AUTO"</code>.</p>
+<pre><code class="language-python"># (minh họa) cần: pip install openvino
+import numpy as np
+import openvino as ov
+
+core = ov.Core()
+print(core.available_devices)                         # ví dụ ['CPU', 'GPU'] tùy máy
+
+mo_hinh = ov.convert_model("fp32.onnx")               # đọc ONNX
+ov.save_model(mo_hinh, "ok_ng.xml")                   # lưu IR; mặc định nén trọng số sang FP16
+compiled = core.compile_model(mo_hinh, "CPU", {"PERFORMANCE_HINT": "LATENCY"})   # hoặc "GPU", "NPU"
+
+x = np.zeros((1, 3, 96, 96), np.float32)
+logits = compiled(x)[compiled.output(0)]
+print(logits.shape)</code></pre>
+<pre><code class="language-bash"># Công cụ đo đi kèm OpenVINO: tối ưu độ trễ, chạy 15 giây, in median và các phân vị
+benchmark_app -m ok_ng.xml -d CPU -hint latency -t 15 -shape "[1,3,96,96]"</code></pre>
+<p>INT8 cho OpenVINO thường làm bằng thư viện NNCF (lượng tử hóa sau huấn luyện với bộ ảnh hiệu chuẩn), hoặc dùng luôn mô hình QDQ từ mục 6. ONNX Runtime cũng có OpenVINO Execution Provider (<code>"OpenVINOExecutionProvider"</code>, tùy chọn <code>device_type</code>) nếu bạn muốn giữ API ONNX Runtime.</p>
+
+<h3>7.3. Chọn runtime theo phần cứng</h3>
+<table>
+  <tr><th>Phần cứng trạm</th><th>Lựa chọn đầu tiên</th><th>Độ chính xác số nên thử</th><th>Ghi chú</th></tr>
+  <tr><td>PC công nghiệp CPU Intel, không GPU</td><td>ONNX Runtime CPU hoặc OpenVINO CPU</td><td>FP32 → INT8 static</td><td>Đo cả hai; OpenVINO thường nhỉnh hơn trên CPU Intel</td></tr>
+  <tr><td>CPU Intel có GPU tích hợp / NPU</td><td>OpenVINO (<code>"GPU"</code>, <code>"NPU"</code>)</td><td>FP16, INT8</td><td>Giảm tải CPU cho camera và PLC</td></tr>
+  <tr><td>CPU AMD hoặc x86 khác</td><td>ONNX Runtime CPU</td><td>FP32 → INT8 static (nếu có VNNI)</td><td>OpenVINO thường vẫn chạy được trên CPU x86 nhưng hãy đo</td></tr>
+  <tr><td>GPU NVIDIA rời</td><td>TensorRT (trực tiếp hoặc qua ORT TensorRT EP)</td><td>FP16 → INT8</td><td>Engine build trên đúng máy; CUDA EP là phương án đơn giản hơn</td></tr>
+  <tr><td>NVIDIA Jetson</td><td>TensorRT (đi kèm JetPack)</td><td>FP16, INT8</td><td>Đặt chế độ công suất cố định khi đo</td></tr>
+  <tr><td>Windows, ứng dụng C#, GPU bất kỳ</td><td>ONNX Runtime DirectML</td><td>FP32, FP16</td><td>Một gói chạy trên GPU NVIDIA/AMD/Intel</td></tr>
+  <tr><td>ARM (máy nhúng)</td><td>ONNX Runtime CPU (ARM64)</td><td>INT8 static</td><td>Mô hình nhỏ, đầu vào nhỏ là chính</td></tr>
+</table>
+
+<h2>8. Trước khi tối ưu mô hình: tối ưu những thứ rẻ hơn</h2>
+<ul>
+  <li><strong>Đầu vào nhỏ hơn</strong>: cắt ROI thay vì đưa cả ảnh 5 MP; thời gian CNN tỉ lệ gần với số pixel, nên giảm cạnh ảnh một nửa là giảm khoảng 4 lần.</li>
+  <li><strong>Mô hình nhỏ hơn</strong>: bản n/s thay cho m/l của cùng họ mô hình, nếu escape/overkill vẫn đạt.</li>
+  <li><strong>Tiền xử lý</strong>: resize, đổi màu, chuẩn hóa viết bằng vòng lặp Python có thể chậm hơn cả mô hình; dùng OpenCV/NumPy vector hóa.</li>
+  <li><strong>Pipeline song song</strong>: luồng chụp, luồng suy luận, luồng lưu ảnh/ghi log nối qua hàng đợi, để suy luận không phải chờ ghi đĩa.</li>
+  <li><strong>Ổn định phần cứng</strong>: chế độ nguồn hiệu năng cao, tắt tiết kiệm điện, theo dõi nhiệt độ; CPU hạ xung khi nóng làm p99 tăng vọt sau vài giờ chạy.</li>
 </ul>
 
-<h2>Checklist triển khai</h2>
-<ol>
-  <li>Đo thời gian toàn chu trình trên phần cứng đích.</li>
-  <li>Chọn runtime phù hợp, thử FP16, cân nhắc INT8.</li>
-  <li>Đánh giá lại độ chính xác trên tập test thật.</li>
-  <li>Chạy thử liên tục nhiều giờ, theo dõi nhiệt độ, bộ nhớ, thời gian p99.</li>
-</ol>
-<p>Xem thêm cách chạy ONNX trong ứng dụng .NET: <a href="onnx-runtime-csharp-chay-mo-hinh-ai.html">ONNX Runtime với C#</a>.</p>
+<h2>9. Lỗi thường gặp</h2>
+<table>
+  <tr><th>Triệu chứng</th><th>Nguyên nhân</th><th>Cách xử lý</th></tr>
+  <tr><td>"Mô hình chạy 300 ms" nhưng lần thứ hai chỉ 5 ms</td><td>Đo cả tạo session/lần chạy đầu</td><td>Tách riêng, khởi động nóng</td></tr>
+  <tr><td>Trung bình đạt, PLC vẫn timeout</td><td>p99/max vượt ngân sách</td><td>Báo p99, max; tìm nguồn giật (luồng khác, GC, nhiệt)</td></tr>
+  <tr><td>INT8 chậm hơn FP32</td><td>Dynamic quantization cho CNN; mô hình quá nhỏ; CPU không có VNNI</td><td>Static QDQ, đo lại; chấp nhận FP32 nếu đạt ngân sách</td></tr>
+  <tr><td>INT8 lọt lỗi nhỏ</td><td>Bộ hiệu chuẩn không đại diện, thiếu ảnh lỗi nhỏ</td><td>Hiệu chuẩn lại, Percentile/Entropy, loại trừ lớp nhạy, hoặc QAT</td></tr>
+  <tr><td>Engine TensorRT không chạy trên máy khác</td><td>Engine gắn với GPU và phiên bản TensorRT</td><td>Build lại trên máy đích, lưu kèm phiên bản</td></tr>
+  <tr><td>Bật GPU nhưng không nhanh hơn</td><td>EP GPU không nạp được, rơi về CPU; hoặc thời gian chép ảnh lớn hơn thời gian tính</td><td>In <code>sess.get_providers()</code>; đo cả chép dữ liệu</td></tr>
+</table>
+
+<h2>10. Bài tập</h2>
+<div class="ex"><p><strong>Bài 1 (thực hành chính).</strong> Viết script đo mô hình của bạn với ONNX Runtime CPU và ít nhất một cấu hình tăng tốc, xuất bảng so sánh gồm: cấu hình, kích thước file, p50, p99, số quyết định bị lật so với FP32, escape, overkill. Trong môi trường không có GPU, "runtime tăng tốc" là INT8 static với hai phương pháp hiệu chuẩn; trên máy có GPU/Intel, thêm một dòng TensorRT hoặc OpenVINO.</p><details><summary>Xem đáp án</summary>
+<pre><code class="language-python">from onnxruntime.quantization import CalibrationMethod
+
+quantize_static("fp32_pre.onnx", "int8_pct.onnx", BoDocHieuChuan(X[:100]),
+                quant_format=QuantFormat.QDQ, per_channel=True,
+                calibrate_method=CalibrationMethod.Percentile)
+
+
+def danh_gia(ten, ham_chay, file=None):
+    out = ham_chay(X_test)
+    d = out.argmax(1)
+    t = [ham_chay(X_test[:1]) for _ in range(20)]             # khởi động nóng
+    ts = []
+    for _ in range(200):
+        t0 = time.perf_counter()
+        ham_chay(X_test[:1])
+        ts.append((time.perf_counter() - t0) * 1000)
+    kb = Path(file).stat().st_size // 1024 if file else 0
+    return (f"| {ten:24s} | {kb:4d} | {np.percentile(ts, 50):5.2f} | {np.percentile(ts, 99):5.2f} | "
+            f"{int((d != ref.argmax(1)).sum()):3d} | {int(((y_test == 1) &amp; (d == 0)).sum()):3d} | "
+            f"{int(((y_test == 0) &amp; (d == 1)).sum()):3d} |")
+
+
+def ham_ort(file):
+    so = ort.SessionOptions()
+    so.intra_op_num_threads = 4
+    s = ort.InferenceSession(file, so, providers=["CPUExecutionProvider"])
+    return lambda x: s.run(None, {"images": x})[0]
+
+
+print("| cấu hình                 |   KB |   p50 |   p99 | lật | esc | ovk |")
+for ten, f in [("ORT CPU FP32", "fp32.onnx"), ("ORT CPU INT8 MinMax", "int8_static.onnx"),
+               ("ORT CPU INT8 Percentile", "int8_pct.onnx")]:
+    print(danh_gia(ten, ham_ort(f), f))
+print("EP có trong bản onnxruntime này:", ort.get_available_providers())</code></pre>
+<pre><code class="language-text">Collecting tensor data and making histogram ...
+Finding optimal threshold for each tensor using 'percentile' algorithm ...
+Number of tensors : 15
+Number of histogram bins : 2048
+Percentile : (0.0010000000000047748,99.999)
+| cấu hình                 |   KB |   p50 |   p99 | lật | esc | ovk |
+| ORT CPU FP32             |  256 |  0.38 |  8.62 |   0 |   6 |   0 |
+| ORT CPU INT8 MinMax      |   82 |  0.68 |  5.03 |   0 |   6 |   0 |
+| ORT CPU INT8 Percentile  |   82 |  0.69 |  9.52 |   0 |   6 |   0 |
+EP có trong bản onnxruntime này: ['AzureExecutionProvider', 'CPUExecutionProvider']</code></pre>
+<p>Năm dòng đầu là thông báo tiến trình mà bộ hiệu chuẩn Percentile tự in ra. Thời gian tùy máy; các cột lật/escape/overkill tái lập được. Với mô hình nhỏ này, trên CPU, kết luận trung thực là: giữ FP32, vì INT8 không nhanh hơn. Trên máy có GPU NVIDIA, thêm một dòng với <code>ham_ort</code> dùng <code>providers=["CUDAExecutionProvider"]</code> (hoặc TensorRT EP như mục 7.1); trên máy Intel, thêm dòng OpenVINO với <code>compiled = core.compile_model("fp32.onnx", "CPU")</code> và <code>lambda x: compiled(x)[0]</code>. Hàm <code>danh_gia</code> không đổi, nên bảng so sánh luôn công bằng: cùng dữ liệu, cùng cách đo. Kết luận viết dưới bảng phải trả lời: cấu hình nào đạt ngân sách p99 mà escape không tăng?</p>
+</details></div>
+
+<div class="ex"><p><strong>Bài 2.</strong> Một đồng nghiệp hiệu chuẩn INT8 bằng 100 ảnh nhưng chỉ lấy ảnh OK ("ảnh OK dễ thu thập"). Hãy thử và so số quyết định bị lật, escape với bản hiệu chuẩn đủ hai loại. Giải thích.</p><details><summary>Xem đáp án</summary>
+<pre><code class="language-python">chi_ok = X[:700][nhan[:700] == 0][:100]
+quantize_static("fp32_pre.onnx", "int8_chi_ok.onnx", BoDocHieuChuan(chi_ok),
+                quant_format=QuantFormat.QDQ, per_channel=True)
+for f in ["int8_static.onnx", "int8_chi_ok.onnx"]:
+    d = ort.InferenceSession(f, providers=["CPUExecutionProvider"]).run(None, {"images": X_test})[0].argmax(1)
+    print(f"{f:18s} lật {int((d != ref.argmax(1)).sum())}, escape {int(((y_test == 1) &amp; (d == 0)).sum())}, "
+          f"overkill {int(((y_test == 0) &amp; (d == 1)).sum())}")</code></pre>
+<pre><code class="language-text">int8_static.onnx   lật 0, escape 6, overkill 0
+int8_chi_ok.onnx   lật 13, escape 19, overkill 0</code></pre>
+<p>Hiệu chuẩn chỉ bằng ảnh OK lật 13 quyết định và escape tăng từ 6 lên 19 (trên 150 ảnh NG), trong khi bản hiệu chuẩn đủ hai loại không lật quyết định nào. Lý do: dải activation được đo trên ảnh OK. Ở ảnh NG, các kênh "phát hiện vết xước" cho giá trị lớn hơn hẳn mọi giá trị đã thấy khi hiệu chuẩn, bị cắt (clip) ở mức lớn nhất của dải, nên tín hiệu lỗi yếu đi: đúng loại lỗi biến thành escape. Bộ hiệu chuẩn phải đại diện cho mọi điều kiện sản xuất: cả OK lẫn NG, các ca sáng/tối, các lô vật liệu. Con số cụ thể có thể khác trên máy bạn, nhưng hãy luôn kiểm tra theo cách này.</p>
+</details></div>
+
+<div class="ex"><p><strong>Bài 3.</strong> Trạm có 4 camera chụp đồng thời, chu kỳ 400 ms, ngân sách cho suy luận 120 ms (p99). Đo trên PC trạm: batch 1 có p99 = 34 ms; batch 4 có p99 = 95 ms. (a) Chạy tuần tự 4 lần batch 1 có đạt không? (b) Batch 4 có đạt không, và lợi gì? (c) Nếu thêm camera thứ 5, bạn đề xuất gì?</p><details><summary>Xem đáp án</summary>
+<p>(a) 4 × 34 = 136 ms &gt; 120 ms: không đạt (cộng p99 của 4 lần là ước lượng bi quan, nhưng với ngân sách cứng thì phải dùng nó, hoặc đo trực tiếp p99 của cả chuỗi 4 lần). (b) Batch 4: 95 ms ≤ 120 ms, đạt, còn biên 25 ms; lợi vì một lần gọi tận dụng song song tốt hơn, giảm chi phí cố định mỗi lần gọi. Bốn ảnh cùng một chu kỳ nên gom lô không làm tăng độ trễ chờ. (c) Batch 5 ước tính khoảng 95 × 5/4 ≈ 119 ms, sát ngân sách, không có biên: cần đo thật, và chuẩn bị phương án như cắt ROI nhỏ hơn, INT8 static đã kiểm định escape, hoặc GPU/iGPU. Nguyên tắc: không nghiệm thu một cấu hình mà p99 sát ngân sách.</p>
+</details></div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Bắt đầu từ ngân sách thời gian của dây chuyền; tiêu chí là p99 trên đúng PC trạm khi toàn bộ ứng dụng đang chạy.</li>
+  <li>Đo đúng: tách tạo session và lần chạy đầu, khởi động nóng, <code>perf_counter</code>, báo p50/p95/p99/max; nhớ đồng bộ khi đo GPU.</li>
+  <li>ONNX Runtime CPU: <code>graph_optimization_level=ORT_ENABLE_ALL</code>, chọn <code>intra_op_num_threads</code> bằng phép đo, chừa CPU cho phần còn lại của trạm. Batch tăng thông lượng nhưng tăng độ trễ; chỉ gom ảnh của cùng chu kỳ.</li>
+  <li>FP16 giảm một nửa kích thước, nhanh trên GPU, không nhanh trên CPU phổ thông. INT8: <code>x ≈ scale·(q − zero_point)</code>; dynamic không cần dữ liệu nhưng không hợp CNN; static QDQ cần bộ hiệu chuẩn đại diện.</li>
+  <li>INT8 có thể nhanh hơn rõ (mô hình đủ nặng, CPU có VNNI) hoặc không (mô hình nhỏ); và có thể lật quyết định. Nghiệm thu bằng escape/overkill, không bằng tốc độ.</li>
+  <li>TensorRT cho GPU NVIDIA/Jetson (engine gắn với máy), OpenVINO cho Intel CPU/iGPU/NPU, DirectML cho Windows mọi GPU; chọn theo bảng phần cứng và luôn đo lại.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Đo latency, logging và giám sát mô hình</strong>, đo thời gian từng bước của pipeline và phát hiện drift khi trạm đã chạy thật.</p>

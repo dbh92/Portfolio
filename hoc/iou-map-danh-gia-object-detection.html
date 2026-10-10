@@ -3,23 +3,23 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>IoU, mAP50 và mAP50-95: đánh giá mô hình Object Detection | HọcFree</title>
-<meta name="description" content="Ý nghĩa các chỉ số mà YOLO báo cáo, cách chẩn đoán mô hình từ chỉ số và chỉ số nào thật sự quan trọng khi triển khai.">
+<title>IoU, mAP50 và mAP50-95: tự tính và chẩn đoán mô hình Object Detection</title>
+<meta name="description" content="Tự viết IoU, NMS, ghép TP/FP/FN, AP và mAP bằng NumPy, đọc đúng chỉ số Ultralytics, chẩn đoán mô hình và đổi sang escape, overkill.">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <link rel="canonical" href="https://hocfree.vn/hoc/iou-map-danh-gia-object-detection.html">
 <meta property="og:site_name" content="HọcFree">
 <meta property="og:type" content="article">
-<meta property="og:title" content="IoU, mAP50 và mAP50-95: đánh giá mô hình Object Detection">
-<meta property="og:description" content="Ý nghĩa các chỉ số mà YOLO báo cáo, cách chẩn đoán mô hình từ chỉ số và chỉ số nào thật sự quan trọng khi triển khai.">
+<meta property="og:title" content="IoU, mAP50 và mAP50-95: tự tính và chẩn đoán mô hình Object Detection">
+<meta property="og:description" content="Tự viết IoU, NMS, ghép TP/FP/FN, AP và mAP bằng NumPy, đọc đúng chỉ số Ultralytics, chẩn đoán mô hình và đổi sang escape, overkill.">
 <meta property="og:url" content="https://hocfree.vn/hoc/iou-map-danh-gia-object-detection.html">
 <meta property="og:image" content="https://hocfree.vn/assets/images/posts/iou-map-danh-gia-object-detection.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="675">
-<meta property="og:image:alt" content="IoU, mAP50 và mAP50-95: đánh giá mô hình Object Detection">
+<meta property="og:image:alt" content="IoU, mAP50 và mAP50-95: tự tính và chẩn đoán mô hình Object Detection">
 <meta property="og:locale" content="vi_VN">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="IoU, mAP50 và mAP50-95: đánh giá mô hình Object Detection">
-<meta name="twitter:description" content="Ý nghĩa các chỉ số mà YOLO báo cáo, cách chẩn đoán mô hình từ chỉ số và chỉ số nào thật sự quan trọng khi triển khai.">
+<meta name="twitter:title" content="IoU, mAP50 và mAP50-95: tự tính và chẩn đoán mô hình Object Detection">
+<meta name="twitter:description" content="Tự viết IoU, NMS, ghép TP/FP/FN, AP và mAP bằng NumPy, đọc đúng chỉ số Ultralytics, chẩn đoán mô hình và đổi sang escape, overkill.">
 <meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/iou-map-danh-gia-object-detection.jpg">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
@@ -36,8 +36,9 @@
 <meta property="article:section" content="Học AI &amp; Lập trình">
 <meta property="article:tag" content="Object Detection">
 <meta property="article:tag" content="AI Vision">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "IoU, mAP50 và mAP50-95: đánh giá mô hình Object Detection", "description": "Ý nghĩa các chỉ số mà YOLO báo cáo, cách chẩn đoán mô hình từ chỉ số và chỉ số nào thật sự quan trọng khi triển khai.", "image": ["https://hocfree.vn/assets/images/posts/iou-map-danh-gia-object-detection.jpg"], "datePublished": "2026-09-19", "dateModified": "2026-09-19", "inLanguage": "vi", "articleSection": "Học AI & Lập trình", "keywords": "Object Detection, AI Vision", "wordCount": 536, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/hoc/iou-map-danh-gia-object-detection.html"}, "isPartOf": {"@type": "Course", "name": "Trở thành Vision Engineer", "url": "https://hocfree.vn/lo-trinh/vision-engineer.html"}}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Learning Paths", "item": "https://hocfree.vn/lo-trinh/"}, {"@type": "ListItem", "position": 3, "name": "Trở thành Vision Engineer", "item": "https://hocfree.vn/lo-trinh/vision-engineer.html"}, {"@type": "ListItem", "position": 4, "name": "Chặng 12: Detection / Segmentation / Anomaly Detection", "item": "https://hocfree.vn/lo-trinh/vision-engineer/detection-segmentation-anomaly.html"}, {"@type": "ListItem", "position": 5, "name": "IoU, mAP50 và mAP50-95: đánh giá mô hình Object Detection"}]}</script>
+<meta property="article:tag" content="Python">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "IoU, mAP50 và mAP50-95: tự tính và chẩn đoán mô hình Object Detection", "description": "Tự viết IoU, NMS, ghép TP/FP/FN, AP và mAP bằng NumPy, đọc đúng chỉ số Ultralytics, chẩn đoán mô hình và đổi sang escape, overkill.", "image": ["https://hocfree.vn/assets/images/posts/iou-map-danh-gia-object-detection.jpg"], "datePublished": "2026-09-19", "dateModified": "2026-09-19", "inLanguage": "vi", "articleSection": "Học AI & Lập trình", "keywords": "Object Detection, AI Vision, Python", "wordCount": 4965, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/hoc/iou-map-danh-gia-object-detection.html"}, "isPartOf": {"@type": "Course", "name": "Trở thành Vision Engineer", "url": "https://hocfree.vn/lo-trinh/vision-engineer.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Learning Paths", "item": "https://hocfree.vn/lo-trinh/"}, {"@type": "ListItem", "position": 3, "name": "Trở thành Vision Engineer", "item": "https://hocfree.vn/lo-trinh/vision-engineer.html"}, {"@type": "ListItem", "position": 4, "name": "Chặng 12: Detection / Segmentation / Anomaly Detection", "item": "https://hocfree.vn/lo-trinh/vision-engineer/detection-segmentation-anomaly.html"}, {"@type": "ListItem", "position": 5, "name": "IoU, mAP50 và mAP50-95: tự tính và chẩn đoán mô hình Object Detection"}]}</script>
 </head>
 <body>
 <a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
@@ -134,71 +135,399 @@
       <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../lo-trinh/">Learning Paths</a><span>/</span><a href="../lo-trinh/vision-engineer.html">Vision Engineer</a><span>/</span><a href="../lo-trinh/vision-engineer/detection-segmentation-anomaly.html">Chặng 12: Detection / Segmentation / Anomaly Detection</a></nav>
       <header class="article-head">
         <div class="course-bar" data-course="vision-engineer"><a class="course-chip" href="../lo-trinh/vision-engineer/detection-segmentation-anomaly.html">⭐ Vision Engineer · Chặng 12</a><span class="lesson-no">Bài 2/7</span><span class="kind kind-lesson">Bài học</span><span class="lesson-min"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></svg>~60 phút</span></div>
-        <h1>IoU, mAP50 và mAP50-95: đánh giá mô hình Object Detection</h1>
-        <p class="lead">Ý nghĩa các chỉ số mà YOLO báo cáo, cách chẩn đoán mô hình từ chỉ số và chỉ số nào thật sự quan trọng khi triển khai.</p>
+        <h1>IoU, mAP50 và mAP50-95: tự tính và chẩn đoán mô hình Object Detection</h1>
+        <p class="lead">Tự viết IoU, NMS, ghép TP/FP/FN, AP và mAP bằng NumPy, đọc đúng chỉ số Ultralytics, chẩn đoán mô hình và đổi sang escape, overkill.</p>
         <div class="article-meta">
           <span class="avatar" aria-hidden="true">HF</span>
-          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-09-19">19/09/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>3 phút đọc</span></div>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-09-19">19/09/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>28 phút đọc</span></div>
         </div>
       </header>
       <figure class="article-cover">
-        <img src="../assets/images/posts/iou-map-danh-gia-object-detection.webp" alt="IoU, mAP50 và mAP50-95: đánh giá mô hình Object Detection" width="1200" height="675" fetchpriority="high" decoding="async">
+        <img src="../assets/images/posts/iou-map-danh-gia-object-detection.webp" alt="IoU, mAP50 và mAP50-95: tự tính và chẩn đoán mô hình Object Detection" width="1200" height="675" fetchpriority="high" decoding="async">
       </figure>
       <section class="lesson-goals" aria-label="Mục tiêu bài học"><h2>Học xong bài này, bạn sẽ</h2><ul><li>Hiểu IoU, precision, recall theo ngưỡng</li><li>Đọc mAP50 và mAP50-95</li><li>Chẩn đoán mô hình từ chỉ số</li></ul><p class="goals-before">Nên học trước: <a href="../hoc/yolo26-object-detection-nhap-mon.html">Object Detection với YOLO26</a></p></section>
-      <details class="toc" open><summary>Nội dung bài viết</summary><ol><li><a href="#iou-hai-khung-trung-nhau-bao-nhieu">IoU: hai khung trùng nhau bao nhiêu?</a></li><li><a href="#khi-nao-mot-du-doan-duoc-tinh-la-dung">Khi nào một dự đoán được tính là đúng?</a></li><li><a href="#precision-recall-va-duong-cong-pr">Precision, Recall và đường cong PR</a></li><li><a href="#ap-va-map">AP và mAP</a></li><li><a href="#doc-ket-qua-cua-ultralytics">Đọc kết quả của Ultralytics</a></li><li><a href="#chan-doan-mo-hinh-tu-chi-so">Chẩn đoán mô hình từ chỉ số</a></li><li><a href="#chi-so-nao-cho-nha-may">Chỉ số nào cho nhà máy?</a></li></ol></details>
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol class="toc-plain"><li><a href="#1-iou-hai-hop-trung-nhau-bao-nhieu">1. IoU: hai hộp trùng nhau bao nhiêu</a></li><li><a href="#2-nms-bo-cac-hop-trung-lap">2. NMS: bỏ các hộp trùng lặp</a></li><li><a href="#3-ghep-du-doan-voi-nhan-that-tp-fp-fn">3. Ghép dự đoán với nhãn thật: TP, FP, FN</a></li><li><a href="#4-precision-recall-theo-nguong-tin-cay-va-duong-cong-pr">4. Precision, recall theo ngưỡng tin cậy và đường cong PR</a></li><li><a href="#5-ap-va-map50">5. AP và mAP50</a></li><li><a href="#6-map50-95-doi-hoi-hop-khit">6. mAP50-95: đòi hỏi hộp khít</a></li><li><a href="#7-doc-ket-qua-cua-ultralytics">7. Đọc kết quả của Ultralytics</a></li><li><a href="#8-chan-doan-mo-hinh-tu-chi-so">8. Chẩn đoán mô hình từ chỉ số</a></li><li><a href="#9-sai-lam-thuong-gap">9. Sai lầm thường gặp</a></li><li><a href="#10-bai-tap">10. Bài tập</a></li><li><a href="#tom-tat">Tóm tắt</a></li></ol></details>
       <div class="prose">
-<p>Huấn luyện YOLO xong, bạn nhận về một loạt con số: precision, recall, mAP50, mAP50-95. Bài này giải thích ý nghĩa từng chỉ số để bạn đánh giá đúng mô hình phát hiện đối tượng và biết cần cải thiện ở đâu.</p>
+<p>Ở bài "Object Detection với YOLO26", lệnh <code>model.val()</code> in ra precision, recall, mAP50, mAP50-95 và bạn được yêu cầu báo cáo mAP50. Nhưng mAP50 = 0,92 nghĩa là gì? Vì sao mAP50-95 chỉ 0,61? Mô hình đang bỏ sót, báo nhầm hay chỉ khoanh hộp chưa khít? Bài này trả lời bằng cách <strong>tự tính mọi con số bằng NumPy</strong> trên một tập dự đoán nhỏ mà bạn có thể kiểm tra bằng tay: IoU, NMS, ghép dự đoán với nhãn thật, precision và recall theo ngưỡng, đường cong PR, AP, mAP50 và mAP50-95. Sau đó ta mô phỏng bốn "mô hình" có bệnh khác nhau để học cách chẩn đoán từ chỉ số, và nối mAP với ngôn ngữ của nhà máy: escape và overkill ở một ngưỡng cố định. Bài sau, "Phân đoạn ảnh: semantic, instance, panoptic", dùng lại IoU nhưng tính trên mặt nạ thay vì hộp.</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Tự viết hàm IoU và kiểm tra với các cặp hộp cho trước; hiểu vì sao IoU khắt khe với vật nhỏ; cài NMS; ghép dự đoán với nhãn thật để có TP, FP, FN ở một ngưỡng IoU; tính precision, recall theo ngưỡng tin cậy, AP (nội suy toàn điểm và 101 điểm), mAP50, mAP50-95; đọc đúng các con số của Ultralytics; chẩn đoán mô hình từ tổ hợp chỉ số; đổi sang escape/overkill cấp ảnh cho nhà máy.</div>
 
-<h2 id="iou-hai-khung-trung-nhau-bao-nhieu">IoU: hai khung trùng nhau bao nhiêu?</h2>
-<p><strong>IoU</strong> (Intersection over Union) = diện tích phần giao / diện tích phần hợp của khung dự đoán và khung thật. IoU = 1 là trùng khít, 0 là không chạm nhau.</p>
-<pre><code>def iou(a, b):
-    """a, b: (x1, y1, x2, y2)"""
-    ix1, iy1 = max(a[0], b[0]), max(a[1], b[1])
-    ix2, iy2 = min(a[2], b[2]), min(a[3], b[3])
-    inter = max(0, ix2 - ix1) * max(0, iy2 - iy1)
-    area_a = (a[2] - a[0]) * (a[3] - a[1])
-    area_b = (b[2] - b[0]) * (b[3] - b[1])
-    return inter / (area_a + area_b - inter + 1e-9)
+<h2 id="1-iou-hai-hop-trung-nhau-bao-nhieu">1. IoU: hai hộp trùng nhau bao nhiêu</h2>
+<p><strong>IoU</strong> (Intersection over Union) là diện tích phần giao chia cho diện tích phần hợp của hai hộp:</p>
+<pre><code class="language-text">IoU = S(A ∩ B) / S(A ∪ B) = S(A ∩ B) / (S(A) + S(B) − S(A ∩ B))</code></pre>
+<p>IoU = 1 khi hai hộp trùng khít, 0 khi không chạm nhau. Hộp viết dạng <code>(x1, y1, x2, y2)</code> theo pixel, tọa độ liên tục (rộng = <code>x2 − x1</code>, không cộng 1; một số code cũ của Pascal VOC cộng 1, đừng trộn hai quy ước). Đây là bài thực hành của bài: viết hàm và kiểm tra với các cặp hộp đã tính tay.</p>
+<pre><code class="language-python">def iou(a, b):
+    """a, b: (x1, y1, x2, y2). Trả về IoU trong [0, 1]."""
+    rong = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))      # bề rộng phần giao (0 nếu không giao)
+    cao = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    giao = rong * cao
+    hop = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - giao
+    return giao / hop if hop &gt; 0 else 0.0
 
-print(iou((10, 10, 60, 60), (30, 30, 80, 80)))   # ≈ 0.22</code></pre>
 
-<h2 id="khi-nao-mot-du-doan-duoc-tinh-la-dung">Khi nào một dự đoán được tính là đúng?</h2>
-<p>Một dự đoán là <strong>True Positive</strong> nếu đúng lớp và IoU với một khung thật vượt ngưỡng (ví dụ 0,5). Mỗi khung thật chỉ được ghép với một dự đoán; dự đoán thừa là <strong>False Positive</strong>, khung thật không được ghép là <strong>False Negative</strong>.</p>
+cap = [
+    ("lệch chéo",     (10, 10, 60, 60), (30, 30, 80, 80), 900 / 4100),
+    ("trùng khít",    (0, 0, 100, 100), (0, 0, 100, 100), 1.0),
+    ("tách rời",      (0, 0, 10, 10),   (20, 20, 30, 30), 0.0),
+    ("nằm trong",     (0, 0, 100, 100), (25, 25, 75, 75), 2500 / 10000),
+    ("chạm cạnh",     (0, 0, 10, 10),   (10, 0, 20, 10),  0.0),
+]
+for ten, a, b, ky_vong in cap:
+    v = iou(a, b)
+    assert abs(v - ky_vong) &lt; 1e-9 and abs(v - iou(b, a)) &lt; 1e-12     # đúng giá trị tay và đối xứng
+    print(f"{ten:11s}: IoU = {v:.4f}  (tính tay {ky_vong:.4f})")</code></pre>
+<pre><code class="language-text">lệch chéo  : IoU = 0.2195  (tính tay 0.2195)
+trùng khít : IoU = 1.0000  (tính tay 1.0000)
+tách rời   : IoU = 0.0000  (tính tay 0.0000)
+nằm trong  : IoU = 0.2500  (tính tay 0.2500)
+chạm cạnh  : IoU = 0.0000  (tính tay 0.0000)</code></pre>
+<p>Cặp "lệch chéo": phần giao là hình vuông 30×30 = 900, mỗi hộp 50×50 = 2500, hợp = 2500 + 2500 − 900 = 4100, IoU ≈ 0,22. Hai hộp nhìn khá gần nhau nhưng IoU rất thấp: IoU là thước đo khắt khe. Cặp "nằm trong": hộp nhỏ nằm trọn trong hộp lớn vẫn chỉ có IoU 0,25, vì IoU phạt cả việc hộp dự đoán quá to.</p>
+<p>Khi đánh giá, ta cần IoU giữa <em>mọi</em> dự đoán và <em>mọi</em> nhãn thật. Viết bằng phép toán mảng (broadcasting) nhanh hơn vòng lặp hàng trăm lần, và kiểm tra chéo với <code>torchvision.ops.box_iou</code>:</p>
+<pre><code class="language-python">import numpy as np
+import torch
+from torchvision.ops import box_iou
 
-<h2 id="precision-recall-va-duong-cong-pr">Precision, Recall và đường cong PR</h2>
-<p>Thay đổi ngưỡng tin cậy (confidence) từ cao xuống thấp, ta được nhiều cặp (precision, recall) và vẽ thành đường cong. Ngưỡng cao: ít báo sai nhưng bỏ sót nhiều; ngưỡng thấp: bắt nhiều nhưng báo sai nhiều.</p>
 
-<h2 id="ap-va-map">AP và mAP</h2>
+def iou_ma_tran(A, B):
+    """A: (N, 4), B: (M, 4) → ma trận IoU (N, M)."""
+    A, B = np.asarray(A, float)[:, None], np.asarray(B, float)[None]
+    rong = (np.minimum(A[..., 2], B[..., 2]) - np.maximum(A[..., 0], B[..., 0])).clip(0)
+    cao = (np.minimum(A[..., 3], B[..., 3]) - np.maximum(A[..., 1], B[..., 1])).clip(0)
+    giao = rong * cao
+    dt = lambda X: (X[..., 2] - X[..., 0]) * (X[..., 3] - X[..., 1])
+    return giao / (dt(A) + dt(B) - giao)
+
+
+rng = np.random.default_rng(0)
+xy = rng.uniform(0, 500, (200, 2))
+A = np.hstack([xy, xy + rng.uniform(10, 80, (200, 2))])
+B = A[:150] + rng.normal(0, 8, (150, 4))
+M = iou_ma_tran(A, B)
+M_tv = box_iou(torch.tensor(A), torch.tensor(B)).numpy()
+print("shape", M.shape, "| lệch lớn nhất so với torchvision:", float(np.abs(M - M_tv).max()))
+print("vòng lặp cho cùng kết quả:", np.isclose(M[3, 7], iou(A[3], B[7])))</code></pre>
+<pre><code class="language-text">shape (200, 150) | lệch lớn nhất so với torchvision: 0.0
+vòng lặp cho cùng kết quả: True</code></pre>
+
+<h3 id="iou-khat-khe-voi-vat-nho">IoU khắt khe với vật nhỏ</h3>
+<p>Cùng một sai lệch 2 pixel (cỡ sai số gán nhãn bằng tay) ảnh hưởng tới IoU rất khác nhau tùy kích thước vật:</p>
+<pre><code class="language-python">for canh in (8, 16, 32, 64, 128):
+    that = (100, 100, 100 + canh, 100 + canh)
+    lech = (102, 102, 102 + canh, 102 + canh)              # dịch 2 px theo cả x và y
+    print(f"vật {canh:3d} px: IoU khi lệch 2 px = {iou(that, lech):.2f}")</code></pre>
+<pre><code class="language-text">vật   8 px: IoU khi lệch 2 px = 0.39
+vật  16 px: IoU khi lệch 2 px = 0.62
+vật  32 px: IoU khi lệch 2 px = 0.78
+vật  64 px: IoU khi lệch 2 px = 0.88
+vật 128 px: IoU khi lệch 2 px = 0.94</code></pre>
+<p>Vật 8 px lệch 2 px chỉ còn IoU 0,39: dưới ngưỡng 0,5, dự đoán gần như đúng vẫn bị tính là sai. Đây là lý do mAP của vết lỗi nhỏ luôn thấp hơn vật lớn, và vì sao <strong>quy ước gán nhãn nhất quán</strong> (hộp ôm sát hay chừa viền) quan trọng với vật nhỏ: sai lệch giữa hai người gán nhãn đã đủ làm tụt chỉ số.</p>
+
+<h2 id="2-nms-bo-cac-hop-trung-lap">2. NMS: bỏ các hộp trùng lặp</h2>
+<p>Đa số mô hình phát hiện (YOLOv8, YOLO11, Faster R-CNN…) dự đoán nhiều hộp chồng lên nhau cho cùng một vật. <strong>NMS</strong> (Non-Maximum Suppression) dọn dẹp: sắp xếp hộp theo điểm tin cậy giảm dần, giữ hộp cao nhất, bỏ mọi hộp cùng lớp có IoU với nó vượt ngưỡng (thường 0,45–0,7), lặp lại với các hộp còn lại. YOLO26 là mô hình end-to-end, tự học cách chỉ trả một hộp cho mỗi vật nên không cần bước này; nhưng bạn vẫn gặp NMS khi dùng các mô hình khác, khi ghép kết quả từ nhiều ô ảnh (tiling) chồng lấn, và khi đọc code triển khai cũ.</p>
+<pre><code class="language-python">import numpy as np
+import torch
+from torchvision.ops import nms
+
+
+def nms_numpy(hop, diem, nguong_iou=0.5):
+    """Trả về chỉ số các hộp được giữ, theo thứ tự điểm giảm dần (một lớp)."""
+    thu_tu = np.argsort(-diem)
+    giu = []
+    while len(thu_tu):
+        i = thu_tu[0]
+        giu.append(int(i))
+        con_lai = thu_tu[1:]
+        thu_tu = con_lai[iou_ma_tran(hop[[i]], hop[con_lai])[0] &lt;= nguong_iou]
+    return giu
+
+
+hop = np.array([[100, 100, 140, 140], [102, 98, 143, 141], [97, 103, 138, 139],    # 3 hộp cho 1 con vít
+                [300, 120, 340, 160], [305, 125, 345, 165]], float)               # 2 hộp cho con vít khác
+diem = np.array([0.91, 0.88, 0.62, 0.75, 0.80])
+print("NumPy      giữ:", nms_numpy(hop, diem, 0.5))
+print("torchvision giữ:", nms(torch.tensor(hop), torch.tensor(diem), 0.5).tolist())</code></pre>
+<pre><code class="language-text">NumPy      giữ: [0, 4]
+torchvision giữ: [0, 4]</code></pre>
+<p>Còn đúng hai hộp, một cho mỗi vít. Ngưỡng IoU của NMS là một tham số thật sự: quá thấp thì hai vật sát nhau (vít trong khay xếp khít) bị gộp làm một, quá cao thì một vật ra hai hộp và bị đếm hai lần.</p>
+
+<h2 id="3-ghep-du-doan-voi-nhan-that-tp-fp-fn">3. Ghép dự đoán với nhãn thật: TP, FP, FN</h2>
+<p>Để chấm điểm, mỗi dự đoán được ghép với tối đa một nhãn thật theo quy tắc (giống COCO):</p>
+<ol>
+  <li>Xét từng lớp riêng. Sắp các dự đoán của lớp đó (trên toàn bộ tập ảnh) theo điểm tin cậy giảm dần.</li>
+  <li>Với mỗi dự đoán, tìm trong cùng ảnh nhãn thật cùng lớp <strong>chưa được ghép</strong> có IoU lớn nhất. Nếu IoU ≥ ngưỡng (ví dụ 0,5): <strong>TP</strong> (True Positive), đánh dấu nhãn đó đã ghép. Nếu không: <strong>FP</strong> (False Positive).</li>
+  <li>Nhãn thật không được dự đoán nào ghép: <strong>FN</strong> (False Negative, bỏ sót).</li>
+</ol>
+<p>Hệ quả: hộp trùng lặp cho một vật đã có TP sẽ thành FP; hộp đúng vị trí nhưng sai lớp là FP của lớp này và để lại FN ở lớp kia. Tập dữ liệu nhỏ dưới đây (3 ảnh, 2 lớp như bài trước) được thiết kế để có đủ các tình huống: hộp tốt, hộp lệch, hộp trùng, báo nhầm trên nền, bỏ sót.</p>
+<pre><code class="language-python">import numpy as np
+
+TEN = {0: "vit", 1: "dai_oc"}
+# nhãn thật: (ảnh, lớp, x1, y1, x2, y2)
+GT = [(1, 0, 10, 10, 50, 50), (1, 0, 100, 20, 140, 60), (1, 1, 200, 100, 250, 150),
+      (2, 0, 30, 30, 70, 70), (2, 1, 120, 80, 170, 130), (2, 1, 220, 40, 270, 90),
+      (3, 0, 50, 100, 90, 140), (3, 0, 150, 150, 190, 190)]
+# dự đoán: (ảnh, lớp, điểm, x1, y1, x2, y2)
+PRED = [(1, 0, .95, 11, 11, 51, 49), (1, 0, .80, 104, 22, 146, 62), (1, 0, .40, 12, 8, 52, 50),
+        (1, 1, .90, 202, 103, 252, 148),
+        (2, 0, .85, 36, 36, 76, 76), (2, 1, .70, 121, 82, 168, 131), (2, 1, .30, 300, 10, 340, 50),
+        (3, 0, .60, 50, 100, 90, 140), (3, 0, .55, 160, 160, 200, 200), (3, 0, .35, 250, 20, 280, 50)]
+
+
+def ghep(lop, nguong_iou):
+    """Trả về (điểm, cờ TP, IoU tốt nhất) của các dự đoán lớp `lop` theo điểm giảm dần, và số nhãn thật."""
+    gt = [g for g in GT if g[1] == lop]
+    pr = sorted([p for p in PRED if p[1] == lop], key=lambda p: -p[2])
+    da_ghep = [False] * len(gt)
+    diem, tp, iou_tot = [], [], []
+    for anh, _, s, *hop in pr:
+        ung_vien = [(iou(hop, g[2:]), k) for k, g in enumerate(gt) if g[0] == anh and not da_ghep[k]]
+        v, k = max(ung_vien, default=(0.0, -1))
+        la_tp = v &gt;= nguong_iou
+        if la_tp:
+            da_ghep[k] = True
+        diem.append(s); tp.append(la_tp); iou_tot.append(v)
+    return np.array(diem), np.array(tp), np.array(iou_tot), len(gt)
+
+
+s, tp, v, n_gt = ghep(0, 0.5)
+tp_cum, fp_cum = np.cumsum(tp), np.cumsum(~tp)
+P, R = tp_cum / (tp_cum + fp_cum), tp_cum / n_gt
+print(f"Lớp vit, IoU ≥ 0.5, {n_gt} nhãn thật")
+print(" điểm | IoU  | kết quả | TP tích lũy | FP tích lũy | precision | recall")
+for k in range(len(s)):
+    print(f" {s[k]:.2f} | {v[k]:.2f} | {'TP' if tp[k] else 'FP':7s} | {tp_cum[k]:11d} | {fp_cum[k]:11d} |"
+          f" {P[k]:9.3f} | {R[k]:.3f}")
+print("FN (bỏ sót) =", n_gt - tp.sum())</code></pre>
+<pre><code class="language-text">Lớp vit, IoU ≥ 0.5, 5 nhãn thật
+ điểm | IoU  | kết quả | TP tích lũy | FP tích lũy | precision | recall
+ 0.95 | 0.90 | TP      |           1 |           0 |     1.000 | 0.200
+ 0.85 | 0.57 | TP      |           2 |           0 |     1.000 | 0.400
+ 0.80 | 0.72 | TP      |           3 |           0 |     1.000 | 0.600
+ 0.60 | 1.00 | TP      |           4 |           0 |     1.000 | 0.800
+ 0.55 | 0.39 | FP      |           4 |           1 |     0.800 | 0.800
+ 0.40 | 0.00 | FP      |           4 |           2 |     0.667 | 0.800
+ 0.35 | 0.00 | FP      |           4 |           3 |     0.571 | 0.800
+FN (bỏ sót) = 1</code></pre>
+<p>Đọc từng dòng: dự đoán 0,85 lệch 6 px so với vít thật, IoU 0,57, vẫn qua ngưỡng 0,5. Dự đoán 0,55 lệch 10 px, IoU 0,39: là FP, và vít thật ở ảnh 3 trở thành FN. Dự đoán 0,40 trùng với vít đã được hộp 0,95 ghép, không còn nhãn thật nào chưa ghép ở gần (cột IoU vì vậy bằng 0): FP (nếu có NMS, hoặc với YOLO26 end-to-end, hộp này thường đã không còn). Dự đoán 0,35 nằm trên nền: FP.</p>
+
+<h2 id="4-precision-recall-theo-nguong-tin-cay-va-duong-cong-pr">4. Precision, recall theo ngưỡng tin cậy và đường cong PR</h2>
+<p>Mỗi dòng của bảng trên tương ứng với một <strong>ngưỡng tin cậy</strong>: đặt ngưỡng bằng điểm của dòng đó thì chỉ các dự đoán từ dòng đầu đến dòng đó được giữ lại.</p>
 <ul>
-  <li><strong>AP</strong> (Average Precision): diện tích dưới đường cong precision–recall của <em>một lớp</em>, tóm tắt chất lượng trên mọi ngưỡng tin cậy.</li>
-  <li><strong>mAP</strong>: trung bình AP của tất cả các lớp.</li>
-  <li><strong>mAP50</strong>: tính với ngưỡng IoU 0,5, khá "dễ dãi" về vị trí khung.</li>
-  <li><strong>mAP50-95</strong>: trung bình mAP ở các ngưỡng IoU từ 0,5 đến 0,95 (bước 0,05), đòi hỏi khung chính xác. Đây là chỉ số chính trên bộ COCO.</li>
+  <li><strong>Precision</strong> = TP / (TP + FP): trong các hộp mô hình báo, bao nhiêu phần là đúng. Precision thấp = báo nhầm nhiều.</li>
+  <li><strong>Recall</strong> = TP / số nhãn thật: trong các vật thật, bao nhiêu phần được tìm thấy. Recall thấp = bỏ sót nhiều.</li>
+</ul>
+<p>Hạ ngưỡng thì recall chỉ tăng hoặc giữ nguyên, precision thường giảm. Vẽ các cặp (recall, precision) được <strong>đường cong PR</strong>. Ở bảng trên, ngưỡng 0,60 cho precision 1,0 và recall 0,8; hạ xuống 0,35 recall không tăng thêm (vít thứ năm bị hộp lệch, không hộp nào ghép được) mà precision rơi xuống 0,57. Cách chọn ngưỡng theo các con số này (và theo chi phí của nhà máy) đã học ở bài "Precision, Recall và ma trận nhầm lẫn" của chặng 5.</p>
+
+<h2 id="5-ap-va-map50">5. AP và mAP50</h2>
+<p><strong>AP</strong> (Average Precision) tóm tắt cả đường cong PR của <em>một lớp</em> thành một số: diện tích dưới đường cong, sau khi làm "phẳng" đường cong bằng cách thay precision ở mỗi mức recall bằng precision lớn nhất ở mọi mức recall lớn hơn hoặc bằng (bao trên, envelope). Hai cách tính phổ biến:</p>
+<ul>
+  <li><strong>Nội suy toàn điểm</strong> (Pascal VOC từ 2010): cộng diện tích các bậc thang của bao trên.</li>
+  <li><strong>Nội suy 101 điểm</strong> (COCO): lấy trung bình precision của bao trên tại 101 mức recall 0; 0,01; …; 1.</li>
+</ul>
+<p>Mức recall chưa đạt được (ở đây trên 0,8) có precision 0, nên bỏ sót làm AP giảm trực tiếp. <strong>mAP</strong> là trung bình AP của các lớp; <strong>mAP50</strong> là mAP khi ngưỡng IoU để tính TP là 0,5.</p>
+<pre><code class="language-python">import numpy as np
+
+
+def ap_tu_pr(P, R, cach="toan_diem"):
+    r = np.concatenate([[0.0], R, [1.0]])
+    p = np.concatenate([[1.0], P, [0.0]])
+    p = np.maximum.accumulate(p[::-1])[::-1]                     # bao trên: precision không tăng theo recall
+    if cach == "toan_diem":
+        i = np.where(r[1:] != r[:-1])[0]
+        return float(np.sum((r[i + 1] - r[i]) * p[i + 1]))
+    muc = np.linspace(0, 1, 101)                                 # COCO 101 điểm
+    chi_so = np.searchsorted(r, muc, side="left")                # điểm đầu tiên có recall ≥ mức
+    return float(np.mean([p[k] if k &lt; len(p) else 0.0 for k in chi_so]))
+
+
+def ap_lop(lop, nguong_iou, cach="toan_diem"):
+    s, tp, _, n_gt = ghep(lop, nguong_iou)
+    tp_cum, fp_cum = np.cumsum(tp), np.cumsum(~tp)
+    return ap_tu_pr(tp_cum / (tp_cum + fp_cum), tp_cum / n_gt, cach)
+
+
+for cach in ("toan_diem", "101_diem"):
+    ap = {TEN[k]: ap_lop(k, 0.5, cach) for k in TEN}
+    print(f"{cach:9s}: AP50 " + ", ".join(f"{t} = {v:.4f}" for t, v in ap.items())
+          + f" → mAP50 = {np.mean(list(ap.values())):.4f}")</code></pre>
+<pre><code class="language-text">toan_diem: AP50 vit = 0.8000, dai_oc = 0.6667 → mAP50 = 0.7333
+101_diem : AP50 vit = 0.8020, dai_oc = 0.6634 → mAP50 = 0.7327</code></pre>
+<p>Kiểm tra bằng tay lớp <code>vit</code>: bao trên có precision 1,0 từ recall 0 đến 0,8, rồi 0 sau đó; diện tích = 0,8 × 1,0 = 0,8. Cách 101 điểm cho 81/101 ≈ 0,802 vì đếm cả mức recall 0 và 0,8. Lớp <code>dai_oc</code>: precision 1,0 đến recall 2/3, AP ≈ 0,667. Các thư viện khác nhau dùng cách nội suy và quy tắc ghép hơi khác nhau, nên cùng một tập dự đoán có thể cho mAP lệch nhau ở chữ số thập phân thứ hai hoặc thứ ba. <strong>Chỉ so sánh mAP tính bằng cùng một công cụ, trên cùng một tập dữ liệu.</strong></p>
+<p>Kiểm tra chéo với scikit-learn: <code>average_precision_score</code> tính AP <em>không nội suy</em> (Σ ΔR·P tại mỗi TP) trên các dự đoán đã có, nên chỉ cần nhân thêm tỉ lệ nhãn thật được tìm thấy:</p>
+<pre><code class="language-python">import numpy as np
+from sklearn.metrics import average_precision_score
+
+for lop in TEN:
+    s, tp, _, n_gt = ghep(lop, 0.5)
+    tp_cum, fp_cum = np.cumsum(tp), np.cumsum(~tp)
+    P, R = tp_cum / (tp_cum + fp_cum), tp_cum / n_gt
+    ap_tay = float(np.sum(np.diff(np.r_[0, R]) * P))                     # không nội suy
+    ap_sk = average_precision_score(tp, s) * tp.sum() / n_gt
+    print(f"{TEN[lop]:7s}: tự tính {ap_tay:.4f} | scikit-learn {ap_sk:.4f}")</code></pre>
+<pre><code class="language-text">vit    : tự tính 0.8000 | scikit-learn 0.8000
+dai_oc : tự tính 0.6667 | scikit-learn 0.6667</code></pre>
+
+<h2 id="6-map50-95-doi-hoi-hop-khit">6. mAP50-95: đòi hỏi hộp khít</h2>
+<p>mAP50 chỉ cần hộp trùng một nửa. <strong>mAP50-95</strong> (COCO gọi là AP, Ultralytics ghi <code>mAP50-95</code>) lấy trung bình mAP ở 10 ngưỡng IoU 0,50; 0,55; …; 0,95. Hộp phải khít mới giữ được TP ở ngưỡng cao:</p>
+<pre><code class="language-python">import numpy as np
+
+nguong = np.round(np.arange(0.50, 0.96, 0.05), 2)
+bang = {TEN[k]: [ap_lop(k, t) for t in nguong] for k in TEN}
+print("IoU  | " + " | ".join(f"{t:6s}" for t in bang) + " | mAP")
+for i, t in enumerate(nguong):
+    hang = [bang[ten][i] for ten in bang]
+    print(f"{t:.2f} | " + " | ".join(f"{v:6.3f}" for v in hang) + f" | {np.mean(hang):.3f}")
+map50 = np.mean([bang[t][0] for t in bang])
+map50_95 = np.mean([np.mean(bang[t]) for t in bang])
+print(f"mAP50 = {map50:.3f} | mAP75 = {np.mean([bang[t][5] for t in bang]):.3f} | mAP50-95 = {map50_95:.3f}")</code></pre>
+<pre><code class="language-text">IoU  | vit    | dai_oc | mAP
+0.50 |  0.800 |  0.667 | 0.733
+0.55 |  0.800 |  0.667 | 0.733
+0.60 |  0.500 |  0.667 | 0.583
+0.65 |  0.500 |  0.667 | 0.583
+0.70 |  0.500 |  0.667 | 0.583
+0.75 |  0.300 |  0.667 | 0.483
+0.80 |  0.300 |  0.667 | 0.483
+0.85 |  0.300 |  0.167 | 0.233
+0.90 |  0.300 |  0.000 | 0.150
+0.95 |  0.050 |  0.000 | 0.025
+mAP50 = 0.733 | mAP75 = 0.483 | mAP50-95 = 0.459</code></pre>
+<p>Ở IoU 0,6 hộp lệch 6 px (IoU 0,57) của lớp vit rớt khỏi TP, AP vit giảm; từ 0,85 trở lên chỉ còn các hộp gần như trùng khít; ở 0,95 chỉ hộp trùng hoàn toàn còn được tính. mAP50-95 thấp hơn mAP50 nhiều cho biết: mô hình <em>tìm</em> được vật, nhưng <em>khoanh</em> chưa khít.</p>
+<div class="tip"><strong>Chỉ số nào cho bài toán nào</strong>Đếm vật, kiểm tra có/không: mAP50 (và precision, recall ở ngưỡng chạy) là đủ, vì hộp lệch vài pixel không đổi kết quả đếm. Định vị cho robot gắp, đo vị trí: cần mAP75 hoặc mAP50-95 cao, và tốt hơn nữa là đo trực tiếp sai số tâm hộp theo mm. Ultralytics chọn <code>best.pt</code> theo chỉ số tổng hợp thiên về mAP50-95.</div>
+
+<h2 id="7-doc-ket-qua-cua-ultralytics">7. Đọc kết quả của Ultralytics</h2>
+<pre><code class="language-python"># (minh họa) cần ultralytics và best.pt từ bài trước
+from ultralytics import YOLO
+
+metrics = YOLO("runs_vit/yolo26n_640/weights/best.pt").val(data="data.yaml", split="val")
+b = metrics.box
+print(f"P = {b.mp:.3f}, R = {b.mr:.3f}")                    # precision, recall trung bình các lớp
+print(f"mAP50 = {b.map50:.3f}, mAP75 = {b.map75:.3f}, mAP50-95 = {b.map:.3f}")
+print("mAP50-95 từng lớp:", b.maps)                         # mảng, theo thứ tự names</code></pre>
+<table>
+  <tr><th>Cột Ultralytics in ra</th><th>Ý nghĩa</th><th>Tương ứng trong bài</th></tr>
+  <tr><td><code>Images</code>, <code>Instances</code></td><td>Số ảnh, số nhãn thật của lớp</td><td><code>n_gt</code></td></tr>
+  <tr><td><code>Box(P)</code>, <code>R</code></td><td>Precision, recall tại <strong>một</strong> ngưỡng tin cậy do thư viện chọn (ngưỡng cho F1 trung bình cao nhất), ở IoU 0,5</td><td>Một dòng của bảng mục 3</td></tr>
+  <tr><td><code>mAP50</code></td><td>Trung bình AP ở IoU 0,5 trên mọi ngưỡng tin cậy</td><td>Mục 5</td></tr>
+  <tr><td><code>mAP50-95</code></td><td>Trung bình mAP ở 10 ngưỡng IoU</td><td>Mục 6</td></tr>
+</table>
+<p>Lưu ý: P và R in ra <em>không</em> phải ở ngưỡng <code>conf</code> bạn sẽ dùng trong sản xuất, và mAP được tính trên mọi ngưỡng tin cậy, kể cả những ngưỡng thấp bạn không bao giờ dùng. Khi <code>val</code>, thư viện mặc định dùng ngưỡng <code>conf</code> rất thấp để vẽ được đầy đủ đường PR; đừng so mAP này với kết quả <code>predict</code> ở <code>conf=0.5</code>.</p>
+
+<h2 id="8-chan-doan-mo-hinh-tu-chi-so">8. Chẩn đoán mô hình từ chỉ số</h2>
+<p>Để thấy mỗi "bệnh" để lại dấu vết gì trên các chỉ số, ta mô phỏng một tập kiểm tra 300 ảnh vết móp (150 ảnh OK không có lỗi, 150 ảnh NG có 1–2 vết, cỡ 20–60 px) và bốn mô hình giả lập: A tốt; B tìm đúng vật nhưng hộp lỏng lẻo (lệch trung bình 12% kích thước); C bỏ sót 35% vết; D báo nhầm nhiều trên nền. Chỉ số tính bằng các hàm vừa viết.</p>
+<pre><code class="language-python">import numpy as np
+
+
+def mo_phong(p_thay, lech, p_bao_nham, seed=0):
+    rng = np.random.default_rng(seed)
+    gt, pred = [], []
+    for anh in range(300):
+        for _ in range(0 if anh &lt; 150 else int(rng.integers(1, 3))):
+            x, y, c = rng.uniform(0, 400), rng.uniform(0, 400), rng.uniform(20, 60)
+            gt.append((anh, 0, x, y, x + c, y + c))
+            if rng.random() &lt; p_thay:
+                d = rng.normal(0, lech * c, 4)
+                pred.append((anh, 0, rng.uniform(0.6, 0.99), x + d[0], y + d[1], x + c + d[2], y + c + d[3]))
+        if rng.random() &lt; p_bao_nham:                       # báo nhầm trên nền
+            x, y, c = rng.uniform(0, 400), rng.uniform(0, 400), rng.uniform(20, 60)
+            pred.append((anh, 0, rng.uniform(0.3, 0.9), x, y, x + c, y + c))
+    return gt, pred
+
+
+def danh_gia(gt, pred, nguong_conf=0.5):
+    global GT, PRED
+    GT, PRED = gt, pred                                      # dùng lại hàm ghep() ở trên
+    ap = [ap_lop(0, t) for t in np.round(np.arange(0.5, 0.96, 0.05), 2)]
+    s, tp, _, n_gt = ghep(0, 0.5)
+    giu = s &gt;= nguong_conf
+    P, R = tp[giu].sum() / max(giu.sum(), 1), tp[giu].sum() / n_gt
+    co_loi = {g[0] for g in gt}                               # ảnh NG
+    bao_ng = {p[0] for p in pred if p[2] &gt;= nguong_conf}      # ảnh có ít nhất 1 hộp ≥ ngưỡng
+    escape = len(co_loi - bao_ng) / len(co_loi)
+    overkill = len(bao_ng - co_loi) / (300 - len(co_loi))
+    return P, R, ap[0], float(np.mean(ap)), escape, overkill
+
+
+mo_hinh = {"A tốt": (0.97, 0.03, 0.03), "B hộp lỏng": (0.97, 0.12, 0.03),
+           "C bỏ sót": (0.65, 0.03, 0.03), "D báo nhầm": (0.97, 0.03, 0.40)}
+print("mô hình    |  P@0.5 |  R@0.5 | mAP50 | mAP50-95 | escape ảnh | overkill ảnh")
+for ten, tham_so in mo_hinh.items():
+    P, R, m50, m5095, esc, ovk = danh_gia(*mo_phong(*tham_so))
+    print(f"{ten:10s} | {P:6.3f} | {R:6.3f} | {m50:5.3f} | {m5095:8.3f} | {esc:10.1%} | {ovk:12.1%}")</code></pre>
+<pre><code class="language-text">mô hình    |  P@0.5 |  R@0.5 | mAP50 | mAP50-95 | escape ảnh | overkill ảnh
+A tốt      |  0.968 |  0.968 | 0.948 |    0.790 |       1.3% |         2.0%
+B hộp lỏng |  0.946 |  0.946 | 0.903 |    0.316 |       1.3% |         2.0%
+C bỏ sót   |  0.958 |  0.624 | 0.617 |    0.522 |      24.7% |         2.0%
+D báo nhầm |  0.778 |  0.978 | 0.887 |    0.739 |       0.0% |        24.7%</code></pre>
+<p>Bảng chẩn đoán rút ra từ mô phỏng (và đúng với mô hình thật):</p>
+<table>
+  <tr><th>Dấu hiệu</th><th>Bệnh</th><th>Hướng xử lý</th></tr>
+  <tr><td>mAP50 cao, mAP50-95 thấp hơn nhiều (B)</td><td>Tìm đúng nhưng hộp không khít</td><td>Rà quy ước và chất lượng hộp khi gán nhãn; tăng <code>imgsz</code> nếu vật nhỏ; nếu chỉ cần đếm thì có thể chấp nhận</td></tr>
+  <tr><td>Recall thấp, precision cao (C)</td><td>Bỏ sót: vật nhỏ, bị che, điều kiện chụp chưa có trong train</td><td>Xem các FN, thêm ảnh đúng loại đó; tăng <code>imgsz</code>; kiểm tra nhãn thiếu trong train (vật không được gán nhãn dạy mô hình bỏ qua)</td></tr>
+  <tr><td>Precision thấp, recall cao (D)</td><td>Báo nhầm nền, vân, phản xạ thành vật</td><td>Thêm ảnh nền và ảnh "dễ gây nhầm" (file nhãn rỗng); xem ma trận nhầm lẫn cột "background"</td></tr>
+  <tr><td>Một lớp thấp hẳn</td><td>Ít dữ liệu, nhãn không nhất quán, hai lớp quá giống nhau</td><td>Ma trận nhầm lẫn; rà nhãn lớp đó; cân nhắc gộp lớp nếu nhà máy không cần phân biệt</td></tr>
+  <tr><td>mAP val cao, thực tế kém</td><td>Val không đại diện (rò rỉ từ train, cùng lô)</td><td>Tập test chụp ngày khác, lô khác</td></tr>
+</table>
+<p>Hai cột cuối là ngôn ngữ của nhà máy: ở ngưỡng 0,5, ảnh NG không có hộp nào là <strong>escape</strong> (lọt lỗi), ảnh OK có hộp là <strong>overkill</strong> (loại nhầm). Mô hình B có mAP50-95 tệ nhất nhưng escape và overkill như mô hình A: nếu trạm chỉ cần biết "có vết móp hay không", hộp lỏng không phải vấn đề. Mô hình C có precision gần như mô hình A, nhưng lọt khoảng một phần tư số ảnh lỗi, không thể chấp nhận. Mô hình D không lọt ảnh lỗi nào nhưng loại nhầm một phần tư số sản phẩm tốt. Đó là lý do báo cáo cho nhà máy phải là escape, overkill ở ngưỡng chạy thật, trên tập test đủ lớn, kèm số mẫu (bài "Chọn ngưỡng và đánh giá theo escape, overkill, cycle time"); mAP dùng để <em>so sánh mô hình</em> trong lúc phát triển.</p>
+
+<h2 id="9-sai-lam-thuong-gap">9. Sai lầm thường gặp</h2>
+<ul>
+  <li><strong>So mAP giữa hai công cụ</strong> (Ultralytics, pycocotools, code tự viết) hoặc giữa hai tập val khác nhau: cách nội suy và ghép khác nhau làm lệch kết quả.</li>
+  <li><strong>Báo cáo mAP50 cho bài toán định vị</strong> cần độ chính xác vị trí: hộp lệch 40% vẫn là TP ở IoU 0,5.</li>
+  <li><strong>Đọc P, R của Ultralytics như thể ở ngưỡng sản xuất.</strong></li>
+  <li><strong>Lấy ngưỡng NMS quá thấp</strong> khi vật xếp sát nhau: vật bị gộp, đếm thiếu.</li>
+  <li><strong>Đánh giá vật nhỏ bằng IoU 0,5 mà không xem ảnh</strong>: vài pixel sai lệch nhãn đủ biến TP thành FP + FN.</li>
+  <li><strong>Quên ảnh OK trong tập đánh giá</strong>: mAP chỉ tính trên các vật có thật, không phản ánh overkill trên ảnh sạch nếu tập test ít ảnh nền.</li>
 </ul>
 
-<h2 id="doc-ket-qua-cua-ultralytics">Đọc kết quả của Ultralytics</h2>
-<pre><code>from ultralytics import YOLO
-metrics = YOLO("runs/detect/train/weights/best.pt").val(data="data.yaml")
-print(metrics.box.map50, metrics.box.map)       # mAP50, mAP50-95
-print(metrics.box.maps)                          # mAP50-95 theo từng lớp</code></pre>
-<p>Thư mục kết quả còn có ma trận nhầm lẫn và các đường cong PR, F1 theo ngưỡng tin cậy, rất hữu ích để chọn ngưỡng triển khai.</p>
+<h2 id="10-bai-tap">10. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> (Thực hành của bài) Dùng hàm <code>iou</code> ở mục 1, tính IoU cho ba cặp hộp sau, so với kết quả tính tay: (a) <code>(0, 0, 40, 40)</code> và <code>(20, 0, 60, 40)</code>; (b) <code>(10, 10, 110, 60)</code> và <code>(10, 10, 60, 110)</code>; (c) <code>(0, 0, 50, 50)</code> và <code>(0, 0, 25, 25)</code>.</p>
+<details><summary>Xem đáp án</summary>
+<p>Tính tay: (a) giao 20×40 = 800, hợp 1600 + 1600 − 800 = 2400, IoU = 1/3. (b) giao 50×50 = 2500, mỗi hộp 100×50 = 5000, hợp 7500, IoU = 1/3. (c) hộp nhỏ nằm trong: 625 / 2500 = 0,25.</p>
+<pre><code class="language-python">cap = [((0, 0, 40, 40), (20, 0, 60, 40), 800 / 2400),
+       ((10, 10, 110, 60), (10, 10, 60, 110), 2500 / 7500),
+       ((0, 0, 50, 50), (0, 0, 25, 25), 625 / 2500)]
+for a, b, tay in cap:
+    print(f"{a} vs {b}: {iou(a, b):.4f} (tay {tay:.4f})", "khớp" if abs(iou(a, b) - tay) &lt; 1e-9 else "SAI")</code></pre>
+<pre><code class="language-text">(0, 0, 40, 40) vs (20, 0, 60, 40): 0.3333 (tay 0.3333) khớp
+(10, 10, 110, 60) vs (10, 10, 60, 110): 0.3333 (tay 0.3333) khớp
+(0, 0, 50, 50) vs (0, 0, 25, 25): 0.2500 (tay 0.2500) khớp</code></pre>
+<p>Cặp (b) đáng nhớ: hai hộp cùng diện tích, cùng góc trên trái, chỉ xoay hướng dài, IoU chỉ còn 1/3. Đó là lý do vật dài, mảnh và nghiêng (vết xước chéo) đánh giá bằng hộp thẳng rất kém; bài sau giới thiệu phân đoạn.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Một lớp có 4 nhãn thật. Năm dự đoán theo điểm giảm dần có kết quả TP, FP, TP, TP, FP. Tính precision, recall sau mỗi dự đoán và AP (nội suy toàn điểm) bằng tay, rồi kiểm tra bằng <code>ap_tu_pr</code>.</p>
+<details><summary>Xem đáp án</summary>
+<p>TP tích lũy 1, 1, 2, 3, 3; FP tích lũy 0, 1, 1, 1, 2. Precision 1; 0,5; 0,667; 0,75; 0,6. Recall 0,25; 0,25; 0,5; 0,75; 0,75. Bao trên: precision 1 đến recall 0,25; 0,75 từ 0,25 đến 0,75; sau đó 0. AP = 0,25 × 1 + 0,5 × 0,75 = 0,625.</p>
+<pre><code class="language-python">import numpy as np
 
-<h2 id="chan-doan-mo-hinh-tu-chi-so">Chẩn đoán mô hình từ chỉ số</h2>
-<table>
-  <tr><th>Hiện tượng</th><th>Khả năng</th><th>Hướng xử lý</th></tr>
-  <tr><td>mAP50 cao, mAP50-95 thấp</td><td>Tìm đúng vật nhưng khung chưa khít</td><td>Kiểm tra chất lượng gán nhãn, tăng độ phân giải</td></tr>
-  <tr><td>Recall thấp</td><td>Bỏ sót vật, thường là vật nhỏ hoặc bị che</td><td>Thêm dữ liệu loại đó, tăng <code>imgsz</code></td></tr>
-  <tr><td>Precision thấp</td><td>Báo nhầm nền thành vật</td><td>Thêm ảnh nền không có vật, ảnh dễ gây nhầm</td></tr>
-  <tr><td>Một lớp rất thấp</td><td>Ít dữ liệu hoặc nhãn không nhất quán</td><td>Xem ma trận nhầm lẫn, rà lại nhãn lớp đó</td></tr>
-</table>
+tp = np.array([1, 0, 1, 1, 0], bool)
+tc, fc = np.cumsum(tp), np.cumsum(~tp)
+print("AP =", round(ap_tu_pr(tc / (tc + fc), tc / 4), 4))</code></pre>
+<pre><code class="language-text">AP = 0.625</code></pre>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Hai mô hình phát hiện vết lỗi trên cùng tập val: M1 có mAP50 0,91, mAP50-95 0,52, P 0,93, R 0,78; M2 có mAP50 0,88, mAP50-95 0,66, P 0,80, R 0,90. Trạm chỉ cần loại sản phẩm có lỗi (không đo kích thước), khách hàng ưu tiên không lọt lỗi. Chọn mô hình nào để thử tiếp, và cần đo thêm gì trước khi quyết định?</p>
+<details><summary>Xem đáp án</summary>
+<p>M2 đáng thử hơn: recall cao hơn (bỏ sót ít hơn) quan trọng nhất khi ưu tiên không lọt lỗi; mAP50-95 của M1 thấp cho thấy hộp kém khít nhưng điều đó không quan trọng với trạm chỉ cần có/không. Precision thấp của M2 có thể bù bằng chọn ngưỡng hoặc thêm ảnh nền. Tuy nhiên P, R in ra ở ngưỡng do thư viện chọn, nên phải: (1) tính escape và overkill <strong>cấp ảnh</strong> của cả hai mô hình theo nhiều ngưỡng trên tập test có đủ ảnh OK và NG; (2) chọn ngưỡng cho escape bằng 0 (hoặc ≤ mức khách cho phép) rồi so overkill tại đó; (3) kiểm tra cycle time. Quyết định theo kết quả đó, không theo mAP.</p>
+</details>
+</div>
 
-<h2 id="chi-so-nao-cho-nha-may">Chỉ số nào cho nhà máy?</h2>
-<p>mAP phù hợp để so sánh mô hình, nhưng khi triển khai bạn chạy ở <strong>một ngưỡng cố định</strong>. Hãy báo cáo precision và recall (hoặc tỷ lệ lọt lỗi và loại nhầm) tại đúng ngưỡng đó, trên tập test chụp ở điều kiện thật. Xem thêm <a href="../kien-thuc/precision-recall-f1-ma-tran-nham-lan.html">precision, recall và ma trận nhầm lẫn</a>.</p>
+<h2 id="tom-tat">Tóm tắt</h2>
+<ul>
+  <li>IoU = giao / hợp; khắt khe với vật nhỏ (lệch 2 px trên vật 8 px còn 0,39); tính dạng ma trận để nhanh, kiểm tra chéo với <code>torchvision.ops.box_iou</code>.</li>
+  <li>NMS giữ hộp điểm cao nhất, bỏ hộp trùng có IoU vượt ngưỡng; YOLO26 end-to-end không cần NMS nhưng bạn vẫn gặp nó ở mô hình khác và khi ghép ô ảnh.</li>
+  <li>Ghép dự đoán theo điểm giảm dần với nhãn thật chưa ghép có IoU lớn nhất: TP, FP, FN; hộp trùng là FP.</li>
+  <li>Precision, recall thay đổi theo ngưỡng tin cậy; AP là diện tích dưới bao trên của đường PR (toàn điểm hoặc 101 điểm); mAP là trung bình các lớp.</li>
+  <li>mAP50 dễ dãi về vị trí; mAP50-95 đòi hộp khít. Chẩn đoán: mAP50-95 ≪ mAP50 là hộp lỏng; R thấp là bỏ sót; P thấp là báo nhầm.</li>
+  <li>mAP để so mô hình; nhà máy cần escape, overkill cấp ảnh ở ngưỡng chạy thật.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Phân đoạn ảnh: semantic, instance, panoptic</strong>, khi hộp bao không đủ và cần biết chính xác từng pixel thuộc vết lỗi nào.</p>
 
       </div>
       <section class="practice"><h2><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <circle cx="12" cy="12" r="6" /> <circle cx="12" cy="12" r="2" /></svg>Bài tập thực hành</h2><ol><li>Tự viết hàm tính IoU giữa hai hộp và kiểm tra với 3 cặp hộp cho trước.</li></ol><p>Làm xong bài tập mới chuyển sang bài tiếp theo: tự viết code là cách duy nhất để nhớ lâu.</p></section><div class="lesson-done" data-course="vision-engineer"><button type="button" class="lesson-done-btn" data-lesson-done="iou-map-danh-gia-object-detection" aria-pressed="false"><span class="box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></span><span class="off">Đánh dấu đã học xong</span><span class="on">Đã học xong bài này</span></button><a class="btn lg" href="../kien-thuc/phan-doan-anh-semantic-instance-panoptic.html">Bài tiếp theo<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a></div>
       <footer class="article-foot">
-        <div class="tags"><a class="tag" href="../search.html?q=Object Detection">#Object Detection</a><a class="tag" href="../search.html?q=AI Vision">#AI Vision</a></div>
+        <div class="tags"><a class="tag" href="../search.html?q=Object Detection">#Object Detection</a><a class="tag" href="../search.html?q=AI Vision">#AI Vision</a><a class="tag" href="../search.html?q=Python">#Python</a></div>
         <div class="share">
       <span>Chia sẻ:</span>
       <a class="share-btn fb" href="https://www.facebook.com/sharer/sharer.php?u=https://hocfree.vn/hoc/iou-map-danh-gia-object-detection.html" target="_blank" rel="noopener" aria-label="Chia sẻ Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8z"/></svg></a>

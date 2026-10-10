@@ -1,65 +1,339 @@
-<p><strong>U-Net</strong> ra đời năm 2015 cho phân đoạn ảnh y sinh và đến nay vẫn là kiến trúc được dùng nhiều nhất cho semantic segmentation khi dữ liệu ít, ví dụ phân đoạn vết nứt, vùng thiếu keo, vết loang. Bài này giải thích ý tưởng và cài đặt một U-Net nhỏ bằng PyTorch.</p>
+<p>Bài "Phân đoạn vết lỗi với YOLO26-seg" dùng một mô hình đóng gói sẵn: gọi <code>train</code>, nhận mặt nạ. Bài này đi theo hướng ngược lại: tự xây <strong>U-Net</strong>, kiến trúc semantic segmentation kinh điển (Ronneberger và cộng sự, 2015, ban đầu cho ảnh y sinh), bằng PyTorch, từng lớp một. U-Net vẫn là lựa chọn số một khi dữ liệu ít và cần mặt nạ chính xác từng pixel cho vết nứt, vết xước, vùng thiếu keo; hiểu nó cũng giúp bạn hiểu phần "đầu phân đoạn" của các mô hình lớn hơn. Ta sẽ hiểu encoder–decoder và skip connection, cài một U-Net nhỏ, thấy bằng số vì sao <strong>Dice loss</strong> cần cho vùng lỗi chỉ chiếm 1–2% ảnh, huấn luyện trên tập vết xước tổng hợp, báo cáo Dice, IoU và escape/overkill, rồi biến mặt nạ thành phép đo. Bạn cần nền tảng của bài "PyTorch cơ bản: tensor, autograd, vòng lặp huấn luyện" ở chặng 10. Bài sau, "Anomaly detection: học từ ảnh OK với PaDiM, PatchCore", giải quyết trường hợp không có ảnh lỗi để gán nhãn.</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Giải thích vai trò của encoder, decoder, skip connection và theo dõi được kích thước tensor qua từng tầng; cài U-Net nhỏ trong PyTorch; viết soft Dice loss và hiểu vì sao BCE một mình kém với vùng lỗi nhỏ; tăng cường dữ liệu đồng thời cho ảnh và mặt nạ; huấn luyện, so sánh BCE, BCE + Dice và U-Net không có skip connection; báo cáo Dice, IoU (toàn tập và theo ảnh) và escape/overkill cấp ảnh; hậu xử lý mặt nạ thành vết lỗi có kích thước.</div>
 
-<h2>Ý tưởng: chữ U</h2>
+<h2>1. Encoder, decoder và skip connection</h2>
+<p>Mạng phân loại ở chặng 10 thu nhỏ ảnh dần qua các tầng tích chập và pooling, cuối cùng chỉ còn một vector: nó biết ảnh có <em>cái gì</em> nhưng đã vứt bỏ <em>ở đâu</em>. Phân đoạn cần cả hai, và đầu ra phải có cùng kích thước với ảnh vào. U-Net giải quyết bằng ba thành phần, xếp thành hình chữ U:</p>
 <ul>
-  <li><strong>Nhánh mã hóa (encoder)</strong>: các lớp tích chập và giảm kích thước, học "cái gì" có trong ảnh.</li>
-  <li><strong>Nhánh giải mã (decoder)</strong>: phóng to dần về kích thước ban đầu, xác định "ở đâu".</li>
-  <li><strong>Kết nối tắt (skip connection)</strong>: nối đặc trưng chi tiết từ encoder sang decoder cùng tầng, giúp biên mặt nạ sắc nét. Đây là điểm làm nên thành công của U-Net.</li>
+  <li><strong>Encoder (nhánh xuống)</strong>: các khối "2 lớp tích chập 3×3 + ReLU" xen kẽ max-pooling 2×2. Mỗi lần pooling, kích thước giảm một nửa, số kênh tăng gấp đôi. Càng xuống sâu, mỗi điểm đặc trưng "nhìn" một vùng ảnh càng rộng (receptive field lớn), nên hiểu được ngữ cảnh: đây là vết xước dài chứ không phải một hạt nhiễu.</li>
+  <li><strong>Decoder (nhánh lên)</strong>: phóng to dần về kích thước ban đầu bằng <em>tích chập chuyển vị</em> (<code>ConvTranspose2d</code>, stride 2) hoặc nội suy, mỗi bước theo sau bởi khối tích chập.</li>
+  <li><strong>Skip connection (kết nối tắt)</strong>: ở mỗi tầng, đặc trưng của encoder được <strong>ghép kênh</strong> (<code>torch.cat</code>) vào decoder cùng kích thước. Encoder tầng nông còn giữ chi tiết vị trí sắc nét (biên vết xước chính xác từng pixel) mà nhánh sâu đã làm mờ; skip connection chuyển thẳng chi tiết đó sang decoder. Không có nó, mặt nạ ra nhòe và vết mảnh dễ mất (mục 6 đo bằng số).</li>
 </ul>
+<p>Lớp cuối là tích chập 1×1 đưa số kênh về số lớp (1 kênh cho bài toán nhị phân lỗi/nền), cho ra <strong>logit</strong> tại mỗi pixel; qua sigmoid thành xác suất pixel đó là lỗi.</p>
 
-<h2>Cài đặt U-Net nhỏ</h2>
-<pre><code>import torch
+<h2>2. Dữ liệu mẫu: vết xước mảnh trên kim loại chải</h2>
+<p>400 ảnh 48×48 (320 train, 80 val): vân chải ngang và nhiễu, 70% ảnh có 1–2 vết xước mảnh (rộng 1–2 px, sáng hơn nền không nhiều), 30% ảnh OK. Mặt nạ là ảnh 0/1 cùng kích thước. Ảnh nhỏ để huấn luyện trên CPU trong vài giây; với ảnh thật bạn sẽ cắt ô (tile) 256×256 hoặc 512×512 từ ảnh camera.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+S = 48
+rng = np.random.default_rng(0)
+
+
+def tao_mau(co_loi, rng):
+    img = 120 + rng.normal(0, 6, (S, 1)) + rng.normal(0, 5, (S, S))     # vân chải ngang + nhiễu
+    mask = np.zeros((S, S), np.uint8)
+    if co_loi:
+        for _ in range(int(rng.integers(1, 3))):
+            p = rng.integers(4, S - 4, 2)
+            goc, dai = rng.uniform(0, np.pi), rng.uniform(8, 30)
+            q = (p + dai * np.array([np.cos(goc), np.sin(goc)])).astype(int).clip(0, S - 1)
+            cv2.line(mask, tuple(int(v) for v in p), tuple(int(v) for v in q), 1, int(rng.integers(1, 3)))
+        img = img + 18 * mask                                           # vết xước sáng hơn nền ~18 mức xám
+    return np.clip(img, 0, 255).astype(np.uint8), mask
+
+
+du_lieu = [tao_mau(rng.random() &lt; 0.7, rng) for _ in range(400)]
+X = np.stack([a for a, _ in du_lieu])
+Y = np.stack([m for _, m in du_lieu])
+np.savez("vet_xuoc.npz", X_train=X[:320], Y_train=Y[:320], X_val=X[320:], Y_val=Y[320:])
+print("train", X[:320].shape, "| val", X[320:].shape)
+print(f"ảnh có lỗi: {Y.reshape(400, -1).any(1).mean():.0%} | pixel lỗi trên toàn tập: {Y.mean():.2%}")
+cv2.imwrite("mau_vet_xuoc.png", cv2.resize(cv2.hconcat([*X[:4], *(Y[:4] * 255)]), None, fx=3, fy=3,
+                                           interpolation=cv2.INTER_NEAREST))</code></pre>
+<pre><code class="language-text">train (320, 48, 48) | val (80, 48, 48)
+ảnh có lỗi: 70% | pixel lỗi trên toàn tập: 1.58%</code></pre>
+<p>Chỉ khoảng 1–2% pixel là lỗi. Đây là đặc điểm của gần như mọi bài toán lỗi bề mặt, và là nguồn gốc của vấn đề ở mục 4.</p>
+
+<h2>3. Cài U-Net nhỏ bằng PyTorch</h2>
+<p>U-Net gốc có 4 lần giảm kích thước và 64 kênh ở tầng đầu (khoảng 31 triệu tham số). Với ảnh 48×48 và dữ liệu nhỏ, ta dùng 3 tầng và 8 kênh ở tầng đầu. Tham số <code>skip</code> cho phép tắt kết nối tắt để so sánh ở mục 6. Lớp <code>BatchNorm2d</code> giúp huấn luyện ổn định; nhớ rằng nó hoạt động khác nhau giữa <code>train()</code> và <code>eval()</code>.</p>
+<pre><code class="language-python">import torch
 from torch import nn
 
-def block(cin, cout):
+torch.set_num_threads(2)
+
+
+def khoi(cin, cout):
+    """Hai lớp Conv 3×3 (padding 1 giữ nguyên kích thước) + BatchNorm + ReLU."""
     return nn.Sequential(
-        nn.Conv2d(cin, cout, 3, padding=1), nn.BatchNorm2d(cout), nn.ReLU(inplace=True),
-        nn.Conv2d(cout, cout, 3, padding=1), nn.BatchNorm2d(cout), nn.ReLU(inplace=True),
-    )
+        nn.Conv2d(cin, cout, 3, padding=1, bias=False), nn.BatchNorm2d(cout), nn.ReLU(inplace=True),
+        nn.Conv2d(cout, cout, 3, padding=1, bias=False), nn.BatchNorm2d(cout), nn.ReLU(inplace=True))
+
 
 class UNet(nn.Module):
-    def __init__(self, in_ch=1, n_classes=1, base=16):
+    def __init__(self, in_ch=1, n_lop=1, c=8, skip=True):
         super().__init__()
-        self.e1, self.e2, self.e3 = block(in_ch, base), block(base, base * 2), block(base * 2, base * 4)
+        self.skip = skip
+        k = 2 if skip else 1                                          # ghép kênh thì số kênh vào decoder gấp đôi
+        self.e1, self.e2, self.e3 = khoi(in_ch, c), khoi(c, 2 * c), khoi(2 * c, 4 * c)
         self.pool = nn.MaxPool2d(2)
-        self.mid = block(base * 4, base * 8)
-        self.up3, self.d3 = nn.ConvTranspose2d(base * 8, base * 4, 2, 2), block(base * 8, base * 4)
-        self.up2, self.d2 = nn.ConvTranspose2d(base * 4, base * 2, 2, 2), block(base * 4, base * 2)
-        self.up1, self.d1 = nn.ConvTranspose2d(base * 2, base, 2, 2), block(base * 2, base)
-        self.out = nn.Conv2d(base, n_classes, 1)
+        self.giua = khoi(4 * c, 8 * c)                                # đáy chữ U
+        self.up3, self.d3 = nn.ConvTranspose2d(8 * c, 4 * c, 2, stride=2), khoi(4 * c * k, 4 * c)
+        self.up2, self.d2 = nn.ConvTranspose2d(4 * c, 2 * c, 2, stride=2), khoi(2 * c * k, 2 * c)
+        self.up1, self.d1 = nn.ConvTranspose2d(2 * c, c, 2, stride=2), khoi(c * k, c)
+        self.ra = nn.Conv2d(c, n_lop, 1)                              # 1×1: về số lớp, ra logit
 
-    def forward(self, x):
+    def noi(self, len_, tat):
+        return torch.cat([len_, tat], 1) if self.skip else len_
+
+    def forward(self, x, in_kich_thuoc=False):
         e1 = self.e1(x)
         e2 = self.e2(self.pool(e1))
         e3 = self.e3(self.pool(e2))
-        m = self.mid(self.pool(e3))
-        d3 = self.d3(torch.cat([self.up3(m), e3], 1))     # skip connection
-        d2 = self.d2(torch.cat([self.up2(d3), e2], 1))
-        d1 = self.d1(torch.cat([self.up1(d2), e1], 1))
-        return self.out(d1)                               # logits, chưa qua sigmoid
+        g = self.giua(self.pool(e3))
+        d3 = self.d3(self.noi(self.up3(g), e3))                       # skip connection: ghép e3
+        d2 = self.d2(self.noi(self.up2(d3), e2))
+        d1 = self.d1(self.noi(self.up1(d2), e1))
+        if in_kich_thuoc:
+            for ten, t in (("e1", e1), ("e2", e2), ("e3", e3), ("giữa", g), ("d3", d3), ("d2", d2), ("d1", d1)):
+                print(f"  {ten:4s} {tuple(t.shape)}")
+        return self.ra(d1)
 
+
+torch.manual_seed(0)
 net = UNet()
-print(net(torch.randn(2, 1, 256, 256)).shape)             # [2, 1, 256, 256]</code></pre>
-<p>Kích thước ảnh đầu vào nên chia hết cho 8 (ba lần giảm một nửa).</p>
+print("kích thước tensor qua các tầng (batch 2, ảnh 48×48):")
+y = net(torch.randn(2, 1, 48, 48), in_kich_thuoc=True)
+print("  ra  ", tuple(y.shape))
+print(f"số tham số: U-Net {sum(p.numel() for p in net.parameters()):,} | "
+      f"không skip {sum(p.numel() for p in UNet(skip=False).parameters()):,}")</code></pre>
+<pre><code class="language-text">kích thước tensor qua các tầng (batch 2, ảnh 48×48):
+  e1   (2, 8, 48, 48)
+  e2   (2, 16, 24, 24)
+  e3   (2, 32, 12, 12)
+  giữa (2, 64, 6, 6)
+  d3   (2, 32, 12, 12)
+  d2   (2, 16, 24, 24)
+  d1   (2, 8, 48, 48)
+  ra   (2, 1, 48, 48)
+số tham số: U-Net 121,033 | không skip 108,937</code></pre>
+<p>Đọc theo hình chữ U: 48 → 24 → 12 → 6 (đáy, 64 kênh) rồi 6 → 12 → 24 → 48, mỗi tầng decoder có cùng kích thước với tầng encoder đối diện, đó là điều kiện để ghép kênh. Vì có 3 lần pooling, kích thước ảnh vào phải <strong>chia hết cho 2³ = 8</strong>; nếu không, phép ghép báo lỗi lệch kích thước. Ảnh camera 1280×1024 chia hết cho 8; ảnh 1000×750 thì không, cần đệm hoặc cắt.</p>
 
-<h2>Hàm mất mát cho vùng lỗi nhỏ</h2>
-<p>Vết lỗi thường chỉ chiếm 1% diện tích ảnh; dùng riêng Binary Cross-Entropy, mô hình dễ "lười" dự đoán toàn nền. Kết hợp với <strong>Dice loss</strong>:</p>
-<pre><code>def dice_loss(logits, target, eps=1.0):
-    p = torch.sigmoid(logits)
-    inter = (p * target).sum(dim=(1, 2, 3))
-    union = p.sum(dim=(1, 2, 3)) + target.sum(dim=(1, 2, 3))
-    return 1 - ((2 * inter + eps) / (union + eps)).mean()
+<h2>4. Vì sao cần Dice loss</h2>
+<p>Hàm mất mát mặc định cho phân loại nhị phân từng pixel là <strong>BCE</strong> (binary cross-entropy, <code>nn.BCEWithLogitsLoss</code> nhận thẳng logit). BCE lấy trung bình trên mọi pixel; khi 98,5% pixel là nền, mô hình có thể đạt BCE thấp và độ chính xác pixel rất cao bằng cách... đoán toàn nền. <strong>Dice loss</strong> = 1 − Dice, với Dice "mềm" tính trên xác suất thay vì mặt nạ 0/1:</p>
+<pre><code class="language-text">Dice_mềm = (2·Σ p·y + ε) / (Σ p + Σ y + ε)        p: xác suất dự đoán, y: mặt nạ thật, ε: số nhỏ chống chia 0</code></pre>
+<p>Dice chỉ quan tâm vùng lỗi (tử số chỉ khác 0 ở pixel lỗi), nên không bị số đông pixel nền lấn át. Thử với mô hình "lười" đoán toàn nền với xác suất lỗi 1%:</p>
+<pre><code class="language-python">import numpy as np
+import torch
+from torch import nn
+
+d = np.load("vet_xuoc.npz")
+y = torch.from_numpy(d["Y_val"]).float()[:, None]                    # (80, 1, 48, 48)
+
+
+def dice_loss(logit, y, eps=1.0):
+    p = torch.sigmoid(logit)
+    giao = (p * y).sum()
+    return 1 - (2 * giao + eps) / (p.sum() + y.sum() + eps)
+
 
 bce = nn.BCEWithLogitsLoss()
-def loss_fn(logits, mask):          # mask: 0/1, dạng float, cùng kích thước logits
-    return bce(logits, mask) + dice_loss(logits, mask)</code></pre>
+logit_luoi = torch.full_like(y, float(np.log(0.01 / 0.99)))          # mọi pixel: P(lỗi) = 1%
+du_doan = torch.sigmoid(logit_luoi) &gt; 0.5
+print(f"mô hình đoán toàn nền: độ chính xác pixel {(du_doan == y.bool()).float().mean():.2%}")
+print(f"  BCE  = {bce(logit_luoi, y):.4f}   (nhỏ, trông như tốt)")
+print(f"  Dice loss = {dice_loss(logit_luoi, y):.4f}   (gần 1: tệ nhất có thể)")
+print(f"  số pixel lỗi tìm được: {int((du_doan &amp; y.bool()).sum())} / {int(y.sum())}")</code></pre>
+<pre><code class="language-text">mô hình đoán toàn nền: độ chính xác pixel 98.44%
+  BCE  = 0.0817   (nhỏ, trông như tốt)
+  Dice loss = 0.9876   (gần 1: tệ nhất có thể)
+  số pixel lỗi tìm được: 0 / 2876</code></pre>
+<p>Trong thực tế người ta thường <strong>cộng BCE + Dice</strong>: BCE cho gradient ổn định từng pixel ngay từ đầu, Dice kéo mô hình về phía vùng lỗi nhỏ. Hai lựa chọn khác cùng mục đích: <code>pos_weight</code> của <code>BCEWithLogitsLoss</code> (tăng trọng số pixel lỗi) và focal loss (giảm trọng số pixel dễ). Lưu ý tính Dice <strong>trên cả batch</strong> như trên ổn định hơn tính riêng từng ảnh rồi lấy trung bình, vì ảnh OK không có pixel lỗi nào.</p>
 
-<h2>Huấn luyện và suy luận</h2>
+<h2>5. Tăng cường dữ liệu cho ảnh và mặt nạ cùng lúc</h2>
+<p>Mọi phép biến đổi <strong>hình học</strong> (lật, xoay, cắt, co giãn) phải áp dụng <em>giống hệt</em> cho ảnh và mặt nạ; nếu chỉ lật ảnh mà không lật mặt nạ, nhãn sai và mô hình học sai một cách âm thầm. Phép biến đổi <strong>cường độ</strong> (độ sáng, tương phản, nhiễu) chỉ áp dụng cho ảnh. Với bề mặt không có hướng ưu tiên, lật và xoay 90° là các phép an toàn; với vân chải có hướng cố định, cân nhắc chỉ lật (xoay 90° biến vân ngang thành vân dọc, không có thật trên dây chuyền).</p>
+<pre><code class="language-python">import torch
+
+
+def tang_cuong(x, y, gen):
+    """x: (B, 1, H, W) ảnh, y: (B, 1, H, W) mặt nạ. Cùng một phép hình học cho cả hai."""
+    if torch.rand(1, generator=gen) &lt; 0.5:
+        x, y = x.flip(-1), y.flip(-1)                                 # lật ngang
+    if torch.rand(1, generator=gen) &lt; 0.5:
+        x, y = x.flip(-2), y.flip(-2)                                 # lật dọc
+    x = x * (1 + 0.1 * (torch.rand(x.shape[0], 1, 1, 1, generator=gen) - 0.5))   # độ sáng: chỉ ảnh
+    return x, y
+
+
+gen = torch.Generator().manual_seed(0)
+x = torch.arange(16.0).reshape(1, 1, 4, 4)
+xa, ya = tang_cuong(x, (x &gt; 11).float(), gen)
+print("mặt nạ vẫn khớp ảnh sau tăng cường:", torch.equal(ya.bool(), xa / xa.max() * 15 &gt; 11.5))</code></pre>
+<pre><code class="language-text">mặt nạ vẫn khớp ảnh sau tăng cường: True</code></pre>
+
+<h2>6. Huấn luyện và so sánh</h2>
+<p>Vòng lặp huấn luyện giống bài PyTorch cơ bản, chỉ khác hàm mất mát và chỉ số. Ta báo cáo:</p>
 <ul>
-  <li>Vòng lặp huấn luyện giống hệt bài <a href="pytorch-co-ban-tensor-autograd.html">PyTorch cơ bản</a>, chỉ thay hàm mất mát.</li>
-  <li>Augmentation phải áp dụng <strong>đồng thời</strong> cho ảnh và mặt nạ (lật, xoay cùng một cách).</li>
-  <li>Suy luận: <code>mask = torch.sigmoid(net(x)) &gt; 0.5</code>, sau đó dùng OpenCV tìm contour để đo vùng lỗi.</li>
+  <li><strong>Dice và IoU toàn tập</strong>: cộng TP, FP, FN pixel của cả tập val rồi mới chia. Đây là con số thường báo cáo.</li>
+  <li><strong>Dice trung bình theo ảnh có lỗi</strong>: cho biết mô hình có bỏ rơi các vết nhỏ ở từng ảnh hay không.</li>
+  <li><strong>Escape / overkill cấp ảnh</strong>: ảnh bị coi là NG nếu mặt nạ dự đoán có ít nhất 5 pixel lỗi; đây là con số nhà máy quan tâm.</li>
+</ul>
+<p>So sánh ba cấu hình với cùng số epoch: U-Net + BCE, U-Net + BCE + Dice, U-Net không skip + BCE + Dice.</p>
+<pre><code class="language-python">import time
+
+import numpy as np
+import torch
+from torch import nn
+
+d = np.load("vet_xuoc.npz")
+chuan = lambda a: (torch.from_numpy(a).float()[:, None] - 120) / 20
+Xtr, Ytr = chuan(d["X_train"]), torch.from_numpy(d["Y_train"]).float()[:, None]
+Xva, Yva = chuan(d["X_val"]), torch.from_numpy(d["Y_val"]).float()[:, None]
+
+
+@torch.no_grad()
+def danh_gia(net, nguong=0.5, min_px=5):
+    net.eval()
+    p = torch.sigmoid(net(Xva)) &gt; nguong
+    y = Yva.bool()
+    tp, fp, fn = (p &amp; y).sum().item(), (p &amp; ~y).sum().item(), (~p &amp; y).sum().item()
+    co_loi = y.flatten(1).any(1)
+    dice_anh = [(2 * (pi &amp; yi).sum() / (pi.sum() + yi.sum())).item() for pi, yi in zip(p[co_loi], y[co_loi])]
+    bao_ng = p.flatten(1).sum(1) &gt;= min_px
+    return {"Dice": 2 * tp / (2 * tp + fp + fn), "IoU": tp / (tp + fp + fn), "Dice/ảnh": float(np.mean(dice_anh)),
+            "escape": (co_loi &amp; ~bao_ng).sum().item() / co_loi.sum().item(),
+            "overkill": (~co_loi &amp; bao_ng).sum().item() / (~co_loi).sum().item()}
+
+
+def huan_luyen(skip=True, dung_dice=True, epochs=12, seed=0):
+    torch.manual_seed(seed)
+    gen = torch.Generator().manual_seed(seed)
+    net = UNet(skip=skip)
+    opt = torch.optim.Adam(net.parameters(), lr=3e-3)
+    bce = nn.BCEWithLogitsLoss()
+    for ep in range(epochs):
+        net.train()
+        for i in torch.randperm(len(Xtr), generator=gen).split(32):
+            x, y = tang_cuong(Xtr[i], Ytr[i], gen)
+            logit = net(x)
+            loss = bce(logit, y) + (dice_loss(logit, y) if dung_dice else 0)
+            opt.zero_grad()
+            loss.backward()
+            opt.step()
+    return net
+
+
+ket_qua = {}
+for ten, cau_hinh in (("U-Net + BCE", dict(dung_dice=False)), ("U-Net + BCE + Dice", dict()),
+                      ("Không skip + BCE + Dice", dict(skip=False))):
+    t0 = time.perf_counter()
+    net = huan_luyen(**cau_hinh)
+    ket_qua[ten] = (net, danh_gia(net), time.perf_counter() - t0)
+print("cấu hình                 |  Dice |   IoU | Dice/ảnh | escape | overkill")
+for ten, (_, m, t) in ket_qua.items():
+    print(f"{ten:24s} | {m['Dice']:.3f} | {m['IoU']:.3f} | {m['Dice/ảnh']:8.3f} | {m['escape']:6.1%} | {m['overkill']:8.1%}")
+torch.save(ket_qua["U-Net + BCE + Dice"][0].state_dict(), "unet_vet_xuoc.pt")</code></pre>
+<pre><code class="language-text">cấu hình                 |  Dice |   IoU | Dice/ảnh | escape | overkill
+U-Net + BCE              | 0.859 | 0.753 |    0.747 |   7.4% |     0.0%
+U-Net + BCE + Dice       | 0.910 | 0.835 |    0.871 |   1.9% |     0.0%
+Không skip + BCE + Dice  | 0.671 | 0.505 |    0.565 |   5.6% |     0.0%</code></pre>
+<p>(Huấn luyện trên CPU mất từ vài giây đến vài chục giây mỗi cấu hình tùy máy; con số có thể lệch nhẹ giữa các máy và phiên bản PyTorch, xu hướng thì không.) Ba điều rút ra. (1) Cùng 12 epoch và cùng seed, thêm Dice loss tăng Dice toàn tập từ khoảng 0,86 lên 0,91 và Dice theo ảnh tăng rõ hơn nữa (khoảng 0,75 lên 0,87): với BCE một mình, mô hình bỏ rơi các vết mờ, ngắn ở từng ảnh, nên escape cấp ảnh cao hơn (khoảng 7% so với 2%). Mức chênh cụ thể cần kiểm chứng qua nhiều seed (bài tập 3). (2) Bỏ skip connection, Dice rơi xuống khoảng 0,67 dù mô hình chỉ ít tham số hơn khoảng 10%: decoder phải dựng lại vết rộng 1–2 px từ đặc trưng 6×6 đã mất chi tiết vị trí, nên mặt nạ nhòe, lệch. Đây chính là lý do skip connection là trái tim của U-Net. (3) Overkill bằng 0 ở cả ba cấu hình: trên dữ liệu này, khó khăn nằm ở việc tìm đủ vết mảnh, không phải báo nhầm.</p>
+<div class="tip"><strong>Báo cáo Dice cho đúng</strong>Ghi rõ: Dice toàn tập hay trung bình theo ảnh; ngưỡng xác suất (0,5); tập nào (val hay test); ảnh OK xử lý thế nào (Dice của ảnh không có lỗi không xác định khi mô hình cũng không báo gì, vì vậy ở trên chỉ tính Dice/ảnh trên ảnh có lỗi, còn ảnh OK được đánh giá bằng overkill). Hai người báo "Dice 0,8" có thể đang nói về hai thứ khác nhau.</div>
+
+<h2>7. Từ mặt nạ đến vết lỗi có kích thước</h2>
+<p>Đầu ra của U-Net là bản đồ xác suất. Biến nó thành quyết định gồm ba bước: phân ngưỡng (0,5 hoặc chọn theo escape/overkill trên tập kiểm định), tách vùng liên thông và bỏ vùng quá nhỏ (nhiễu), rồi đo từng vùng như bài YOLO26-seg (diện tích, chiều dài). Vì là semantic segmentation, hai vết chạm nhau sẽ thành một vùng, như bài "Phân đoạn ảnh: semantic, instance, panoptic" đã phân tích.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+import torch
+
+MM_PX = 0.05
+net = UNet()
+net.load_state_dict(torch.load("unet_vet_xuoc.pt", weights_only=True))
+net.eval()
+co_loi = d["Y_val"].reshape(len(d["Y_val"]), -1).any(1)
+chon = np.r_[np.flatnonzero(co_loi)[:4], np.flatnonzero(~co_loi)[:2]]   # 4 ảnh NG, 2 ảnh OK
+with torch.no_grad():
+    xs = torch.sigmoid(net(Xva[chon]))[:, 0].numpy()                # xác suất (6, 48, 48)
+
+o = []
+for k, p in zip(chon, xs):
+    m = (p &gt; 0.5).astype(np.uint8)
+    n, nhan, tk, _ = cv2.connectedComponentsWithStats(m, connectivity=8)
+    vet = []
+    for j in range(1, n):
+        if tk[j, cv2.CC_STAT_AREA] &lt; 5:                              # bỏ đốm nhiễu dưới 5 px
+            continue
+        cnt = cv2.findContours((nhan == j).astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[0][0]
+        vet.append(f"dài {max(cv2.minAreaRect(cnt)[1]) * MM_PX:.2f} mm")
+    print(f"ảnh val {k}: thật {'NG' if d['Y_val'][k].any() else 'OK'} | dự đoán {len(vet)} vết {vet}")
+    goc = cv2.cvtColor(d["X_val"][k], cv2.COLOR_GRAY2BGR)
+    nhiet = cv2.applyColorMap((p * 255).astype(np.uint8), cv2.COLORMAP_JET)
+    vien = goc.copy()
+    cv2.drawContours(vien, cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[0], -1, (0, 0, 255), 1)
+    o.append(cv2.vconcat([goc, cv2.addWeighted(goc, 0.5, nhiet, 0.5, 0), vien]))
+cv2.imwrite("unet_ket_qua.png", cv2.resize(cv2.hconcat(o), None, fx=3, fy=3, interpolation=cv2.INTER_NEAREST))
+print("đã lưu unet_ket_qua.png: hàng 1 ảnh gốc, hàng 2 bản đồ xác suất, hàng 3 viền mặt nạ")</code></pre>
+<pre><code class="language-text">ảnh val 0: thật NG | dự đoán 1 vết ['dài 0.70 mm']
+ảnh val 6: thật NG | dự đoán 1 vết ['dài 0.47 mm']
+ảnh val 7: thật NG | dự đoán 2 vết ['dài 1.17 mm', 'dài 0.39 mm']
+ảnh val 8: thật NG | dự đoán 1 vết ['dài 0.56 mm']
+ảnh val 1: thật OK | dự đoán 0 vết []
+ảnh val 2: thật OK | dự đoán 0 vết []
+đã lưu unet_ket_qua.png: hàng 1 ảnh gốc, hàng 2 bản đồ xác suất, hàng 3 viền mặt nạ</code></pre>
+<p>Ở đây đo chiều dài bằng <code>minAreaRect</code> vì vết tổng hợp là đoạn thẳng; với vết cong dùng khung xương như bài trước. <code>torch.load(..., weights_only=True)</code> chỉ nạp tensor trọng số, an toàn hơn nạp cả đối tượng Python. Khi triển khai, U-Net được xuất sang ONNX như mọi mô hình PyTorch khác (bài "Xuất ONNX và kiểm tra kết quả khớp PyTorch" của chặng 13); vì mạng toàn tích chập, có thể khai báo chiều cao, rộng động để chạy trên ảnh lớn hơn ảnh huấn luyện, miễn là chia hết cho 8.</p>
+
+<h2>8. Đi xa hơn với dữ liệu thật</h2>
+<ul>
+  <li><strong>Encoder pretrained</strong>: thay nhánh encoder tự viết bằng ResNet, EfficientNet đã huấn luyện trên ImageNet giúp hội tụ nhanh hơn và tốt hơn khi dữ liệu ít. Các thư viện mã nguồn mở về segmentation cho PyTorch cung cấp sẵn U-Net với nhiều encoder để thử nhanh.</li>
+  <li><strong>Cắt ô</strong>: ảnh camera vài megapixel không đưa nguyên vào U-Net được (bộ nhớ). Huấn luyện trên ô 256–512 px cắt ngẫu nhiên, ưu tiên lấy nhiều ô chứa lỗi; khi dự đoán, trượt cửa sổ có chồng lấn rồi ghép bản đồ xác suất.</li>
+  <li><strong>Chọn ngưỡng xác suất và diện tích tối thiểu</strong> trên tập kiểm định theo escape/overkill, không mặc định 0,5 và 5 px.</li>
+  <li><strong>Nhiều lớp lỗi</strong>: đầu ra <code>n_lop</code> kênh với softmax và cross-entropy (kèm Dice nhiều lớp), mặt nạ là ảnh mã lớp lưu PNG.</li>
 </ul>
 
-<h2>Đi xa hơn</h2>
-<p>Thay encoder tự viết bằng một mạng đã huấn luyện sẵn (ResNet, EfficientNet) giúp mô hình hội tụ nhanh hơn với ít dữ liệu. Các thư viện mã nguồn mở về segmentation cung cấp sẵn U-Net với nhiều encoder pretrained để thử nghiệm nhanh.</p>
+<h2>9. Sai lầm thường gặp</h2>
+<ul>
+  <li><strong>Chỉ dùng BCE</strong> với lỗi chiếm 1% ảnh, rồi ngạc nhiên vì mô hình "chính xác 99%" mà không tìm ra lỗi nào.</li>
+  <li><strong>Báo cáo độ chính xác pixel</strong>: luôn gần 100% với dữ liệu mất cân bằng, vô nghĩa.</li>
+  <li><strong>Tăng cường hình học chỉ cho ảnh</strong>, quên mặt nạ; hoặc nội suy mặt nạ bằng song tuyến khi co giãn (sinh giá trị 0,5 ở biên): dùng nội suy láng giềng gần nhất cho mặt nạ.</li>
+  <li><strong>Ảnh có kích thước không chia hết cho 2^(số lần pooling)</strong>: lỗi lệch kích thước ở <code>torch.cat</code>.</li>
+  <li><strong>Quên <code>net.eval()</code></strong> khi đánh giá, dự đoán: BatchNorm dùng thống kê của batch hiện tại, kết quả dao động.</li>
+  <li><strong>Lưu mặt nạ bằng JPEG</strong>.</li>
+</ul>
+
+<h2>10. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> U-Net trong bài với ảnh vào 256×256 và <code>c = 16</code>: tensor ở đáy chữ U có kích thước bao nhiêu? Ảnh 250×250 có dùng được không? Kiểm tra bằng code.</p>
+<details><summary>Xem đáp án</summary>
+<p>Ba lần pooling: 256 → 128 → 64 → 32; đáy có 8·c = 128 kênh, tensor (1, 128, 32, 32). Ảnh 250: 250 → 125 → 62 → 31, khi phóng lên 31 → 62 → 124 không khớp 125 của encoder, <code>torch.cat</code> báo lỗi. Cần đệm ảnh lên 256 (rồi cắt mặt nạ ra lại 250).</p>
+<pre><code class="language-python">import torch
+
+net16 = UNet(c=16).eval()
+with torch.no_grad():
+    g = net16.giua(net16.pool(net16.e3(net16.pool(net16.e2(net16.pool(net16.e1(torch.zeros(1, 1, 256, 256))))))))
+    print("đáy chữ U:", tuple(g.shape))
+    try:
+        net16(torch.zeros(1, 1, 250, 250))
+    except RuntimeError as e:
+        print("ảnh 250×250 lỗi:", str(e).split(".")[0])</code></pre>
+<pre><code class="language-text">đáy chữ U: (1, 128, 32, 32)
+ảnh 250×250 lỗi: Sizes of tensors must match except in dimension 1</code></pre>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Trên tập val, mặt nạ thật có 1200 pixel lỗi, mô hình dự đoán 1000 pixel lỗi, trong đó 800 pixel đúng. Tính Dice, IoU, precision và recall cấp pixel. Mô hình đang bỏ sót hay báo thừa?</p>
+<details><summary>Xem đáp án</summary>
+<p>TP = 800, FP = 1000 − 800 = 200, FN = 1200 − 800 = 400. Dice = 2·800 / (1000 + 1200) ≈ 0,727. IoU = 800 / (800 + 200 + 400) ≈ 0,571. Precision = 800/1000 = 0,8; recall = 800/1200 ≈ 0,667. Recall thấp hơn precision: mô hình chủ yếu <strong>bỏ sót</strong> (vết bị dự đoán ngắn hơn, mảnh hơn thật). Hướng xử lý: tăng trọng số Dice hoặc <code>pos_weight</code>, hạ ngưỡng xác suất, thêm dữ liệu vết mờ.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> (Thực hành của bài) Huấn luyện lại U-Net + BCE + Dice với 3 seed khác nhau và báo cáo Dice toàn tập dạng trung bình ± độ lệch chuẩn. Vì sao nên báo cáo như vậy thay vì một con số?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import numpy as np
+
+dice = [danh_gia(huan_luyen(seed=s))["Dice"] for s in (1, 2, 3)]
+print("Dice từng seed:", [round(v, 3) for v in dice])
+print(f"Dice = {np.mean(dice):.3f} ± {np.std(dice):.3f} (12 epoch, 3 seed)")</code></pre>
+<pre><code class="language-text">Dice từng seed: [0.83, 0.867, 0.871]
+Dice = 0.856 ± 0.018 (12 epoch, 3 seed)</code></pre>
+<p>Với dữ liệu nhỏ, kết quả phụ thuộc đáng kể vào khởi tạo ngẫu nhiên và thứ tự dữ liệu. Chính bảng ở mục 6 là ví dụ: seed 0 cho Dice 0,910, cao hơn cả ba seed ở đây. Một con số duy nhất có thể là may mắn, và chênh lệch giữa BCE và BCE + Dice ở mục 6 cũng phải được kiểm chứng qua nhiều seed trước khi kết luận; trung bình ± độ lệch chuẩn qua vài seed cho biết khác biệt giữa hai cấu hình (ví dụ có và không có Dice) có thật hay chỉ là dao động. Khi khác biệt nhỏ hơn độ lệch chuẩn, đừng kết luận cấu hình nào tốt hơn. Bài báo cáo đầy đủ ghi thêm: số ảnh train/val, kích thước ảnh, số epoch, ngưỡng xác suất, và escape/overkill cấp ảnh.</p>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>U-Net = encoder (tích chập + pooling, hiểu ngữ cảnh) + decoder (phóng to về kích thước gốc) + skip connection (ghép đặc trưng chi tiết của encoder vào decoder cùng tầng, giữ biên sắc nét).</li>
+  <li>Kích thước ảnh vào chia hết cho 2^(số lần pooling); đầu ra là logit từng pixel, sigmoid ra xác suất.</li>
+  <li>Lỗi nhỏ (1–2% pixel) làm BCE và độ chính xác pixel đánh lừa; dùng BCE + Dice (hoặc <code>pos_weight</code>, focal loss).</li>
+  <li>Tăng cường hình học đồng thời cho ảnh và mặt nạ; cường độ chỉ cho ảnh.</li>
+  <li>Báo cáo Dice/IoU (ghi rõ cách tính), Dice theo ảnh, và escape/overkill cấp ảnh; hậu xử lý bằng ngưỡng, vùng liên thông, lọc diện tích, rồi đo theo mm.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Anomaly detection: học từ ảnh OK với PaDiM, PatchCore</strong>, khi không có đủ ảnh lỗi để gán nhãn mặt nạ.</p>

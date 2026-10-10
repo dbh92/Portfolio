@@ -1,43 +1,245 @@
-<p>Phát hiện đối tượng (object detection) cho biết vật nằm trong khung nào. <strong>Phân đoạn (segmentation)</strong> đi xa hơn: xác định chính xác từng điểm ảnh thuộc về vật gì. Bài này phân biệt các loại phân đoạn và khi nào cần dùng chúng.</p>
+<p>Hai bài trước dạy bạn phát hiện vật bằng hộp bao và đánh giá bằng IoU, mAP. Hộp bao đủ để đếm vít hay khoanh vị trí vết móp, nhưng không đủ khi tiêu chuẩn chất lượng viết "vết xước dài quá 2 mm thì loại" hay "tổng diện tích vết dầu không quá 3 mm²": một vết xước chéo nằm trong hộp bao mà phần lớn diện tích hộp là bề mặt tốt. <strong>Phân đoạn ảnh</strong> (image segmentation) trả lời câu hỏi chính xác hơn: <em>từng pixel</em> thuộc về cái gì. Bài này phân biệt ba loại phân đoạn (semantic, instance, panoptic) bằng chính các mảng NumPy mà mỗi loại tạo ra, cho thấy bằng số khi nào phải phân đoạn thay vì phát hiện, cách đánh giá mặt nạ (IoU, Dice) và các mô hình phổ biến. Đây là bài nền cho hai bài thực hành tiếp theo: "Phân đoạn vết lỗi với YOLO26-seg" (instance) và "U-Net cho phân đoạn ảnh" (semantic).</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Nêu được đầu ra của semantic, instance, panoptic segmentation và dựng được cả ba từ một ảnh mẫu; chỉ ra bằng số vì sao hộp bao sai khi đo diện tích, chiều dài vết lỗi; biết khi nào semantic + tách vùng liên thông là đủ và khi nào bắt buộc instance; tính IoU, Dice trên mặt nạ; biết các cách lưu mặt nạ (ảnh nhị phân, đa giác, RLE); chọn được loại phân đoạn và mô hình phù hợp cho một bài toán nhà máy.</div>
 
-<h2>Ba loại phân đoạn</h2>
-<h3>Semantic segmentation (phân đoạn ngữ nghĩa)</h3>
-<p>Gán mỗi điểm ảnh một <strong>lớp</strong>: nền, vết xước, vết bẩn... Không phân biệt các vật khác nhau cùng lớp: ba vết xước gần nhau là một vùng "vết xước".</p>
-<h3>Instance segmentation (phân đoạn từng đối tượng)</h3>
-<p>Mỗi <strong>đối tượng</strong> có mặt nạ riêng: vết xước số 1, số 2, số 3. Đếm được số lượng, đo được kích thước từng cái.</p>
-<h3>Panoptic segmentation</h3>
-<p>Kết hợp cả hai: các vật đếm được (người, xe) được tách riêng từng cái, còn vùng nền không đếm được (đường, trời) được phân lớp chung.</p>
+<h2>1. Ba loại phân đoạn qua một ảnh mẫu</h2>
+<p>Ảnh mẫu: tấm kim loại 300×200 px có ba vết xước (hai vết cắt chéo nhau), một vết dầu, và một nhãn dán ở góc. Hệ số quy đổi đã hiệu chuẩn (bài "Quy đổi pixel sang mm và đánh giá sai số" ở chặng 8) là 0,05 mm/px. Ta vẽ từng vật riêng, giống như người gán nhãn vẽ từng đa giác, rồi dựng ba loại mặt nạ.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
 
-<h2>So sánh với các bài toán khác</h2>
+H, W, MM_PX = 200, 300, 0.05
+LOP = {0: "nen", 1: "xuoc", 2: "dau", 3: "nhan_dan"}
+
+
+def ve(fn):
+    m = np.zeros((H, W), np.uint8)
+    fn(m)
+    return m &gt; 0
+
+
+# từng đối tượng: (lớp, mặt nạ riêng)
+doi_tuong = [
+    (1, ve(lambda m: cv2.line(m, (40, 40), (140, 120), 1, 3))),      # xước A
+    (1, ve(lambda m: cv2.line(m, (60, 130), (160, 50), 1, 3))),      # xước B, cắt chéo A
+    (1, ve(lambda m: cv2.line(m, (200, 150), (270, 160), 1, 3))),    # xước C
+    (2, ve(lambda m: cv2.ellipse(m, (230, 60), (25, 15), 20, 0, 360, 1, -1))),   # vết dầu
+]
+nhan_dan = ve(lambda m: cv2.rectangle(m, (0, 165), (80, 199), 1, -1))  # vùng "stuff", không đếm
+
+# 1) SEMANTIC: một số nguyên lớp cho mỗi pixel
+sem = np.zeros((H, W), np.uint8)
+sem[nhan_dan] = 3
+for lop, m in doi_tuong:
+    sem[m] = lop
+
+# 2) INSTANCE: danh sách (lớp, mặt nạ nhị phân, điểm tin cậy nếu là dự đoán), chỉ cho vật đếm được
+inst = [(lop, m) for lop, m in doi_tuong]
+
+# 3) PANOPTIC: mỗi pixel một cặp (lớp, id); stuff có id 0, mỗi vật một id riêng, không chồng nhau
+pan_lop, pan_id = sem.copy(), np.zeros((H, W), np.int32)
+for k, (lop, m) in enumerate(doi_tuong, 1):
+    pan_id[m &amp; (pan_id == 0)] = k                                  # pixel giao nhau thuộc vật vẽ trước
+
+print("semantic : mảng", sem.shape, sem.dtype, "giá trị", {LOP[v]: int((sem == v).sum()) for v in np.unique(sem)})
+print("instance :", len(inst), "mặt nạ:", [(LOP[l], int(m.sum())) for l, m in inst])
+print("panoptic : cặp (lớp, id) xuất hiện:",
+      sorted({(LOP[int(a)], int(b)) for a, b in zip(pan_lop.ravel(), pan_id.ravel())}))
+print("pixel thuộc 2 vết xước cùng lúc:", int((inst[0][1] &amp; inst[1][1]).sum()))
+
+MAU = np.array([(60, 60, 60), (0, 0, 255), (0, 200, 255), (200, 120, 0)], np.uint8)
+mau_inst = np.zeros((H, W, 3), np.uint8)
+for k, (_, m) in enumerate(inst):
+    mau_inst[m] = [(0, 0, 255), (0, 255, 0), (255, 0, 255), (0, 200, 255)][k]
+cv2.imwrite("ba_loai_phan_doan.png", cv2.hconcat([MAU[sem], mau_inst, MAU[pan_lop] // 2 + mau_inst // 2]))
+print("đã lưu ba_loai_phan_doan.png: semantic | instance | panoptic")</code></pre>
+<pre><code class="language-text">semantic : mảng (200, 300) uint8 giá trị {'nen': 54240, 'xuoc': 1694, 'dau': 1231, 'nhan_dan': 2835}
+instance : 4 mặt nạ: [('xuoc', 675), ('xuoc', 685), ('xuoc', 363), ('dau', 1231)]
+panoptic : cặp (lớp, id) xuất hiện: [('dau', 4), ('nen', 0), ('nhan_dan', 0), ('xuoc', 1), ('xuoc', 2), ('xuoc', 3)]
+pixel thuộc 2 vết xước cùng lúc: 29
+đã lưu ba_loai_phan_doan.png: semantic | instance | panoptic</code></pre>
 <table>
-  <tr><th>Bài toán</th><th>Đầu ra</th><th>Chi phí gán nhãn</th></tr>
-  <tr><td>Phân loại</td><td>Một nhãn cho cả ảnh</td><td>Thấp</td></tr>
-  <tr><td>Phát hiện đối tượng</td><td>Khung chữ nhật + lớp</td><td>Trung bình</td></tr>
-  <tr><td>Phân đoạn</td><td>Mặt nạ từng điểm ảnh</td><td>Cao (vẽ đa giác hoặc tô mặt nạ)</td></tr>
+  <tr><th>Loại</th><th>Đầu ra</th><th>Trả lời câu hỏi</th><th>Không trả lời được</th></tr>
+  <tr><td><strong>Semantic</strong></td><td>Một ảnh nhãn H×W, mỗi pixel một lớp</td><td>Pixel nào là xước, pixel nào là dầu; tổng diện tích mỗi loại lỗi</td><td>Có mấy vết xước, mỗi vết dài bao nhiêu (các vết chạm nhau dính thành một vùng)</td></tr>
+  <tr><td><strong>Instance</strong></td><td>Danh sách đối tượng, mỗi cái một mặt nạ nhị phân + lớp (+ điểm tin cậy)</td><td>Có 3 vết xước, vết A dài x mm, vết B dài y mm</td><td>Vùng nền, vùng không đếm được (thường bỏ qua)</td></tr>
+  <tr><td><strong>Panoptic</strong></td><td>Mỗi pixel một cặp (lớp, id): "stuff" (nền, nhãn dán) có lớp, "thing" (vật đếm được) có thêm id</td><td>Cả hai: phân vùng toàn ảnh và từng vật, không pixel nào bị bỏ hoặc thuộc hai vật</td><td>Chi phí gán nhãn, mô hình nặng hơn; ít khi cần trong kiểm tra lỗi</td></tr>
+</table>
+<p>Thuật ngữ "stuff" (vùng không đếm được: nền, trời, đường, lớp sơn) và "thing" (vật đếm được: người, xe, vết xước) đến từ các bộ dữ liệu như COCO. Trong nhà máy, gần như mọi thứ bạn quan tâm là "thing" (vết lỗi, linh kiện), còn "stuff" chỉ là bề mặt sản phẩm. Vì vậy hai loại dùng nhiều nhất là <strong>semantic</strong> và <strong>instance</strong>; panoptic xuất hiện chủ yếu ở xe tự hành, robot di động, phân tích cảnh.</p>
+
+<h2>2. Khi nào hộp bao không đủ</h2>
+<p>Đo trên chính ảnh mẫu: diện tích hộp bao so với diện tích thật của từng vết, và chiều dài đo từ hộp so với chiều dài đo từ mặt nạ.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+print("vật    | hộp bao mm² | mặt nạ mm² | hộp/mặt nạ | dài theo cạnh hộp | dài theo mặt nạ")
+for k, (lop, m) in enumerate(inst):
+    ys, xs = np.nonzero(m)
+    w, h = xs.max() - xs.min() + 1, ys.max() - ys.min() + 1
+    dt_hop, dt_mn = w * h * MM_PX ** 2, m.sum() * MM_PX ** 2
+    cnt = cv2.findContours(m.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[0][0]
+    dai = max(cv2.minAreaRect(cnt)[1]) * MM_PX                  # cạnh dài của hình chữ nhật xoay
+    print(f"{'ABCD'[k]} {LOP[lop]:4s} | {dt_hop:11.2f} | {dt_mn:10.2f} | {dt_hop / dt_mn:10.1f} | "
+          f"{max(w, h) * MM_PX:17.2f} | {dai:15.2f}")</code></pre>
+<pre><code class="language-text">vật    | hộp bao mm² | mặt nạ mm² | hộp/mặt nạ | dài theo cạnh hộp | dài theo mặt nạ
+A xuoc |       22.31 |       1.69 |       13.2 |              5.25 |            6.56
+B xuoc |       22.31 |       1.71 |       13.0 |              5.25 |            6.56
+C xuoc |        2.81 |       0.91 |        3.1 |              3.75 |            3.73
+D dau  |        4.04 |       3.08 |        1.3 |              2.45 |            2.50</code></pre>
+<p>Với vết xước chéo A, hộp bao lớn gấp khoảng 13 lần diện tích thật, và "chiều dài" đọc từ cạnh hộp (5,25 mm) thấp hơn chiều dài thật theo đường chéo (khoảng 6,5 mm). Một tiêu chí "dài quá 6 mm thì loại" sẽ cho kết quả sai nếu đo từ hộp. Với vết C gần nằm ngang, hai cách gần giống nhau; với vết dầu tròn trịa, tỉ lệ hộp/mặt nạ chỉ khoảng 1,3. Quy tắc thực tế: vật <strong>dài, mảnh, nghiêng, hình dạng bất thường</strong> cần mặt nạ; vật gọn, hình dạng ổn định thì hộp bao thường đủ.</p>
+
+<h2>3. Semantic + tách vùng liên thông có thay được instance?</h2>
+<p>Mô hình semantic (như U-Net) rẻ hơn khi gán nhãn và huấn luyện. Từ mặt nạ semantic, ta có thể tách từng vết bằng <strong>vùng liên thông</strong> (connected components, đã học ở chặng xử lý ảnh). Cách này đúng khi các vết không chạm nhau, và sai khi chúng chạm:</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+xuoc = (sem == 1).astype(np.uint8)
+n, nhan, thong_ke, _ = cv2.connectedComponentsWithStats(xuoc, connectivity=8)
+print(f"semantic + vùng liên thông: {n - 1} vết xước")
+for k in range(1, n):
+    print(f"  vùng {k}: {thong_ke[k, cv2.CC_STAT_AREA] * MM_PX ** 2:.2f} mm²")
+print(f"instance (đúng)          : {sum(l == 1 for l, _ in inst)} vết xước")
+for k, (l, m) in enumerate(inst):
+    if l == 1:
+        print(f"  vết {'ABC'[k]}: {m.sum() * MM_PX ** 2:.2f} mm²")</code></pre>
+<pre><code class="language-text">semantic + vùng liên thông: 2 vết xước
+  vùng 1: 3.33 mm²
+  vùng 2: 0.91 mm²
+instance (đúng)          : 3 vết xước
+  vết A: 1.69 mm²
+  vết B: 1.71 mm²
+  vết C: 0.91 mm²</code></pre>
+<p>Hai vết A và B cắt nhau nên semantic + vùng liên thông thấy một "vết" hình chữ X có diện tích gần gấp đôi. Nếu tiêu chí là "không quá 2 vết xước" thì kết quả đếm sai (thấy 2 thay vì 3), nếu tiêu chí là diện tích từng vết thì vết "X" bị tính quá lớn. Kết luận:</p>
+<ul>
+  <li>Tiêu chí theo <strong>tổng</strong> (tổng diện tích lỗi trên sản phẩm, có lỗi hay không) hoặc lỗi hiếm khi chạm nhau: <strong>semantic</strong> + vùng liên thông là đủ, gán nhãn đơn giản hơn (tô mặt nạ, không cần tách từng vật).</li>
+  <li>Tiêu chí theo <strong>từng vết</strong> (dài nhất, số lượng) và vết có thể chạm, chồng nhau: <strong>instance</strong>.</li>
+  <li>Hai vết chồng nhau thì instance mask cho phép một pixel thuộc cả hai vết (ở đây có pixel giao), panoptic thì bắt buộc mỗi pixel thuộc đúng một vật.</li>
+</ul>
+
+<h2>4. Đánh giá mặt nạ: IoU và Dice</h2>
+<p>IoU ở bài trước áp dụng nguyên vẹn cho mặt nạ, chỉ thay diện tích hộp bằng số pixel. Lĩnh vực phân đoạn (nhất là y tế) còn dùng hệ số <strong>Dice</strong> (còn gọi F1 trên pixel):</p>
+<pre><code class="language-text">IoU  = |A ∩ B| / |A ∪ B|
+Dice = 2·|A ∩ B| / (|A| + |B|)        quan hệ: Dice = 2·IoU / (1 + IoU)</code></pre>
+<p>Dice luôn lớn hơn hoặc bằng IoU, nên đừng so Dice của mô hình này với IoU của mô hình khác. Thử với dự đoán bị "phình" 1 pixel (biên dày thêm 1 px), sai số rất thường gặp:</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+
+def iou_dice(a, b):
+    giao, hop = (a &amp; b).sum(), (a | b).sum()
+    return giao / hop, 2 * giao / (a.sum() + b.sum())
+
+
+k3 = np.ones((3, 3), np.uint8)
+for ten, m in (("xước A (mảnh)", inst[0][1]), ("vết dầu (to)", inst[3][1])):
+    du_doan = cv2.dilate(m.astype(np.uint8), k3) &gt; 0                # biên dày thêm 1 px
+    i, d = iou_dice(m, du_doan)
+    print(f"{ten:14s}: IoU {i:.2f} | Dice {d:.2f} | 2·IoU/(1+IoU) = {2 * i / (1 + i):.2f}")</code></pre>
+<pre><code class="language-text">xước A (mảnh) : IoU 0.64 | Dice 0.78 | 2·IoU/(1+IoU) = 0.78
+vết dầu (to)  : IoU 0.88 | Dice 0.94 | 2·IoU/(1+IoU) = 0.94</code></pre>
+<p>Cùng sai 1 pixel ở biên: vết dầu to vẫn có IoU cao, vết xước rộng 3 px rơi xuống khoảng 0,64, dù về mặt sử dụng (đo chiều dài) dự đoán vẫn rất tốt. Với vật mảnh và nhỏ, IoU/Dice pixel thấp chưa chắc là mô hình tệ; hãy đánh giá thêm bằng đại lượng nhà máy quan tâm: sai số chiều dài, diện tích theo mm, và escape/overkill theo tiêu chí. Với instance segmentation, công cụ (như Ultralytics) còn báo <strong>mAP mặt nạ</strong>: giống mAP của bài trước nhưng IoU tính trên mặt nạ thay vì hộp.</p>
+
+<h2>5. Lưu mặt nạ: ảnh nhị phân, đa giác, RLE</h2>
+<p>Nhãn phân đoạn được lưu theo ba cách chính, và bạn sẽ phải chuyển qua lại giữa chúng:</p>
+<ul>
+  <li><strong>Ảnh mặt nạ</strong> (PNG, mỗi pixel một mã lớp): dùng cho semantic (U-Net). Phải lưu PNG, không lưu JPEG: nén mất mát làm sai mã lớp ở biên.</li>
+  <li><strong>Đa giác</strong> (danh sách đỉnh): gọn, dễ sửa trong công cụ gán nhãn; định dạng nhãn YOLO-seg dùng đa giác chuẩn hóa 0–1.</li>
+  <li><strong>RLE</strong> (run-length encoding, mã hóa độ dài chuỗi): COCO dùng cho mặt nạ phức tạp, có lỗ.</li>
+</ul>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+
+def rle_ma_hoa(m):
+    """RLE kiểu COCO (đơn giản): độ dài xen kẽ 0,1,0,1… theo thứ tự cột (Fortran)."""
+    v = np.r_[0, m.ravel(order="F").astype(np.int8), 0]
+    doi = np.flatnonzero(np.diff(v)) + 1
+    dem = np.diff(np.r_[1, doi, len(v) - 1])
+    return dem.tolist()
+
+
+def rle_giai_ma(dem, shape):
+    v = np.repeat(np.arange(len(dem)) % 2, dem).astype(bool)
+    return v.reshape(shape, order="F")
+
+
+m = inst[3][1]                                                     # vết dầu
+cnt = cv2.findContours(m.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0][0]
+da_giac = cv2.approxPolyDP(cnt, 0.7, True)[:, 0]                  # đơn giản hóa đa giác, sai lệch ≤ 0,7 px
+ve_lai = cv2.fillPoly(np.zeros((H, W), np.uint8), [da_giac], 1) &gt; 0
+rle = rle_ma_hoa(m)
+cv2.imwrite("mat_na_dau.png", m.astype(np.uint8) * 255)
+print(f"ảnh mặt nạ PNG : {len(open('mat_na_dau.png', 'rb').read())} byte")
+print(f"đa giác        : {len(da_giac)} đỉnh, IoU với mặt nạ gốc {iou_dice(m, ve_lai)[0]:.3f}")
+print(f"RLE            : {len(rle)} số, giải mã khớp hoàn toàn: {np.array_equal(rle_giai_ma(rle, m.shape), m)}")</code></pre>
+<pre><code class="language-text">ảnh mặt nạ PNG : 562 byte
+đa giác        : 17 đỉnh, IoU với mặt nạ gốc 0.982
+RLE            : 99 số, giải mã khớp hoàn toàn: True</code></pre>
+<p>RLE giữ chính xác từng pixel; đa giác là xấp xỉ, sai lệch phụ thuộc số đỉnh (tham số của <code>approxPolyDP</code>). Bài "Phân đoạn vết lỗi với YOLO26-seg" chuyển mặt nạ sang nhãn đa giác YOLO và kiểm tra sai số này.</p>
+
+<h2>6. Chọn loại bài toán cho trạm kiểm tra</h2>
+<table>
+  <tr><th>Câu hỏi của trạm</th><th>Bài toán phù hợp</th></tr>
+  <tr><td>Sản phẩm có lỗi hay không, không cần biết ở đâu</td><td>Phân loại (chặng 10) hoặc anomaly detection (bài "Anomaly detection: học từ ảnh OK với PaDiM, PatchCore")</td></tr>
+  <tr><td>Đếm vật, kiểm tra đủ/thiếu, vị trí gần đúng</td><td>Phát hiện đối tượng (hộp bao)</td></tr>
+  <tr><td>Tổng diện tích lỗi, tỉ lệ phủ keo, vùng thiếu sơn</td><td>Semantic segmentation</td></tr>
+  <tr><td>Kích thước, số lượng từng vết lỗi theo tiêu chí; vết có thể chạm nhau</td><td>Instance segmentation</td></tr>
+  <tr><td>Hiểu toàn cảnh: robot di động, phân vùng kho, xe tự hành</td><td>Panoptic segmentation</td></tr>
+  <tr><td>Vật tương phản rõ với nền, ánh sáng ổn định</td><td>Phân ngưỡng + contour, watershed (không cần học sâu)</td></tr>
+</table>
+<p>Hàng cuối không phải để cho có: nếu đèn backlight tạo được bóng vật đen tuyền trên nền trắng, phân ngưỡng và contour cho mặt nạ chính xác từng pixel, chạy vài mili giây, không cần dữ liệu huấn luyện. Học sâu cần thiết khi ranh giới vật phụ thuộc kết cấu, ngữ cảnh mà luật đơn giản không mô tả được (vết xước mờ trên kim loại chải xước, vết dầu trên nền vân), như bài "Rule-based hay Deep Learning?" ở chặng 11 đã phân tích.</p>
+
+<h2>7. Các mô hình phổ biến</h2>
+<table>
+  <tr><th>Mô hình</th><th>Loại</th><th>Ghi chú thực tế</th></tr>
+  <tr><td><strong>U-Net</strong> (2015)</td><td>Semantic</td><td>Encoder–decoder với skip connection; hiệu quả với ít dữ liệu, dễ tự cài và tùy biến; rất phổ biến cho lỗi bề mặt. Bài "U-Net cho phân đoạn ảnh".</td></tr>
+  <tr><td><strong>DeepLabv3+</strong></td><td>Semantic</td><td>Dùng tích chập giãn (atrous) để nhìn rộng; có sẵn trong torchvision (DeepLabv3) và các thư viện phân đoạn.</td></tr>
+  <tr><td><strong>Mask R-CNN</strong> (2017)</td><td>Instance</td><td>Hai giai đoạn: phát hiện hộp rồi dự đoán mặt nạ trong hộp; chính xác, chậm hơn YOLO; có trong torchvision, Detectron2.</td></tr>
+  <tr><td><strong>YOLO-seg</strong> (YOLO26-seg…)</td><td>Instance</td><td>Một giai đoạn, thời gian thực, quy trình huấn luyện giống hệt YOLO phát hiện. Bài "Phân đoạn vết lỗi với YOLO26-seg".</td></tr>
+  <tr><td><strong>Mask2Former</strong> và các mô hình "universal"</td><td>Semantic, instance và panoptic</td><td>Một kiến trúc cho cả ba loại; mạnh nhưng nặng, thường dùng trong nghiên cứu hoặc khi có GPU mạnh.</td></tr>
+  <tr><td><strong>SAM</strong> (Segment Anything) và các phiên bản sau</td><td>Phân đoạn theo gợi ý (điểm, hộp)</td><td>Mô hình nền tảng không cần huấn luyện cho từng bài; rất hữu ích để <strong>gán nhãn nhanh</strong> (bấm một điểm ra mặt nạ) trong các công cụ như CVAT, Label Studio; ít khi dùng trực tiếp làm mô hình kiểm tra lỗi vì nó không biết "lỗi" là gì.</td></tr>
 </table>
 
-<h2>Khi nào cần phân đoạn?</h2>
+<h2>8. Sai lầm thường gặp</h2>
 <ul>
-  <li><strong>Đo diện tích, chiều dài lỗi</strong>: tiêu chuẩn chất lượng thường quy định "vết xước dài quá 2 mm thì loại", khung chữ nhật không đo chính xác được vết xước chéo.</li>
-  <li><strong>Vật có hình dạng bất thường</strong>: vết dầu loang, vùng thiếu keo, vết nứt dài.</li>
-  <li><strong>Gắp vật chính xác</strong>: robot cần biết đường bao thực tế, không chỉ khung bao.</li>
-  <li><strong>Y tế, nông nghiệp, viễn thám</strong>: khối u, lá bệnh, vùng đất canh tác.</li>
+  <li><strong>Chọn instance khi chỉ cần tổng diện tích</strong>: tốn công vẽ đa giác tách từng vết mà không dùng tới.</li>
+  <li><strong>Chọn semantic khi tiêu chí theo từng vết</strong> và vết có thể chạm nhau: đếm sai, đo sai như mục 3.</li>
+  <li><strong>Lưu mặt nạ semantic bằng JPEG</strong>: biên bị nhiễu thành các mã lớp lạ.</li>
+  <li><strong>Đánh giá vết mảnh chỉ bằng IoU pixel</strong>: kết luận sai rằng mô hình tệ; hãy đo sai số theo mm.</li>
+  <li><strong>Quy ước gán nhãn biên không thống nhất</strong> (người vẽ sát mép vết, người vẽ chừa viền): với vết rộng 3 px, đó là chênh lệch hơn 60% diện tích.</li>
 </ul>
 
-<h2>Các mô hình phổ biến</h2>
+<h2>9. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> (Thực hành của bài) Trạm kiểm tra tấm nhựa ép: tiêu chuẩn của khách hàng là "không vết lõm nào có diện tích lớn hơn 0,5 mm²; tổng diện tích lõm không quá 2 mm²". Vết lõm đôi khi nằm sát nhau thành cụm. Chọn loại phân đoạn phù hợp và giải thích. Nếu tiêu chuẩn chỉ còn vế sau thì sao?</p>
+<details><summary>Xem đáp án</summary>
+<p><strong>Instance segmentation.</strong> Vế "từng vết không quá 0,5 mm²" cần diện tích của <em>từng</em> vết; vì các vết có thể sát nhau, semantic + vùng liên thông sẽ gộp cụm thành một vùng lớn và báo NG sai (overkill), hoặc ngược lại nếu tách bằng xử lý hình thái thì dễ cắt một vết thành hai (escape). Instance cho mỗi vết một mặt nạ; diện tích = số pixel × (mm/px)², tổng diện tích = diện tích hợp các mặt nạ (không cộng trùng pixel giao). Nếu tiêu chuẩn chỉ còn "tổng diện tích không quá 2 mm²", <strong>semantic</strong> là đủ và rẻ hơn: gán nhãn bằng tô mặt nạ, mô hình U-Net, tổng diện tích = số pixel lớp "lõm" × (mm/px)². Trong cả hai trường hợp, cần đánh giá sai số diện tích theo mm² trên ảnh có nhãn, vì vết nhỏ (vài chục pixel) có sai số tương đối lớn ở biên.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Mặt nạ thật có 400 pixel, mặt nạ dự đoán có 360 pixel, phần giao 300 pixel. Tính IoU và Dice bằng tay, kiểm tra công thức Dice = 2·IoU/(1 + IoU).</p>
+<details><summary>Xem đáp án</summary>
+<p>Hợp = 400 + 360 − 300 = 460. IoU = 300/460 ≈ 0,652. Dice = 600/760 ≈ 0,789. Kiểm tra: 2 × 0,652 / 1,652 ≈ 0,789.</p>
+<pre><code class="language-python">giao, a, b = 300, 400, 360
+i, d = giao / (a + b - giao), 2 * giao / (a + b)
+print(f"IoU {i:.3f} | Dice {d:.3f} | 2·IoU/(1+IoU) {2 * i / (1 + i):.3f}")</code></pre>
+<pre><code class="language-text">IoU 0.652 | Dice 0.789 | 2·IoU/(1+IoU) 0.789</code></pre>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Chọn bài toán (phân loại, phát hiện, semantic, instance, hoặc không cần học sâu) cho: (a) đếm số viên thuốc trên vỉ dưới đèn nền, viên trắng trên nền đen; (b) đo tỉ lệ phủ keo trên mép hộp giấy, keo trong suốt hơi bóng; (c) phát hiện và đo chiều dài từng vết nứt trên gạch men, vết nứt có thể phân nhánh và giao nhau.</p>
+<details><summary>Xem đáp án</summary>
 <ul>
-  <li><strong>U-Net</strong>: kiến trúc kinh điển cho phân đoạn ngữ nghĩa, hiệu quả với ít dữ liệu, xem <a href="../hoc/unet-phan-doan-anh.html">bài U-Net</a>.</li>
-  <li><strong>YOLO-seg</strong>: phân đoạn từng đối tượng thời gian thực, xem <a href="../hoc/yolo26-seg-phan-doan-vet-loi.html">YOLO26-seg</a>.</li>
-  <li><strong>Mask R-CNN</strong>: kiến trúc hai giai đoạn nổi tiếng cho instance segmentation.</li>
-  <li><strong>SAM</strong> (Segment Anything): mô hình nền tảng phân đoạn theo gợi ý, rất mạnh để <a href="../tai-nguyen/sam-gan-nhan-phan-doan-nhanh.html">gán nhãn nhanh</a>.</li>
+  <li>(a) <strong>Không cần học sâu</strong>: đèn nền cho tương phản rất rõ, phân ngưỡng + đếm contour (hoặc watershed nếu viên chạm nhau) là đủ, nhanh và dễ nghiệm thu.</li>
+  <li>(b) <strong>Semantic</strong>: chỉ cần tỉ lệ diện tích "có keo" trên vùng mép, không cần tách từng vệt. Keo trong suốt có thể cần chiếu sáng đặc biệt (chặng 6) trước khi nghĩ tới mô hình.</li>
+  <li>(c) <strong>Instance</strong> (hoặc semantic rồi phân tích khung xương nếu quy tắc tách nhánh rõ ràng): cần chiều dài từng vết, mà vết có thể giao nhau. Chiều dài vết cong, phân nhánh nên đo bằng khung xương (skeleton) của mặt nạ, không phải cạnh hộp.</li>
 </ul>
+</details>
+</div>
 
-<h2>Chỉ số đánh giá</h2>
+<h2>Tóm tắt</h2>
 <ul>
-  <li><strong>IoU / Dice</strong> trên mặt nạ: mức trùng khớp giữa mặt nạ dự đoán và mặt nạ thật.</li>
-  <li><strong>mAP mask</strong>: tương tự mAP của detection nhưng tính IoU trên mặt nạ.</li>
-  <li>Với lỗi nhỏ, chú ý: vài điểm ảnh sai ở biên có thể làm IoU giảm mạnh dù kết quả vẫn dùng được.</li>
+  <li>Semantic: mỗi pixel một lớp, không phân biệt vật cùng lớp. Instance: mỗi vật một mặt nạ + lớp. Panoptic: mỗi pixel một cặp (lớp, id), gồm cả "stuff" và "thing", không chồng nhau.</li>
+  <li>Cần phân đoạn thay vì hộp bao khi đo diện tích, chiều dài, hình dạng; với vết xước chéo, hộp bao sai diện tích hơn 10 lần và sai cả chiều dài.</li>
+  <li>Semantic + vùng liên thông thay được instance chỉ khi các vật không chạm nhau hoặc tiêu chí theo tổng.</li>
+  <li>Đánh giá mặt nạ bằng IoU, Dice (Dice = 2·IoU/(1+IoU)), mAP mặt nạ; với vật mảnh, đo thêm sai số theo mm.</li>
+  <li>Mặt nạ lưu dạng PNG, đa giác hoặc RLE; mô hình phổ biến: U-Net, DeepLabv3+ (semantic), Mask R-CNN, YOLO-seg (instance), Mask2Former (cả ba), SAM (gán nhãn nhanh).</li>
 </ul>
-
-<h2>Không phải lúc nào cũng cần Deep Learning</h2>
-<p>Nếu vật tương phản rõ với nền, phân ngưỡng + contour hay watershed đã là phân đoạn (xem <a href="../hoc/watershed-tach-vat-dinh-nhau.html">watershed</a>). Deep Learning cần thiết khi ranh giới vật phụ thuộc vào kết cấu, ngữ cảnh mà luật đơn giản không mô tả được.</p>
+<p>Bài tiếp theo: <strong>Phân đoạn vết lỗi với YOLO26-seg</strong>, gán nhãn đa giác, huấn luyện instance segmentation và đo từng vết lỗi theo mm.</p>
