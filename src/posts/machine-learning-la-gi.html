@@ -1,50 +1,297 @@
-<p>"Machine Learning" xuất hiện ở khắp nơi, nhưng nhiều người vẫn hình dung mơ hồ. Bài này giải thích bằng ví dụ gần gũi với nhà máy: <strong>Machine Learning là gì, các loại bài toán chính, và khi nào nên dùng</strong>.</p>
+<p>Chín chặng trước, mọi quyết định OK/NG trong trạm vision của bạn đều do <strong>bạn viết luật</strong>: ngưỡng nhị phân, diện tích blob, khoảng cách đo được so với dung sai. Cách đó nhanh, dễ giải thích và vẫn là lựa chọn số một khi luật rõ ràng. Nhưng có những bài toán mà chính người kiểm tra lành nghề cũng không diễn đạt được luật thành con số: vết xước "trông lạ", bề mặt vân gỗ tự nhiên có vết nứt, mối hàn "không đẹp". Chặng 10 mở ra hướng thứ hai: <strong>cho máy học luật từ dữ liệu có đáp án</strong>. Bài này đặt nền móng cho cả chặng: học máy (Machine Learning) khác lập trình truyền thống ở đâu, có những loại bài toán nào và gọi tên chúng bằng ví dụ nhà máy, quy trình một dự án ML từ lúc nhận yêu cầu đến lúc giám sát trên dây chuyền. Bài sau, "Gradient descent từ đầu với NumPy", mở hộp đen để xem máy "học" bằng phép tính nào.</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Giải thích được khác biệt giữa luật viết tay và mô hình học từ dữ liệu, và tự chạy một ví dụ so sánh hai cách trên cùng bộ dữ liệu OK/NG; gọi đúng tên bài toán (phân loại, hồi quy, phân cụm, phát hiện bất thường; với ảnh: classification, detection, segmentation); nắm các thuật ngữ feature, label, train, inference; mô tả được các bước của một dự án ML trong nhà máy và các điểm hay hỏng. Code dùng scikit-learn 1.9 và NumPy.</div>
+<pre><code class="language-bash">pip install numpy scikit-learn</code></pre>
 
-<h2>Lập trình truyền thống và Machine Learning</h2>
-<ul>
-  <li><strong>Lập trình truyền thống</strong>: con người viết luật. "Nếu đường kính &gt; 25,05 mm thì loại."</li>
-  <li><strong>Machine Learning</strong>: con người cung cấp <em>dữ liệu và đáp án</em>, thuật toán tự tìm ra luật. Đưa 10.000 bộ số đo cảm biến kèm nhãn "hỏng/không hỏng", mô hình tự học cách dự đoán máy sắp hỏng.</li>
-</ul>
-<p>Machine Learning hữu ích khi luật quá phức tạp để viết tay, hoặc chính con người cũng không diễn đạt được luật (bạn nhận ra mặt người quen ngay lập tức, nhưng không viết được "công thức" cho việc đó).</p>
+<h2>1. Lập trình truyền thống và học máy</h2>
+<p>Hai cách làm khác nhau ở chỗ <em>ai viết ra luật</em>:</p>
+<pre><code class="language-text">Lập trình truyền thống:   dữ liệu + LUẬT (kỹ sư viết)        →  máy  →  kết quả (OK/NG)
+Học máy (huấn luyện):     dữ liệu + KẾT QUẢ ĐÚNG (nhãn)      →  máy  →  LUẬT (mô hình)
+Học máy (khi chạy):       dữ liệu mới + mô hình đã học       →  máy  →  kết quả</code></pre>
+<p>Ví dụ trạm đo trục: "đường kính ngoài 25,00 ± 0,05 mm" là một luật rõ ràng, viết một dòng <code>if</code> là xong; dùng học máy ở đây chỉ thêm rủi ro. Ngược lại, trạm kiểm tra bề mặt có vết bẩn, vết xước, vết lõm với đủ hình dạng: luật "diện tích &gt; 50 px là NG" sẽ bỏ sót vết xước dài mảnh nhưng diện tích nhỏ, và loại nhầm vết bẩn lớn nhưng mờ. Người QC nhìn là biết, nhưng họ <strong>không viết ra được</strong> công thức. Đó là chỗ của học máy: bạn đưa cho thuật toán vài trăm ví dụ đã được QC gán nhãn, thuật toán tự tìm luật phân biệt.</p>
+<table>
+  <tr><th></th><th>Luật viết tay (rule-based)</th><th>Học máy</th></tr>
+  <tr><td>Đầu vào của kỹ sư</td><td>Hiểu biết về quy trình, tiêu chuẩn</td><td>Dữ liệu có nhãn đúng, đủ nhiều và đủ đa dạng</td></tr>
+  <tr><td>Khi điều kiện đổi (lô vật liệu mới)</td><td>Sửa ngưỡng bằng tay</td><td>Thu thêm dữ liệu, huấn luyện lại, nghiệm thu lại</td></tr>
+  <tr><td>Giải thích quyết định</td><td>Dễ: "diện tích 63 px &gt; 50 px"</td><td>Khó hơn, nhất là mạng nơ-ron sâu</td></tr>
+  <tr><td>Mạnh ở</td><td>Đo kích thước, đếm, kiểm tra có/không, tiêu chí trong bản vẽ</td><td>Lỗi bề mặt biến dạng nhiều, nền phức tạp, tiêu chí "nhìn là biết"</td></tr>
+  <tr><td>Cái giá</td><td>Thời gian kỹ sư dò ngưỡng cho từng trường hợp</td><td>Thời gian thu thập, gán nhãn dữ liệu; cần quy trình kiểm soát phiên bản mô hình</td></tr>
+</table>
 
-<h2>Ba nhóm bài toán chính</h2>
-<h3>1. Học có giám sát (supervised learning)</h3>
-<p>Dữ liệu có nhãn đáp án. Hai dạng:</p>
-<ul>
-  <li><strong>Phân loại (classification)</strong>: dự đoán nhóm. Ảnh này OK hay NG? Email có phải spam?</li>
-  <li><strong>Hồi quy (regression)</strong>: dự đoán một con số. Nhiệt độ lò sau 10 phút? Tuổi thọ còn lại của dao cắt?</li>
-</ul>
-<h3>2. Học không giám sát (unsupervised learning)</h3>
-<p>Dữ liệu không có nhãn; thuật toán tự tìm cấu trúc:</p>
-<ul>
-  <li><strong>Phân cụm (clustering)</strong>: gom sản phẩm lỗi thành các nhóm lỗi tương tự.</li>
-  <li><strong>Phát hiện bất thường</strong>: học "bình thường" là gì rồi báo động khi có điều khác lạ, rất hợp khi dữ liệu lỗi hiếm.</li>
-</ul>
-<h3>3. Học tăng cường (reinforcement learning)</h3>
-<p>Tác tử học bằng thử và sai, nhận "phần thưởng" khi làm đúng. Dùng cho điều khiển robot, trò chơi, tối ưu lập lịch.</p>
+<h2>2. Ví dụ chạy được: luật một ngưỡng so với mô hình học</h2>
+<p>Giả sử trạm của bạn đã có bước xử lý ảnh cổ điển (chặng 3–4): tìm vết tối lớn nhất trên chi tiết và đo hai <strong>đặc trưng</strong> (feature): diện tích vết (pixel) và độ tương phản của vết so với nền (mức xám). QC xem lại 400 chi tiết và gán nhãn OK/NG. Tiêu chí thật của QC (mà không ai viết ra) là "vết nhìn thấy rõ": vết nhỏ nhưng rất tối là NG, vết to nhưng mờ cũng là NG. Thêm vào đó khoảng 3% nhãn bị gán nhầm, giống dữ liệu thật. Ta mô phỏng dữ liệu này, chia làm hai phần: 400 mẫu để <em>học</em> (train) và 400 mẫu khác để <em>kiểm tra</em> (test).</p>
+<pre><code class="language-python">import numpy as np
 
-<h2>Machine Learning, Deep Learning và AI</h2>
-<ul>
-  <li><strong>AI</strong>: lĩnh vực rộng nhất, máy làm những việc cần "trí thông minh".</li>
-  <li><strong>Machine Learning</strong>: một nhánh của AI, học từ dữ liệu.</li>
-  <li><strong>Deep Learning</strong>: một nhánh của Machine Learning dùng mạng nơ-ron nhiều lớp; đặc biệt mạnh với ảnh, âm thanh, văn bản.</li>
-</ul>
-<p>Với dữ liệu dạng bảng (số đo cảm biến, thông số máy), các thuật toán ML "cổ điển" như cây quyết định, random forest, gradient boosting thường vẫn là lựa chọn tốt nhất. Với ảnh, Deep Learning chiếm ưu thế.</p>
+rng = np.random.default_rng(0)
 
-<h2>Quy trình một dự án Machine Learning</h2>
-<ol>
-  <li><strong>Xác định bài toán</strong> và cách đo thành công (ví dụ: lọt lỗi dưới 0,1%).</li>
-  <li><strong>Thu thập và làm sạch dữ liệu</strong>: thường chiếm phần lớn thời gian.</li>
-  <li><strong>Chia dữ liệu</strong> train / validation / test.</li>
-  <li><strong>Huấn luyện</strong> vài mô hình, bắt đầu từ mô hình đơn giản.</li>
-  <li><strong>Đánh giá</strong> trên tập test bằng chỉ số phù hợp.</li>
-  <li><strong>Triển khai và theo dõi</strong>: dữ liệu thực tế thay đổi theo thời gian, mô hình cần được giám sát.</li>
-</ol>
 
-<h2>Khi nào <em>không</em> nên dùng Machine Learning</h2>
+def tao_du_lieu(n):
+    """Mỗi mẫu: [diện tích vết (px), độ tương phản (mức xám)] và nhãn 0 = OK, 1 = NG."""
+    dien_tich = rng.uniform(0, 120, n)
+    tuong_phan = rng.uniform(5, 60, n)
+    ng = (dien_tich * tuong_phan &gt; 3000).astype(int)     # tiêu chí "nhìn thấy rõ" của QC
+    nham = rng.random(n) &lt; 0.03                           # 3% nhãn gán nhầm
+    ng[nham] = 1 - ng[nham]
+    return np.column_stack([dien_tich, tuong_phan]), ng
+
+
+X_train, y_train = tao_du_lieu(400)
+X_test, y_test = tao_du_lieu(400)
+print("X_train:", X_train.shape, "| y_train:", y_train.shape)
+print("5 mẫu đầu:\n", np.round(X_train[:5], 1), y_train[:5])
+print(f"tỉ lệ NG: train {y_train.mean():.1%}, test {y_test.mean():.1%}")</code></pre>
+<pre><code class="language-text">X_train: (400, 2) | y_train: (400,)
+5 mẫu đầu:
+ [[76.4 16.1]
+ [32.4 56.6]
+ [ 4.9 10.2]
+ [ 2.   5.3]
+ [97.6 22.8]] [0 0 0 0 0]
+tỉ lệ NG: train 28.5%, test 21.5%</code></pre>
+<p>Tỉ lệ NG cao (20–30%) vì đây là các chi tiết đã bị trạm cũ đánh dấu có vết, đưa cho QC xem lại; trên cả dây chuyền tỉ lệ NG thường thấp hơn nhiều. Mỗi hàng của <code>X</code> là một <strong>mẫu</strong> (sample), mỗi cột là một đặc trưng; <code>y</code> là <strong>nhãn</strong> (label). Đây là cách tổ chức dữ liệu chuẩn của mọi thư viện học máy.</p>
+<p><strong>Cách 1, luật viết tay.</strong> Kỹ sư chọn đặc trưng dễ hiểu nhất là diện tích, và dò ngưỡng tốt nhất trên tập train. <strong>Cách 2, học máy.</strong> Đưa cả hai đặc trưng và nhãn cho hai thuật toán phổ biến của scikit-learn: cây quyết định (decision tree) và hồi quy logistic (logistic regression). Cả hai chỉ cần hai dòng: tạo mô hình, gọi <code>fit</code>. Ta đánh giá cả ba trên tập test, theo ngôn ngữ nhà máy: bao nhiêu NG bị <strong>lọt</strong> (escape) và bao nhiêu OK bị <strong>loại nhầm</strong> (overkill).</p>
+<pre><code class="language-python">from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+
+
+def danh_gia(ten, du_doan, y):
+    lot = int(((du_doan == 0) &amp; (y == 1)).sum())          # NG bị cho qua
+    nham = int(((du_doan == 1) &amp; (y == 0)).sum())         # OK bị loại
+    print(f"{ten:28s} đúng {np.mean(du_doan == y):6.1%} | lọt NG {lot:3d}/{int(y.sum())}"
+          f" | loại nhầm OK {nham:3d}/{int((y == 0).sum())}")
+
+
+# Cách 1: luật một ngưỡng diện tích, dò ngưỡng tốt nhất trên tập train
+nguong = max(range(0, 121), key=lambda a: np.mean((X_train[:, 0] &gt; a) == y_train))
+print(f"Luật: NG nếu diện tích &gt; {nguong} px")
+danh_gia("Luật diện tích", (X_test[:, 0] &gt; nguong).astype(int), y_test)
+
+# Cách 2: học máy, máy tự tìm luật từ (X_train, y_train)
+cay = DecisionTreeClassifier(max_depth=4, random_state=0).fit(X_train, y_train)
+danh_gia("Cây quyết định (sâu 4)", cay.predict(X_test), y_test)
+logistic = LogisticRegression().fit(np.log1p(X_train), y_train)   # log: tích thành tổng
+danh_gia("Logistic trên log đặc trưng", logistic.predict(np.log1p(X_test)), y_test)</code></pre>
+<pre><code class="language-text">Luật: NG nếu diện tích &gt; 100 px
+Luật diện tích               đúng  80.8% | lọt NG  44/86 | loại nhầm OK  33/314
+Cây quyết định (sâu 4)       đúng  94.2% | lọt NG  15/86 | loại nhầm OK   8/314
+Logistic trên log đặc trưng  đúng  95.8% | lọt NG  11/86 | loại nhầm OK   6/314</code></pre>
+<p>Luật một ngưỡng sai nhiều vì tiêu chí thật phụ thuộc <em>đồng thời</em> hai đặc trưng. Cây quyết định tự tìm ra các ngưỡng kết hợp; hồi quy logistic trên log đặc trưng gần như tìm đúng tiêu chí thật vì <code>log(diện tích) + log(tương phản) &gt; log(3000)</code> là một đường thẳng trong không gian log. Hai bài học nhỏ:</p>
 <ul>
-  <li>Luật rõ ràng, viết được bằng vài dòng code.</li>
-  <li>Không có hoặc có quá ít dữ liệu đại diện.</li>
-  <li>Sai một lần là hậu quả nghiêm trọng mà không có lớp kiểm soát nào khác.</li>
+  <li>Mô hình học máy không "thông minh" hơn kỹ sư; nó chỉ thử được nhiều tổ hợp ngưỡng hơn, nhanh hơn, dựa trên nhãn.</li>
+  <li>Chọn đặc trưng tốt (ở đây là lấy log) giúp mô hình đơn giản làm việc tốt. Deep Learning, chủ đề của cả chặng này, đi xa hơn một bước: <strong>tự học luôn đặc trưng</strong> từ pixel, không cần bạn đo diện tích hay tương phản.</li>
 </ul>
-<p>Thực hành ngay với bài <a href="../hoc/scikit-learn-phan-loai-ok-ng.html">phân loại OK/NG bằng scikit-learn</a>.</p>
+<p>Cây quyết định có ưu điểm là in được luật nó học ra dưới dạng đọc được. Với độ sâu 2 cho dễ đọc:</p>
+<pre><code class="language-python">from sklearn.tree import DecisionTreeClassifier, export_text
+
+cay2 = DecisionTreeClassifier(max_depth=2, random_state=0).fit(X_train, y_train)
+print(export_text(cay2, feature_names=["dien_tich", "tuong_phan"], class_names=["OK", "NG"]))</code></pre>
+<pre><code class="language-text">|--- tuong_phan &lt;= 35.51
+|   |--- dien_tich &lt;= 98.64
+|   |   |--- class: OK
+|   |--- dien_tich &gt;  98.64
+|   |   |--- class: OK
+|--- tuong_phan &gt;  35.51
+|   |--- dien_tich &lt;= 51.60
+|   |   |--- class: OK
+|   |--- dien_tich &gt;  51.60
+|   |   |--- class: NG</code></pre>
+<p>Đây chính là một "chương trình if/else" mà máy viết ra từ dữ liệu, thay vì bạn viết: NG khi tương phản &gt; 35,51 <em>và</em> diện tích &gt; 51,60 px. (Nhánh trái tách thêm một lần nhưng hai lá đều là OK; cây chỉ tối ưu độ "thuần" của từng nhóm, không quan tâm hai lá cùng kết luận.) Với độ sâu 4, cây có thêm nhiều ngưỡng kết hợp và bám sát tiêu chí thật hơn. Với mạng nơ-ron, "chương trình" là hàng triệu con số trọng số và không in ra đọc được như vậy.</p>
+
+<h2>3. Thuật ngữ cần nắm</h2>
+<table>
+  <tr><th>Thuật ngữ</th><th>Nghĩa</th><th>Trong ví dụ trên</th></tr>
+  <tr><td>Mẫu (sample)</td><td>Một đối tượng cần dự đoán</td><td>Một chi tiết (hoặc một ảnh)</td></tr>
+  <tr><td>Đặc trưng (feature)</td><td>Con số mô tả mẫu, đầu vào của mô hình</td><td>Diện tích, độ tương phản; với Deep Learning là chính các pixel</td></tr>
+  <tr><td>Nhãn (label)</td><td>Đáp án đúng do con người cung cấp</td><td>OK = 0, NG = 1 do QC gán</td></tr>
+  <tr><td>Mô hình (model)</td><td>Hàm biến đặc trưng thành dự đoán, có các tham số chỉnh được</td><td>Cây quyết định, hồi quy logistic, CNN</td></tr>
+  <tr><td>Tham số (parameter)</td><td>Các con số mô hình học ra</td><td>Các ngưỡng trong cây; trọng số của logistic</td></tr>
+  <tr><td>Huấn luyện (training, <code>fit</code>)</td><td>Chỉnh tham số để dự đoán khớp nhãn trên tập train</td><td><code>cay.fit(X_train, y_train)</code></td></tr>
+  <tr><td>Suy luận (inference, <code>predict</code>)</td><td>Dùng mô hình đã học cho mẫu mới; đây là phần chạy trên trạm</td><td><code>cay.predict(X_test)</code></td></tr>
+  <tr><td>Siêu tham số (hyperparameter)</td><td>Lựa chọn do kỹ sư đặt trước khi huấn luyện</td><td><code>max_depth=4</code></td></tr>
+  <tr><td>Tổng quát hóa (generalization)</td><td>Dự đoán đúng trên dữ liệu chưa từng thấy</td><td>Kết quả trên tập test, không phải tập train</td></tr>
+</table>
+<div class="warn"><strong>Đánh giá trên dữ liệu đã học là tự lừa mình</strong>Một cây quyết định không giới hạn độ sâu có thể đúng 100% trên tập train bằng cách "học thuộc" từng mẫu, kể cả 3% nhãn sai. Con số có ý nghĩa duy nhất là kết quả trên dữ liệu mô hình chưa thấy. Bài "Overfitting và chia train/val/test" ở cuối chặng dạy cách chia dữ liệu đúng.</div>
+
+<h2>4. Các loại bài toán học máy</h2>
+<p>Phân loại theo <strong>kiểu dữ liệu huấn luyện</strong> có ba nhóm chính:</p>
+<table>
+  <tr><th>Nhóm</th><th>Dữ liệu huấn luyện</th><th>Bài toán</th><th>Ví dụ nhà máy</th></tr>
+  <tr><td rowspan="2">Học có giám sát (supervised)</td><td rowspan="2">Có nhãn cho từng mẫu</td><td>Phân loại (classification): dự đoán một <em>nhóm</em></td><td>Ảnh OK hay NG; loại lỗi: xước, lõm, bẩn</td></tr>
+  <tr><td>Hồi quy (regression): dự đoán một <em>con số</em></td><td>Độ mòn dao cắt; số giờ đèn còn dùng được; độ nhám bề mặt từ ảnh</td></tr>
+  <tr><td rowspan="2">Học không giám sát (unsupervised)</td><td rowspan="2">Không có nhãn</td><td>Phân cụm (clustering): gom mẫu giống nhau</td><td>Gom 2.000 ảnh NG thành các nhóm lỗi để QC đặt tên</td></tr>
+  <tr><td>Phát hiện bất thường (anomaly detection): học "bình thường", báo cái lạ</td><td>Chỉ có ảnh OK, lỗi hiếm và muôn hình dạng; giám sát rung động máy</td></tr>
+  <tr><td>Học tăng cường (reinforcement)</td><td>Phần thưởng từ môi trường qua thử và sai</td><td>Học chính sách hành động</td><td>Robot học gắp vật trong mô phỏng; ít gặp ở trạm kiểm tra</td></tr>
+</table>
+<p>Phát hiện bất thường thường được huấn luyện chỉ trên dữ liệu OK (không cần nhãn từng lỗi), nên hay được xếp vào nhóm không giám sát hoặc "bán giám sát". Đây là hướng rất quan trọng với nhà máy vì ảnh NG luôn hiếm.</p>
+<p>Ba đoạn code ngắn dưới đây cho bạn thấy ba loại còn lại "trông" thế nào trong code. Đầu tiên là <strong>hồi quy</strong>: độ sáng trung bình ảnh của trạm giảm dần theo số giờ chạy của đèn LED; dự đoán khi nào đèn xuống dưới mức 180 để lên lịch thay đèn trước khi tỉ lệ loại nhầm tăng.</p>
+<pre><code class="language-python">import numpy as np
+from sklearn.linear_model import LinearRegression
+
+rng = np.random.default_rng(1)
+gio = np.arange(0, 6000, 250).reshape(-1, 1)                    # đặc trưng: số giờ chạy đèn
+do_sang = 215 - 0.004 * gio.ravel() + rng.normal(0, 1.5, len(gio))   # nhãn: mức xám trung bình đo được
+
+hoi_quy = LinearRegression().fit(gio, do_sang)
+a, b = hoi_quy.coef_[0], hoi_quy.intercept_
+print(f"mô hình: độ sáng ≈ {b:.1f} {a * 1000:+.2f} × (giờ / 1000)")
+print("dự đoán ở 7000 giờ:", round(float(hoi_quy.predict([[7000]])[0]), 1))
+print("đèn chạm mức 180 sau khoảng", round((180 - b) / a), "giờ")</code></pre>
+<pre><code class="language-text">mô hình: độ sáng ≈ 215.2 -4.01 × (giờ / 1000)
+dự đoán ở 7000 giờ: 187.1
+đèn chạm mức 180 sau khoảng 8779 giờ</code></pre>
+<p>Đầu ra của hồi quy là một số thực, không phải một nhóm. Bài sau sẽ tự cài thuật toán tìm <code>a</code>, <code>b</code> này bằng gradient descent thay vì gọi <code>LinearRegression</code>.</p>
+<p>Tiếp theo là <strong>phân cụm</strong>: bạn có đặc trưng của 300 vết lỗi chưa ai phân loại (diện tích, độ dài/độ rộng, độ tối). K-means gom chúng thành 3 cụm; thuật toán không biết tên lỗi, chính bạn nhìn tâm cụm và đặt tên.</p>
+<pre><code class="language-python">import numpy as np
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+
+rng = np.random.default_rng(2)
+xuoc = np.column_stack([rng.normal(40, 8, 100), rng.normal(8, 1.5, 100), rng.normal(50, 8, 100)])
+lom = np.column_stack([rng.normal(90, 15, 100), rng.normal(1.3, 0.2, 100), rng.normal(30, 6, 100)])
+bui = np.column_stack([rng.normal(6, 2, 100), rng.normal(1.5, 0.4, 100), rng.normal(70, 10, 100)])
+vet = np.vstack([xuoc, lom, bui])                  # [diện tích, dài/rộng, độ tối]; không có nhãn
+
+Z = StandardScaler().fit_transform(vet)            # đưa các cột về cùng thang đo
+km = KMeans(n_clusters=3, n_init=10, random_state=0).fit(Z)
+for k in range(3):
+    tam = vet[km.labels_ == k].mean(axis=0)
+    print(f"cụm {k}: {np.sum(km.labels_ == k):3d} vết | diện tích {tam[0]:5.1f} px, "
+          f"dài/rộng {tam[1]:4.1f}, độ tối {tam[2]:4.1f}")</code></pre>
+<pre><code class="language-text">cụm 0: 100 vết | diện tích  90.8 px, dài/rộng  1.3, độ tối 29.5
+cụm 1: 100 vết | diện tích   6.1 px, dài/rộng  1.5, độ tối 70.8
+cụm 2: 100 vết | diện tích  39.9 px, dài/rộng  8.0, độ tối 48.8</code></pre>
+<p>Nhìn tâm cụm, kỹ sư nhận ra ngay: cụm có tỉ lệ dài/rộng khoảng 8 là vết xước, cụm diện tích lớn và tròn là vết lõm, cụm nhỏ và tối là bụi. Phân cụm hay được dùng ở bước <em>khám phá dữ liệu</em>, trước khi viết quy chuẩn gán nhãn.</p>
+<p>Cuối cùng là <strong>phát hiện bất thường</strong>: chỉ huấn luyện trên chi tiết OK, rồi để mô hình chấm điểm "lạ" cho chi tiết mới.</p>
+<pre><code class="language-python">import numpy as np
+from sklearn.covariance import EllipticEnvelope
+
+rng = np.random.default_rng(3)
+ok_train = rng.normal([150, 12, 0.5], [3, 1.5, 0.1], (500, 3))   # [độ sáng, độ nhám, diện tích vết lớn nhất]
+ok_moi = rng.normal([150, 12, 0.5], [3, 1.5, 0.1], (200, 3))
+ng_moi = np.vstack([rng.normal([150, 12, 4.0], [3, 1.5, 1.0], (10, 3)),    # có vết lớn
+                    rng.normal([132, 12, 0.5], [3, 1.5, 0.1], (10, 3))])   # bạc màu, tối hơn
+
+mo_hinh = EllipticEnvelope(contamination=0.01, random_state=0).fit(ok_train)   # chỉ thấy OK
+bao_ok = np.mean(mo_hinh.predict(ok_moi) == -1)    # -1 = bất thường
+bao_ng = np.mean(mo_hinh.predict(ng_moi) == -1)
+print(f"OK mới bị báo bất thường: {bao_ok:.1%} | NG mới bị phát hiện: {bao_ng:.0%}")</code></pre>
+<pre><code class="language-text">OK mới bị báo bất thường: 1.0% | NG mới bị phát hiện: 100%</code></pre>
+<p><code>EllipticEnvelope</code> học trung bình và hiệp phương sai của dữ liệu OK, tức là một "vùng bình thường" hình elip, rồi báo bất thường mọi điểm nằm quá xa vùng đó. Mô hình chưa từng thấy một mẫu NG nào nhưng vẫn bắt được cả hai loại lỗi, vì chúng nằm ngoài vùng bình thường. Cái giá là một tỉ lệ nhỏ OK bị báo nhầm, chỉnh bằng tham số <code>contamination</code> (thực chất là chọn ngưỡng). Lưu ý: ví dụ này dễ vì lỗi cách xa vùng OK; lỗi nhỏ nằm sát biên mới là thử thách thật. Chặng 12 có bài "Anomaly detection: học từ ảnh OK với PaDiM, PatchCore" áp dụng ý tưởng này trực tiếp trên ảnh.</p>
+
+<h3>Bài toán trên ảnh: classification, detection, segmentation</h3>
+<p>Với Deep Learning trên ảnh, các bài toán được gọi tên theo <strong>dạng đầu ra</strong>. Chọn đúng loại ngay từ đầu quyết định cách gán nhãn, chi phí gán nhãn và cách đánh giá:</p>
+<table>
+  <tr><th>Bài toán</th><th>Đầu ra cho mỗi ảnh</th><th>Nhãn cần gán</th><th>Dùng khi</th></tr>
+  <tr><td>Phân loại ảnh (classification)</td><td>Một lớp và điểm số: "NG, 0,93"</td><td>Một nhãn cho cả ảnh: rẻ nhất</td><td>ROI đã cắt sẵn, chỉ cần biết OK/NG hoặc loại lỗi. Dự án cuối chặng này</td></tr>
+  <tr><td>Phát hiện đối tượng (object detection)</td><td>Danh sách khung chữ nhật + lớp + điểm số</td><td>Vẽ khung quanh từng vật/lỗi</td><td>Cần vị trí, số lượng: đếm linh kiện, tìm lỗi trên tấm lớn, YOLO</td></tr>
+  <tr><td>Phân đoạn (segmentation)</td><td>Nhãn cho từng pixel (mặt nạ)</td><td>Tô từng pixel lỗi: đắt nhất</td><td>Cần diện tích, hình dạng chính xác của lỗi để so tiêu chí "vết ≥ 0,3 mm²"</td></tr>
+  <tr><td>Phát hiện bất thường trên ảnh</td><td>Điểm bất thường + bản đồ nhiệt</td><td>Chỉ cần ảnh OK</td><td>Lỗi hiếm, không đoán trước được hình dạng</td></tr>
+  <tr><td>OCR</td><td>Chuỗi ký tự</td><td>Văn bản đúng cho từng ảnh</td><td>Đọc số seri, hạn sử dụng</td></tr>
+</table>
+
+<h2>5. AI, Machine Learning và Deep Learning</h2>
+<ul>
+  <li><strong>AI</strong> (trí tuệ nhân tạo) là lĩnh vực rộng nhất: máy làm những việc cần "trí thông minh". Một hệ luật viết tay cũng có thể gọi là AI.</li>
+  <li><strong>Machine Learning</strong> là nhánh của AI học luật từ dữ liệu. Các thuật toán "cổ điển" (cây quyết định, random forest, gradient boosting, SVM, logistic) cần bạn cung cấp đặc trưng.</li>
+  <li><strong>Deep Learning</strong> là nhánh của ML dùng mạng nơ-ron nhiều lớp, tự học đặc trưng từ dữ liệu thô (pixel). Cần nhiều dữ liệu và tính toán hơn, nhưng vượt trội với ảnh có biến động lớn.</li>
+</ul>
+<p>Với dữ liệu dạng bảng (thông số máy, kết quả đo, đặc trưng blob), ML cổ điển thường vẫn là lựa chọn tốt nhất: nhanh, cần ít dữ liệu, dễ giải thích. Với ảnh thô, Deep Learning chiếm ưu thế. Trong một trạm thực tế, ba cách thường <strong>kết hợp</strong>: luật cổ điển định vị chi tiết và đo kích thước, mạng nơ-ron phân loại lỗi bề mặt trong ROI, luật nghiệp vụ tổng hợp kết quả gửi PLC. Bài "Rule-based hay Deep Learning?" ở chặng 11 đi sâu vào cách chọn.</p>
+
+<h2>6. Quy trình một dự án Machine Learning trong nhà máy</h2>
+<table>
+  <tr><th>Bước</th><th>Việc chính</th><th>Câu hỏi phải trả lời</th></tr>
+  <tr><td>1. Xác định bài toán</td><td>Chọn loại bài toán, định nghĩa lỗi bằng văn bản và ảnh mẫu, đặt chỉ tiêu</td><td>Lọt lỗi tối đa bao nhiêu? Loại nhầm tối đa bao nhiêu? Cycle time bao nhiêu ms? Luật cổ điển có làm được không?</td></tr>
+  <tr><td>2. Thu thập dữ liệu</td><td>Chụp trên chính trạm, đủ ca, đủ lô, đủ loại lỗi; ghi lại mã lô, ngày, ca cho từng ảnh</td><td>Dữ liệu có đại diện cho mọi biến động thật không? Có đủ ảnh NG mỗi loại không?</td></tr>
+  <tr><td>3. Gán nhãn</td><td>Viết quy chuẩn gán nhãn, cho 2 người gán độc lập một phần ảnh để đo độ nhất quán</td><td>Ảnh "lưng chừng" gán thế nào? Ai là người quyết định cuối?</td></tr>
+  <tr><td>4. Chia dữ liệu</td><td>Train / validation / test, chia theo lô hoặc theo ngày</td><td>Ảnh của cùng một chi tiết có nằm ở hai tập không?</td></tr>
+  <tr><td>5. Huấn luyện</td><td>Bắt đầu từ mô hình đơn giản (baseline), rồi mới thử mô hình lớn hơn</td><td>Mô hình phức tạp có thực sự tốt hơn baseline trên tập validation không?</td></tr>
+  <tr><td>6. Đánh giá, chọn ngưỡng</td><td>Ma trận nhầm lẫn, escape, overkill trên tập test chưa từng dùng; chọn ngưỡng theo chi phí</td><td>Đạt chỉ tiêu bước 1 chưa? Những ảnh sai có điểm chung gì?</td></tr>
+  <tr><td>7. Triển khai</td><td>Xuất mô hình (ONNX), tích hợp với trạm và PLC, đo cycle time, chạy song song với QC</td><td>Kết quả trên trạm có giống trên máy huấn luyện không?</td></tr>
+  <tr><td>8. Giám sát, cải tiến</td><td>Theo dõi tỉ lệ NG, phân bố điểm số, lưu ảnh khó; huấn luyện lại khi cần</td><td>Dữ liệu hôm nay có còn giống dữ liệu đã huấn luyện không?</td></tr>
+</table>
+<p>Trong thực tế, các bước 2–4 (dữ liệu) thường chiếm phần lớn thời gian dự án, và quy trình là một <strong>vòng lặp</strong>: kết quả bước 6 hay bước 8 thường đưa bạn quay lại bước 2 để thu thêm loại ảnh còn thiếu.</p>
+<p>Bước 8 hay bị bỏ qua nhất. Đoạn code sau cho thấy vì sao: dùng lại mô hình logistic ở mục 2, giả sử sau ba tháng người ta thay đèn mới sáng hơn, mọi vết đo được tương phản cao hơn khoảng 8 mức xám, trong khi tiêu chí NG của QC không đổi.</p>
+<pre><code class="language-python">X_moi, y_moi = tao_du_lieu(400)                  # lô mới, tiêu chí QC như cũ
+X_den_moi = X_moi.copy()
+X_den_moi[:, 1] += 8                             # đèn mới: tương phản đo được tăng 8 mức xám
+danh_gia("Trước khi thay đèn", logistic.predict(np.log1p(X_moi)), y_moi)
+danh_gia("Sau khi thay đèn", logistic.predict(np.log1p(X_den_moi)), y_moi)</code></pre>
+<pre><code class="language-text">Trước khi thay đèn           đúng  95.8% | lọt NG   8/98 | loại nhầm OK   9/302
+Sau khi thay đèn             đúng  87.2% | lọt NG   4/98 | loại nhầm OK  47/302</code></pre>
+<p>Mô hình không hề "hỏng", chương trình không báo lỗi gì, nhưng số chi tiết OK bị loại nhầm tăng từ 9 lên 47 (gấp 5 lần), vì mọi vết giờ "trông" rõ hơn với mô hình. Số NG lọt giảm nhẹ không phải tin tốt: ngưỡng hiệu dụng đã dịch chuyển mà không ai quyết định việc đó. Hiện tượng dữ liệu đầu vào thay đổi so với lúc huấn luyện gọi là <strong>data drift</strong> (trôi dữ liệu). Cách phòng: khóa cấu hình quang học, theo dõi tỉ lệ NG theo ca và phân bố đặc trưng/điểm số, và bất kỳ thay đổi nào ở camera, đèn, vật liệu đều phải kiểm tra lại mô hình trên bộ ảnh vàng.</p>
+
+<h2>7. Khi nào không nên dùng học máy</h2>
+<ul>
+  <li><strong>Luật rõ ràng và đo được</strong>: kích thước theo bản vẽ, có/không có linh kiện, đếm số lỗ. Viết luật vài dòng, dễ nghiệm thu hơn nhiều.</li>
+  <li><strong>Không có dữ liệu đại diện</strong>: chưa có dây chuyền, chưa có ảnh lỗi thật, không có người gán nhãn đáng tin.</li>
+  <li><strong>Khách hàng yêu cầu giải thích từng quyết định</strong> theo tiêu chuẩn đo lường, mà mô hình không đáp ứng được.</li>
+  <li><strong>Sai một lần là hậu quả nghiêm trọng</strong> và không có lớp kiểm soát thứ hai (kiểm tra lặp, QC lấy mẫu).</li>
+  <li><strong>Điều kiện chụp chưa ổn định</strong>: hãy sửa chiếu sáng và cơ khí trước. Học máy không thay thế được một hệ quang học tốt; nó chỉ làm tốt hơn khi đầu vào đã ổn định.</li>
+</ul>
+
+<h2>8. Sai lầm thường gặp</h2>
+<ul>
+  <li><strong>Dùng học máy cho việc luật làm được</strong>, rồi mất hàng tuần thu thập dữ liệu cho một phép đo kích thước.</li>
+  <li><strong>Đánh giá trên dữ liệu đã dùng để huấn luyện</strong>, báo cáo 99% rồi thất vọng trên dây chuyền.</li>
+  <li><strong>Chỉ nhìn độ chính xác (accuracy)</strong>. Với 2% NG, mô hình luôn trả lời "OK" đã đúng 98% mà không bắt được lỗi nào. Hãy báo cáo lọt NG và loại nhầm OK riêng.</li>
+  <li><strong>Nhãn không nhất quán</strong>: hai QC đánh giá khác nhau cùng một vết. Mô hình không thể tốt hơn chất lượng nhãn.</li>
+  <li><strong>Không lưu thông tin lô, ngày, ca</strong> cho từng ảnh, nên không chia dữ liệu đúng được và không truy được nguyên nhân khi mô hình kém.</li>
+  <li><strong>Coi triển khai là kết thúc</strong>, không giám sát data drift.</li>
+</ul>
+
+<h2>9. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Xác định loại bài toán (phân loại, hồi quy, phân cụm hay phát hiện bất thường) cho 5 yêu cầu sau: (a) dự đoán độ dày lớp sơn (µm) từ ảnh màu của tấm thép; (b) phân biệt viên thuốc OK, sứt mẻ, sai màu; (c) nhà máy có 50.000 ảnh bo mạch OK và gần như không có ảnh lỗi, muốn báo động khi có gì khác thường; (d) có 3.000 ảnh NG chưa phân loại, cần biết có những nhóm lỗi nào để viết quy chuẩn; (e) dự đoán máy ép sẽ hỏng trong 7 ngày tới hay không từ dữ liệu rung. Sau đó làm tương tự với 5 bài toán ở nhà máy bạn biết.</p>
+<details><summary>Xem đáp án</summary>
+<table>
+  <tr><th>Yêu cầu</th><th>Loại</th><th>Giải thích</th></tr>
+  <tr><td>(a) Độ dày sơn</td><td>Hồi quy</td><td>Đầu ra là một số thực (µm). Nhãn lấy từ máy đo độ dày chuẩn.</td></tr>
+  <tr><td>(b) Viên thuốc</td><td>Phân loại (3 lớp)</td><td>Có nhãn, đầu ra là một trong ba nhóm.</td></tr>
+  <tr><td>(c) Bo mạch</td><td>Phát hiện bất thường</td><td>Chỉ có dữ liệu OK; mô hình học "bình thường" và báo cái lạ.</td></tr>
+  <tr><td>(d) 3.000 ảnh NG</td><td>Phân cụm</td><td>Không có nhãn loại lỗi; gom nhóm để con người đặt tên.</td></tr>
+  <tr><td>(e) Máy ép</td><td>Phân loại (2 lớp: hỏng trong 7 ngày hay không)</td><td>Nếu đổi thành "còn bao nhiêu ngày đến khi hỏng" thì thành hồi quy. Cách đặt câu hỏi quyết định loại bài toán.</td></tr>
+</table>
+<p>Với 5 bài toán của bạn, hãy viết thêm cho mỗi bài: đặc trưng đầu vào là gì, nhãn lấy từ đâu và ai gán, và luật viết tay có làm được không. Nếu câu trả lời cuối là "có", hãy dùng luật.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Một tập test có 1.000 chi tiết, trong đó 20 NG. Mô hình A luôn trả lời OK. Mô hình B bắt được 18 NG và loại nhầm 30 OK. Tính accuracy, số lọt NG và số loại nhầm của mỗi mô hình. Mô hình nào tốt hơn cho một trạm mà lọt lỗi bị khách hàng phạt nặng?</p>
+<details><summary>Xem đáp án</summary>
+<p>A: đúng 980/1000 = <strong>98,0%</strong>, lọt 20/20 NG, loại nhầm 0. B: đúng (18 + 950)/1000 = <strong>96,8%</strong>, lọt 2/20 NG, loại nhầm 30/980 ≈ 3,1%. A có accuracy cao hơn nhưng vô dụng: nó không bắt được lỗi nào. B tốt hơn hẳn cho trạm này; 30 chi tiết loại nhầm có thể được QC kiểm lại. Bài học: luôn báo cáo lọt NG và loại nhầm OK riêng, không chỉ accuracy.</p>
+<pre><code class="language-python">import numpy as np
+
+y = np.array([1] * 20 + [0] * 980)
+a = np.zeros(1000, int)
+b = np.array([1] * 18 + [0] * 2 + [1] * 30 + [0] * 950)
+for ten, p in (("A", a), ("B", b)):
+    print(ten, f"đúng {np.mean(p == y):.1%}", "| lọt", int(((p == 0) &amp; (y == 1)).sum()),
+          "| loại nhầm", int(((p == 1) &amp; (y == 0)).sum()))</code></pre>
+<pre><code class="language-text">A đúng 98.0% | lọt 20 | loại nhầm 0
+B đúng 96.8% | lọt 2 | loại nhầm 30</code></pre>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Trong ví dụ mục 2, hãy thử cây quyết định với <code>max_depth=None</code> (không giới hạn). In độ chính xác trên tập train và tập test. Giải thích vì sao hai con số khác nhau.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">from sklearn.tree import DecisionTreeClassifier
+
+cay_sau = DecisionTreeClassifier(max_depth=None, random_state=0).fit(X_train, y_train)
+print("độ sâu:", cay_sau.get_depth(), "| số lá:", cay_sau.get_n_leaves())
+print(f"đúng trên train: {cay_sau.score(X_train, y_train):.1%}")
+print(f"đúng trên test : {cay_sau.score(X_test, y_test):.1%}")</code></pre>
+<pre><code class="language-text">độ sâu: 9 | số lá: 39
+đúng trên train: 100.0%
+đúng trên test : 91.5%</code></pre>
+<p>Cây không giới hạn chia đến khi mỗi lá chỉ còn mẫu một lớp, nên đúng 100% trên train, kể cả các mẫu bị gán nhãn nhầm: nó đã <strong>học thuộc</strong> nhiễu. Trên test, những nhánh học thuộc đó không giúp gì, thậm chí gây sai. Đây là hiện tượng <strong>overfitting</strong>; chính vì thế ta chỉ tin con số trên dữ liệu mô hình chưa thấy.</p>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Lập trình truyền thống: kỹ sư viết luật. Học máy: đưa dữ liệu và nhãn, thuật toán tự tìm luật (mô hình); khi chạy trên trạm, mô hình chỉ suy luận.</li>
+  <li>Dùng học máy khi luật khó viết ra (lỗi bề mặt đa dạng), dùng luật khi tiêu chí rõ ràng (kích thước, có/không).</li>
+  <li>Học có giám sát: phân loại (nhóm) và hồi quy (con số). Không giám sát: phân cụm và phát hiện bất thường (chỉ cần dữ liệu OK). Với ảnh: classification, detection, segmentation khác nhau ở dạng đầu ra và chi phí gán nhãn.</li>
+  <li>Thuật ngữ cốt lõi: mẫu, đặc trưng, nhãn, tham số, huấn luyện (<code>fit</code>), suy luận (<code>predict</code>), tổng quát hóa.</li>
+  <li>Dự án ML là vòng lặp: định nghĩa bài toán và chỉ tiêu, thu thập và gán nhãn, chia dữ liệu, huấn luyện từ baseline, đánh giá bằng escape/overkill, triển khai, giám sát data drift.</li>
+  <li>Luôn đánh giá trên dữ liệu chưa dùng để huấn luyện, và báo cáo lọt NG, loại nhầm OK thay vì chỉ accuracy.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Gradient descent từ đầu với NumPy</strong>, nơi bạn tự viết thuật toán giúp mô hình "học" từ dữ liệu.</p>

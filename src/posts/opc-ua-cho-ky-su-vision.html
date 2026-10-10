@@ -1,69 +1,316 @@
-<p><strong>OPC UA</strong> (Open Platform Communications Unified Architecture) đang trở thành "ngôn ngữ chung" để các thiết bị và phần mềm trong nhà máy trao đổi dữ liệu: PLC, robot, trạm vision, SCADA, MES. Bài này giải thích những khái niệm cơ bản và cách một trạm vision viết bằng Python giao tiếp qua OPC UA.</p>
+<p>Ở bài "Modbus TCP bằng Python với pymodbus", mọi dữ liệu là thanh ghi 16 bit đánh số: "HR 12–13 là đường kính, float32, ABCD" chỉ tồn tại trong một file Excel mà hai bên phải giữ khớp nhau. <strong>OPC UA</strong> (Open Platform Communications Unified Architecture, chuẩn IEC 62541) giải quyết đúng chỗ yếu đó: dữ liệu là các <strong>biến có tên, có kiểu, có cấu trúc</strong>, client có thể duyệt xem server có gì, đăng ký nhận thông báo khi giá trị đổi thay vì hỏi vòng, và kênh truyền có thể ký, mã hóa. Ngày nay nhiều PLC đời mới có sẵn OPC UA server (ví dụ S7-1500, Omron NJ/NX, Beckhoff TwinCAT; một số dòng cần bật tùy chọn, mua license runtime hoặc thêm module), SCADA và MES gần như đều nói được OPC UA. Bài này dạy bạn các khái niệm cốt lõi rồi chạy một server và client hoàn chỉnh bằng thư viện <code>asyncua</code> ngay trên máy. Bài tiếp theo, "TCP socket: gửi kết quả và tọa độ cho robot", quay về kênh đơn giản nhất cho những thiết bị không có OPC UA.</p>
 
-<h2>Vì sao OPC UA?</h2>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Giải thích được server, client, address space, node, NodeId, namespace; duyệt (browse) cây node, đọc và ghi biến đúng kiểu dữ liệu; đăng ký nhận thay đổi (subscription) và hiểu publishing/sampling interval; chạy một OPC UA server mô phỏng và client đọc Trigger, ghi Result; biết các chế độ bảo mật; so sánh có lý do với Modbus TCP.</div>
+
+<h2>1. Các khái niệm cốt lõi</h2>
+<table>
+  <tr><th>Khái niệm</th><th>Nghĩa</th><th>Ví dụ trong trạm vision</th></tr>
+  <tr><td><strong>Server</strong></td><td>Bên giữ dữ liệu, chờ kết nối (cổng mặc định 4840)</td><td>OPC UA server trong PLC; hoặc chính phần mềm vision làm server cho SCADA/MES đọc</td></tr>
+  <tr><td><strong>Client</strong></td><td>Bên kết nối tới server để duyệt, đọc, ghi, đăng ký</td><td>PC vision đọc Trigger từ PLC, ghi Result vào PLC</td></tr>
+  <tr><td><strong>Endpoint</strong></td><td>Địa chỉ + chính sách bảo mật để kết nối</td><td><code>opc.tcp://192.168.0.10:4840</code></td></tr>
+  <tr><td><strong>Address space</strong></td><td>Toàn bộ dữ liệu của server, tổ chức thành cây (chính xác là đồ thị) các node</td><td>Objects → Vision → Trigger, Result…</td></tr>
+  <tr><td><strong>Node</strong></td><td>Một phần tử: Object (thư mục, thiết bị), Variable (có giá trị), Method (hàm gọi được)…</td><td>Object "Vision", Variable "DiameterMM"</td></tr>
+  <tr><td><strong>NodeId</strong></td><td>Định danh duy nhất của node: namespace index + định danh (số, chuỗi, GUID hoặc byte)</td><td><code>ns=2;s=Vision.Result</code>, <code>i=2253</code> (node Server chuẩn, ns=0 bỏ qua được)</td></tr>
+  <tr><td><strong>Namespace</strong></td><td>Không gian tên; ns=0 là của chuẩn OPC UA, các ns khác do server đăng ký bằng URI</td><td><code>urn:hocfree:tram-vision</code> → ns=2</td></tr>
+  <tr><td><strong>BrowseName / DisplayName</strong></td><td>Tên dùng khi duyệt / tên hiển thị cho người</td><td><code>2:DiameterMM</code></td></tr>
+  <tr><td><strong>DataType</strong></td><td>Kiểu của giá trị biến: Boolean, Int16, UInt32, Float, Double, String, kiểu cấu trúc…</td><td>Result là Int16, DiameterMM là Double</td></tr>
+</table>
+<p>Hai chi tiết thực tế: (1) <strong>chỉ số namespace có thể thay đổi</strong> giữa các lần khởi động hoặc giữa các phiên bản firmware, còn URI của namespace thì không; client chuyên nghiệp tra chỉ số từ URI (<code>get_namespace_index</code>) thay vì viết cứng <code>ns=3</code>. (2) Kiểu định danh do server quyết định: PLC Siemens dùng NodeId chuỗi kiểu <code>ns=3;s="DB_Vision"."Result"</code> (có dấu nháy kép), nhiều server khác dùng số. Đừng đoán: duyệt cây bằng một công cụ client OPC UA (có nhiều công cụ miễn phí) hoặc bằng code ở mục 3 để lấy NodeId chính xác.</p>
+
+<h2>2. Cài đặt asyncua</h2>
+<p><code>asyncua</code> là thư viện OPC UA mã nguồn mở cho Python (dự án FreeOpcUa/opcua-asyncio), có cả client lẫn server, viết theo kiểu <code>asyncio</code> (mọi lệnh mạng là <code>await</code>). Bài này kiểm tra với <strong>asyncua 2.1.0</strong> trên Python 3.13.</p>
+<pre><code class="language-bash">pip install asyncua
+python -c "import importlib.metadata as m; print(m.version('asyncua'))"</code></pre>
+<p>Thư viện cũ tên <code>opcua</code> (đồng bộ, không async) đã ngừng phát triển; đừng trộn hai thư viện. Nếu cần gọi từ code đồng bộ, <code>asyncua</code> có lớp bọc <code>asyncua.sync</code>, nhưng trong bài ta dùng thẳng <code>asyncio</code>. Thư viện ghi khá nhiều cảnh báo qua <code>logging</code>; các ví dụ hạ mức log xuống ERROR cho gọn.</p>
+
+<h2>3. Server mô phỏng, duyệt cây, đọc và ghi</h2>
+<p>Ngoài đời, OPC UA server thường nằm trong PLC. Để học, ta tự dựng một server trên <code>127.0.0.1</code> với một object <code>Vision</code> và năm biến, rồi cho client kết nối vào. Hàm <code>tao_server</code> được dùng lại ở các ví dụ sau.</p>
+<pre><code class="language-python">import asyncio
+import logging
+from asyncua import Server, Client, ua
+
+logging.getLogger("asyncua").setLevel(logging.ERROR)        # bớt cảnh báo của thư viện
+NS_URI = "urn:hocfree:tram-vision"
+
+
+async def tao_server(port):
+    """OPC UA server mô phỏng 'PLC': object Vision với 5 biến, không bảo mật, chỉ nghe trên 127.0.0.1."""
+    server = Server()
+    await server.init()
+    server.set_endpoint(f"opc.tcp://127.0.0.1:{port}/vision/")
+    server.set_security_policy([ua.SecurityPolicyType.NoSecurity])
+    ns = await server.register_namespace(NS_URI)
+    tram = await server.nodes.objects.add_object(ua.NodeId("Vision", ns), f"{ns}:Vision")
+    bien = {}
+    for ten, gia_tri, kieu in [("Trigger", False, ua.VariantType.Boolean),     # PLC ghi
+                               ("CycleNo", 0, ua.VariantType.UInt32),          # PLC ghi
+                               ("Result", 0, ua.VariantType.Int16),            # vision ghi: 1 OK, 2 NG
+                               ("DiameterMM", 0.0, ua.VariantType.Double),     # vision ghi
+                               ("CycleEcho", 0, ua.VariantType.UInt32)]:       # vision ghi SAU CÙNG
+        nut = await tram.add_variable(ua.NodeId(f"Vision.{ten}", ns), f"{ns}:{ten}", ua.Variant(gia_tri, kieu))
+        await nut.set_writable()                                 # cho phép client ghi
+        bien[ten] = nut
+    return server, ns, bien
+
+
+async def demo_doc_ghi():
+    server, ns, bien = await tao_server(4841)
+    async with server:                                            # start() ... stop()
+        async with Client(url="opc.tcp://127.0.0.1:4841/vision/", timeout=2) as client:
+            idx = await client.get_namespace_index(NS_URI)        # tra ns từ URI, không viết cứng
+            print("Namespace", NS_URI, "→ ns =", idx)
+
+            print("Duyệt Objects:")
+            for nut in await client.nodes.objects.get_children():
+                print("  ", nut.nodeid.to_string(), (await nut.read_browse_name()).to_string())
+
+            tram = await client.nodes.objects.get_child(f"{idx}:Vision")
+            print("Biến trong Vision:")
+            for nut in await tram.get_children():
+                ten = (await nut.read_browse_name()).Name
+                kieu = await nut.read_data_type_as_variant_type()
+                print(f"   {nut.nodeid.to_string():&lt;24} {ten:&lt;11} {kieu.name:&lt;8} = {await nut.read_value()}")
+
+            trigger = client.get_node(f"ns={idx};s=Vision.Trigger")
+            result = client.get_node(f"ns={idx};s=Vision.Result")
+            print("Đọc Trigger:", await trigger.read_value())
+
+            await result.write_value(ua.Variant(1, ua.VariantType.Int16))      # đúng kiểu Int16
+            print("Ghi Result = 1 (Int16) → server thấy:", await bien["Result"].read_value())
+            for gia_tri in (2, 2.0):                                            # int Python = Int64, float = Double
+                try:
+                    await result.write_value(gia_tri)
+                except ua.UaStatusCodeError as e:
+                    print(f"Ghi Result = {gia_tri!r} → bị từ chối: {type(e).__name__}")
+
+
+asyncio.run(demo_doc_ghi())</code></pre>
+<pre><code class="language-text">Namespace urn:hocfree:tram-vision → ns = 2
+Duyệt Objects:
+   i=31915 0:Locations
+   i=2253 0:Server
+   i=23470 0:Aliases
+   ns=2;s=Vision 2:Vision
+Biến trong Vision:
+   ns=2;s=Vision.Trigger    Trigger     Boolean  = False
+   ns=2;s=Vision.CycleNo    CycleNo     UInt32   = 0
+   ns=2;s=Vision.Result     Result      Int16    = 0
+   ns=2;s=Vision.DiameterMM DiameterMM  Double   = 0.0
+   ns=2;s=Vision.CycleEcho  CycleEcho   UInt32   = 0
+Đọc Trigger: False
+Ghi Result = 1 (Int16) → server thấy: 1
+Ghi Result = 2 → bị từ chối: BadTypeMismatch
+Ghi Result = 2.0 → bị từ chối: BadTypeMismatch</code></pre>
+<p>Đọc kết quả từng phần:</p>
 <ul>
-  <li><strong>Chuẩn mở, độc lập hãng</strong>: PLC của nhiều hãng lớn có sẵn OPC UA server tích hợp.</li>
-  <li><strong>Mô hình dữ liệu có cấu trúc</strong>: không chỉ là các thanh ghi số như Modbus, mà là cây đối tượng có tên, kiểu dữ liệu, đơn vị, mô tả.</li>
-  <li><strong>Bảo mật tích hợp</strong>: mã hóa, chứng chỉ, xác thực người dùng.</li>
-  <li><strong>Đăng ký nhận thay đổi</strong> (subscription): client được thông báo khi giá trị thay đổi, không cần hỏi liên tục.</li>
+  <li>Namespace của ta được cấp chỉ số 2 (0 là của chuẩn, 1 là của chính server). Dưới <code>Objects</code> ngoài object <code>Vision</code> của ta còn có các node chuẩn như <code>Server</code> (<code>i=2253</code>), nơi chứa trạng thái, thời gian, khả năng của server; danh sách node chuẩn có thể khác đôi chút giữa các phiên bản thư viện.</li>
+  <li>Mỗi biến có NodeId dạng chuỗi, BrowseName, kiểu dữ liệu và giá trị: client <em>tự khám phá</em> được tất cả mà không cần file Excel nào.</li>
+  <li><strong>Kiểu dữ liệu phải khớp chính xác.</strong> Số nguyên Python được gửi mặc định là Int64, số thực là Double; biến Int16 từ chối cả hai bằng mã lỗi <code>BadTypeMismatch</code>. Luôn bọc giá trị trong <code>ua.Variant(giá_trị, ua.VariantType.Int16)</code>, hoặc đọc kiểu của biến một lần lúc khởi động (<code>read_data_type_as_variant_type</code>) rồi dùng lại. Đây là lỗi số một khi ghi vào biến của PLC: INT của Siemens là Int16, DINT là Int32, REAL là Float (32 bit), LREAL là Double.</li>
 </ul>
+<div class="warn"><strong>Mã trạng thái (StatusCode) đi kèm mọi giá trị</strong>Mỗi lần đọc trả về một DataValue gồm giá trị, <em>StatusCode</em> (Good, Uncertain, Bad…) và các mốc thời gian. Giá trị đi kèm StatusCode xấu (ví dụ PLC mất kết nối với cảm biến) không được dùng để ra quyết định OK/NG. <code>read_value()</code> chỉ trả giá trị; khi cần cả trạng thái, dùng <code>read_data_value()</code>.</div>
 
-<h2>Các khái niệm chính</h2>
-<ul>
-  <li><strong>Server</strong>: thiết bị cung cấp dữ liệu (PLC, trạm vision). <strong>Client</strong>: bên đọc/ghi dữ liệu.</li>
-  <li><strong>Address space</strong>: cây các <strong>node</strong> (đối tượng, biến, phương thức).</li>
-  <li><strong>NodeId</strong>: định danh của node, ví dụ <code>ns=2;s=Vision.Result</code> (namespace 2, định danh dạng chuỗi).</li>
-  <li><strong>Endpoint</strong>: địa chỉ kết nối dạng <code>opc.tcp://192.168.0.10:4840</code>.</li>
-</ul>
-
-<h2>Client Python với asyncua</h2>
-<pre><code>pip install asyncua</code></pre>
-<pre><code>import asyncio
+<h2>4. Subscription: nhận thông báo thay vì hỏi vòng</h2>
+<p>Với Modbus, client phải hỏi "Trigger đã bật chưa?" mỗi vài chục ms. OPC UA có <strong>subscription</strong>: client tạo một subscription, gắn vào đó các <strong>monitored item</strong> (biến cần theo dõi); server tự lấy mẫu biến và gửi thông báo khi giá trị đổi. Hai thông số quyết định độ trễ:</p>
+<table>
+  <tr><th>Thông số</th><th>Ý nghĩa</th><th>Giá trị gợi ý cho trạm vision</th></tr>
+  <tr><td><strong>Sampling interval</strong> (theo từng monitored item)</td><td>Server kiểm tra giá trị biến bao lâu một lần</td><td>10–50 ms cho Trigger; 0 = nhanh nhất server cho phép</td></tr>
+  <tr><td><strong>Publishing interval</strong> (theo subscription)</td><td>Server gom các thay đổi và gửi cho client bao lâu một lần</td><td>20–100 ms; server có thể sửa lại theo giới hạn của nó</td></tr>
+  <tr><td>Queue size, deadband</td><td>Giữ bao nhiêu thay đổi giữa hai lần gửi; bỏ qua thay đổi nhỏ (cho số đo nhiễu)</td><td>Queue &gt; 1 nếu không được bỏ sót sườn ngắn</td></tr>
+</table>
+<p>Hệ quả quan trọng: độ trễ từ lúc PLC bật Trigger đến lúc vision biết có thể tới cỡ sampling + publishing interval, cộng thời gian PLC cập nhật biến vào server OPC UA (nhiều PLC chỉ làm việc đó trong thời gian rảnh của chu kỳ quét). Tức là hàng chục ms và <strong>không tất định</strong>. Một xung Trigger ngắn hơn sampling interval có thể bị bỏ sót hoàn toàn. Vì vậy trong trạm cần chụp đúng vị trí, trigger chụp vẫn đi bằng dây I/O vào camera; OPC UA chở dữ liệu ngữ cảnh (số chu kỳ, công thức) và kết quả.</p>
+<p>Ví dụ dưới là bài thực hành của bài học: server đóng vai PLC, chạy ba chu kỳ: đặt <code>CycleNo</code>, bật <code>Trigger</code>, chờ đến khi <code>CycleEcho</code> bằng số chu kỳ thì đọc kết quả, tắt Trigger. Phía vision là client: đăng ký nhận thay đổi của <code>Trigger</code>, khi thấy <strong>sườn lên</strong> thì đọc <code>CycleNo</code>, "chụp và đo" đường kính trên một ảnh tổng hợp, ghi <code>DiameterMM</code>, <code>Result</code> và cuối cùng <code>CycleEcho</code>. Cách dùng CycleEcho làm tín hiệu "đã xong" giống hệt quy tắc ở bài I/O số và bài Modbus: dữ liệu ghi trước, tín hiệu hoàn thành ghi sau cùng.</p>
+<pre><code class="language-python">import asyncio
+import cv2
+import numpy as np
 from asyncua import Client, ua
 
-URL = "opc.tcp://192.168.0.10:4840"
+MM_PER_PX = 0.05
+DUNG_SAI = (9.90, 10.10)                     # đường kính hợp lệ, mm
 
-async def main():
-    async with Client(url=URL) as client:
-        trigger = client.get_node("ns=2;s=Line2.Vision.Trigger")
-        result = client.get_node("ns=2;s=Line2.Vision.Result")
-        length = client.get_node("ns=2;s=Line2.Vision.LengthMM")
 
-        if await trigger.read_value():
-            ok, L = True, 25.012                       # thay bằng kết quả xử lý ảnh
-            await result.write_value(ua.Variant(1 if ok else 2, ua.VariantType.Int16))
-            await length.write_value(ua.Variant(L, ua.VariantType.Double))
+def chup_va_do(ban_kinh_px):
+    """'Chụp' ảnh tổng hợp một trục tròn và đo đường kính từ diện tích (số pixel trắng)."""
+    anh = np.zeros((260, 260), np.uint8)
+    cv2.circle(anh, (130, 130), ban_kinh_px, 255, -1)
+    dien_tich = np.count_nonzero(anh)
+    return 2 * np.sqrt(dien_tich / np.pi) * MM_PER_PX
 
-asyncio.run(main())</code></pre>
-<p>Kiểu dữ liệu khi ghi phải khớp kiểu của biến trên server (Int16, Double...), nếu không server sẽ từ chối. NodeId thực tế lấy từ cấu hình PLC hoặc duyệt cây bằng công cụ client OPC UA miễn phí.</p>
 
-<h2>Đăng ký nhận thay đổi thay vì hỏi liên tục</h2>
-<pre><code>class Handler:
-    async def datachange_notification(self, node, val, data):
-        if val:
-            print("Có trigger, bắt đầu chụp")
+class BatThayDoi:
+    """Handler của subscription: asyncua gọi datachange_notification mỗi khi biến đổi giá trị."""
 
-async def watch():
-    async with Client(url=URL) as client:
-        trigger = client.get_node("ns=2;s=Line2.Vision.Trigger")
-        sub = await client.create_subscription(50, Handler())   # chu kỳ 50 ms
-        await sub.subscribe_data_change(trigger)
-        await asyncio.sleep(3600)</code></pre>
+    def __init__(self):
+        self.hang_doi = asyncio.Queue()
 
-<h2>OPC UA so với Modbus TCP</h2>
+    def datachange_notification(self, node, val, data):
+        self.hang_doi.put_nowait(val)        # chỉ đẩy vào hàng đợi, xử lý ở vòng lặp chính
+
+
+async def vision_client(url, so_chu_ky, ban_kinh_theo_chu_ky):
+    async with Client(url=url, timeout=2) as client:
+        idx = await client.get_namespace_index(NS_URI)
+        nut = {ten: client.get_node(f"ns={idx};s=Vision.{ten}")
+               for ten in ("Trigger", "CycleNo", "Result", "DiameterMM", "CycleEcho")}
+        bat = BatThayDoi()
+        sub = await client.create_subscription(20, bat)                 # publishing interval 20 ms
+        await sub.subscribe_data_change(nut["Trigger"], sampling_interval=10)
+        print("vision: thông báo đầu tiên (giá trị hiện tại) Trigger =", await bat.hang_doi.get())
+        truoc, da_xu_ly = False, 0
+        while da_xu_ly &lt; so_chu_ky:
+            trigger = await asyncio.wait_for(bat.hang_doi.get(), timeout=3)
+            if trigger and not truoc:                                    # sườn lên
+                chu_ky = await nut["CycleNo"].read_value()
+                d = chup_va_do(ban_kinh_theo_chu_ky[chu_ky])
+                ok = DUNG_SAI[0] &lt;= d &lt;= DUNG_SAI[1]
+                await nut["DiameterMM"].write_value(ua.Variant(round(d, 3), ua.VariantType.Double))
+                await nut["Result"].write_value(ua.Variant(1 if ok else 2, ua.VariantType.Int16))
+                await nut["CycleEcho"].write_value(ua.Variant(chu_ky, ua.VariantType.UInt32))   # SAU CÙNG
+                print(f"vision: chu kỳ {chu_ky}: D = {d:.3f} mm → {'OK' if ok else 'NG'}")
+                da_xu_ly += 1
+            truoc = trigger
+        await sub.delete()
+
+
+async def plc_gia(bien, so_chu_ky):
+    """Logic 'PLC' chạy phía server: ghi thẳng vào node của server."""
+    await asyncio.sleep(0.3)                                             # chờ vision kết nối
+    for chu_ky in range(1, so_chu_ky + 1):
+        await bien["CycleNo"].write_value(ua.Variant(chu_ky, ua.VariantType.UInt32))
+        await bien["Trigger"].write_value(True)
+        for _ in range(200):                                             # chờ tối đa 2 s
+            if await bien["CycleEcho"].read_value() == chu_ky:
+                break
+            await asyncio.sleep(0.01)
+        else:
+            print(f"PLC: chu kỳ {chu_ky} quá thời gian → xử lý như NG, báo lỗi")
+        kq = await bien["Result"].read_value()
+        d = await bien["DiameterMM"].read_value()
+        print(f"PLC: chu kỳ {chu_ky}: Result = {kq} ({'OK' if kq == 1 else 'NG'}), D = {d} mm")
+        await bien["Trigger"].write_value(False)
+        await asyncio.sleep(0.1)
+
+
+async def demo_subscription():
+    server, ns, bien = await tao_server(4842)
+    async with server:
+        await asyncio.wait_for(asyncio.gather(
+            vision_client("opc.tcp://127.0.0.1:4842/vision/", 3, {1: 100, 2: 104, 3: 101}),
+            plc_gia(bien, 3)), timeout=15)
+    print("Đã dừng server.")
+
+
+asyncio.run(demo_subscription())</code></pre>
+<pre><code class="language-text">vision: thông báo đầu tiên (giá trị hiện tại) Trigger = False
+vision: chu kỳ 1: D = 10.000 mm → OK
+PLC: chu kỳ 1: Result = 1 (OK), D = 10.0 mm
+vision: chu kỳ 2: D = 10.395 mm → NG
+PLC: chu kỳ 2: Result = 2 (NG), D = 10.395 mm
+vision: chu kỳ 3: D = 10.095 mm → OK
+PLC: chu kỳ 3: Result = 1 (OK), D = 10.095 mm
+Đã dừng server.</code></pre>
+<p>Bốn điểm cần để ý:</p>
+<ul>
+  <li><strong>Thông báo đầu tiên</strong> luôn là giá trị hiện tại ngay khi đăng ký (ở đây Trigger = False). Code bắt sườn phải tính đến nó, nếu không lúc vision khởi động giữa chừng khi Trigger đang bật, nó sẽ chụp nhầm một sản phẩm cũ hoặc bỏ sót.</li>
+  <li><strong>Handler chỉ đẩy vào hàng đợi.</strong> <code>datachange_notification</code> được thư viện gọi từ task xử lý thông báo; làm việc nặng (chụp, xử lý ảnh) ngay trong đó sẽ làm chậm mọi thông báo khác. Đẩy vào <code>asyncio.Queue</code> rồi xử lý ở vòng lặp chính là mẫu chuẩn. (asyncua 2.x còn có chế độ lặp <code>async for</code> trên subscription khi không truyền handler.)</li>
+  <li><strong>Thứ tự ghi:</strong> DiameterMM và Result trước, CycleEcho sau cùng; PLC chỉ đọc kết quả khi CycleEcho khớp số chu kỳ nó đã gửi. Mỗi lệnh ghi riêng lẻ là một yêu cầu riêng, nên nếu đảo thứ tự, PLC có thể thấy CycleEcho mới đi kèm Result cũ. (Có thể gộp nhiều giá trị vào một lệnh <code>write_values</code>, nhưng chuẩn không bảo đảm server áp dụng chúng một cách nguyên tử, nên vẫn giữ quy ước "echo sau cùng".)</li>
+  <li>Mọi thao tác đều có thời hạn: <code>timeout=2</code> cho từng yêu cầu của client, <code>wait_for</code> khi chờ thông báo, vòng chờ 2 s phía PLC, và <code>timeout=15</code> cho toàn bộ demo để script luôn tự kết thúc.</li>
+</ul>
+<p>Trong dự án thật, phía vision chỉ cần phần <code>vision_client</code>: thay URL bằng endpoint của PLC, thay tên biến bằng NodeId lấy được khi duyệt cây, và bật <code>Client(url, auto_reconnect=True)</code> hoặc tự viết vòng kết nối lại (asyncua 2.x có tùy chọn tự kết nối lại và tạo lại subscription).</p>
+
+<h2>5. Bảo mật: ba chế độ và chứng chỉ</h2>
+<p>OPC UA được thiết kế có bảo mật từ đầu, ở hai tầng:</p>
 <table>
-  <tr><th></th><th>Modbus TCP</th><th>OPC UA</th></tr>
-  <tr><td>Độ phức tạp</td><td>Rất đơn giản</td><td>Phức tạp hơn</td></tr>
-  <tr><td>Dữ liệu</td><td>Thanh ghi 16 bit, phải tự quy ước</td><td>Biến có tên, kiểu, cấu trúc</td></tr>
-  <tr><td>Bảo mật</td><td>Gần như không có</td><td>Tích hợp sẵn</td></tr>
-  <tr><td>Tích hợp lên MES/IT</td><td>Hạn chế</td><td>Rất phù hợp</td></tr>
-  <tr><td>Độ trễ thời gian thực cứng</td><td>Phụ thuộc mạng</td><td>Phụ thuộc mạng; tín hiệu yêu cầu tức thời vẫn nên dùng I/O số</td></tr>
+  <tr><th>Tầng</th><th>Lựa chọn</th><th>Ghi chú</th></tr>
+  <tr><td><strong>Kênh truyền</strong>: Message Security Mode</td><td><code>None</code>: không ký, không mã hóa<br><code>Sign</code>: ký (chống sửa gói), không mã hóa<br><code>SignAndEncrypt</code>: ký và mã hóa</td><td>Đi kèm một <em>security policy</em> chọn thuật toán: hiện nên dùng <code>Basic256Sha256</code>, <code>Aes128_Sha256_RsaOaep</code> hoặc <code>Aes256_Sha256_RsaPss</code>; <code>Basic128Rsa15</code> và <code>Basic256</code> đã bị coi là lỗi thời</td></tr>
+  <tr><td><strong>Ứng dụng</strong>: chứng chỉ X.509</td><td>Mỗi client và server có <em>application instance certificate</em> riêng</td><td>Server chỉ chấp nhận client có chứng chỉ trong danh sách tin cậy (trust list); lần đầu kết nối, chứng chỉ client thường rơi vào thư mục "rejected" và quản trị viên phải chuyển sang "trusted"</td></tr>
+  <tr><td><strong>Người dùng</strong>: user identity token</td><td>Anonymous, Username/Password, chứng chỉ người dùng</td><td>Cho phép phân quyền: tài khoản vision chỉ được ghi nhóm biến Vision</td></tr>
+</table>
+<p>Ví dụ trong bài dùng <code>NoSecurity</code> vì chạy trên 127.0.0.1. Với PLC thật, cấu hình phổ biến là <code>Basic256Sha256</code> + <code>SignAndEncrypt</code> + tài khoản người dùng. Trong asyncua, phía client đặt bằng một dòng trước khi kết nối, ví dụ <code>await client.set_security_string("Basic256Sha256,SignAndEncrypt,cert.der,key.pem")</code> cùng <code>client.set_user(...)</code>, <code>client.set_password(...)</code>; chứng chỉ có thể tạo bằng OpenSSL hoặc công cụ đi kèm thư viện. Khi kết nối bị từ chối với lỗi về chứng chỉ, hãy kiểm tra theo thứ tự: chứng chỉ client đã được tin cậy trên server chưa, đồng hồ hai máy có lệch nhiều không (chứng chỉ có thời hạn hiệu lực), application URI trong chứng chỉ có khớp không.</p>
+<div class="warn"><strong>Đừng để None trên mạng sản xuất</strong>Endpoint <code>None</code> rất tiện khi chạy thử, nhưng cho phép bất kỳ máy nào trong mạng đọc và <em>ghi</em> vào PLC. Thống nhất với bộ phận IT/OT của nhà máy: chế độ bảo mật, ai cấp chứng chỉ, tài khoản nào được ghi biến nào.</div>
+
+<h2>6. OPC UA hay Modbus TCP?</h2>
+<table>
+  <tr><th></th><th>Modbus TCP</th><th>OPC UA (client/server)</th></tr>
+  <tr><td>Mô hình dữ liệu</td><td>Bit và thanh ghi 16 bit đánh số; kiểu, đơn vị, thứ tự byte do hai bên tự quy ước</td><td>Node có tên, kiểu, đơn vị, mô tả, cấu trúc; client tự duyệt được</td></tr>
+  <tr><td>Phát hiện thay đổi</td><td>Client hỏi vòng</td><td>Subscription: server gửi khi đổi</td></tr>
+  <tr><td>Chất lượng dữ liệu</td><td>Không có</td><td>StatusCode và mốc thời gian theo từng giá trị</td></tr>
+  <tr><td>Bảo mật</td><td>Không có trong chuẩn gốc</td><td>Ký, mã hóa, chứng chỉ, tài khoản</td></tr>
+  <tr><td>Độ phức tạp</td><td>Rất thấp, gỡ lỗi bằng mắt thường</td><td>Cao hơn: chứng chỉ, namespace, async</td></tr>
+  <tr><td>Hỗ trợ trên PLC</td><td>Gần như mọi PLC, kể cả đời cũ, giá rẻ</td><td>Chủ yếu PLC đời mới; có dòng cần license hoặc module</td></tr>
+  <tr><td>Thời gian</td><td>Do chu kỳ hỏi vòng, vài đến vài chục ms</td><td>Sampling + publishing, thường hàng chục ms; không tất định</td></tr>
+  <tr><td>Tích hợp lên SCADA/MES</td><td>Hạn chế</td><td>Rất phù hợp; có companion specification cho nhiều ngành, kể cả <em>OPC UA for Machine Vision</em> (OPC 40100)</td></tr>
+</table>
+<p>Lời khuyên thực tế: trạm đơn lẻ với PLC đời cũ hoặc giá rẻ, ít dữ liệu → Modbus TCP. PLC có OPC UA server sẵn, cần nhiều biến có cấu trúc, dữ liệu còn đi lên SCADA/MES, hoặc nhà máy có yêu cầu bảo mật → OPC UA. Cả hai trường hợp: trigger chụp cần chính xác thời gian vẫn đi bằng dây I/O.</p>
+
+<h2>7. Lỗi thường gặp</h2>
+<table>
+  <tr><th>Hiện tượng</th><th>Nguyên nhân</th><th>Cách xử lý</th></tr>
+  <tr><td><code>BadTypeMismatch</code> khi ghi</td><td>Gửi int Python (Int64) vào biến Int16, Double vào Float</td><td><code>ua.Variant(v, ua.VariantType.…)</code> đúng kiểu của biến</td></tr>
+  <tr><td><code>BadNodeIdUnknown</code></td><td>Sai NodeId: sai ns, thiếu dấu nháy trong NodeId kiểu Siemens, biến chưa được bật truy cập OPC UA trong PLC</td><td>Duyệt cây để lấy NodeId thật; tra ns từ URI</td></tr>
+  <tr><td><code>BadUserAccessDenied</code> / <code>BadNotWritable</code></td><td>Biến chỉ đọc hoặc tài khoản không có quyền ghi</td><td>Nhờ kỹ sư PLC cấp quyền ghi cho đúng nhóm biến</td></tr>
+  <tr><td>Bỏ sót trigger</td><td>Xung ngắn hơn sampling interval; queue size 1</td><td>Dùng mức (giữ Trigger đến khi có echo) thay vì xung; trigger chụp bằng dây I/O</td></tr>
+  <tr><td>Thông báo đến chậm dần, chương trình ì</td><td>Xử lý ảnh ngay trong <code>datachange_notification</code></td><td>Handler chỉ đẩy vào hàng đợi</td></tr>
+  <tr><td>Kết nối bị từ chối sau khi bật bảo mật</td><td>Chứng chỉ chưa được tin cậy, lệch giờ, sai application URI</td><td>Chuyển chứng chỉ sang trusted, đồng bộ giờ (NTP), kiểm tra URI</td></tr>
 </table>
 
-<h2>Lời khuyên</h2>
+<h2>8. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Viết hàm <code>in_cay(node, sau)</code> duyệt đệ quy và in cây node bắt đầu từ object <code>Vision</code> của server mô phỏng, mỗi dòng gồm BrowseName, NodeClass và (với biến) kiểu dữ liệu. Chạy trên cổng 4843.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import asyncio
+from asyncua import Client, ua
+
+
+async def in_cay(node, sau=0, toi_da=3):
+    ten = (await node.read_browse_name()).to_string()
+    lop = await node.read_node_class()
+    dong = f"{'  ' * sau}{ten} [{lop.name}]"
+    if lop == ua.NodeClass.Variable:
+        dong += f" {(await node.read_data_type_as_variant_type()).name}"
+    print(dong)
+    if sau &lt; toi_da:
+        for con in await node.get_children():
+            await in_cay(con, sau + 1, toi_da)
+
+
+async def bai_1():
+    server, ns, bien = await tao_server(4843)
+    async with server:
+        async with Client(url="opc.tcp://127.0.0.1:4843/vision/", timeout=2) as client:
+            idx = await client.get_namespace_index(NS_URI)
+            await in_cay(client.get_node(f"ns={idx};s=Vision"))
+
+
+asyncio.run(bai_1())</code></pre>
+<pre><code class="language-text">2:Vision [Object]
+  2:Trigger [Variable] Boolean
+  2:CycleNo [Variable] UInt32
+  2:Result [Variable] Int16
+  2:DiameterMM [Variable] Double
+  2:CycleEcho [Variable] UInt32</code></pre>
+<p>Hàm dùng lại <code>tao_server</code> và <code>NS_URI</code> ở mục 3. Đặt giới hạn độ sâu <code>toi_da</code> khi duyệt server thật: cây của PLC có thể có hàng nghìn node, và duyệt từ gốc <code>Objects</code> không giới hạn sẽ rất lâu.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Biến đường kính trong PLC Siemens khai báo kiểu <code>REAL</code>. Đoạn code <code>await nut.write_value(ua.Variant(10.004, ua.VariantType.Double))</code> báo lỗi. Vì sao, sửa thế nào? Khi đọc lại, giá trị có đúng bằng 10.004 không?</p>
+<details><summary>Xem đáp án</summary>
+<p>REAL của Siemens là số thực 32 bit, tương ứng <code>ua.VariantType.Float</code>; Double là 64 bit nên server trả <code>BadTypeMismatch</code>. Sửa: <code>ua.Variant(10.004, ua.VariantType.Float)</code>. Đọc lại sẽ được giá trị float32 gần nhất, in ra kiểu <code>10.003999710083008</code>: không phải lỗi, mà là giới hạn của float32 (khoảng 7 chữ số có nghĩa). Khi so sánh hay ghi log, làm tròn theo độ phân giải đo (ví dụ 3 chữ số thập phân), và nếu cần chính xác tuyệt đối thì dùng LREAL (Double) hoặc số nguyên µm.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Đội IT muốn MES đọc kết quả trực tiếp từ trạm vision thay vì qua PLC. Đề xuất kiến trúc: ai là server, ai là client, đặt bảo mật thế nào, và làm sao để MES không bỏ sót kết quả nào khi dây chuyền chạy 2 sản phẩm/giây?</p>
+<details><summary>Xem đáp án</summary>
+<p>Phần mềm vision chạy thêm một OPC UA server (asyncua làm được, như mục 3) với object chứa kết quả lần kiểm tra gần nhất (số seri, CycleNo, Result, các số đo, đường dẫn ảnh); MES là client đăng ký subscription. Bảo mật: endpoint <code>SignAndEncrypt</code> với <code>Basic256Sha256</code>, tắt endpoint None, chứng chỉ của MES trong trust list, tài khoản MES chỉ đọc. Để không bỏ sót: subscription gửi theo publishing interval, nếu trong một chu kỳ có hai kết quả mà queue size = 1 thì chỉ còn kết quả cuối, nên đặt queue size lớn hơn (ví dụ 10) cho monitored item, đưa số thứ tự vào dữ liệu để MES phát hiện lỗ hổng, và quan trọng nhất là có cơ chế lưu đệm và gửi lại phía vision (bài "MES và truy xuất nguồn gốc"): subscription là kênh thông báo, không phải kho lưu trữ, kết nối rớt là mất các thay đổi trong lúc rớt.</p>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
 <ul>
-  <li>Tín hiệu trigger yêu cầu tức thời, chính xác mili giây: vẫn dùng <strong>I/O số</strong>. OPC UA dùng cho dữ liệu kết quả, thông số, trạng thái.</li>
-  <li>Bật bảo mật (chế độ ký và mã hóa) trong môi trường sản xuất thật, không để chế độ không bảo mật.</li>
-  <li>Thử nghiệm với OPC UA server giả lập trước khi kết nối PLC thật.</li>
+  <li>OPC UA: server giữ address space gồm các node; client duyệt, đọc, ghi, đăng ký. NodeId = namespace + định danh; tra chỉ số namespace từ URI, lấy NodeId bằng cách duyệt cây.</li>
+  <li>Ghi phải đúng kiểu: <code>ua.Variant(v, ua.VariantType.Int16/Float/Double…)</code>; INT ↔ Int16, DINT ↔ Int32, REAL ↔ Float, LREAL ↔ Double. Mỗi giá trị có StatusCode.</li>
+  <li>Subscription thay cho hỏi vòng; sampling và publishing interval quyết định độ trễ (hàng chục ms, không tất định); thông báo đầu tiên là giá trị hiện tại; handler chỉ đẩy vào hàng đợi.</li>
+  <li>Quy ước bắt tay vẫn như cũ: dữ liệu ghi trước, CycleEcho sau cùng, mọi chờ đợi có timeout.</li>
+  <li>Bảo mật: None / Sign / SignAndEncrypt, chứng chỉ ứng dụng và trust list, tài khoản người dùng; không để None trên mạng sản xuất.</li>
+  <li>Modbus TCP: đơn giản, có ở mọi PLC. OPC UA: dữ liệu có cấu trúc, bảo mật, hợp tích hợp SCADA/MES. Trigger chụp chính xác thời gian vẫn đi bằng dây I/O.</li>
 </ul>
-<p class="note">Tham khảo: <a href="https://github.com/FreeOpcUa/opcua-asyncio" rel="noopener" target="_blank">thư viện opcua-asyncio (asyncua)</a>.</p>
+<p>Bài tiếp theo: <strong>TCP socket: gửi kết quả và tọa độ cho robot</strong>, kênh tự định nghĩa mà robot của gần như mọi hãng đều nói được.</p>

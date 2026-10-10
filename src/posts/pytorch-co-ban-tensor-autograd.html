@@ -1,73 +1,589 @@
-<p>PyTorch là framework Deep Learning được dùng nhiều nhất trong nghiên cứu và ngày càng phổ biến trong sản xuất. Ultralytics YOLO, Anomalib, phần lớn mô hình trên Hugging Face đều chạy trên PyTorch. Bài này giới thiệu ba khái niệm nền tảng: <strong>tensor, autograd và vòng lặp huấn luyện</strong>.</p>
+<p>Ở bài "Gradient descent từ đầu với NumPy", bạn tự đạo hàm và tự cập nhật hai tham số. Ở bài "Mạng nơ-ron và CNN hoạt động thế nào", bạn thấy một CNN nhỏ đã có hàng chục nghìn tham số: tự đạo hàm bằng tay là không thể. <strong>PyTorch</strong> giải quyết đúng việc đó. Nó là framework Deep Learning phổ biến nhất hiện nay; Ultralytics YOLO, Anomalib và phần lớn mô hình trên Hugging Face đều chạy trên PyTorch. Bài này dạy ba khái niệm nền tảng mà mọi dự án PyTorch đều dùng: <strong>tensor</strong> (mảng số chạy được trên GPU), <strong>autograd</strong> (tự tính gradient) và <strong>vòng lặp huấn luyện 4 bước</strong>, kèm cách lưu và nạp mô hình an toàn. Bài sau, "Dataset, DataLoader và augmentation", thay dữ liệu tạo sẵn trong bộ nhớ bằng thư mục ảnh thật.</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Tạo và biến đổi tensor, nắm dtype, shape, device; chuyển qua lại giữa NumPy/OpenCV và tensor (kể cả <code>permute</code> HWC→CHW); viết code chạy được cả trên GPU lẫn CPU; dùng autograd (<code>requires_grad</code>, <code>backward</code>, <code>zero_grad</code>, <code>no_grad</code>) và hiểu vì sao gradient bị cộng dồn; định nghĩa mạng bằng <code>nn.Module</code>; viết vòng lặp huấn luyện 4 bước và huấn luyện một CNN nhỏ phân loại OK/NG; lưu và nạp <code>state_dict</code> với <code>torch.load(weights_only=True)</code>. Bài viết chạy với PyTorch 2.14 (CPU).</div>
 
-<h2>Tensor: mảng số chạy được trên GPU</h2>
-<pre><code>import torch
+<h2>1. Cài đặt và kiểm tra</h2>
+<pre><code class="language-bash"># Bản CPU (chạy được trên mọi máy, đủ cho toàn bộ bài này):
+pip install torch torchvision
+# Máy có GPU NVIDIA: vào trang pytorch.org, mục "Get Started", chọn hệ điều hành và phiên bản CUDA
+# để lấy đúng lệnh pip (có tham số --index-url). Driver NVIDIA phải đủ mới cho phiên bản CUDA đó.</code></pre>
+<pre><code class="language-python">import torch
 
-a = torch.tensor([[1.0, 2.0], [3.0, 4.0]])
-b = torch.rand(2, 2)
-print(a @ b, a.shape, a.dtype)
+print("torch", torch.__version__)
+print("CUDA (GPU NVIDIA) dùng được:", torch.cuda.is_available())
+if torch.cuda.is_available():
+    print("GPU:", torch.cuda.get_device_name(0))</code></pre>
+<pre><code class="language-text">torch 2.14.1+cu130
+CUDA (GPU NVIDIA) dùng được: False</code></pre>
+<p>Máy chạy bài viết không có GPU, nên dòng thứ hai là <code>False</code>; hậu tố <code>+cu130</code> chỉ cho biết bản torch này được biên dịch kèm CUDA 13.0, không có nghĩa là máy có GPU. Trên máy có GPU NVIDIA và driver phù hợp, bạn sẽ thấy <code>True</code> và tên GPU. Mọi đoạn code trong bài đều tự chọn thiết bị nên chạy được ở cả hai trường hợp.</p>
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
-x = torch.randn(64, 3, 224, 224, device=device)   # 64 ảnh RGB 224x224
-print(x.device)</code></pre>
-<p>Tensor giống mảng NumPy, thêm hai năng lực: chạy trên GPU và tự tính đạo hàm. Quy ước ảnh trong PyTorch là <strong>N, C, H, W</strong> (số ảnh, kênh, cao, rộng), khác OpenCV là H, W, C.</p>
+<h2>2. Tensor: mảng nhiều chiều có dtype, shape, device</h2>
+<p><strong>Tensor</strong> giống mảng NumPy, thêm hai năng lực: chạy được trên GPU và ghi nhớ phép tính để tự đạo hàm. Ba thuộc tính phải luôn để ý: <code>shape</code> (kích thước các trục), <code>dtype</code> (kiểu số) và <code>device</code> (nằm ở CPU hay GPU).</p>
+<pre><code class="language-python">import torch
 
-<h2>Autograd: tự động tính đạo hàm</h2>
-<pre><code>w = torch.tensor(2.0, requires_grad=True)
+a = torch.tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])   # từ list Python
+print(a.shape, a.dtype, a.device)
+print("zeros:", torch.zeros(2, 3).dtype, "| arange:", torch.arange(5), torch.arange(5).dtype)
+
+torch.manual_seed(0)
+b = torch.rand(3, 2)                        # số ngẫu nhiên đều trong [0, 1)
+print("a @ b =\n", a @ b)                   # nhân ma trận (2x3)·(3x2) = (2x2)
+print("a * 10 =", (a * 10).tolist())        # nhân từng phần tử
+print("tổng theo cột (dim=0):", a.sum(dim=0), "| theo hàng (dim=1):", a.sum(dim=1))
+print("broadcasting a - a.mean(dim=0):\n", a - a.mean(dim=0))
+print("reshape (3, 2):", a.reshape(3, 2).tolist(), "| hàng 1:", a[1], "| cột 2:", a[:, 2])
+
+u8 = torch.tensor([250, 10], dtype=torch.uint8)
+print("uint8: 250 + 10 =", (u8 + 10).tolist(), " ← tràn số, giống NumPy")</code></pre>
+<pre><code class="language-text">torch.Size([2, 3]) torch.float32 cpu
+zeros: torch.float32 | arange: tensor([0, 1, 2, 3, 4]) torch.int64
+a @ b =
+ tensor([[1.5955, 2.9345],
+        [4.2720, 7.5375]])
+a * 10 = [[10.0, 20.0, 30.0], [40.0, 50.0, 60.0]]
+tổng theo cột (dim=0): tensor([5., 7., 9.]) | theo hàng (dim=1): tensor([ 6., 15.])
+broadcasting a - a.mean(dim=0):
+ tensor([[-1.5000, -1.5000, -1.5000],
+        [ 1.5000,  1.5000,  1.5000]])
+reshape (3, 2): [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]] | hàng 1: tensor([4., 5., 6.]) | cột 2: tensor([3., 6.])
+uint8: 250 + 10 = [4, 20]  ← tràn số, giống NumPy</code></pre>
+<table>
+  <tr><th>dtype</th><th>Dùng cho</th><th>Ghi chú</th></tr>
+  <tr><td><code>torch.float32</code></td><td>Ảnh đầu vào, trọng số, mọi phép tính của mạng</td><td>Mặc định khi tạo từ số thực trong Python. Mạng nơ-ron gần như luôn dùng float32 (hoặc float16 khi tối ưu)</td></tr>
+  <tr><td><code>torch.int64</code> (long)</td><td>Nhãn lớp cho <code>CrossEntropyLoss</code>, chỉ số</td><td>Mặc định khi tạo từ số nguyên</td></tr>
+  <tr><td><code>torch.uint8</code></td><td>Ảnh thô 0–255 vừa đọc lên</td><td>Phải đổi sang float trước khi đưa vào mạng; cộng trừ bị tràn số</td></tr>
+  <tr><td><code>torch.float64</code></td><td>Hiếm khi dùng trong mạng</td><td>Mảng NumPy mặc định là float64, chuyển sang tensor vẫn giữ float64: nguồn lỗi phổ biến (mục 10)</td></tr>
+</table>
+
+<h2>3. Từ NumPy và OpenCV sang tensor</h2>
+<p>Ảnh bạn đọc bằng OpenCV là mảng NumPy <code>uint8</code>, thứ tự trục <code>(H, W, C)</code>, kênh BGR. Lớp tích chập của PyTorch nhận <code>(N, C, H, W)</code>: số ảnh, kênh, cao, rộng. Chuyển đổi gồm đổi kiểu, đổi thứ tự trục bằng <code>permute</code> và thêm trục batch bằng <code>unsqueeze</code>:</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+import torch
+
+anh = np.zeros((48, 64, 3), np.uint8)          # ảnh OpenCV: cao 48, rộng 64, 3 kênh BGR
+anh[:, :, 2] = 200                              # kênh đỏ (chỉ số 2 trong BGR)
+print("OpenCV:", anh.shape, anh.dtype)
+
+rgb = cv2.cvtColor(anh, cv2.COLOR_BGR2RGB)
+t = torch.from_numpy(rgb)                       # dùng CHUNG bộ nhớ với mảng NumPy
+t = t.permute(2, 0, 1)                          # (H, W, C) → (C, H, W)
+t = t.float() / 255.0                           # uint8 → float32 trong [0, 1]
+x = t.unsqueeze(0)                              # thêm trục batch → (1, C, H, W)
+print("tensor:", tuple(x.shape), x.dtype, "| kênh R trung bình:", round(x[0, 0].mean().item(), 3))
+
+# from_numpy chia sẻ bộ nhớ, torch.tensor thì sao chép
+m = np.zeros(3, np.float32)
+chia_se, sao_chep = torch.from_numpy(m), torch.tensor(m)
+m[0] = 7
+print("from_numpy thấy thay đổi:", chia_se.tolist(), "| torch.tensor:", sao_chep.tolist())
+print("NumPy float64 → tensor:", torch.from_numpy(np.zeros(2)).dtype)
+
+# chiều ngược lại: tensor (1, C, H, W) → ảnh OpenCV để lưu hoặc hiển thị
+ve = (x[0].permute(1, 2, 0) * 255).round().to(torch.uint8).numpy()
+print("về lại OpenCV:", ve.shape, ve.dtype, "| khớp ảnh gốc:", np.array_equal(cv2.cvtColor(ve, cv2.COLOR_RGB2BGR), anh))</code></pre>
+<pre><code class="language-text">OpenCV: (48, 64, 3) uint8
+tensor: (1, 3, 48, 64) torch.float32 | kênh R trung bình: 0.784
+from_numpy thấy thay đổi: [7.0, 0.0, 0.0] | torch.tensor: [0.0, 0.0, 0.0]
+NumPy float64 → tensor: torch.float64
+về lại OpenCV: (48, 64, 3) uint8 | khớp ảnh gốc: True</code></pre>
+<p>Ba điểm cần nhớ: <code>permute</code> chỉ đổi cách đọc bộ nhớ, không sao chép (một số hàm đòi bộ nhớ liền mạch sẽ cần thêm <code>.contiguous()</code>); <code>from_numpy</code> chia sẻ bộ nhớ nên sửa mảng là sửa tensor; mảng NumPy float64 cần <code>.float()</code> trước khi đưa vào mạng. Bài "Dataset, DataLoader và augmentation" đóng gói các bước này thành lớp Dataset, kèm chuẩn hóa mean/std.</p>
+
+<h2>4. CPU và GPU: viết code chạy được ở cả hai</h2>
+<p>Quy tắc của PyTorch: <strong>mọi tensor tham gia một phép tính phải nằm trên cùng thiết bị</strong>. Mô hình và dữ liệu đều phải được chuyển bằng <code>.to(device)</code>. Mẫu code chuẩn chọn GPU nếu có, CPU nếu không:</p>
+<pre><code class="language-python">import torch
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print("thiết bị:", device)
+
+x = torch.randn(64, 3, 32, 32)                  # 64 ảnh RGB 32x32, tạo trên CPU
+w = torch.randn(10, 3 * 32 * 32)
+x, w = x.to(device), w.to(device)               # chuyển sang thiết bị đã chọn
+y = x.flatten(1) @ w.T                          # tính trên GPU nếu có
+print("kết quả:", tuple(y.shape), "nằm trên", y.device)
+
+ket_qua = y.cpu().numpy()                       # muốn dùng NumPy/OpenCV: phải về CPU trước
+print("về NumPy:", ket_qua.shape, ket_qua.dtype)</code></pre>
+<pre><code class="language-text">thiết bị: cpu
+kết quả: (64, 10) nằm trên cpu
+về NumPy: (64, 10) float32</code></pre>
+<p>Trên máy có GPU, dòng đầu in <code>cuda</code> và kết quả nằm trên <code>cuda:0</code>. Nếu quên chuyển một tensor, PyTorch báo lỗi dạng <code>RuntimeError: Expected all tensors to be on the same device ...</code>. Gọi <code>.numpy()</code> trực tiếp trên tensor GPU cũng báo lỗi; phải <code>.cpu()</code> trước. Trên máy Mac Apple Silicon, thiết bị tương ứng là <code>"mps"</code> (kiểm tra bằng <code>torch.backends.mps.is_available()</code>).</p>
+<div class="tip"><strong>GPU nhanh hơn ở đâu?</strong>GPU nhanh khi phép tính <em>lớn và song song</em>: batch nhiều ảnh, mạng nhiều lớp. Với tensor rất nhỏ, chi phí chép dữ liệu CPU↔GPU có thể lớn hơn phép tính. Trên trạm sản xuất, mô hình thường được xuất sang ONNX và chạy bằng ONNX Runtime, OpenVINO hoặc TensorRT (chặng 13), nhưng huấn luyện thì gần như luôn cần GPU khi dữ liệu là hàng nghìn ảnh.</div>
+
+<h2>5. Autograd: PyTorch tự tính gradient</h2>
+<p>Đánh dấu một tensor bằng <code>requires_grad=True</code>, PyTorch sẽ ghi lại mọi phép tính dùng tensor đó thành một <strong>đồ thị tính toán</strong>. Gọi <code>.backward()</code> trên kết quả cuối (một số vô hướng, thường là loss), PyTorch đi ngược đồ thị và điền gradient vào thuộc tính <code>.grad</code> của từng tham số. Ví dụ nhỏ nhất:</p>
+<pre><code class="language-python">import torch
+
+w = torch.tensor(2.0, requires_grad=True)
 x = torch.tensor(3.0)
-loss = (w * x - 10) ** 2
-loss.backward()            # tính dloss/dw
-print(w.grad)              # 2·(w·x − 10)·x = 2·(6 − 10)·3 = -24</code></pre>
-<p>Đây chính là thứ bạn phải tự tính bằng tay trong bài <a href="hoi-quy-tuyen-tinh-gradient-descent-numpy.html">gradient descent với NumPy</a>. Với mạng hàng triệu tham số, autograd làm việc đó tự động.</p>
+loss = (w * x - 10) ** 2                         # (6 - 10)² = 16
+print("loss:", loss.item(), "| grad_fn:", loss.grad_fn.__class__.__name__)
+loss.backward()                                  # tính dloss/dw
+print("w.grad:", w.grad.item(), " (tay: 2·(w·x − 10)·x = 2·(6 − 10)·3 = −24)")</code></pre>
+<pre><code class="language-text">loss: 16.0 | grad_fn: PowBackward0
+w.grad: -24.0  (tay: 2·(w·x − 10)·x = 2·(6 − 10)·3 = −24)</code></pre>
+<p>Áp dụng cho chính bài hiệu chỉnh pixel–mm của bài trước: so gradient autograd với công thức <code>∂L/∂w = 2·mean(e·x)</code>, <code>∂L/∂b = 2·mean(e)</code> mà bạn đã tự đạo hàm.</p>
+<pre><code class="language-python">import numpy as np
+import torch
 
-<h2>Định nghĩa mạng nơ-ron</h2>
-<pre><code>from torch import nn
+rng = np.random.default_rng(0)
+x_np = np.sort(rng.uniform(150, 750, 40))
+y_np = 0.0482 * x_np + 0.35 + rng.normal(0, 0.03, 40)
+x = torch.tensor(x_np, dtype=torch.float32)
+y = torch.tensor(y_np, dtype=torch.float32)
 
-class SmallCNN(nn.Module):
-    def __init__(self, num_classes=2):
+w = torch.tensor(0.03, requires_grad=True)
+b = torch.tensor(0.1, requires_grad=True)
+loss = torch.mean((w * x + b - y) ** 2)
+loss.backward()
+
+e = (w * x + b - y).detach()                     # detach: lấy giá trị, không ghi vào đồ thị
+print(f"autograd : dL/dw = {w.grad.item():.2f}, dL/db = {b.grad.item():.4f}")
+print(f"công thức: dL/dw = {(2 * (e * x).mean()).item():.2f}, dL/db = {(2 * e.mean()).item():.4f}")</code></pre>
+<pre><code class="language-text">autograd : dL/dw = -9538.79, dL/db = -17.6992
+công thức: dL/dw = -9538.79, dL/db = -17.6992</code></pre>
+<p>Hai kết quả trùng nhau (sai khác ở chữ số cuối là do float32 so với float64 của bài trước). Điều quan trọng: bạn chỉ viết phép tính <em>xuôi</em> (forward); phần đạo hàm PyTorch lo, dù mô hình có hai tham số hay hai chục triệu.</p>
+
+<h3>Gradient bị cộng dồn: vì sao phải zero_grad</h3>
+<p>PyTorch <strong>cộng</strong> gradient mới vào <code>.grad</code> chứ không ghi đè. Thiết kế này có chủ ý (cho phép gộp gradient từ nhiều batch nhỏ), nhưng nếu quên xóa, mỗi bước cập nhật sẽ dùng tổng gradient của mọi bước trước:</p>
+<pre><code class="language-python">import torch
+
+w = torch.tensor(2.0, requires_grad=True)
+for lan in range(3):
+    loss = (w * 3.0 - 10) ** 2
+    loss.backward()
+    print(f"lần {lan + 1}: w.grad = {w.grad.item()}")   # -24, -48, -72: cộng dồn!
+
+w.grad.zero_()                                       # xóa gradient (optimizer.zero_grad() làm việc này)
+loss = (w * 3.0 - 10) ** 2
+loss.backward()
+print("sau zero_():", w.grad.item())
+
+with torch.no_grad():                                # không ghi đồ thị: dùng khi cập nhật tham số và khi suy luận
+    z = w * 3.0
+print("trong no_grad, z.requires_grad =", z.requires_grad)</code></pre>
+<pre><code class="language-text">lần 1: w.grad = -24.0
+lần 2: w.grad = -48.0
+lần 3: w.grad = -72.0
+sau zero_(): -24.0
+trong no_grad, z.requires_grad = False</code></pre>
+<table>
+  <tr><th>Công cụ</th><th>Tác dụng</th><th>Dùng khi</th></tr>
+  <tr><td><code>requires_grad=True</code></td><td>Yêu cầu tính gradient cho tensor này</td><td>Tham số tự tạo. Tham số trong <code>nn.Module</code> đã bật sẵn</td></tr>
+  <tr><td><code>loss.backward()</code></td><td>Tính gradient của loss theo mọi tham số, cộng vào <code>.grad</code></td><td>Mỗi bước huấn luyện, một lần</td></tr>
+  <tr><td><code>optimizer.zero_grad()</code></td><td>Xóa <code>.grad</code> trước khi tính gradient mới</td><td>Trước mỗi <code>backward()</code></td></tr>
+  <tr><td><code>torch.no_grad()</code></td><td>Tắt ghi đồ thị: nhanh hơn, ít bộ nhớ</td><td>Đánh giá, suy luận trên trạm, tự cập nhật tham số bằng tay</td></tr>
+  <tr><td><code>.detach()</code>, <code>.item()</code></td><td>Lấy giá trị ra khỏi đồ thị (tensor, hoặc số Python)</td><td>Ghi log loss, tính chỉ số, vẽ đồ thị</td></tr>
+</table>
+
+<h2>6. Vòng lặp huấn luyện 4 bước</h2>
+<p>Viết lại gradient descent của bài trước bằng PyTorch, đầu tiên với tham số tự tạo và cập nhật bằng tay để thấy autograd thay thế đúng phần nào:</p>
+<pre><code class="language-python">import numpy as np
+import torch
+
+rng = np.random.default_rng(0)
+x_np = np.sort(rng.uniform(150, 750, 40))
+y_np = 0.0482 * x_np + 0.35 + rng.normal(0, 0.03, 40)
+x = torch.tensor((x_np - x_np.mean()) / x_np.std(), dtype=torch.float32)   # chuẩn hóa như bài trước
+y = torch.tensor(y_np, dtype=torch.float32)
+
+w = torch.zeros((), requires_grad=True)
+b = torch.zeros((), requires_grad=True)
+lr = 0.1
+for buoc in range(60):
+    du_doan = w * x + b                          # 1. forward
+    loss = torch.mean((du_doan - y) ** 2)        # 2. loss
+    loss.backward()                              # 3. backward: autograd thay cho công thức tự đạo hàm
+    with torch.no_grad():                        # 4. cập nhật (không ghi đồ thị)
+        w -= lr * w.grad
+        b -= lr * b.grad
+        w.grad.zero_()
+        b.grad.zero_()
+    if buoc % 20 == 0:
+        print(f"bước {buoc:2d}: loss {loss.item():.5f}")
+print(f"w_gốc = {w.item() / x_np.std():.5f} mm/px, b_gốc = {b.item() - w.item() * x_np.mean() / x_np.std():.4f} mm")</code></pre>
+<pre><code class="language-text">bước  0: loss 609.69592
+bước 20: loss 0.08208
+bước 40: loss 0.00105
+w_gốc = 0.04818 mm/px, b_gốc = 0.3686 mm</code></pre>
+<p>Kết quả trùng với NumPy ở bài trước (0,04818 mm/px; 0,3686 mm). Trong thực tế không ai tự tạo <code>w</code>, <code>b</code> và tự cập nhật: PyTorch có sẵn lớp (<code>nn.Linear</code>), hàm loss (<code>nn.MSELoss</code>) và bộ tối ưu (<code>torch.optim.SGD</code>, <code>Adam</code>). Vòng lặp chuẩn mà bạn sẽ viết trong mọi dự án:</p>
+<pre><code class="language-python">import numpy as np
+import torch
+from torch import nn
+
+rng = np.random.default_rng(0)
+x_np = np.sort(rng.uniform(150, 750, 40))
+y_np = 0.0482 * x_np + 0.35 + rng.normal(0, 0.03, 40)
+X = torch.tensor((x_np - x_np.mean()) / x_np.std(), dtype=torch.float32).unsqueeze(1)   # (40, 1)
+Y = torch.tensor(y_np, dtype=torch.float32).unsqueeze(1)                               # (40, 1)
+
+torch.manual_seed(0)
+mo_hinh = nn.Linear(1, 1)                        # chứa w (weight) và b (bias), requires_grad sẵn
+ham_loss = nn.MSELoss()
+toi_uu = torch.optim.SGD(mo_hinh.parameters(), lr=0.1)
+
+for buoc in range(60):
+    du_doan = mo_hinh(X)                         # 1. forward
+    loss = ham_loss(du_doan, Y)                  # 2. tính loss
+    toi_uu.zero_grad()                           #    (xóa gradient cũ)
+    loss.backward()                              # 3. backward
+    toi_uu.step()                                # 4. cập nhật tham số
+    if buoc % 20 == 0:
+        print(f"bước {buoc:2d}: loss {loss.item():.5f}")
+w, b = mo_hinh.weight.item(), mo_hinh.bias.item()
+print(f"w_gốc = {w / x_np.std():.5f} mm/px, b_gốc = {b - w * x_np.mean() / x_np.std():.4f} mm")</code></pre>
+<pre><code class="language-text">bước  0: loss 585.31970
+bước 20: loss 0.07884
+bước 40: loss 0.00105
+w_gốc = 0.04818 mm/px, b_gốc = 0.3686 mm</code></pre>
+<p>Loss ban đầu khác đoạn trước vì <code>nn.Linear</code> khởi tạo trọng số ngẫu nhiên thay vì bằng 0, nhưng điểm hội tụ giống hệt. Bốn bước <strong>forward → loss → backward → step</strong> (cùng <code>zero_grad</code> trước <code>backward</code>) lặp lại không đổi từ ví dụ hai tham số này đến mô hình hàng trăm triệu tham số. Chỉ có mô hình, hàm loss và cách nạp dữ liệu thay đổi.</p>
+
+<h2>7. Định nghĩa mạng bằng nn.Module</h2>
+<p>Mạng của bạn là một lớp kế thừa <code>nn.Module</code>: khai báo các lớp con trong <code>__init__</code>, mô tả đường đi của dữ liệu trong <code>forward</code>. PyTorch tự tìm mọi tham số của các lớp con, nên <code>model.parameters()</code> trả về đủ để đưa cho optimizer. Đây là CNN nhỏ của bài "Mạng nơ-ron và CNN hoạt động thế nào", nhận ảnh xám 32×32:</p>
+<pre><code class="language-python">import torch
+from torch import nn
+
+
+class CNNNho(nn.Module):
+    def __init__(self, so_lop=2):
         super().__init__()
-        self.features = nn.Sequential(
-            nn.Conv2d(1, 16, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
-            nn.Conv2d(16, 32, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+        self.dac_trung = nn.Sequential(
+            nn.Conv2d(1, 8, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),     # 1x32x32 → 8x16x16
+            nn.Conv2d(8, 16, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),    # → 16x8x8
+            nn.Conv2d(16, 32, 3, padding=1), nn.ReLU(),                    # → 32x8x8
+            nn.AdaptiveMaxPool2d(1),                                       # → 32x1x1: "có vết ở đâu đó không"
         )
-        self.head = nn.Linear(32 * 16 * 16, num_classes)   # đầu vào ảnh xám 64x64
+        self.dau_ra = nn.Linear(32, so_lop)
 
     def forward(self, x):
-        x = self.features(x)
-        return self.head(x.flatten(1))
+        return self.dau_ra(self.dac_trung(x).flatten(1))                   # logit, chưa softmax
 
-model = SmallCNN().to(device)
-print(model(torch.randn(8, 1, 64, 64, device=device)).shape)   # [8, 2]</code></pre>
 
-<h2>Vòng lặp huấn luyện chuẩn</h2>
-<pre><code>from torch.utils.data import DataLoader, TensorDataset
+torch.manual_seed(0)
+model = CNNNho()
+x = torch.randn(4, 1, 32, 32)
+for lop in model.dac_trung:
+    x = lop(x)
+    if not isinstance(lop, nn.ReLU):
+        print(f"{lop.__class__.__name__:18s} → {tuple(x.shape)}")
+print("đầu ra:", tuple(model(torch.randn(4, 1, 32, 32)).shape))
+for ten, p in model.named_parameters():
+    if ten.endswith("weight"):
+        print(f"{ten:20s} {tuple(p.shape)}")
+print("tổng số tham số:", sum(p.numel() for p in model.parameters()))</code></pre>
+<pre><code class="language-text">Conv2d             → (4, 8, 32, 32)
+MaxPool2d          → (4, 8, 16, 16)
+Conv2d             → (4, 16, 16, 16)
+MaxPool2d          → (4, 16, 8, 8)
+Conv2d             → (4, 32, 8, 8)
+AdaptiveMaxPool2d  → (4, 32, 1, 1)
+đầu ra: (4, 2)
+dac_trung.0.weight   (8, 1, 3, 3)
+dac_trung.3.weight   (16, 8, 3, 3)
+dac_trung.6.weight   (32, 16, 3, 3)
+dau_ra.weight        (2, 32)
+tổng số tham số: 5954</code></pre>
+<p>Mạng trả về <strong>logit</strong> (điểm chưa chuẩn hóa) cho 2 lớp. Không thêm softmax ở cuối: <code>nn.CrossEntropyLoss</code> tự làm softmax bên trong, ổn định số học hơn. Khi cần xác suất (để so với ngưỡng NG), gọi <code>torch.softmax(logit, dim=1)</code> lúc suy luận. Lớp <code>AdaptiveMaxPool2d(1)</code> lấy giá trị lớn nhất trên toàn feature map: đặc trưng "có vết xước ở bất kỳ đâu" mạnh thì logit NG cao, rất hợp với lỗi nhỏ nằm ở vị trí ngẫu nhiên.</p>
 
-X = torch.randn(512, 1, 64, 64)
-y = torch.randint(0, 2, (512,))
-loader = DataLoader(TensorDataset(X, y), batch_size=32, shuffle=True)
+<h2>8. Huấn luyện CNN nhỏ phân loại OK/NG</h2>
+<p>Tạo bộ ảnh xám 32×32 mô phỏng bề mặt kim loại: ảnh OK có vân và nhiễu, ảnh NG có thêm một vết xước tối ở vị trí, hướng, độ dài ngẫu nhiên. 400 ảnh để huấn luyện, 200 ảnh để kiểm tra. <code>TensorDataset</code> và <code>DataLoader</code> chia dữ liệu thành batch 32 ảnh, xáo trộn mỗi epoch (bài sau dạy kỹ phần này).</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+import torch
 
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-criterion = nn.CrossEntropyLoss()
+torch.set_num_threads(2)
 
+
+def tao_anh(ng, rng):
+    van = rng.normal(0, 0.04, (32, 1)) + rng.normal(0, 0.03, (32, 32))   # vân ngang + nhiễu
+    anh = (0.55 + rng.normal(0, 0.03) + van).astype(np.float32)          # độ sáng mỗi tấm hơi khác
+    if ng:
+        x1, y1 = (int(v) for v in rng.integers(4, 28, 2))
+        goc, dai = rng.uniform(0, np.pi), rng.integers(6, 14)
+        x2, y2 = int(x1 + dai * np.cos(goc)), int(y1 + dai * np.sin(goc))
+        cv2.line(anh, (x1, y1), (x2, y2), float(anh.mean() - 0.18), 1)
+    return np.clip(anh, 0, 1)
+
+
+def tao_bo(n, rng):
+    nhan = rng.permutation(np.arange(n) % 2)                 # nửa OK (0), nửa NG (1)
+    anh = np.stack([tao_anh(bool(k), rng) for k in nhan])
+    return torch.from_numpy(anh).unsqueeze(1), torch.from_numpy(nhan).long()
+
+
+rng = np.random.default_rng(0)
+X_train, y_train = tao_bo(400, rng)
+X_val, y_val = tao_bo(200, rng)
+mean, std = X_train.mean().item(), X_train.std().item()      # chỉ tính trên tập train
+X_train, X_val = (X_train - mean) / std, (X_val - mean) / std  # dùng cùng mean/std cho val
+torch.save({"X_train": X_train, "y_train": y_train, "X_val": X_val, "y_val": y_val,
+            "mean": mean, "std": std}, "okng32.pt")
+print("train:", tuple(X_train.shape), X_train.dtype, "| nhãn:", y_train.dtype, torch.bincount(y_train).tolist())
+print("val  :", tuple(X_val.shape), torch.bincount(y_val).tolist())
+print(f"chuẩn hóa: mean {mean:.4f}, std {std:.4f}")</code></pre>
+<pre><code class="language-text">train: (400, 1, 32, 32) torch.float32 | nhãn: torch.int64 [200, 200]
+val  : (200, 1, 32, 32) [100, 100]
+chuẩn hóa: mean 0.5498, std 0.0596</code></pre>
+<p>Chú ý kiểu dữ liệu: ảnh <code>float32</code> shape <code>(N, 1, 32, 32)</code>, nhãn <code>int64</code> shape <code>(N,)</code>, đúng thứ <code>CrossEntropyLoss</code> cần. Ảnh được <strong>chuẩn hóa</strong> bằng mean/std tính trên tập train, đúng bài học của bài gradient descent. Bước này không phải hình thức: khi viết bài, thử bỏ chuẩn hóa (ảnh quanh 0,55, độ lệch rất nhỏ), cùng mạng và cùng số epoch đứng yên ở 50%, tức đoán mò. Giờ là vòng lặp huấn luyện đầy đủ, kèm đánh giá sau mỗi epoch:</p>
+<div class="tip"><strong>Dùng lại lớp CNNNho</strong>Các đoạn code từ đây dùng lớp <code>CNNNho</code> của mục 7 và file <code>okng32.pt</code> vừa tạo. Chạy chúng trong cùng một notebook (Jupyter, VS Code Interactive), hoặc lưu lớp vào file <code>mo_hinh.py</code> và thêm <code>from mo_hinh import CNNNho</code> ở đầu mỗi đoạn; cách thứ hai là cách nên dùng cho dự án thật, vì code trạm cũng phải import đúng lớp này để nạp <code>state_dict</code>.</div>
+<pre><code class="language-python">import torch
+from torch import nn
+from torch.utils.data import DataLoader, TensorDataset
+
+torch.manual_seed(0)
+torch.set_num_threads(2)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+d = torch.load("okng32.pt", weights_only=True)
+train_dl = DataLoader(TensorDataset(d["X_train"], d["y_train"]), batch_size=32, shuffle=True)
+val_dl = DataLoader(TensorDataset(d["X_val"], d["y_val"]), batch_size=100, shuffle=False)
+
+model = CNNNho().to(device)                      # lớp CNNNho ở mục 7
+ham_loss = nn.CrossEntropyLoss()
+toi_uu = torch.optim.Adam(model.parameters(), lr=3e-3)
+
+
+def danh_gia(model, loader):
+    model.eval()                                 # chế độ đánh giá (quan trọng với Dropout, BatchNorm)
+    tong_loss, dung, n = 0.0, 0, 0
+    with torch.no_grad():                        # không cần gradient khi đánh giá
+        for xb, yb in loader:
+            xb, yb = xb.to(device), yb.to(device)
+            logit = model(xb)
+            tong_loss += ham_loss(logit, yb).item() * len(yb)
+            dung += (logit.argmax(dim=1) == yb).sum().item()
+            n += len(yb)
+    return tong_loss / n, dung / n
+
+
+for epoch in range(8):
+    model.train()                                # chế độ huấn luyện
+    tong, n = 0.0, 0
+    for xb, yb in train_dl:
+        xb, yb = xb.to(device), yb.to(device)
+        logit = model(xb)                        # 1. forward
+        loss = ham_loss(logit, yb)               # 2. loss
+        toi_uu.zero_grad()
+        loss.backward()                          # 3. backward
+        toi_uu.step()                            # 4. step
+        tong += loss.item() * len(yb)            # .item(): lấy số, không giữ đồ thị
+        n += len(yb)
+    val_loss, val_acc = danh_gia(model, val_dl)
+    print(f"epoch {epoch + 1}: train loss {tong / n:.3f} | val loss {val_loss:.3f} | val đúng {val_acc:.1%}")</code></pre>
+<pre><code class="language-text">epoch 1: train loss 0.677 | val loss 0.651 | val đúng 53.0%
+epoch 2: train loss 0.617 | val loss 0.572 | val đúng 94.0%
+epoch 3: train loss 0.502 | val loss 0.377 | val đúng 98.5%
+epoch 4: train loss 0.308 | val loss 0.184 | val đúng 97.5%
+epoch 5: train loss 0.184 | val loss 0.133 | val đúng 100.0%
+epoch 6: train loss 0.095 | val loss 0.066 | val đúng 98.5%
+epoch 7: train loss 0.052 | val loss 0.052 | val đúng 100.0%
+epoch 8: train loss 0.048 | val loss 0.088 | val đúng 96.5%</code></pre>
+<p>Con số cụ thể có thể lệch đôi chút giữa các máy và phiên bản thư viện, nhưng xu hướng sẽ giống: epoch đầu mô hình gần như đoán mò (53%), rồi "bắt" được đặc trưng vết xước và vượt 94% từ epoch 2. Độ chính xác val dao động vài phần trăm ở cuối (100% rồi 96,5%) vì tập val chỉ có 200 ảnh và learning rate giữ cố định; bài "Overfitting và chia train/val/test" dạy cách đọc và xử lý những dao động này. Hai chi tiết nhỏ nhưng quan trọng: <code>model.train()</code> / <code>model.eval()</code> chuyển chế độ cho các lớp như Dropout và BatchNorm (mạng này chưa có, nhưng hãy tập thói quen); <code>loss.item()</code> thay vì cộng thẳng tensor <code>loss</code>, nếu không bạn giữ lại toàn bộ đồ thị của mọi batch trong bộ nhớ.</p>
+
+<h2>9. Lưu và nạp mô hình: state_dict</h2>
+<p>Cách lưu được khuyến nghị là lưu <strong><code>state_dict</code></strong>: một từ điển tên tham số → tensor. File không chứa code của lớp mạng; khi nạp, bạn tạo lại đối tượng cùng lớp rồi đổ trọng số vào.</p>
+<pre><code class="language-python">import torch
+
+torch.save(model.state_dict(), "cnn_nho.pt")
+print("các khóa:", list(model.state_dict().keys())[:4], "...")
+
+model2 = CNNNho()                                            # tạo lại kiến trúc
+trong_so = torch.load("cnn_nho.pt", map_location="cpu", weights_only=True)
+model2.load_state_dict(trong_so)
+model2.eval()
+
+d = torch.load("okng32.pt", weights_only=True)
+with torch.no_grad():
+    a = model.cpu().eval()(d["X_val"][:5])
+    b = model2(d["X_val"][:5])
+print("hai mô hình cho cùng logit:", torch.equal(a, b))
+p_ng = torch.softmax(b, dim=1)[:, 1]                         # xác suất lớp NG (cột 1)
+print("P(NG) của 5 ảnh val:", [round(v, 3) for v in p_ng.tolist()], "| nhãn thật:", d["y_val"][:5].tolist())
+
+# checkpoint đầy đủ để huấn luyện tiếp: thêm optimizer, epoch, thông tin lớp
+torch.save({"model": model.state_dict(), "optimizer": toi_uu.state_dict(), "epoch": 8,
+            "lop": ["OK", "NG"]}, "checkpoint.pt")
+ck = torch.load("checkpoint.pt", weights_only=True)
+print("checkpoint:", sorted(ck.keys()), "| lớp:", ck["lop"])</code></pre>
+<pre><code class="language-text">các khóa: ['dac_trung.0.weight', 'dac_trung.0.bias', 'dac_trung.3.weight', 'dac_trung.3.bias'] ...
+hai mô hình cho cùng logit: True
+P(NG) của 5 ảnh val: [0.05, 0.999, 0.981, 0.506, 0.005] | nhãn thật: [0, 1, 1, 1, 0]
+checkpoint: ['epoch', 'lop', 'model', 'optimizer'] | lớp: ['OK', 'NG']</code></pre>
+<ul>
+  <li>Ảnh val thứ tư là NG nhưng P(NG) chỉ 0,506, sát ranh giới: có thể vết xước ngắn hoặc mờ. Với ngưỡng 0,5 nó vẫn bị bắt, nhưng ngưỡng 0,6 sẽ cho lọt. Chọn ngưỡng theo escape và overkill là việc của dự án cuối chặng.</li>
+  <li><code>map_location="cpu"</code>: file lưu từ máy huấn luyện có GPU vẫn nạp được trên máy trạm không có GPU.</li>
+  <li><code>weights_only=True</code>: chỉ cho phép nạp tensor và kiểu dữ liệu cơ bản (dict, list, số, chuỗi). File <code>.pt</code> dùng định dạng pickle của Python, và pickle có thể chứa <strong>code tùy ý chạy ngay khi nạp</strong>; <code>weights_only=True</code> chặn điều đó. Từ PyTorch 2.6 đây là giá trị mặc định, nhưng hãy viết rõ ra để code dễ đọc và an toàn với phiên bản cũ. Không bao giờ nạp file <code>.pt</code> từ nguồn lạ với <code>weights_only=False</code>.</li>
+  <li>Lưu luôn danh sách lớp <code>["OK", "NG"]</code> và các tham số tiền xử lý cùng mô hình, để phía trạm biết cột 1 là NG.</li>
+  <li>Cách <code>torch.save(model)</code> (lưu cả đối tượng) phụ thuộc vào đường dẫn module của lớp mạng và cần <code>weights_only=False</code> khi nạp; tránh dùng.</li>
+</ul>
+
+<h2>10. Sai lầm thường gặp</h2>
+<p>Ba lỗi kiểu dữ liệu mà người mới nào cũng gặp, kèm thông báo lỗi thật để bạn nhận ra ngay:</p>
+<pre><code class="language-python">import numpy as np
+import torch
+from torch import nn
+
+lop = nn.Linear(3, 2)
+ham_loss = nn.CrossEntropyLoss()
+thu = {
+    "mảng NumPy float64 đưa thẳng vào mạng": lambda: lop(torch.from_numpy(np.ones((4, 3)))),
+    "ảnh thiếu trục batch hoặc sai số kênh": lambda: nn.Conv2d(1, 8, 3)(torch.zeros(3, 32, 32)),
+    "nhãn 2 chiều (N, 1) thay vì (N,)": lambda: ham_loss(torch.zeros(4, 2), torch.zeros(4, 1).long()),
+}
+for mo_ta, ham in thu.items():
+    try:
+        ham()
+        print(f"{mo_ta}: không lỗi")
+    except RuntimeError as e:
+        print(f"{mo_ta}:\n    {str(e).splitlines()[0]}")</code></pre>
+<pre><code class="language-text">mảng NumPy float64 đưa thẳng vào mạng:
+    mat1 and mat2 must have the same dtype, but got Double and Float
+ảnh thiếu trục batch hoặc sai số kênh:
+    Given groups=1, weight of size [8, 1, 3, 3], expected input[1, 3, 32, 32] to have 1 channels, but got 3 channels instead
+nhãn 2 chiều (N, 1) thay vì (N,):
+    0D or 1D target tensor expected, multi-target not supported</code></pre>
+<p>Lỗi thứ nhất sửa bằng <code>.float()</code>. Lỗi thứ hai nguy hiểm hơn: <code>Conv2d</code> chấp nhận đầu vào 3 chiều <code>(C, H, W)</code> không batch, nên ảnh RGB <code>(3, 32, 32)</code> đưa vào mạng 1 kênh được hiểu là ảnh có 3 kênh và báo lỗi số kênh; nếu số kênh tình cờ khớp, mạng chạy với dữ liệu sai mà không báo gì. Luôn in <code>shape</code> trước khi đưa vào mạng. Lỗi thứ ba: nhãn cho <code>CrossEntropyLoss</code> phải là <code>int64</code> shape <code>(N,)</code>. Những lỗi không báo gì, cần tự kiểm tra:</p>
+<ul>
+  <li><strong>Quên <code>zero_grad()</code></strong>: gradient cộng dồn, huấn luyện dao động hoặc phân kỳ.</li>
+  <li><strong>Quên <code>model.eval()</code></strong> khi đánh giá hoặc xuất mô hình: Dropout vẫn tắt ngẫu nhiên neuron, BatchNorm dùng thống kê của batch hiện tại. Kết quả mỗi lần chạy một khác.</li>
+  <li><strong>Quên <code>torch.no_grad()</code></strong> khi suy luận: chậm hơn và tốn bộ nhớ (trên GPU có thể hết bộ nhớ).</li>
+  <li><strong>Thêm softmax trước <code>CrossEntropyLoss</code></strong>: mô hình vẫn học nhưng chậm và kém hơn, vì loss áp softmax hai lần.</li>
+  <li><strong>Mô hình trên GPU, dữ liệu trên CPU</strong> (hoặc ngược lại): báo lỗi device; nhớ <code>.to(device)</code> cho cả hai.</li>
+  <li><strong>Cộng <code>loss</code> (tensor) vào biến tổng</strong> thay vì <code>loss.item()</code>: bộ nhớ tăng dần mỗi batch.</li>
+</ul>
+
+<h2>11. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Huấn luyện CNN nhỏ trên <strong>Fashion-MNIST</strong> (70.000 ảnh xám 28×28 của 10 loại quần áo, giày dép; 60.000 train, 10.000 test) đạt trên 85% độ chính xác trên tập kiểm tra. Dùng đúng vòng lặp 4 bước của mục 8, chỉ đổi dữ liệu và số lớp.</p>
+<details><summary>Xem đáp án</summary>
+<p>torchvision tải sẵn bộ dữ liệu này (khoảng 30 MB, cần Internet ở lần chạy đầu). <code>ToImage</code> + <code>ToDtype(..., scale=True)</code> đổi ảnh PIL thành tensor float trong [0, 1]; <code>Normalize</code> dùng mean/std xấp xỉ của tập train.</p>
+<pre><code class="language-python"># (minh họa) cần Internet để tải Fashion-MNIST lần đầu
+import torch
+from torch import nn
+from torch.utils.data import DataLoader
+from torchvision import datasets
+from torchvision.transforms import v2
+
+torch.manual_seed(0)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+tf = v2.Compose([v2.ToImage(), v2.ToDtype(torch.float32, scale=True), v2.Normalize([0.286], [0.353])])
+train_ds = datasets.FashionMNIST("data", train=True, download=True, transform=tf)
+test_ds = datasets.FashionMNIST("data", train=False, download=True, transform=tf)
+train_dl = DataLoader(train_ds, batch_size=128, shuffle=True)
+test_dl = DataLoader(test_ds, batch_size=512)
+
+
+class CNNFashion(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.dac_trung = nn.Sequential(
+            nn.Conv2d(1, 32, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),    # 28 → 14
+            nn.Conv2d(32, 64, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),   # 14 → 7
+        )
+        self.dau_ra = nn.Sequential(nn.Flatten(), nn.Linear(64 * 7 * 7, 128), nn.ReLU(), nn.Linear(128, 10))
+
+    def forward(self, x):
+        return self.dau_ra(self.dac_trung(x))
+
+
+model = CNNFashion().to(device)
+ham_loss = nn.CrossEntropyLoss()
+toi_uu = torch.optim.Adam(model.parameters(), lr=1e-3)
 for epoch in range(5):
     model.train()
-    total = 0.0
-    for xb, yb in loader:
+    for xb, yb in train_dl:
         xb, yb = xb.to(device), yb.to(device)
-        optimizer.zero_grad()           # 1. xóa gradient cũ
-        loss = criterion(model(xb), yb) # 2. lan truyền xuôi, tính loss
-        loss.backward()                 # 3. lan truyền ngược
-        optimizer.step()                # 4. cập nhật trọng số
-        total += loss.item() * len(xb)
-    print(f"epoch {epoch}: loss {total / len(loader.dataset):.4f}")</code></pre>
-<p>Bốn bước này lặp lại trong mọi chương trình huấn luyện, từ ví dụ nhỏ đến mô hình hàng tỷ tham số.</p>
+        loss = ham_loss(model(xb), yb)
+        toi_uu.zero_grad()
+        loss.backward()
+        toi_uu.step()
+    model.eval()
+    dung = 0
+    with torch.no_grad():
+        for xb, yb in test_dl:
+            dung += (model(xb.to(device)).argmax(1) == yb.to(device)).sum().item()
+    print(f"epoch {epoch + 1}: độ chính xác test {dung / len(test_ds):.2%}")
+torch.save(model.state_dict(), "cnn_fashion.pt")</code></pre>
+<p>Mạng này thường vượt 85% ngay sau epoch đầu và đạt khoảng 90% sau 5 epoch (con số cụ thể thay đổi theo máy và seed). Trên CPU mỗi epoch mất cỡ vài chục giây đến một hai phút; trên GPU vài giây. Nếu kết quả dưới 85%, kiểm tra: có <code>zero_grad</code> chưa, có <code>model.eval()</code> khi đánh giá chưa, learning rate có quá lớn không (thử 1e-3), ảnh đã chia 255 chưa. Lưu ý: dùng tập test để báo cáo kết quả cuối, đừng dùng nó để chọn số epoch; bài "Overfitting và chia train/val/test" giải thích vì sao.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Không chạy code, dự đoán các giá trị in ra. Sau đó chạy để kiểm tra.</p>
+<pre><code class="language-python">import torch
 
-<h2>Đánh giá và lưu mô hình</h2>
-<pre><code>model.eval()
-with torch.no_grad():                   # không tính gradient khi suy luận: nhanh, ít bộ nhớ
-    pred = model(X[:8].to(device)).argmax(1)
+w = torch.tensor(1.0, requires_grad=True)
+(w * 5).backward()
+print(w.grad.item())
+(w ** 2).backward()
+print(w.grad.item())
+with torch.no_grad():
+    w -= 0.1 * w.grad
+print(round(w.item(), 2), w.grad.item())</code></pre>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-text">5.0
+7.0
+0.3 7.0</code></pre>
+<p>Lần 1: đạo hàm của <code>5w</code> là 5. Lần 2: đạo hàm của <code>w²</code> tại w = 1 là 2, <strong>cộng dồn</strong> vào 5 thành 7. Bước cập nhật dùng gradient 7: <code>w = 1 − 0,1·7 = 0,3</code>. Cập nhật tham số không xóa gradient, nên <code>w.grad</code> vẫn là 7; nếu bước sau quên <code>zero_grad</code>, gradient tiếp tục bị cộng vào con số sai này.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Đoạn huấn luyện sau có 4 lỗi (không phải lỗi cú pháp). Tìm và sửa.</p>
+<pre><code class="language-python"># (minh họa) đoạn code có lỗi cố ý
+for epoch in range(10):
+    for xb, yb in train_dl:
+        logit = torch.softmax(model(xb), dim=1)
+        loss = ham_loss(logit, yb)
+        loss.backward()
+        toi_uu.step()
+    dung = 0
+    for xb, yb in val_dl:
+        dung += (model(xb).argmax(1) == yb).sum().item()
+    print(epoch, dung / len(val_dl.dataset))</code></pre>
+<details><summary>Xem đáp án</summary>
+<ol>
+  <li>Thiếu <code>toi_uu.zero_grad()</code> trước <code>loss.backward()</code>: gradient cộng dồn qua mọi batch.</li>
+  <li>Softmax trước <code>CrossEntropyLoss</code>: loss đã tự làm softmax; truyền thẳng logit.</li>
+  <li>Không gọi <code>model.train()</code> đầu mỗi epoch và <code>model.eval()</code> trước khi đánh giá.</li>
+  <li>Đánh giá không có <code>torch.no_grad()</code>: tốn bộ nhớ và thời gian vô ích.</li>
+</ol>
+<p>Bản sửa (dùng lại mô hình và dữ liệu của mục 8):</p>
+<pre><code class="language-python">import torch
+from torch import nn
+from torch.utils.data import DataLoader, TensorDataset
 
-torch.save(model.state_dict(), "small_cnn.pt")
-model.load_state_dict(torch.load("small_cnn.pt", map_location=device))</code></pre>
-<p>Quên <code>model.eval()</code> là lỗi rất phổ biến: các lớp như Dropout, BatchNorm hoạt động khác nhau giữa lúc huấn luyện và lúc suy luận.</p>
-<p>Áp dụng vào bài toán thật: <a href="phan-loai-anh-ok-ng-transfer-learning-pytorch.html">phân loại ảnh OK/NG bằng transfer learning</a>.</p>
+torch.manual_seed(0)
+d = torch.load("okng32.pt", weights_only=True)
+train_dl = DataLoader(TensorDataset(d["X_train"], d["y_train"]), batch_size=32, shuffle=True)
+val_dl = DataLoader(TensorDataset(d["X_val"], d["y_val"]), batch_size=100)
+model = CNNNho()
+ham_loss = nn.CrossEntropyLoss()
+toi_uu = torch.optim.Adam(model.parameters(), lr=3e-3)
+
+for epoch in range(3):
+    model.train()
+    for xb, yb in train_dl:
+        loss = ham_loss(model(xb), yb)          # logit thẳng vào loss
+        toi_uu.zero_grad()
+        loss.backward()
+        toi_uu.step()
+    model.eval()
+    dung = 0
+    with torch.no_grad():
+        for xb, yb in val_dl:
+            dung += (model(xb).argmax(1) == yb).sum().item()
+    print(epoch, dung / len(val_dl.dataset))</code></pre>
+<pre><code class="language-text">0 0.53
+1 0.94
+2 0.985</code></pre>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Tensor = mảng nhiều chiều với <code>shape</code>, <code>dtype</code>, <code>device</code>. Mạng dùng <code>float32</code>; nhãn phân loại dùng <code>int64</code>; ảnh OpenCV <code>(H, W, C)</code> BGR uint8 phải đổi sang <code>(N, C, H, W)</code> float bằng <code>permute</code>, <code>unsqueeze</code>.</li>
+  <li>Chọn thiết bị bằng <code>torch.cuda.is_available()</code>, chuyển cả mô hình lẫn dữ liệu bằng <code>.to(device)</code>; về CPU trước khi <code>.numpy()</code>.</li>
+  <li>Autograd: <code>requires_grad</code> ghi đồ thị, <code>backward()</code> điền <code>.grad</code>, gradient <strong>cộng dồn</strong> nên phải <code>zero_grad()</code>; <code>torch.no_grad()</code> khi đánh giá, suy luận.</li>
+  <li>Mạng là lớp kế thừa <code>nn.Module</code> (<code>__init__</code> + <code>forward</code>), trả về logit; <code>CrossEntropyLoss</code> tự làm softmax.</li>
+  <li>Vòng lặp 4 bước: forward → loss → backward (sau <code>zero_grad</code>) → step; <code>model.train()</code> khi huấn luyện, <code>model.eval()</code> khi đánh giá.</li>
+  <li>Lưu <code>state_dict</code>, nạp bằng <code>torch.load(..., map_location="cpu", weights_only=True)</code>; lưu kèm danh sách lớp và tham số tiền xử lý.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Dataset, DataLoader và augmentation</strong>, nơi dữ liệu đến từ thư mục ảnh thật thay vì tensor tạo sẵn.</p>

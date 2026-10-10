@@ -1,55 +1,382 @@
-<p>Mọi mạng nơ-ron hiện đại, từ YOLO đến các mô hình ngôn ngữ lớn, đều học theo cùng một nguyên lý: <strong>tối thiểu hóa hàm mất mát bằng gradient descent</strong>. Cách tốt nhất để hiểu nguyên lý này là tự cài đặt nó cho bài toán đơn giản nhất: hồi quy tuyến tính, chỉ với NumPy.</p>
+<p>Ở bài "Machine Learning là gì?", bạn gọi <code>fit()</code> và mô hình "tự học". Bài này mở hộp đen đó ra. Mọi mạng nơ-ron hiện đại, từ CNN phân loại OK/NG đến YOLO, đều học theo cùng một nguyên lý: định nghĩa một <strong>hàm mất mát</strong> (loss) đo mô hình sai bao nhiêu, tính <strong>gradient</strong> cho biết nên chỉnh tham số theo hướng nào, rồi đi từng bước nhỏ theo hướng ngược gradient. Cách tốt nhất để hiểu nguyên lý này là tự cài nó bằng NumPy cho bài toán đơn giản nhất mà kỹ sư vision gặp hằng ngày: <strong>hiệu chỉnh tuyến tính từ pixel sang milimét</strong>. Bạn sẽ tự đạo hàm, tự viết vòng lặp, thấy tận mắt learning rate quá nhỏ, vừa phải và quá lớn (phân kỳ) bằng con số, hiểu vì sao phải chuẩn hóa dữ liệu, và kiểm tra kết quả với nghiệm bình phương tối thiểu. Bài sau, "Mạng nơ-ron và CNN hoạt động thế nào", dùng đúng vòng lặp này cho mô hình có hàng nghìn tham số.</p>
+<div class="tip"><strong>Mục tiêu cuối bài</strong>Viết được hàm mất mát MSE và tự đạo hàm gradient theo <code>w</code>, <code>b</code>; kiểm tra gradient bằng sai phân hữu hạn; cài gradient descent bằng NumPy; giải thích bằng số ảnh hưởng của learning rate (0,001; 0,01; 0,5; 1,1) và vẽ đường loss; hiểu vì sao chuẩn hóa đặc trưng quyết định learning rate dùng được; so sánh với nghiệm đóng (least squares) và với mini-batch SGD. Chỉ cần NumPy và OpenCV.</div>
 
-<h2>Bài toán</h2>
-<p>Dự đoán nhiệt độ lò <code>y</code> từ công suất cấp <code>x</code>, giả định quan hệ tuyến tính <code>y ≈ w·x + b</code>. Ta cần tìm <code>w</code> và <code>b</code> từ dữ liệu.</p>
-<pre><code>import numpy as np
+<h2>1. Bài toán: hiệu chỉnh pixel sang milimét</h2>
+<p>Trạm đo chiều dài chi tiết bằng camera (chặng 7). Bạn đặt 40 mẫu chuẩn có chiều dài đã biết (đo bằng máy CMM hoặc thước cặp) dưới camera, đo chiều dài mỗi mẫu bằng pixel. Ta tìm quan hệ tuyến tính</p>
+<pre><code class="language-text">y_mm ≈ w · x_px + b</code></pre>
+<p>trong đó <code>w</code> là kích thước một pixel (mm/px) và <code>b</code> là độ lệch cố định (do ngưỡng cạnh, viền chi tiết). Dữ liệu mô phỏng: kích thước pixel thật 0,0482 mm/px, lệch 0,35 mm, nhiễu đo ±0,03 mm.</p>
+<pre><code class="language-python">import numpy as np
 
 rng = np.random.default_rng(0)
-x = rng.uniform(10, 100, size=200)          # công suất (%)
-y = 3.2 * x + 25 + rng.normal(0, 8, 200)    # nhiệt độ thật có nhiễu</code></pre>
+x = np.sort(rng.uniform(150, 750, 40))                 # chiều dài đo bằng camera (px)
+y = 0.0482 * x + 0.35 + rng.normal(0, 0.03, 40)        # chiều dài thật (mm) từ CMM
+np.savez("hieu_chinh.npz", x=x, y=y)                   # các đoạn sau đọc lại file này
+print("5 mẫu đầu (px):", np.round(x[:5], 1))
+print("5 mẫu đầu (mm):", np.round(y[:5], 3))
+print(f"x: trung bình {x.mean():.1f} px, độ lệch chuẩn {x.std():.1f} px | y trung bình {y.mean():.2f} mm")</code></pre>
+<pre><code class="language-text">5 mẫu đầu (px): [151.6 159.9 167.  170.2 174.6]
+5 mẫu đầu (mm): [7.621 8.103 8.439 8.575 8.773]
+x: trung bình 472.0 px, độ lệch chuẩn 180.5 px | y trung bình 23.11 mm</code></pre>
+<p>Bài toán này có lời giải trực tiếp (mục 7), nhưng ta cố ý giải bằng gradient descent: đây là phương pháp duy nhất còn dùng được khi mô hình có hàng triệu tham số và không có công thức nghiệm.</p>
 
-<h2>Hàm mất mát</h2>
-<p>Đo độ sai bằng <strong>trung bình bình phương sai số</strong> (MSE):</p>
-<pre><code>def mse(w, b):
-    return np.mean((w * x + b - y) ** 2)</code></pre>
+<h2>2. Hàm mất mát MSE</h2>
+<p>Với một cặp <code>(w, b)</code>, mô hình dự đoán <code>ŷ = w·x + b</code>. Sai số của mẫu thứ i là <code>e_i = ŷ_i − y_i</code>. Hàm mất mát <strong>MSE</strong> (mean squared error, trung bình bình phương sai số):</p>
+<pre><code class="language-text">L(w, b) = (1/n) · Σ (w·x_i + b − y_i)²</code></pre>
+<p>Vì sao bình phương? Sai âm và sai dương không triệt tiêu nhau; sai lớn bị phạt nặng hơn sai nhỏ; và hàm trơn, đạo hàm được ở mọi điểm. Căn bậc hai của MSE (RMSE) có cùng đơn vị với <code>y</code> (mm), dễ đọc hơn. Thử vài cặp tham số đoán tay:</p>
+<pre><code class="language-python">import numpy as np
 
-<h2>Gradient: hướng làm loss tăng nhanh nhất</h2>
-<p>Lấy đạo hàm của MSE theo <code>w</code> và <code>b</code>:</p>
-<pre><code>dL/dw = 2 · mean((w·x + b − y) · x)
-dL/db = 2 · mean(w·x + b − y)</code></pre>
-<p>Gradient descent đi <strong>ngược</strong> hướng gradient từng bước nhỏ:</p>
+d = np.load("hieu_chinh.npz")
+x, y = d["x"], d["y"]
 
-<h2>Cài đặt</h2>
-<pre><code>x_n = (x - x.mean()) / x.std()      # chuẩn hóa giúp hội tụ nhanh và ổn định
+
+def mse(w, b):
+    return np.mean((w * x + b - y) ** 2)
+
+
+for w, b in [(0.0, 0.0), (0.05, 0.0), (0.048, 0.0), (0.048, 0.35), (0.0482, 0.35)]:
+    print(f"w = {w:.4f} mm/px, b = {b:.2f} mm → MSE = {mse(w, b):10.5f} mm², RMSE = {np.sqrt(mse(w, b)):.4f} mm")</code></pre>
+<pre><code class="language-text">w = 0.0000 mm/px, b = 0.00 mm → MSE =  609.69594 mm², RMSE = 24.6920 mm
+w = 0.0500 mm/px, b = 0.00 mm → MSE =    0.34968 mm², RMSE = 0.5913 mm
+w = 0.0480 mm/px, b = 0.00 mm → MSE =    0.20770 mm², RMSE = 0.4557 mm
+w = 0.0480 mm/px, b = 0.35 mm → MSE =    0.01279 mm², RMSE = 0.1131 mm
+w = 0.0482 mm/px, b = 0.35 mm → MSE =    0.00114 mm², RMSE = 0.0337 mm</code></pre>
+<p>Loss càng nhỏ, đường thẳng càng khớp dữ liệu. Với tham số đúng (0,0482; 0,35), RMSE xấp xỉ mức nhiễu đo 0,03 mm: không mô hình tuyến tính nào làm tốt hơn đáng kể. "Huấn luyện" chính là tìm <code>(w, b)</code> làm <code>L</code> nhỏ nhất, một cách tự động.</p>
+
+<h2>3. Gradient: đạo hàm của loss theo từng tham số</h2>
+<p><strong>Gradient</strong> là vector các đạo hàm riêng <code>(∂L/∂w, ∂L/∂b)</code>. Nó chỉ hướng làm loss <em>tăng</em> nhanh nhất; đi ngược hướng đó thì loss giảm. Đạo hàm bằng quy tắc dây chuyền: với <code>e_i = w·x_i + b − y_i</code>, ta có <code>∂(e_i²)/∂w = 2·e_i·x_i</code> và <code>∂(e_i²)/∂b = 2·e_i</code>. Lấy trung bình:</p>
+<pre><code class="language-text">∂L/∂w = (2/n) · Σ e_i · x_i  = 2 · mean(e · x)
+∂L/∂b = (2/n) · Σ e_i        = 2 · mean(e)</code></pre>
+<p>Đọc công thức: nếu mô hình dự đoán dư (e &gt; 0) ở các mẫu có <code>x</code> lớn, <code>∂L/∂w</code> dương, nên phải giảm <code>w</code>. Công thức tự viết rất dễ sai dấu hoặc thiếu hệ số 2, nên luôn kiểm tra bằng <strong>sai phân hữu hạn</strong>: tăng tham số một lượng rất nhỏ <code>h</code> và xem loss đổi bao nhiêu.</p>
+<pre><code class="language-python">import numpy as np
+
+d = np.load("hieu_chinh.npz")
+x, y = d["x"], d["y"]
+
+
+def mse(w, b):
+    return np.mean((w * x + b - y) ** 2)
+
+
+def gradient(w, b):
+    e = w * x + b - y
+    return 2 * np.mean(e * x), 2 * np.mean(e)
+
+
+w, b, h = 0.03, 0.1, 1e-6
+gw, gb = gradient(w, b)
+gw_so = (mse(w + h, b) - mse(w - h, b)) / (2 * h)      # sai phân trung tâm
+gb_so = (mse(w, b + h) - mse(w, b - h)) / (2 * h)
+print(f"∂L/∂w: công thức {gw:.4f} | sai phân {gw_so:.4f}")
+print(f"∂L/∂b: công thức {gb:.5f} | sai phân {gb_so:.5f}")</code></pre>
+<pre><code class="language-text">∂L/∂w: công thức -9538.7913 | sai phân -9538.7913
+∂L/∂b: công thức -17.69920 | sai phân -17.69920</code></pre>
+<p>Hai cách khớp nhau, công thức đúng. Chú ý độ lớn: <code>∂L/∂w</code> lớn gấp hàng trăm lần <code>∂L/∂b</code>, vì nó được nhân với <code>x</code> (vài trăm pixel). Chi tiết này sẽ gây rắc rối ở mục 6.</p>
+<div class="tip"><strong>Autograd làm thay việc này</strong>Ở bài "PyTorch cơ bản: tensor, autograd, vòng lặp huấn luyện", PyTorch tự tính gradient cho mọi phép toán bạn viết (backpropagation). Nhưng kỹ thuật kiểm tra bằng sai phân vẫn hữu ích khi bạn viết hàm loss tùy biến.</div>
+
+<h2>4. Gradient descent bằng NumPy</h2>
+<p>Thuật toán chỉ có một dòng cốt lõi, lặp lại nhiều lần:</p>
+<pre><code class="language-text">tham_số ← tham_số − learning_rate · gradient</code></pre>
+<p><strong>Learning rate</strong> (tốc độ học, ký hiệu <code>lr</code> hay η) quyết định mỗi bước đi xa bao nhiêu. Trước khi chạy, ta <strong>chuẩn hóa</strong> <code>x</code> về trung bình 0, độ lệch chuẩn 1 (lý do ở mục 6), rồi đổi tham số về đơn vị gốc sau khi học xong:</p>
+<pre><code class="language-python">import numpy as np
+
+d = np.load("hieu_chinh.npz")
+x, y = d["x"], d["y"]
+mu, sigma = x.mean(), x.std()
+xs = (x - mu) / sigma                       # x chuẩn hóa: trung bình 0, độ lệch chuẩn 1
 
 w, b, lr = 0.0, 0.0, 0.1
-for step in range(200):
-    err = w * x_n + b - y
-    dw = 2 * np.mean(err * x_n)
-    db = 2 * np.mean(err)
-    w -= lr * dw
+for buoc in range(101):
+    e = w * xs + b - y                      # 1. dự đoán và sai số
+    loss = np.mean(e ** 2)                  # 2. loss
+    dw, db = 2 * np.mean(e * xs), 2 * np.mean(e)   # 3. gradient
+    if buoc % 20 == 0:
+        print(f"bước {buoc:3d}: loss {loss:12.6f} | w {w:7.4f} | b {b:7.4f}")
+    w -= lr * dw                            # 4. cập nhật ngược hướng gradient
     b -= lr * db
-    if step % 50 == 0:
-        print(step, round(np.mean(err ** 2), 2))
 
-# đổi tham số về thang đo gốc của x
-w_goc = w / x.std()
-b_goc = b - w * x.mean() / x.std()
-print(f"y ≈ {w_goc:.2f}·x + {b_goc:.2f}")    # gần với 3.2·x + 25</code></pre>
+w_goc = w / sigma                           # y = w·(x − mu)/sigma + b = (w/sigma)·x + (b − w·mu/sigma)
+b_goc = b - w * mu / sigma
+print(f"kết quả: y ≈ {w_goc:.5f}·x + {b_goc:.4f}  (giá trị thật 0.0482·x + 0.35)")
+print(f"kích thước pixel ≈ {w_goc * 1000:.2f} µm")</code></pre>
+<pre><code class="language-text">bước   0: loss   609.695943 | w  0.0000 | b  0.0000
+bước  20: loss     0.082084 | w  8.5962 | b 22.8434
+bước  40: loss     0.001052 | w  8.6953 | b 23.1068
+bước  60: loss     0.001041 | w  8.6965 | b 23.1098
+bước  80: loss     0.001041 | w  8.6965 | b 23.1099
+bước 100: loss     0.001041 | w  8.6965 | b 23.1099
+kết quả: y ≈ 0.04818·x + 0.3686  (giá trị thật 0.0482·x + 0.35)
+kích thước pixel ≈ 48.18 µm</code></pre>
+<p>Loss giảm từ hàng trăm xuống khoảng 0,001 mm² (RMSE ≈ 0,03 mm, đúng mức nhiễu) và dừng ở đó: mô hình đã hội tụ. Tham số tìm được khác giá trị thật một chút vì 40 mẫu có nhiễu; đó cũng là kết quả tốt nhất mà dữ liệu cho phép (mục 7 sẽ xác nhận). Đây là toàn bộ "bí mật" của việc huấn luyện. Bốn bước trong vòng lặp (dự đoán, tính loss, tính gradient, cập nhật) chính là bốn bước bạn sẽ viết lại bằng PyTorch.</p>
 
-<h2>Learning rate quan trọng thế nào?</h2>
+<h2>5. Learning rate: quá nhỏ, vừa phải, quá lớn</h2>
+<p>Chạy cùng thuật toán với nhiều learning rate, ghi lại loss sau mỗi bước:</p>
+<pre><code class="language-python">import numpy as np
+
+d = np.load("hieu_chinh.npz")
+x, y = d["x"], d["y"]
+xs = (x - x.mean()) / x.std()
+
+
+def chay_gd(lr, so_buoc=200):
+    w, b, lich_su = 0.0, 0.0, []
+    for _ in range(so_buoc + 1):
+        e = w * xs + b - y
+        lich_su.append(np.mean(e ** 2))
+        w, b = w - lr * 2 * np.mean(e * xs), b - lr * 2 * np.mean(e)
+    return np.array(lich_su)
+
+
+cac_lr = [0.001, 0.01, 0.1, 0.5, 1.0, 1.1]
+duong_loss = {lr: chay_gd(lr) for lr in cac_lr}
+np.savez("duong_loss.npz", **{str(lr): v for lr, v in duong_loss.items()})
+cot = (0, 1, 10, 50, 200)
+print("lr     | " + "".join(f"bước {i}".ljust(10) for i in cot).rstrip())
+for lr, L in duong_loss.items():
+    print(f"{lr:&lt;6} | " + "".join(f"{L[i]:.3g}".ljust(10) for i in cot).rstrip())</code></pre>
+<pre><code class="language-text">lr     | bước 0    bước 1    bước 10   bước 50   bước 200
+0.001  | 610       607       586       499       274
+0.01   | 610       586       407       80.9      0.19
+0.1    | 610       390       7.03      0.00104   0.00104
+0.5    | 610       0.00104   0.00104   0.00104   0.00104
+1.0    | 610       610       610       610       610
+1.1    | 610       878       2.34e+04  5.05e+10  2.87e+34</code></pre>
+<table>
+  <tr><th>lr</th><th>Hiện tượng</th><th>Ý nghĩa</th></tr>
+  <tr><td>0,001</td><td>Loss giảm rất chậm, sau 200 bước vẫn còn rất xa đáy</td><td>Quá nhỏ: tốn thời gian huấn luyện, dễ tưởng nhầm là mô hình "không học được"</td></tr>
+  <tr><td>0,01</td><td>Giảm đều nhưng 200 bước chưa tới đáy</td><td>Hơi nhỏ: cần nhiều bước hơn</td></tr>
+  <tr><td>0,1</td><td>Tới đáy sau khoảng 50 bước</td><td>Tốt</td></tr>
+  <tr><td>0,5</td><td>Tới đáy ngay sau <strong>1 bước</strong></td><td>Tối ưu cho bài này (giải thích bên dưới)</td></tr>
+  <tr><td>1,0</td><td>Loss đứng yên ở giá trị ban đầu</td><td>Tham số nhảy qua lại hai bên đáy mãi mãi</td></tr>
+  <tr><td>1,1</td><td>Loss tăng như hàm mũ</td><td><strong>Phân kỳ</strong> (diverge): mỗi bước vượt quá đáy xa hơn bước trước</td></tr>
+</table>
+<p>Vì sao có những con số "đặc biệt" 0,5 và 1? Với <code>x</code> đã chuẩn hóa (trung bình 0, phương sai 1), hai tham số không ảnh hưởng nhau và mỗi bước cập nhật tương đương với</p>
+<pre><code class="language-text">(w − w*) ← (1 − 2·lr) · (w − w*)       (tương tự với b)</code></pre>
+<p>trong đó <code>w*</code> là giá trị tối ưu. Khoảng cách tới đáy được nhân với hệ số <code>1 − 2·lr</code> sau mỗi bước: lr = 0,001 cho hệ số 0,998 (sau 200 bước còn 0,998<sup>200</sup> ≈ 0,67 khoảng cách ban đầu), lr = 0,1 cho 0,8, lr = 0,5 cho 0 (tới đáy ngay), lr = 1 cho −1 (dao động mãi), lr = 1,1 cho −1,2 (mỗi bước xa thêm 20%, loss tăng 1,44 lần). Điều kiện hội tụ là <code>|1 − 2·lr| &lt; 1</code>, tức <code>0 &lt; lr &lt; 1</code>. Với mạng nơ-ron thật không có công thức gọn như vậy, nhưng hiện tượng giống hệt: có một ngưỡng learning rate mà vượt qua thì huấn luyện nổ tung, loss thành <code>nan</code>.</p>
+<p>Vẽ đường loss theo thang log là cách nhanh nhất để "đọc" một lần huấn luyện. Ta vẽ bằng OpenCV (không cần thư viện vẽ đồ thị):</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+d = np.load("duong_loss.npz")
+W, H, LE = 640, 400, 60                          # kích thước ảnh, lề
+y_min, y_max = -4, 6                             # trục tung: log10(loss) từ 1e-4 đến 1e6
+anh = np.full((H, W, 3), 255, np.uint8)
+
+
+def diem(buoc, loss):
+    ly = np.clip(np.log10(max(loss, 1e-12)), y_min, y_max)
+    px = LE + buoc / 200 * (W - LE - 20)
+    py = H - LE - (ly - y_min) / (y_max - y_min) * (H - LE - 20)
+    return int(round(px)), int(round(py))
+
+
+for k in range(y_min, y_max + 1, 2):             # lưới ngang và nhãn trục tung
+    _, py = diem(0, 10.0 ** k)
+    cv2.line(anh, (LE, py), (W - 20, py), (225, 225, 225), 1)
+    cv2.putText(anh, f"1e{k}", (5, py + 5), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (80, 80, 80), 1)
+cv2.putText(anh, "buoc (0 - 200)", (W // 2 - 50, H - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (80, 80, 80), 1)
+
+mau = {"0.001": (200, 120, 0), "0.01": (0, 160, 0), "0.5": (0, 0, 220), "1.1": (160, 0, 160)}
+for i, (ten, c) in enumerate(mau.items()):
+    L = d[ten]
+    pts = np.array([diem(k, L[k]) for k in range(len(L))], np.int32)
+    cv2.polylines(anh, [pts], False, c, 2, cv2.LINE_AA)
+    cv2.putText(anh, f"lr = {ten}", (W - 150, 40 + 22 * i), cv2.FONT_HERSHEY_SIMPLEX, 0.55, c, 2)
+cv2.imwrite("duong_loss.png", anh)
+print("đã lưu duong_loss.png", anh.shape)</code></pre>
+<pre><code class="language-text">đã lưu duong_loss.png (400, 640, 3)</code></pre>
+<p>Trên hình: đường lr = 0,001 gần như nằm ngang ở phía trên; lr = 0,01 dốc đều xuống; lr = 0,5 rơi thẳng xuống đáy ở bước 1 rồi nằm ngang; lr = 1,1 vọt lên khỏi khung hình (bị cắt ở 1e6). Nếu bạn đã cài matplotlib, đoạn tương đương ngắn hơn:</p>
+<pre><code class="language-python"># (minh họa) cần: pip install matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+
+d = np.load("duong_loss.npz")
+for ten in ["0.001", "0.01", "0.5", "1.1"]:
+    plt.semilogy(d[ten], label=f"lr = {ten}")
+plt.ylim(1e-4, 1e6)
+plt.xlabel("bước")
+plt.ylabel("loss (MSE, mm²)")
+plt.legend()
+plt.savefig("duong_loss_mpl.png", dpi=120)</code></pre>
+
+<h2>6. Chuẩn hóa đặc trưng: vì sao bắt buộc</h2>
+<p>Thử bỏ bước chuẩn hóa, chạy thẳng trên <code>x</code> tính bằng pixel với learning rate "nhỏ" 0,001:</p>
+<pre><code class="language-python">import numpy as np
+
+d = np.load("hieu_chinh.npz")
+x, y = d["x"], d["y"]
+
+
+def gd_tren_x_goc(lr, so_buoc):
+    w, b = 0.0, 0.0
+    for buoc in range(so_buoc + 1):
+        e = w * x + b - y
+        loss = np.mean(e ** 2)
+        if loss &gt; 1e12:
+            return f"phân kỳ ở bước {buoc} (loss {loss:.2e})"
+        w, b = w - lr * 2 * np.mean(e * x), b - lr * 2 * np.mean(e)
+    return f"sau {so_buoc} bước: loss {loss:.4f}, w {w:.5f}, b {b:.4f}"
+
+
+print("lr = 0.001:", gd_tren_x_goc(0.001, 1000))
+print("lr = 1e-6 :", gd_tren_x_goc(1e-6, 1000))
+print("lr = 1e-6 :", gd_tren_x_goc(1e-6, 100000))
+
+for ten, dac_trung in [("x gốc (px)", x), ("x chuẩn hóa", (x - x.mean()) / x.std())]:
+    H = 2 * np.array([[np.mean(dac_trung ** 2), dac_trung.mean()], [dac_trung.mean(), 1.0]])
+    lam = np.linalg.eigvalsh(H)
+    print(f"{ten:12s}: độ cong lớn nhất {lam.max():.4g}, nhỏ nhất {lam.min():.4g}, "
+          f"lr tối đa {2 / lam.max():.3g}, tỉ số cong {lam.max() / lam.min():.3g}")</code></pre>
+<pre><code class="language-text">lr = 0.001: phân kỳ ở bước 2 (loss 4.12e+13)
+lr = 1e-6 : sau 1000 bước: loss 0.0184, w 0.04886, b 0.0002
+lr = 1e-6 : sau 100000 bước: loss 0.0175, w 0.04884, b 0.0094
+x gốc (px)  : độ cong lớn nhất 5.107e+05, nhỏ nhất 0.2552, lr tối đa 3.92e-06, tỉ số cong 2e+06
+x chuẩn hóa : độ cong lớn nhất 2, nhỏ nhất 2, lr tối đa 1, tỉ số cong 1</code></pre>
+<p>Learning rate 0,001, "quá nhỏ" với dữ liệu chuẩn hóa, lại làm thuật toán <strong>phân kỳ</strong> trên dữ liệu gốc. Giảm xuống 10<sup>−6</sup> thì không nổ nữa, nhưng sau 100.000 bước <code>b</code> mới nhích từ 0 lên 0,0094, còn rất xa 0,37; loss 0,0175 vẫn lớn gấp 17 lần loss tối ưu 0,00104 (mục 7). <code>w</code> phải "gánh" luôn phần của <code>b</code> nên lệch sang 0,0488. Nguyên nhân nằm ở <strong>độ cong</strong> của mặt loss theo từng hướng (các trị riêng của ma trận đạo hàm bậc hai):</p>
 <ul>
-  <li>Quá nhỏ: hội tụ rất chậm.</li>
-  <li>Quá lớn: loss dao động hoặc tăng vọt (phân kỳ).</li>
-  <li>Thử với <code>lr = 0.001</code>, <code>0.1</code>, <code>1.1</code> và quan sát loss để có cảm nhận trực quan.</li>
+  <li>Theo hướng <code>w</code>, loss cong rất gắt vì <code>x</code> cỡ vài trăm: learning rate phải nhỏ hơn 2/độ cong lớn nhất, khoảng 4·10<sup>−6</sup>, nếu không sẽ vượt đáy và phân kỳ.</li>
+  <li>Theo hướng còn lại, loss gần như phẳng: với learning rate nhỏ như vậy, mỗi bước chỉ nhích một chút xíu.</li>
+  <li>Tỉ số hai độ cong cỡ 2 triệu: không có learning rate nào vừa đủ lớn cho hướng phẳng vừa đủ nhỏ cho hướng dốc. Mặt loss là một "khe hẹp" dài.</li>
+</ul>
+<p>Sau chuẩn hóa, hai độ cong bằng nhau (bằng 2), mặt loss tròn đều, và một learning rate trong khoảng (0, 1) đi thẳng về đáy. Đây là lý do mọi đường ống Deep Learning đều chuẩn hóa đầu vào: chia ảnh cho 255 và trừ mean, chia std (bài "Dataset, DataLoader và augmentation" sẽ làm việc này cho ảnh).</p>
+<div class="warn"><strong>Tham số chuẩn hóa là một phần của mô hình</strong><code>mu</code> và <code>sigma</code> tính trên dữ liệu huấn luyện phải được lưu lại cùng <code>w</code>, <code>b</code> và dùng y hệt khi chạy trên trạm. Tính lại <code>mu</code>, <code>sigma</code> trên dữ liệu mới, hoặc quên chuẩn hóa ở phía trạm, cho kết quả sai mà không báo lỗi.</div>
+
+<h2>7. So sánh với nghiệm bình phương tối thiểu</h2>
+<p>Hồi quy tuyến tính với MSE có nghiệm đóng (closed-form): giải hệ phương trình chuẩn <code>(AᵀA)·θ = Aᵀy</code> với <code>A = [x, 1]</code>. NumPy làm việc này ổn định bằng <code>np.linalg.lstsq</code> (hoặc <code>np.polyfit</code> bậc 1):</p>
+<pre><code class="language-python">import numpy as np
+
+d = np.load("hieu_chinh.npz")
+x, y = d["x"], d["y"]
+
+A = np.column_stack([x, np.ones_like(x)])
+(w_ls, b_ls), *_ = np.linalg.lstsq(A, y, rcond=None)
+w_pf, b_pf = np.polyfit(x, y, 1)
+
+xs = (x - x.mean()) / x.std()                       # gradient descent như mục 4, lr = 0.5, 20 bước
+w, b = 0.0, 0.0
+for _ in range(20):
+    e = w * xs + b - y
+    w, b = w - 0.5 * 2 * np.mean(e * xs), b - 0.5 * 2 * np.mean(e)
+w_gd, b_gd = w / x.std(), b - w * x.mean() / x.std()
+
+for ten, ww, bb in [("lstsq", w_ls, b_ls), ("polyfit", w_pf, b_pf), ("gradient descent", w_gd, b_gd)]:
+    print(f"{ten:17s}: w = {ww:.6f} mm/px, b = {bb:.5f} mm, MSE = {np.mean((ww * x + bb - y) ** 2):.7f}")</code></pre>
+<pre><code class="language-text">lstsq            : w = 0.048180 mm/px, b = 0.36864 mm, MSE = 0.0010415
+polyfit          : w = 0.048180 mm/px, b = 0.36864 mm, MSE = 0.0010415
+gradient descent : w = 0.048180 mm/px, b = 0.36864 mm, MSE = 0.0010415</code></pre>
+<p>Ba cách cho cùng một nghiệm. Vậy tại sao không luôn dùng công thức đóng? Vì nó chỉ tồn tại cho mô hình tuyến tính với loss bình phương. Mạng nơ-ron có hàm kích hoạt phi tuyến, hàm loss cross-entropy, hàng triệu tham số: không có công thức nào, chỉ còn gradient descent. Với bài hiệu chỉnh pixel–mm thật trên trạm, hãy dùng <code>lstsq</code>; gradient descent ở đây là để hiểu cơ chế.</p>
+
+<h2>8. Từ gradient descent đến mini-batch SGD</h2>
+<p>Ở trên, mỗi bước dùng <em>toàn bộ</em> 40 mẫu để tính gradient. Với 50.000 ảnh, mỗi bước phải chạy qua cả 50.000 ảnh mới cập nhật được một lần, quá chậm và không vừa bộ nhớ GPU. <strong>Mini-batch SGD</strong> (stochastic gradient descent) tính gradient trên một nhóm nhỏ ngẫu nhiên (batch) và cập nhật ngay. Mỗi lần duyệt hết dữ liệu gọi là một <strong>epoch</strong>.</p>
+<pre><code class="language-python">import numpy as np
+
+d = np.load("hieu_chinh.npz")
+x, y = d["x"], d["y"]
+mu, sigma = x.mean(), x.std()
+xs = (x - mu) / sigma
+
+rng = np.random.default_rng(0)
+w, b, lr, batch = 0.0, 0.0, 0.1, 8
+for epoch in range(30):
+    thu_tu = rng.permutation(len(xs))              # xáo trộn mỗi epoch
+    for i in range(0, len(xs), batch):
+        idx = thu_tu[i:i + batch]                   # 5 batch × 8 mẫu = 1 epoch
+        e = w * xs[idx] + b - y[idx]
+        w -= lr * 2 * np.mean(e * xs[idx])
+        b -= lr * 2 * np.mean(e)
+    if epoch % 10 == 9:
+        loss = np.mean((w * xs + b - y) ** 2)
+        print(f"epoch {epoch + 1:2d}: loss toàn bộ {loss:.6f} | w_gốc {w / sigma:.6f} | b_gốc {b - w * mu / sigma:.4f}")</code></pre>
+<pre><code class="language-text">epoch 10: loss toàn bộ 0.001043 | w_gốc 0.048186 | b_gốc 0.3659
+epoch 20: loss toàn bộ 0.001042 | w_gốc 0.048182 | b_gốc 0.3665
+epoch 30: loss toàn bộ 0.001042 | w_gốc 0.048176 | b_gốc 0.3704</code></pre>
+<p>Mỗi batch chỉ là ước lượng "có nhiễu" của gradient thật, nên tham số dao động nhẹ quanh đáy thay vì dừng hẳn; loss vẫn xuống gần mức tối ưu. Trong Deep Learning, nhiễu này còn có ích (giúp thoát vùng phẳng), và người ta giảm dần learning rate về cuối để tham số ổn định.</p>
+<table>
+  <tr><th>Trong bài này</th><th>Trong mạng nơ-ron</th></tr>
+  <tr><td>2 tham số <code>w</code>, <code>b</code></td><td>Hàng nghìn đến hàng trăm triệu tham số</td></tr>
+  <tr><td>Tự đạo hàm bằng tay, kiểm tra bằng sai phân</td><td>Autograd tính tự động (backpropagation)</td></tr>
+  <tr><td>Loss MSE (hồi quy)</td><td>Cross-entropy cho phân loại, MSE/L1 cho hồi quy, loss riêng cho detection</td></tr>
+  <tr><td>Mặt loss "cái bát" một đáy duy nhất</td><td>Mặt loss gồ ghề, nhiều vùng phẳng; không đảm bảo tới điểm thấp nhất toàn cục</td></tr>
+  <tr><td>Gradient descent thuần, lr cố định</td><td>SGD momentum, Adam; lr thay đổi theo lịch (scheduler)</td></tr>
+  <tr><td>Chuẩn hóa <code>x</code> bằng mean/std</td><td>Chia ảnh cho 255, chuẩn hóa mean/std; BatchNorm bên trong mạng</td></tr>
+</table>
+
+<h2>9. Sai lầm thường gặp</h2>
+<ul>
+  <li><strong>Sai dấu khi cập nhật</strong> (<code>w += lr * dw</code>): loss tăng ngay từ bước đầu. Gradient chỉ hướng loss tăng, phải đi ngược.</li>
+  <li><strong>Không chuẩn hóa đầu vào</strong>, rồi kết luận "thuật toán không hội tụ" hoặc giảm lr đến mức không học được gì.</li>
+  <li><strong>Chọn learning rate một lần cho mọi bài</strong>. Learning rate phụ thuộc thang đo dữ liệu, kiến trúc, optimizer, kích thước batch. Luôn nhìn đường loss vài chục bước đầu.</li>
+  <li><strong>Thấy loss thành <code>nan</code> hoặc <code>inf</code></strong> mà không nghĩ tới learning rate quá lớn. Đó là nguyên nhân phổ biến nhất.</li>
+  <li><strong>Quên đổi tham số về thang đo gốc</strong> (hoặc quên lưu <code>mu</code>, <code>sigma</code>), dùng <code>w</code> học trên <code>x</code> chuẩn hóa để nhân với <code>x</code> pixel.</li>
+  <li><strong>Tính gradient bằng tay mà không kiểm tra</strong>: lỗi thiếu hệ số 2 vẫn hội tụ (chỉ như lr nhỏ đi một nửa), nên rất khó phát hiện bằng mắt.</li>
 </ul>
 
-<h2>Liên hệ với Deep Learning</h2>
-<table>
-  <tr><th>Ở đây</th><th>Trong mạng nơ-ron</th></tr>
-  <tr><td>2 tham số w, b</td><td>Hàng triệu đến hàng tỷ tham số</td></tr>
-  <tr><td>Tự tính đạo hàm bằng tay</td><td>Autograd tính tự động (backpropagation)</td></tr>
-  <tr><td>Dùng toàn bộ dữ liệu mỗi bước</td><td>Mini-batch (stochastic gradient descent)</td></tr>
-  <tr><td>Gradient descent thuần</td><td>Các biến thể như Adam, SGD momentum</td></tr>
-</table>
-<p>Hiểu vòng lặp nhỏ này, bạn sẽ thấy vòng lặp huấn luyện PyTorch quen thuộc ngay, xem <a href="pytorch-co-ban-tensor-autograd.html">PyTorch cơ bản</a>.</p>
+<h2>10. Bài tập</h2>
+<div class="ex">
+<p><strong>Bài 1.</strong> Thử learning rate 0,001; 0,01; 0,5 và vẽ đường loss của từng trường hợp, trên dữ liệu đã chuẩn hóa (mục 5). Sau đó lặp lại với <code>x</code> <em>chưa chuẩn hóa</em>: với mỗi lr, loss sau 200 bước là bao nhiêu, hay phân kỳ ở bước nào? Giải thích sự khác biệt.</p>
+<details><summary>Xem đáp án</summary>
+<p>Phần dữ liệu chuẩn hóa: chạy đoạn code mục 5 và mục vẽ. Kết quả: 0,001 giảm rất chậm (bước 200 vẫn còn vài trăm mm²), 0,01 giảm đều (bước 200 còn khoảng 0,19), 0,5 xuống đáy sau 1 bước. Phần chưa chuẩn hóa:</p>
+<pre><code class="language-python">import numpy as np
+
+d = np.load("hieu_chinh.npz")
+x, y = d["x"], d["y"]
+for lr in [0.001, 0.01, 0.5]:
+    w, b, ket_qua = 0.0, 0.0, None
+    for buoc in range(201):
+        e = w * x + b - y
+        loss = np.mean(e ** 2)
+        if not np.isfinite(loss) or loss &gt; 1e12:
+            ket_qua = f"phân kỳ ở bước {buoc}"
+            break
+        w, b = w - lr * 2 * np.mean(e * x), b - lr * 2 * np.mean(e)
+    print(f"lr = {lr}: {ket_qua or f'loss sau 200 bước {loss:.4f}'}")</code></pre>
+<pre><code class="language-text">lr = 0.001: phân kỳ ở bước 2
+lr = 0.01: phân kỳ ở bước 2
+lr = 0.5: phân kỳ ở bước 1</code></pre>
+<p>Trên <code>x</code> gốc, cả ba learning rate đều lớn hơn ngưỡng ổn định khoảng 4·10<sup>−6</sup> (mục 6), nên đều phân kỳ, lr càng lớn càng nổ sớm. Cùng một con số learning rate có thể "quá nhỏ" hay "quá lớn" tùy thang đo dữ liệu.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Camera nhìn hơi nghiêng nên kích thước pixel thay đổi theo hàng ảnh: <code>y_mm = w1·x_px + w2·hang + b</code>, với <code>hang</code> là tọa độ hàng (0–1000) của tâm chi tiết. Viết gradient descent dạng <strong>vector</strong> cho mô hình nhiều đặc trưng <code>ŷ = X·w + b</code> (gradient <code>∂L/∂w = (2/n)·Xᵀe</code>), chuẩn hóa từng cột, rồi so với <code>lstsq</code>. Dùng dữ liệu mô phỏng: 60 mẫu, <code>y = 0,0482·x + 0,0006·hang + 0,35</code> cộng nhiễu 0,03 mm (đoạn sinh dữ liệu ở đầu đáp án).</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import numpy as np
+
+rng = np.random.default_rng(5)
+n = 60
+X = np.column_stack([rng.uniform(150, 750, n), rng.uniform(0, 1000, n)])   # [x_px, hàng]
+y = 0.0482 * X[:, 0] + 0.0006 * X[:, 1] + 0.35 + rng.normal(0, 0.03, n)
+
+mu, sigma = X.mean(axis=0), X.std(axis=0)
+Xs = (X - mu) / sigma                         # chuẩn hóa TỪNG cột
+w, b, lr = np.zeros(2), 0.0, 0.3
+for _ in range(300):
+    e = Xs @ w + b - y
+    w -= lr * 2 / n * (Xs.T @ e)              # vector gradient cho mọi trọng số cùng lúc
+    b -= lr * 2 * np.mean(e)
+w_goc = w / sigma
+b_goc = b - np.sum(w * mu / sigma)
+
+A = np.column_stack([X, np.ones(n)])
+theta, *_ = np.linalg.lstsq(A, y, rcond=None)
+print("gradient descent:", np.round(w_goc, 6), round(b_goc, 4))
+print("lstsq           :", np.round(theta[:2], 6), round(theta[2], 4))</code></pre>
+<pre><code class="language-text">gradient descent: [0.048217 0.000607] 0.3398
+lstsq           : [0.048217 0.000607] 0.3398</code></pre>
+<p>Hai nghiệm khớp nhau. Dạng vector <code>Xᵀe</code> là đúng công thức mà một lớp <code>nn.Linear</code> trong PyTorch dùng khi lan truyền ngược. Với hai cột có thang đo khác nhau (vài trăm và vài nghìn), chuẩn hóa từng cột là bắt buộc.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Không chạy code: với dữ liệu đã chuẩn hóa ở mục 5, (a) learning rate lớn nhất còn hội tụ là bao nhiêu? (b) với lr = 0,2, sau bao nhiêu bước khoảng cách tới đáy còn dưới 1% ban đầu? (c) với lr = 0,9 thì sao?</p>
+<details><summary>Xem đáp án</summary>
+<p>Hệ số co sau mỗi bước là <code>q = 1 − 2·lr</code>. (a) Hội tụ khi <code>|q| &lt; 1</code>, tức <code>lr &lt; 1</code> (lr = 1 dao động mãi). (b) <code>q = 0,6</code>: cần <code>0,6^k &lt; 0,01</code>, <code>k &gt; ln(0,01)/ln(0,6) ≈ 9,0</code>, tức <strong>10 bước</strong>. (c) <code>q = −0,8</code>: tham số nhảy qua lại hai bên đáy nhưng biên độ giảm 0,8 lần mỗi bước, cần <code>k &gt; ln(0,01)/ln(0,8) ≈ 20,6</code>, tức <strong>21 bước</strong>. lr = 0,9 vẫn hội tụ nhưng chậm hơn lr = 0,2, dù lớn hơn gấp 4,5 lần: learning rate lớn hơn không phải lúc nào cũng nhanh hơn.</p>
+</details>
+</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Huấn luyện = tìm tham số làm hàm mất mát nhỏ nhất. MSE <code>mean((w·x + b − y)²)</code> là loss chuẩn cho hồi quy.</li>
+  <li>Gradient <code>∂L/∂w = 2·mean(e·x)</code>, <code>∂L/∂b = 2·mean(e)</code> chỉ hướng loss tăng; gradient descent cập nhật <code>θ ← θ − lr·∇L</code>. Kiểm tra gradient tự viết bằng sai phân hữu hạn.</li>
+  <li>Learning rate quá nhỏ thì chậm, quá lớn thì dao động hoặc phân kỳ (loss tăng vọt, <code>nan</code>). Luôn vẽ đường loss theo thang log.</li>
+  <li>Chuẩn hóa đầu vào làm mặt loss tròn đều và cho phép learning rate lớn; trên dữ liệu chưa chuẩn hóa, cùng lr có thể nổ. Lưu tham số chuẩn hóa cùng mô hình.</li>
+  <li>Với hồi quy tuyến tính, nghiệm đóng <code>lstsq</code> cho cùng kết quả; gradient descent là phương pháp chung cho mọi mô hình, kể cả mạng nơ-ron, thường dưới dạng mini-batch SGD.</li>
+</ul>
+<p>Bài tiếp theo: <strong>Mạng nơ-ron và CNN hoạt động thế nào</strong>, nơi <code>w·x + b</code> trở thành một neuron và hàng nghìn neuron ghép thành mạng phân loại ảnh.</p>
