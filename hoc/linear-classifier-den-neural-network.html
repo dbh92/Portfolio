@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="vi" data-root="../">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Từ Linear Classifier đến Neural Network | HọcFree</title>
+<meta name="description" content="Từ hàm điểm f(x) = Wx + b: trọng số “nhìn” thấy gì, vì sao bắt buộc cần hàm kích hoạt và cách nhiều neuron ghép thành mạng nơ-ron sâu.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://hocfree.vn/hoc/linear-classifier-den-neural-network.html">
+<meta property="og:site_name" content="HọcFree">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Từ Linear Classifier đến Neural Network">
+<meta property="og:description" content="Từ hàm điểm f(x) = Wx + b: trọng số “nhìn” thấy gì, vì sao bắt buộc cần hàm kích hoạt và cách nhiều neuron ghép thành mạng nơ-ron sâu.">
+<meta property="og:url" content="https://hocfree.vn/hoc/linear-classifier-den-neural-network.html">
+<meta property="og:image" content="https://hocfree.vn/assets/images/posts/linear-classifier-den-neural-network.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="Từ Linear Classifier đến Neural Network">
+<meta property="og:locale" content="vi_VN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Từ Linear Classifier đến Neural Network">
+<meta name="twitter:description" content="Từ hàm điểm f(x) = Wx + b: trọng số “nhìn” thấy gì, vì sao bắt buộc cần hàm kích hoạt và cách nhiều neuron ghép thành mạng nơ-ron sâu.">
+<meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/linear-classifier-den-neural-network.jpg">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/fonts.css?v=20261014">
+<link rel="stylesheet" href="../assets/css/style.css?v=20261014">
+<script>try{var t=localStorage.getItem('hf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
+<meta property="article:published_time" content="2026-10-14">
+<meta property="article:section" content="Học AI &amp; Lập trình">
+<meta property="article:tag" content="Deep Learning">
+<meta property="article:tag" content="Machine Learning">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "Từ Linear Classifier đến Neural Network", "description": "Từ hàm điểm f(x) = Wx + b: trọng số “nhìn” thấy gì, vì sao bắt buộc cần hàm kích hoạt và cách nhiều neuron ghép thành mạng nơ-ron sâu.", "image": ["https://hocfree.vn/assets/images/posts/linear-classifier-den-neural-network.jpg"], "datePublished": "2026-10-14", "dateModified": "2026-10-14", "inLanguage": "vi", "articleSection": "Học AI & Lập trình", "keywords": "Deep Learning, Machine Learning", "wordCount": 1949, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/hoc/linear-classifier-den-neural-network.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Học AI & Lập trình", "item": "https://hocfree.vn/hoc/"}, {"@type": "ListItem", "position": 3, "name": "Từ Linear Classifier đến Neural Network"}]}</script>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/contrib/auto-render.min.js" onload="renderMathInElement(document.querySelector('.prose'),{delimiters:[{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}],throwOnError:false})"></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div class="progress" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="container wide header-top">
+    <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="nav-scrim" hidden></div>
+    <a class="logo" href="../" aria-label="HọcFree – Trang chủ"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+    <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
+    <div class="header-actions">
+      <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="login-link" href="../dang-nhap.html">Đăng nhập</a>
+      <a class="btn start-btn" href="../lo-trinh/">Bắt đầu học</a>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="container wide">
+      <nav class="site-nav" id="site-nav" aria-label="Menu chính">
+        <div class="drawer-head">
+          <a class="logo" href="../" tabindex="-1"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+          <button class="icon-btn nav-close" aria-label="Đóng menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <button type="button" class="drawer-search search-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Tìm bài học, chủ đề…</span></button>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="../">Trang chủ</a></li><li class="nav-item has-panel is-mega"><button type="button" class="nav-link nav-trigger is-active" aria-expanded="false" aria-controls="nav-panel-hoc" aria-current="true">Học AI &amp; Lập trình<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel mega" id="nav-panel-hoc">
+  <div class="container wide mega-inner">
+    <div class="mega-groups"><div class="mega-group"><a class="mega-group-title" href="../hoc/#programming">Programming</a><ul><li><a href="../hoc/python.html">Python</a></li><li><a href="../hoc/csharp.html">C#</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#ai-machine-learning">AI &amp; Machine Learning</a><ul><li><a href="../hoc/machine-learning.html">Machine Learning</a></li><li><a href="../hoc/deep-learning.html">Deep Learning</a></li><li><a href="../hoc/pytorch.html">PyTorch</a></li><li><a href="../hoc/generative-ai.html">Generative AI</a></li><li><a href="../hoc/llm-ai-agents.html">LLM / AI Agents</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#computer-vision">Computer Vision</a><ul><li><a href="../hoc/opencv.html">OpenCV</a></li><li><a href="../hoc/image-processing.html">Image Processing</a></li><li><a href="../hoc/computer-vision.html">Computer Vision</a></li><li><a href="../hoc/ocr.html">OCR</a></li><li><a href="../hoc/object-detection.html">Object Detection</a></li><li><a href="../hoc/segmentation.html">Segmentation</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#vision-engineering">Vision Engineering</a><ul><li><a href="../hoc/machine-vision.html">Machine Vision</a></li><li><a href="../hoc/ai-vision.html">AI Vision</a></li><li><a href="../hoc/industrial-vision.html">Industrial Vision</a></li><li><a href="../hoc/camera-lens.html">Camera &amp; Lens</a></li><li><a href="../hoc/lighting.html">Lighting</a></li><li><a href="../hoc/calibration.html">Calibration</a></li><li><a href="../hoc/plc-robot-mes.html">PLC / Robot / MES</a></li><li><a href="../hoc/vision-deployment.html">Vision Deployment</a></li></ul></div></div>
+    <a class="feature-card" href="../lo-trinh/vision-engineer.html">
+  <span class="feature-eyebrow">⭐ Learning Path nổi bật</span>
+  <span class="feature-title">Trở thành Vision Engineer</span>
+  <span class="feature-sub">Machine Vision + AI Vision + Industrial Automation</span>
+  <span class="feature-desc">Lộ trình thực chiến từ Python, OpenCV và Machine Vision đến Deep Learning, AI Vision, Camera, PLC, Robot và triển khai hệ thống Vision trong nhà máy.</span>
+  <span class="feature-chain" aria-label="Các chặng chính"><span>Python</span><i aria-hidden="true">→</i><span>OpenCV</span><i aria-hidden="true">→</i><span>Machine Vision</span><i aria-hidden="true">→</i><span>AI Vision</span><i aria-hidden="true">→</i><span class="chain-goal">🎯 Vision Engineer</span></span>
+  <span class="feature-meta">14 chặng · 5 giai đoạn · ~12 tháng</span>
+  <span class="feature-cta">Xem lộ trình →</span>
+</a>
+  </div>
+  <div class="mega-foot"><div class="container wide mega-foot-inner"><ol class="journey compact" aria-label="Học, thực hành, trở thành kỹ sư"><li><a href="../hoc/" aria-current="step"><span class="journey-n">1</span><span class="journey-t"><b>Học</b><small>Học AI &amp; Lập trình</small></span></a></li><li><a href="../projects/"><span class="journey-n">2</span><span class="journey-t"><b>Thực hành</b><small>Projects</small></span></a></li><li><a href="../lo-trinh/"><span class="journey-n">3</span><span class="journey-t"><b>Trở thành kỹ sư</b><small>Learning Paths</small></span></a></li></ol><a class="panel-all" href="../hoc/">Xem tất cả Học AI &amp; Lập trình →</a></div></div>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-projects">Projects<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-projects">
+  <p class="panel-kicker"><span>Bước 2 · Thực hành</span>Áp dụng vào dự án thật</p>
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../projects/ai-projects.html"><span class="drop-label">AI Projects</span><span class="drop-desc">Ứng dụng ML và LLM, từ ý tưởng đến bản demo</span></a></li><li><a class="drop-link" href="../projects/computer-vision-projects.html"><span class="drop-label">Computer Vision Projects</span><span class="drop-desc">Phát hiện, nhận dạng và theo dõi đối tượng</span></a></li><li><a class="drop-link" href="../projects/industrial-vision-projects.html"><span class="drop-label">Industrial Vision Projects</span><span class="drop-desc">Đo kích thước, kiểm tra lỗi, đọc mã trên dây chuyền</span></a></li></ul></div></div>
+  <a class="panel-all" href="../projects/">Xem tất cả Projects →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-lo-trinh">Learning Paths<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-lo-trinh">
+  <p class="panel-kicker"><span>Bước 3 · Trở thành kỹ sư</span>Định hướng nghề nghiệp</p>
+  <ul class="drop-list"><li><a class="drop-link is-flagship" href="../lo-trinh/vision-engineer.html"><span class="drop-label">⭐ Trở thành Vision Engineer</span><span class="drop-desc">Machine Vision + AI Vision + Industrial Automation · 14 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/#python-developer"><span class="drop-label">Python Developer<span class="badge-soon">Sắp ra mắt</span></span><span class="drop-desc">Python, công cụ, tự động hóa</span></a></li></ul>
+  <a class="panel-all" href="../lo-trinh/">Xem tất cả lộ trình →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-kien-thuc">Kiến thức<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-kien-thuc">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Lĩnh vực</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/programming.html"><span class="drop-label">Programming</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-machine-learning.html"><span class="drop-label">AI / Machine Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/deep-learning.html"><span class="drop-label">Deep Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/machine-vision.html"><span class="drop-label">Machine Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-vision.html"><span class="drop-label">AI Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/industrial-automation.html"><span class="drop-label">Industrial Automation</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Công cụ &amp; mẹo</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/tools-frameworks.html"><span class="drop-label">Tools &amp; Frameworks</span></a></li><li><a class="drop-link" href="../kien-thuc/tips-tricks.html"><span class="drop-label">Tips &amp; Tricks</span></a></li></ul></div></div>
+  <a class="panel-all" href="../kien-thuc/">Xem tất cả Kiến thức →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tin-tuc-ai">Tin tức AI<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tin-tuc-ai">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tin-tuc-ai/ai-news.html"><span class="drop-label">AI News</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-models.html"><span class="drop-label">AI Models</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/technology.html"><span class="drop-label">Technology</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/robotics.html"><span class="drop-label">Robotics</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-industry.html"><span class="drop-label">AI Industry</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tin-tuc-ai/">Xem tất cả Tin tức AI →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-ngoai-ngu">Ngoại ngữ<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-ngoai-ngu">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/english.html"><span class="drop-label">English</span><span class="drop-desc">Lộ trình 700 TOEIC, phương pháp học, giáo trình HF-700TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chinese.html"><span class="drop-label">Chinese</span><span class="drop-desc">Lộ trình HSK3, phương pháp học, giáo trình HF-HSK3</span></a></li></ul></div></div>
+  <a class="panel-all" href="../ngoai-ngu/">Xem tất cả Ngoại ngữ →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tai-nguyen">Tài nguyên<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tai-nguyen">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tai-nguyen/source-code.html"><span class="drop-label">Source Code</span><span class="drop-desc">Mã nguồn mẫu đi kèm bài học</span></a></li><li><a class="drop-link" href="../tai-nguyen/dataset.html"><span class="drop-label">Dataset</span><span class="drop-desc">Bộ dữ liệu ảnh để luyện tập</span></a></li><li><a class="drop-link" href="../tai-nguyen/cheat-sheets.html"><span class="drop-label">Cheat Sheets</span><span class="drop-desc">Tóm tắt nhanh trong một trang</span></a></li><li><a class="drop-link" href="../tai-nguyen/documentation.html"><span class="drop-label">Documentation</span><span class="drop-desc">Tài liệu tra cứu thư viện, API</span></a></li><li><a class="drop-link" href="../tai-nguyen/ebook.html"><span class="drop-label">Ebook / Tài liệu</span><span class="drop-desc">Sách và tài liệu tham khảo</span></a></li><li><a class="drop-link" href="../tai-nguyen/ai-tools.html"><span class="drop-label">AI Tools</span><span class="drop-desc">Công cụ AI hữu ích cho việc học</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tai-nguyen/">Xem tất cả Tài nguyên →</a>
+</div></li></ul>
+        <div class="drawer-foot">
+          <a class="btn ghost" href="../dang-nhap.html">Đăng nhập</a>
+          <a class="btn" href="../lo-trinh/">Bắt đầu học</a>
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+<div class="search-dialog" hidden>
+  <div class="search-scrim"></div>
+  <div class="search-box" role="dialog" aria-modal="true" aria-label="Tìm kiếm">
+    <form class="search-form" action="../search.html" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" placeholder="Tìm bài học, chủ đề, bài viết…" autocomplete="off" aria-label="Từ khóa tìm kiếm" aria-controls="search-suggest">
+      <button type="button" class="icon-btn search-close" aria-label="Đóng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </form>
+    <div class="search-suggest" id="search-suggest" aria-live="polite">
+      <div class="search-empty">
+        <p class="search-group-title">Chủ đề phổ biến</p>
+        <div class="chips"><a class="chip" href="../hoc/python.html">Python</a><a class="chip" href="../hoc/opencv.html">OpenCV</a><a class="chip" href="../hoc/machine-vision.html">Machine Vision</a><a class="chip" href="../hoc/deep-learning.html">Deep Learning</a><a class="chip" href="../hoc/ai-vision.html">AI Vision</a><a class="chip" href="../hoc/object-detection.html">Object Detection</a><a class="chip" href="../hoc/pytorch.html">PyTorch</a><a class="chip" href="../ngoai-ngu/english.html">English</a></div>
+        <p class="search-group-title">Lộ trình nổi bật</p>
+        <a class="search-item" href="../lo-trinh/vision-engineer.html"><span class="search-ico" aria-hidden="true">⭐</span><span>Trở thành Vision Engineer<small>Learning Path · Machine Vision + AI Vision + Industrial Automation</small></span></a>
+      </div>
+    </div>
+    <div class="search-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> chọn</span><span><kbd>Enter</kbd> mở</span><span><kbd>Esc</kbd> đóng</span></div>
+  </div>
+</div>
+<main id="main">
+  <div class="container layout article-layout">
+    <article class="article">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../hoc/">Học AI &amp; Lập trình</a></nav>
+      <header class="article-head">
+        <a class="pill cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+        <h1>Từ Linear Classifier đến Neural Network</h1>
+        <p class="lead">Từ hàm điểm f(x) = Wx + b: trọng số “nhìn” thấy gì, vì sao bắt buộc cần hàm kích hoạt và cách nhiều neuron ghép thành mạng nơ-ron sâu.</p>
+        <div class="article-meta">
+          <span class="avatar" aria-hidden="true">HF</span>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-14">14/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>11 phút đọc</span></div>
+        </div>
+      </header>
+      <figure class="article-cover">
+        <img src="../assets/images/posts/linear-classifier-den-neural-network.webp" alt="Từ Linear Classifier đến Neural Network" width="1200" height="675" fetchpriority="high" decoding="async">
+      </figure>
+      
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol><li><a href="#bai-toan-tu-pixel-den-diem-so-cho-tung-lop">Bài toán: từ pixel đến điểm số cho từng lớp</a></li><li><a href="#linear-classifier-ham-diem-f-x-wx-b">Linear classifier: hàm điểm f(x) = Wx + b</a></li><li><a href="#linear-classifier-nhin-thay-gi">Linear classifier &quot;nhìn&quot; thấy gì?</a></li><li><a href="#tu-linear-classifier-den-neuron">Từ linear classifier đến neuron</a></li><li><a href="#vi-sao-bat-buoc-phai-co-ham-kich-hoat">Vì sao bắt buộc phải có hàm kích hoạt?</a></li><li><a href="#kien-truc-neural-network">Kiến trúc Neural Network</a></li><li><a href="#forward-pass-lan-truyen-xuoi">Forward pass: lan truyền xuôi</a></li><li><a href="#vi-du-hoan-chinh-phan-loai-chu-so-mnist">Ví dụ hoàn chỉnh: phân loại chữ số MNIST</a></li><li><a href="#deep-neural-network-va-dinh-ly-xap-xi-van-nang">Deep Neural Network và định lý xấp xỉ vạn năng</a></li><li><a href="#tom-tat">Tóm tắt</a></li><li><a href="#tai-lieu-tham-khao">Tài liệu tham khảo</a></li></ol></details>
+      <div class="prose">
+<p>Mọi mạng nơ-ron khổng lồ hiện nay, từ ResNet đến YOLO, đều được xây từ một phép toán rất khiêm tốn: <strong>nhân ma trận rồi cộng</strong>. Bài này đi từ bộ phân loại tuyến tính (linear classifier) đơn giản nhất, hiểu nó "nhìn" ảnh ra sao, vì sao nó chưa đủ, và làm thế nào ghép nhiều neuron thành một neural network thực thụ.</p>
+<p class="note">Số trang (ví dụ "trang 81") trong bài chỉ tới slide của bài giảng <a href="../tai-nguyen/slide-deep-learning-computer-vision-ban-do-bai-hoc.html">Deep Learning – Computer Vision – NLP</a> (Thang Nguyen, Viet Nguyen); bài này giải thích chi tiết, kiểm chứng và đính chính các slide đó.</p>
+
+<h2 id="bai-toan-tu-pixel-den-diem-so-cho-tung-lop">Bài toán: từ pixel đến điểm số cho từng lớp</h2>
+<p>Phân loại ảnh nghĩa là: cho một ảnh \(x\), trả về điểm số (score) cho từng lớp trong \(K\) lớp, lớp có điểm cao nhất là dự đoán. Sau khi chuẩn hoá thành xác suất, ta có kết quả kiểu "82% cat, 15% dog, 2% hat, 1% mug".</p>
+<p>Trước hết, "duỗi" ảnh thành một vector cột: ảnh MNIST 28×28 thành vector \(D = 784\) phần tử; ảnh CIFAR-10 32×32×3 thành \(D = 3072\) phần tử.</p>
+
+<h2 id="linear-classifier-ham-diem-f-x-wx-b">Linear classifier: hàm điểm f(x) = Wx + b</h2>
+\[ f(x_i; W, b) = W x_i + b, \qquad f: \mathbb{R}^D \rightarrow \mathbb{R}^K \]
+<ul>
+<li>\(x_i\): ảnh thứ \(i\), vector \(D\times1\).</li>
+<li>\(W\): ma trận trọng số (weights) kích thước \(K\times D\).</li>
+<li>\(b\): vector độ lệch (bias) \(K\times1\).</li>
+<li>Kết quả: vector \(K\) điểm số, mỗi lớp một điểm.</li>
+</ul>
+<h3 id="vi-du-tinh-tay-trang-11-cua-tai-lieu">Ví dụ tính tay (trang 11 của tài liệu)</h3>
+<p>Ảnh "đồ chơi" chỉ có 4 pixel \(x = [56, 231, 24, 2]^T\), 3 lớp cat/dog/ship:</p>
+<div class="mats">
+<table class="mat"><caption>W (3×4)</caption>
+<tr><td>0.2</td><td>-0.5</td><td>0.1</td><td>2.0</td></tr>
+<tr><td>1.5</td><td>1.3</td><td>2.1</td><td>0.0</td></tr>
+<tr><td>0</td><td>0.25</td><td>0.2</td><td>-0.3</td></tr></table>
+<span class="op">·</span>
+<table class="mat"><caption>x</caption><tr><td>56</td></tr><tr><td>231</td></tr><tr><td>24</td></tr><tr><td>2</td></tr></table>
+<span class="op">+</span>
+<table class="mat"><caption>b</caption><tr><td>1.1</td></tr><tr><td>3.2</td></tr><tr><td>-1.2</td></tr></table>
+<span class="op">=</span>
+<table class="mat"><caption>scores</caption><tr><td>-96.8</td></tr><tr><td class="hl">437.9</td></tr><tr><td>60.75</td></tr></table>
+</div>
+<p>Điểm cat: \(0.2\cdot56 - 0.5\cdot231 + 0.1\cdot24 + 2.0\cdot2 + 1.1 = -96.8\). Mô hình (với bộ trọng số tệ này) cho rằng ảnh mèo là… chó, vì dog có điểm cao nhất 437.9. Huấn luyện chính là tìm \(W, b\) để lớp đúng luôn có điểm cao nhất.</p>
+<div class="tip"><strong>Ghi chú về con số 61.95</strong>Hình gốc (lấy từ CS231n) ghi điểm ship là 61.95, nhưng tính đúng là \(0.25\cdot231 + 0.2\cdot24 - 0.3\cdot2 - 1.2 = 60.75\). Hình gốc đã quên cộng bias. Một lời nhắc tốt: luôn tự kiểm tra lại các con số!</div>
+
+<h3 id="hai-cach-nhin-cung-mot-phep-tinh">Hai cách nhìn cùng một phép tính</h3>
+<p>Tài liệu minh hoạ hai cách nhìn: <strong>nhân ma trận</strong> (cả \(W\) nhân vector \(x\)) và <strong>nhân từng phần tử</strong> (element-wise). Chúng là một: mỗi hàng \(w_k\) của \(W\) có cùng kích thước với ảnh; điểm của lớp \(k\) là tổng các tích từng phần tử giữa hàng đó và ảnh, tức tích vô hướng:</p>
+\[ s_k = w_k \cdot x + b_k = \sum_{j=1}^{D} w_{kj}\, x_j + b_k \]
+<p>Nếu xếp lại 784 trọng số của một hàng thành lưới 28×28, ta được một "ảnh trọng số" đặt chồng lên ảnh đầu vào: pixel nào có trọng số dương lớn mà ảnh sáng thì điểm tăng, trọng số âm thì điểm giảm.</p>
+
+<h2 id="linear-classifier-nhin-thay-gi">Linear classifier "nhìn" thấy gì?</h2>
+<h3 id="goc-nhin-1-so-khop-mau-template-matching">Góc nhìn 1: so khớp mẫu (template matching)</h3>
+<p>Mỗi hàng của \(W\) là một <strong>khuôn mẫu</strong> (template) cho một lớp. Hiển thị trọng số sau khi huấn luyện (trang 13–16 của tài liệu) cho thấy:</p>
+<ul>
+<li>Với MNIST, khuôn mẫu của số 0 là một vòng tròn sáng với tâm tối: ảnh nào có nét quanh vòng và trống ở giữa sẽ được điểm cao.</li>
+<li>Với CIFAR-10, khuôn của "airplane" ám màu xanh (bầu trời), "frog" ám xanh lục, "car" ám đỏ. Khuôn "horse" trông như ngựa có <strong>hai đầu</strong> vì dữ liệu có ngựa quay cả trái lẫn phải, trong khi mỗi lớp chỉ có <em>một</em> khuôn để "trung bình hoá" tất cả.</li>
+</ul>
+<h3 id="goc-nhin-2-hinh-hoc">Góc nhìn 2: hình học</h3>
+<p>Mỗi ảnh là một điểm trong không gian \(D\) chiều. Với mỗi lớp, phương trình \(w_k\cdot x + b_k = 0\) là một <strong>siêu phẳng</strong>; bộ phân loại tuyến tính chia không gian bằng các mặt phẳng này. \(W\) quyết định hướng của mặt phẳng, \(b\) dịch chuyển nó (không có bias, mọi mặt phẳng buộc phải đi qua gốc toạ độ).</p>
+<h3 id="gioi-han">Giới hạn</h3>
+<ul>
+<li><strong>Một khuôn mỗi lớp</strong>: không biểu diễn được các biến thể (ngựa trái, ngựa phải, ngựa nhìn thẳng).</li>
+<li><strong>Ranh giới tuyến tính</strong>: không tách được dữ liệu như bài toán XOR hay hai vòng tròn lồng nhau.</li>
+<li><strong>Nhạy với vị trí</strong>: chữ số dịch sang trái vài pixel là lệch khuôn hoàn toàn (đây là "Problems in Neural Network: Variations" ở trang 78, lý do ra đời CNN).</li>
+</ul>
+
+<h2 id="tu-linear-classifier-den-neuron">Từ linear classifier đến neuron</h2>
+<p>Một <strong>neuron sinh học</strong> nhận tín hiệu qua các sợi nhánh (dendrites), tổng hợp ở thân tế bào và "phát xung" theo sợi trục (axon) khi tín hiệu đủ mạnh. <strong>Neuron nhân tạo</strong> mô phỏng thô sơ điều đó:</p>
+<figure class="diagram">
+<svg class="dg" viewBox="0 0 640 230" role="img" aria-label="Sơ đồ một neuron nhân tạo">
+  <circle class="bx" cx="50" cy="50" r="22"/><text x="50" y="55" text-anchor="middle">x₁</text>
+  <circle class="bx" cx="50" cy="115" r="22"/><text x="50" y="120" text-anchor="middle">x₂</text>
+  <circle class="bx" cx="50" cy="180" r="22"/><text x="50" y="185" text-anchor="middle">x₃</text>
+  <path class="ln" d="M72 50L262 108M72 115L260 115M72 180L262 122"/>
+  <text x="160" y="68" class="sm">w₁</text><text x="160" y="108" class="sm">w₂</text><text x="160" y="160" class="sm">w₃</text>
+  <circle class="bx-c" cx="300" cy="115" r="38"/><text x="300" y="112" text-anchor="middle" font-size="18">Σ</text><text x="300" y="132" text-anchor="middle" class="sm">+ b</text>
+  <text x="300" y="30" text-anchor="middle" class="sm">bias b</text><path class="ln" d="M300 38v38"/>
+  <path class="ln" d="M338 115h52"/><text x="364" y="105" text-anchor="middle" class="sm">z</text>
+  <rect class="bx-a" x="392" y="90" width="64" height="50" rx="8"/><text x="424" y="121" text-anchor="middle">f</text>
+  <text x="424" y="162" text-anchor="middle" class="sm">activation</text>
+  <path class="ln" d="M456 115h64"/><text x="580" y="120" text-anchor="middle">y = f(z)</text>
+</svg>
+<figcaption>Neuron = linear classifier (tổng có trọng số + bias) + hàm kích hoạt</figcaption>
+</figure>
+\[ z = \sum_i w_i x_i + b, \qquad y = f(z) \]
+<p>Phần \(\sum w_i x_i + b\) chính là một hàng của linear classifier. Thêm vào một <strong>hàm kích hoạt</strong> (activation function) phi tuyến \(f\), ta được một neuron. Lưu ý phép so sánh với sinh học chỉ mang tính gợi hình; neuron thật phức tạp hơn rất nhiều.</p>
+
+<h2 id="vi-sao-bat-buoc-phai-co-ham-kich-hoat">Vì sao bắt buộc phải có hàm kích hoạt?</h2>
+<p>Thử xếp chồng hai lớp tuyến tính mà không có activation:</p>
+\[ y = W_2 (W_1 x + b_1) + b_2 = \underbrace{(W_2 W_1)}_{W'} x + \underbrace{(W_2 b_1 + b_2)}_{b'} \]
+<p>Kết quả vẫn chỉ là <strong>một</strong> phép biến đổi tuyến tính. Dù xếp 100 lớp, mạng vẫn mạnh ngang một linear classifier. Hàm kích hoạt phi tuyến chen giữa các lớp là thứ cho phép mạng "uốn cong" ranh giới quyết định và học các hàm phức tạp.</p>
+<h3 id="bon-ham-kich-hoat-co-ban">Bốn hàm kích hoạt cơ bản</h3>
+<div class="table-wrap"><table>
+<tr><th>Hàm</th><th>Công thức</th><th>Miền giá trị</th><th>Nhận xét nhanh</th></tr>
+<tr><td>Sigmoid</td><td>\(\sigma(z)=\dfrac{1}{1+e^{-z}}\)</td><td>(0, 1)</td><td>Hợp cho xác suất nhị phân ở đầu ra; ở lớp ẩn dễ gây vanishing gradient, không zero-centered.</td></tr>
+<tr><td>Tanh</td><td>\(\tanh(z)=\dfrac{e^z-e^{-z}}{e^z+e^{-z}}\)</td><td>(−1, 1)</td><td>Zero-centered nên tốt hơn sigmoid, nhưng vẫn bão hoà ở hai đầu.</td></tr>
+<tr><td>ReLU</td><td>\(\max(0, z)\)</td><td>[0, +∞)</td><td>Mặc định cho CNN: tính rẻ, không bão hoà phía dương. Có thể "chết" nếu \(z\) luôn âm.</td></tr>
+<tr><td>Leaky ReLU</td><td>\(\max(\epsilon z, z),\ \epsilon \ll 1\)</td><td>(−∞, +∞)</td><td>Giữ một gradient nhỏ cho phía âm (thường \(\epsilon = 0.01\)), tránh neuron chết.</td></tr>
+</table></div>
+<p>Ta sẽ phân tích sâu vì sao ReLU thắng sigmoid trong bài <a href="vanishing-exploding-gradient-weight-init.html">vanishing/exploding gradient</a>.</p>
+
+<h2 id="kien-truc-neural-network">Kiến trúc Neural Network</h2>
+<p>Ghép nhiều neuron thành các <strong>lớp</strong> (layer), mỗi neuron của lớp sau nối với <em>mọi</em> neuron của lớp trước. Loại lớp này gọi là <strong>fully connected</strong> (FC), còn gọi là Dense hay Linear (tên trong PyTorch: <code>nn.Linear</code>).</p>
+<ul>
+<li><strong>Input layer</strong>: chính là dữ liệu đầu vào, không có tham số.</li>
+<li><strong>Hidden layers</strong>: các lớp ở giữa, thường có activation.</li>
+<li><strong>Output layer</strong>: cho ra điểm số các lớp (logits), thường <em>không</em> có activation (softmax được gộp vào hàm loss).</li>
+</ul>
+<p>Quy ước đếm: "mạng N lớp" không tính input layer. Hai mạng ở trang 20 của tài liệu:</p>
+<div class="table-wrap"><table>
+<tr><th>Mạng</th><th>Số trọng số</th><th>Số bias</th><th>Tổng tham số</th></tr>
+<tr><td>3 → 4 → 2 (2 lớp)</td><td>3·4 + 4·2 = 20</td><td>4 + 2 = 6</td><td>26</td></tr>
+<tr><td>3 → 4 → 4 → 1 (3 lớp)</td><td>3·4 + 4·4 + 4·1 = 32</td><td>4 + 4 + 1 = 9</td><td>41</td></tr>
+</table></div>
+<p>Mạng không có vòng lặp, dữ liệu chỉ đi một chiều từ đầu vào đến đầu ra được gọi là <strong>feedforward neural network</strong> (hay MLP, multi-layer perceptron).</p>
+
+<h2 id="forward-pass-lan-truyen-xuoi">Forward pass: lan truyền xuôi</h2>
+<p>Tính đầu ra từ đầu vào, lần lượt qua từng lớp, gọi là <strong>forward propagation</strong> (forward pass). Với mạng 3 lớp và activation \(f\):</p>
+\[ h_1 = f(W_1 x + b_1), \quad h_2 = f(W_2 h_1 + b_2), \quad \text{out} = W_3 h_2 + b_3 \]
+<p>Nhờ biểu diễn bằng ma trận, cả lớp được tính bằng một phép nhân, rất hợp với GPU:</p>
+<pre><code class="language-python">import numpy as np
+
+relu = lambda z: np.maximum(0, z)
+
+# Mạng 3 → 4 → 4 → 1, khởi tạo ngẫu nhiên
+W1, b1 = np.random.randn(4, 3), np.zeros((4, 1))
+W2, b2 = np.random.randn(4, 4), np.zeros((4, 1))
+W3, b3 = np.random.randn(1, 4), np.zeros((1, 1))
+
+x = np.random.randn(3, 1)          # một mẫu đầu vào
+h1 = relu(W1 @ x + b1)             # (4, 1)
+h2 = relu(W2 @ h1 + b2)            # (4, 1)
+out = W3 @ h2 + b3                 # (1, 1)
+print(out)</code></pre>
+<p>Khi xử lý cả một <strong>batch</strong> \(N\) mẫu, ta xếp chúng thành ma trận \(X\) kích thước \(N\times D\) và tính \(XW^T + b\) (đây đúng là việc <code>nn.Linear</code> làm).</p>
+
+<h2 id="vi-du-hoan-chinh-phan-loai-chu-so-mnist">Ví dụ hoàn chỉnh: phân loại chữ số MNIST</h2>
+<p>Ảnh chữ số 28×28 = 784 pixel (giá trị 0–255, chuẩn hoá về [0, 1]) được duỗi thành 784 neuron đầu vào, qua một lớp ẩn, ra 10 neuron ứng với các chữ số 0–9:</p>
+<pre><code class="language-python">import torch
+import torch.nn as nn
+
+model = nn.Sequential(
+    nn.Flatten(),            # (N, 1, 28, 28) -> (N, 784)
+    nn.Linear(784, 128),     # lớp ẩn: 784*128 + 128 tham số
+    nn.ReLU(),
+    nn.Linear(128, 10),      # lớp ra: 10 logits
+)
+
+x = torch.rand(32, 1, 28, 28)   # batch giả 32 ảnh
+logits = model(x)
+print(logits.shape)              # torch.Size([32, 10])
+print(sum(p.numel() for p in model.parameters()))  # 101770</code></pre>
+<p>Mạng nhỏ này, sau khi huấn luyện vài epoch, đạt khoảng 97–98% độ chính xác trên MNIST, vượt xa linear classifier (khoảng 92%).</p>
+
+<h2 id="deep-neural-network-va-dinh-ly-xap-xi-van-nang">Deep Neural Network và định lý xấp xỉ vạn năng</h2>
+<p><strong>Universal Approximation Theorem</strong> (định lý xấp xỉ vạn năng) phát biểu: một mạng feedforward chỉ với <em>một</em> lớp ẩn, đủ nhiều neuron và activation phi tuyến phù hợp, có thể xấp xỉ <strong>mọi hàm liên tục</strong> trên một miền giới hạn với sai số nhỏ tuỳ ý.</p>
+<p>Định lý này nghe như "một lớp là đủ", nhưng có ba điểm cần hiểu đúng:</p>
+<ol>
+<li>Nó chỉ nói <em>tồn tại</em> một bộ trọng số tốt, không nói làm sao <em>tìm</em> được (đó là việc của huấn luyện).</li>
+<li>Số neuron cần thiết có thể lớn theo cấp số mũ.</li>
+<li>Trên thực tế, mạng <strong>sâu</strong> biểu diễn cùng một hàm hiệu quả hơn nhiều so với mạng rộng nông, nhờ tái sử dụng đặc trưng theo tầng: cạnh → tổ hợp cạnh → bộ phận → đối tượng (trang 23 của tài liệu).</li>
+</ol>
+<div class="tip"><strong>Thực hành ngay trên trình duyệt</strong>Mở <strong>TensorFlow Playground</strong> (playground.tensorflow.org), chọn bộ dữ liệu hình xoắn ốc. Thử 0 lớp ẩn (linear), rồi 1, 2, 3 lớp ẩn; đổi activation giữa Linear, Tanh, ReLU. Bạn sẽ "thấy tận mắt" vì sao cần phi tuyến và độ sâu.</div>
+
+<h2 id="tom-tat">Tóm tắt</h2>
+<ul>
+<li>Linear classifier: \(f(x) = Wx + b\); mỗi hàng của \(W\) là khuôn mẫu cho một lớp.</li>
+<li>Neuron = tổng có trọng số + bias + hàm kích hoạt phi tuyến.</li>
+<li>Không có activation thì xếp bao nhiêu lớp cũng chỉ là tuyến tính.</li>
+<li>Forward pass = nhân ma trận lần lượt qua các lớp; tính được số tham số bằng tay.</li>
+</ul>
+<p>Mạng đã biết "đoán", nhưng làm sao biết nó đoán sai bao nhiêu và sửa \(W\) thế nào? Đó là chủ đề của bài <a href="loss-function-gradient-descent-optimizer.html">Loss function, Gradient Descent và Optimizer</a>.</p>
+
+<h2 id="tai-lieu-tham-khao">Tài liệu tham khảo</h2>
+<ul>
+<li>CS231n: <em>Linear classification</em> và <em>Neural Networks Part 1: Setting up the Architecture</em>.</li>
+<li>Cybenko (1989); Hornik (1991): các chứng minh định lý xấp xỉ vạn năng.</li>
+<li>Goodfellow, Bengio, Courville. <em>Deep Learning</em>, chương 6 (deeplearningbook.org).</li>
+<li>Dive into Deep Learning (d2l.ai), chương 4–5: Linear Neural Networks, Multilayer Perceptrons.</li>
+</ul>
+
+      </div>
+      
+      <footer class="article-foot">
+        <div class="tags"><a class="tag" href="../search.html?q=Deep Learning">#Deep Learning</a><a class="tag" href="../search.html?q=Machine Learning">#Machine Learning</a></div>
+        <div class="share">
+      <span>Chia sẻ:</span>
+      <a class="share-btn fb" href="https://www.facebook.com/sharer/sharer.php?u=https://hocfree.vn/hoc/linear-classifier-den-neural-network.html" target="_blank" rel="noopener" aria-label="Chia sẻ Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8z"/></svg></a>
+      <a class="share-btn x" href="https://twitter.com/intent/tweet?url=https://hocfree.vn/hoc/linear-classifier-den-neural-network.html" target="_blank" rel="noopener" aria-label="Chia sẻ X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+      <button class="share-btn copy-link" data-url="https://hocfree.vn/hoc/linear-classifier-den-neural-network.html" aria-label="Sao chép liên kết"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+    </div>
+      </footer>
+      <div class="author-box">
+        <span class="avatar lg" aria-hidden="true">HF</span>
+        <div>
+          <strong>Ban biên tập HọcFree</strong>
+          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và ngoại ngữ, hoàn toàn miễn phí.</p>
+        </div>
+      </div>
+      <nav class="pager" aria-label="Bài trước/sau"><a class="prev" href="../hoc/loss-function-gradient-descent-optimizer.html"><span>← Bài trước</span>Loss function và optimizer: SGD, Momentum, RMSProp, Adam</a><a class="next" href="../hoc/tong-quan-deep-learning-computer-vision.html"><span>Bài tiếp →</span>Tổng quan Deep Learning cho Computer Vision</a></nav>
+    </article>
+    <aside class="sidebar">
+  <section class="widget"><h2 class="widget-title">Đọc nhiều nhất</h2><ol class="popular"><li><a href="../hoc/yolo26-object-detection-nhap-mon.html"><span class="num">1</span><span class="t">Object Detection với YOLO26: chuẩn bị dữ liệu, huấn luyện và xuất mô hình</span></a></li><li><a href="../kien-thuc/chon-camera-ong-kinh-machine-vision.html"><span class="num">2</span><span class="t">Chọn camera và ống kính Machine Vision: độ phân giải, FOV, tiêu cự</span></a></li><li><a href="../projects/phat-hien-loi-be-mat-anomaly-detection.html"><span class="num">3</span><span class="t">Dự án: phát hiện lỗi bề mặt bằng PatchCore, chỉ học từ ảnh OK</span></a></li><li><a href="../hoc/opencv-co-ban-anh-video-camera.html"><span class="num">4</span><span class="t">OpenCV cơ bản: đọc, hiển thị, ghi ảnh, video và camera</span></a></li><li><a href="../kien-thuc/7-kieu-chieu-sang-machine-vision.html"><span class="num">5</span><span class="t">7 kiểu chiếu sáng Machine Vision: chọn đèn theo bề mặt và loại lỗi</span></a></li></ol></section>
+  <section class="widget">
+    <h2 class="widget-title">Chuyên mục</h2>
+    <ul class="cat-list"><li><a href="../hoc/"><span>Học AI &amp; Lập trình</span><span class="count">162 bài</span></a></li><li><a href="../projects/"><span>Projects</span><span class="count">15 bài</span></a></li><li><a href="../kien-thuc/"><span>Kiến thức</span><span class="count">128 bài</span></a></li><li><a href="../tin-tuc-ai/"><span>Tin tức AI</span><span class="count">16 bài</span></a></li><li><a href="../ngoai-ngu/"><span>Ngoại ngữ</span><span class="count">6 bài</span></a></li><li><a href="../tai-nguyen/"><span>Tài nguyên</span><span class="count">32 bài</span></a></li></ul>
+  </section>
+  <section class="widget widget-about">
+    <h2 class="widget-title">Về HọcFree</h2>
+    <p>Nơi học <strong>miễn phí</strong> AI, lập trình, Computer Vision và ngoại ngữ dành cho người Việt. Không quảng cáo, không thu phí.</p>
+    <a class="btn" href="../gioi-thieu.html">Tìm hiểu thêm</a>
+  </section>
+  <section class="widget"><h2 class="widget-title">Thẻ</h2><div class="tags"><a class="tag" href="../search.html?q=.NET">.NET</a><a class="tag" href="../search.html?q=AI Agents">AI Agents</a><a class="tag" href="../search.html?q=AI Industry">AI Industry</a><a class="tag" href="../search.html?q=AI Models">AI Models</a><a class="tag" href="../search.html?q=AI News">AI News</a><a class="tag" href="../search.html?q=AI Project">AI Project</a><a class="tag" href="../search.html?q=AI Tools">AI Tools</a><a class="tag" href="../search.html?q=AI Vision">AI Vision</a><a class="tag" href="../search.html?q=C#">C#</a><a class="tag" href="../search.html?q=Calibration">Calibration</a><a class="tag" href="../search.html?q=Camera">Camera</a><a class="tag" href="../search.html?q=Cheat Sheet">Cheat Sheet</a><a class="tag" href="../search.html?q=Chiếu sáng">Chiếu sáng</a><a class="tag" href="../search.html?q=Computer Vision">Computer Vision</a><a class="tag" href="../search.html?q=CV News">CV News</a><a class="tag" href="../search.html?q=CV Project">CV Project</a><a class="tag" href="../search.html?q=Công cụ">Công cụ</a><a class="tag" href="../search.html?q=Dataset">Dataset</a><a class="tag" href="../search.html?q=Deep Learning">Deep Learning</a><a class="tag" href="../search.html?q=Deployment">Deployment</a><a class="tag" href="../search.html?q=Documentation">Documentation</a><a class="tag" href="../search.html?q=Ebook">Ebook</a><a class="tag" href="../search.html?q=Generative AI">Generative AI</a><a class="tag" href="../search.html?q=Git">Git</a><a class="tag" href="../search.html?q=HSK">HSK</a><a class="tag" href="../search.html?q=Image Processing">Image Processing</a><a class="tag" href="../search.html?q=Industrial Automation">Industrial Automation</a><a class="tag" href="../search.html?q=Industrial Project">Industrial Project</a><a class="tag" href="../search.html?q=Industrial Vision">Industrial Vision</a><a class="tag" href="../search.html?q=Kinh nghiệm">Kinh nghiệm</a><a class="tag" href="../search.html?q=Lens">Lens</a><a class="tag" href="../search.html?q=LLM">LLM</a><a class="tag" href="../search.html?q=Lập trình">Lập trình</a><a class="tag" href="../search.html?q=Machine Learning">Machine Learning</a><a class="tag" href="../search.html?q=Machine Vision">Machine Vision</a><a class="tag" href="../search.html?q=MES">MES</a><a class="tag" href="../search.html?q=NumPy">NumPy</a><a class="tag" href="../search.html?q=Object Detection">Object Detection</a><a class="tag" href="../search.html?q=OCR">OCR</a><a class="tag" href="../search.html?q=OpenCV">OpenCV</a><a class="tag" href="../search.html?q=PLC">PLC</a><a class="tag" href="../search.html?q=Python">Python</a><a class="tag" href="../search.html?q=PyTorch">PyTorch</a><a class="tag" href="../search.html?q=Robot">Robot</a><a class="tag" href="../search.html?q=Robotics">Robotics</a><a class="tag" href="../search.html?q=Segmentation">Segmentation</a><a class="tag" href="../search.html?q=Source Code">Source Code</a><a class="tag" href="../search.html?q=Technology">Technology</a><a class="tag" href="../search.html?q=Tips">Tips</a><a class="tag" href="../search.html?q=Tiếng Anh">Tiếng Anh</a><a class="tag" href="../search.html?q=Tiếng Trung">Tiếng Trung</a><a class="tag" href="../search.html?q=TOEIC">TOEIC</a><a class="tag" href="../search.html?q=Tự học">Tự học</a><a class="tag" href="../search.html?q=VS Code">VS Code</a><a class="tag" href="../search.html?q=YOLO">YOLO</a><a class="tag" href="../search.html?q=Đo lường">Đo lường</a></div></section>
+</aside>
+  </div>
+  <section class="band">
+    <div class="container">
+      <div class="section-title"><h2>Có thể bạn quan tâm</h2></div>
+      <div class="card-grid"><article class="card">
+  <a class="thumb" href="../hoc/tong-quan-deep-learning-computer-vision.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/tong-quan-deep-learning-computer-vision.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/tong-quan-deep-learning-computer-vision.html">Tổng quan Deep Learning cho Computer Vision</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-14">14/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>10 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/loss-function-gradient-descent-optimizer.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/loss-function-gradient-descent-optimizer.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/loss-function-gradient-descent-optimizer.html">Loss function và optimizer: SGD, Momentum, RMSProp, Adam</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-14">14/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>13 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/backpropagation-lan-truyen-nguoc.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/backpropagation-lan-truyen-nguoc.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/backpropagation-lan-truyen-nguoc.html">Backpropagation: lan truyền ngược qua ví dụ tính tay</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-14">14/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>11 phút đọc</span></div>
+</article></div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <a class="logo" href="../"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+      <p>HọcFree.vn – nền tảng học miễn phí về AI, lập trình, Computer Vision, Machine Vision, tin tức AI và ngoại ngữ dành cho người Việt.</p>
+    </div>
+    <div><h3>Học &amp; thực hành</h3><ul><li><a href="../hoc/">Học AI &amp; Lập trình</a></li><li><a href="../projects/">Projects</a></li><li><a href="../lo-trinh/">Learning Paths</a></li></ul></div>
+    <div><h3>Khám phá</h3><ul><li><a href="../kien-thuc/">Kiến thức</a></li><li><a href="../tin-tuc-ai/">Tin tức AI</a></li><li><a href="../ngoai-ngu/">Ngoại ngữ</a></li><li><a href="../tai-nguyen/">Tài nguyên</a></li></ul></div>
+    <div><h3>Bài mới</h3><ul><li><a href="../tai-nguyen/slide-deep-learning-computer-vision-ban-do-bai-hoc.html">Học theo slide Deep Learning – Computer Vision: bản đồ bài học</a></li><li><a href="../hoc/tong-quan-deep-learning-computer-vision.html">Tổng quan Deep Learning cho Computer Vision</a></li><li><a href="../hoc/linear-classifier-den-neural-network.html">Từ Linear Classifier đến Neural Network</a></li><li><a href="../hoc/loss-function-gradient-descent-optimizer.html">Loss function và optimizer: SGD, Momentum, RMSProp, Adam</a></li></ul></div>
+    <div>
+      <h3>HọcFree</h3>
+      <ul>
+        <li><a href="../gioi-thieu.html">Giới thiệu</a></li>
+        <li><a href="../search.html">Tìm kiếm</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">© 2026 HọcFree.vn · Kiến thức là để chia sẻ.</div>
+  </div>
+</footer>
+<button class="to-top" aria-label="Lên đầu trang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<script src="../assets/js/search-data.js?v=20261014" defer></script>
+<script src="../assets/js/main.js?v=20261014" defer></script>
+</body>
+</html>

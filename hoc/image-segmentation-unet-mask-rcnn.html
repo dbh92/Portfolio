@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="vi" data-root="../">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Image Segmentation: FCN, U-Net, DeepLab, Mask R-CNN | HọcFree</title>
+<meta name="description" content="Phân loại từng pixel: semantic, instance, panoptic; upsampling, transposed convolution, atrous conv, Mask R-CNN, độ đo mIoU, Dice và code PyTorch.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://hocfree.vn/hoc/image-segmentation-unet-mask-rcnn.html">
+<meta property="og:site_name" content="HọcFree">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Image Segmentation: FCN, U-Net, DeepLab, Mask R-CNN">
+<meta property="og:description" content="Phân loại từng pixel: semantic, instance, panoptic; upsampling, transposed convolution, atrous conv, Mask R-CNN, độ đo mIoU, Dice và code PyTorch.">
+<meta property="og:url" content="https://hocfree.vn/hoc/image-segmentation-unet-mask-rcnn.html">
+<meta property="og:image" content="https://hocfree.vn/assets/images/posts/image-segmentation-unet-mask-rcnn.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="Image Segmentation: FCN, U-Net, DeepLab, Mask R-CNN">
+<meta property="og:locale" content="vi_VN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Image Segmentation: FCN, U-Net, DeepLab, Mask R-CNN">
+<meta name="twitter:description" content="Phân loại từng pixel: semantic, instance, panoptic; upsampling, transposed convolution, atrous conv, Mask R-CNN, độ đo mIoU, Dice và code PyTorch.">
+<meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/image-segmentation-unet-mask-rcnn.jpg">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/fonts.css?v=20261014">
+<link rel="stylesheet" href="../assets/css/style.css?v=20261014">
+<script>try{var t=localStorage.getItem('hf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
+<meta property="article:published_time" content="2026-10-14">
+<meta property="article:section" content="Học AI &amp; Lập trình">
+<meta property="article:tag" content="Segmentation">
+<meta property="article:tag" content="PyTorch">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "Image Segmentation: FCN, U-Net, DeepLab, Mask R-CNN", "description": "Phân loại từng pixel: semantic, instance, panoptic; upsampling, transposed convolution, atrous conv, Mask R-CNN, độ đo mIoU, Dice và code PyTorch.", "image": ["https://hocfree.vn/assets/images/posts/image-segmentation-unet-mask-rcnn.jpg"], "datePublished": "2026-10-14", "dateModified": "2026-10-14", "inLanguage": "vi", "articleSection": "Học AI & Lập trình", "keywords": "Segmentation, PyTorch", "wordCount": 2060, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/hoc/image-segmentation-unet-mask-rcnn.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Học AI & Lập trình", "item": "https://hocfree.vn/hoc/"}, {"@type": "ListItem", "position": 3, "name": "Image Segmentation: FCN, U-Net, DeepLab, Mask R-CNN"}]}</script>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/contrib/auto-render.min.js" onload="renderMathInElement(document.querySelector('.prose'),{delimiters:[{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}],throwOnError:false})"></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div class="progress" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="container wide header-top">
+    <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="nav-scrim" hidden></div>
+    <a class="logo" href="../" aria-label="HọcFree – Trang chủ"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+    <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
+    <div class="header-actions">
+      <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="login-link" href="../dang-nhap.html">Đăng nhập</a>
+      <a class="btn start-btn" href="../lo-trinh/">Bắt đầu học</a>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="container wide">
+      <nav class="site-nav" id="site-nav" aria-label="Menu chính">
+        <div class="drawer-head">
+          <a class="logo" href="../" tabindex="-1"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+          <button class="icon-btn nav-close" aria-label="Đóng menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <button type="button" class="drawer-search search-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Tìm bài học, chủ đề…</span></button>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="../">Trang chủ</a></li><li class="nav-item has-panel is-mega"><button type="button" class="nav-link nav-trigger is-active" aria-expanded="false" aria-controls="nav-panel-hoc" aria-current="true">Học AI &amp; Lập trình<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel mega" id="nav-panel-hoc">
+  <div class="container wide mega-inner">
+    <div class="mega-groups"><div class="mega-group"><a class="mega-group-title" href="../hoc/#programming">Programming</a><ul><li><a href="../hoc/python.html">Python</a></li><li><a href="../hoc/csharp.html">C#</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#ai-machine-learning">AI &amp; Machine Learning</a><ul><li><a href="../hoc/machine-learning.html">Machine Learning</a></li><li><a href="../hoc/deep-learning.html">Deep Learning</a></li><li><a href="../hoc/pytorch.html">PyTorch</a></li><li><a href="../hoc/generative-ai.html">Generative AI</a></li><li><a href="../hoc/llm-ai-agents.html">LLM / AI Agents</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#computer-vision">Computer Vision</a><ul><li><a href="../hoc/opencv.html">OpenCV</a></li><li><a href="../hoc/image-processing.html">Image Processing</a></li><li><a href="../hoc/computer-vision.html">Computer Vision</a></li><li><a href="../hoc/ocr.html">OCR</a></li><li><a href="../hoc/object-detection.html">Object Detection</a></li><li><a href="../hoc/segmentation.html">Segmentation</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#vision-engineering">Vision Engineering</a><ul><li><a href="../hoc/machine-vision.html">Machine Vision</a></li><li><a href="../hoc/ai-vision.html">AI Vision</a></li><li><a href="../hoc/industrial-vision.html">Industrial Vision</a></li><li><a href="../hoc/camera-lens.html">Camera &amp; Lens</a></li><li><a href="../hoc/lighting.html">Lighting</a></li><li><a href="../hoc/calibration.html">Calibration</a></li><li><a href="../hoc/plc-robot-mes.html">PLC / Robot / MES</a></li><li><a href="../hoc/vision-deployment.html">Vision Deployment</a></li></ul></div></div>
+    <a class="feature-card" href="../lo-trinh/vision-engineer.html">
+  <span class="feature-eyebrow">⭐ Learning Path nổi bật</span>
+  <span class="feature-title">Trở thành Vision Engineer</span>
+  <span class="feature-sub">Machine Vision + AI Vision + Industrial Automation</span>
+  <span class="feature-desc">Lộ trình thực chiến từ Python, OpenCV và Machine Vision đến Deep Learning, AI Vision, Camera, PLC, Robot và triển khai hệ thống Vision trong nhà máy.</span>
+  <span class="feature-chain" aria-label="Các chặng chính"><span>Python</span><i aria-hidden="true">→</i><span>OpenCV</span><i aria-hidden="true">→</i><span>Machine Vision</span><i aria-hidden="true">→</i><span>AI Vision</span><i aria-hidden="true">→</i><span class="chain-goal">🎯 Vision Engineer</span></span>
+  <span class="feature-meta">14 chặng · 5 giai đoạn · ~12 tháng</span>
+  <span class="feature-cta">Xem lộ trình →</span>
+</a>
+  </div>
+  <div class="mega-foot"><div class="container wide mega-foot-inner"><ol class="journey compact" aria-label="Học, thực hành, trở thành kỹ sư"><li><a href="../hoc/" aria-current="step"><span class="journey-n">1</span><span class="journey-t"><b>Học</b><small>Học AI &amp; Lập trình</small></span></a></li><li><a href="../projects/"><span class="journey-n">2</span><span class="journey-t"><b>Thực hành</b><small>Projects</small></span></a></li><li><a href="../lo-trinh/"><span class="journey-n">3</span><span class="journey-t"><b>Trở thành kỹ sư</b><small>Learning Paths</small></span></a></li></ol><a class="panel-all" href="../hoc/">Xem tất cả Học AI &amp; Lập trình →</a></div></div>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-projects">Projects<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-projects">
+  <p class="panel-kicker"><span>Bước 2 · Thực hành</span>Áp dụng vào dự án thật</p>
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../projects/ai-projects.html"><span class="drop-label">AI Projects</span><span class="drop-desc">Ứng dụng ML và LLM, từ ý tưởng đến bản demo</span></a></li><li><a class="drop-link" href="../projects/computer-vision-projects.html"><span class="drop-label">Computer Vision Projects</span><span class="drop-desc">Phát hiện, nhận dạng và theo dõi đối tượng</span></a></li><li><a class="drop-link" href="../projects/industrial-vision-projects.html"><span class="drop-label">Industrial Vision Projects</span><span class="drop-desc">Đo kích thước, kiểm tra lỗi, đọc mã trên dây chuyền</span></a></li></ul></div></div>
+  <a class="panel-all" href="../projects/">Xem tất cả Projects →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-lo-trinh">Learning Paths<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-lo-trinh">
+  <p class="panel-kicker"><span>Bước 3 · Trở thành kỹ sư</span>Định hướng nghề nghiệp</p>
+  <ul class="drop-list"><li><a class="drop-link is-flagship" href="../lo-trinh/vision-engineer.html"><span class="drop-label">⭐ Trở thành Vision Engineer</span><span class="drop-desc">Machine Vision + AI Vision + Industrial Automation · 14 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/#python-developer"><span class="drop-label">Python Developer<span class="badge-soon">Sắp ra mắt</span></span><span class="drop-desc">Python, công cụ, tự động hóa</span></a></li></ul>
+  <a class="panel-all" href="../lo-trinh/">Xem tất cả lộ trình →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-kien-thuc">Kiến thức<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-kien-thuc">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Lĩnh vực</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/programming.html"><span class="drop-label">Programming</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-machine-learning.html"><span class="drop-label">AI / Machine Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/deep-learning.html"><span class="drop-label">Deep Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/machine-vision.html"><span class="drop-label">Machine Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-vision.html"><span class="drop-label">AI Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/industrial-automation.html"><span class="drop-label">Industrial Automation</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Công cụ &amp; mẹo</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/tools-frameworks.html"><span class="drop-label">Tools &amp; Frameworks</span></a></li><li><a class="drop-link" href="../kien-thuc/tips-tricks.html"><span class="drop-label">Tips &amp; Tricks</span></a></li></ul></div></div>
+  <a class="panel-all" href="../kien-thuc/">Xem tất cả Kiến thức →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tin-tuc-ai">Tin tức AI<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tin-tuc-ai">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tin-tuc-ai/ai-news.html"><span class="drop-label">AI News</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-models.html"><span class="drop-label">AI Models</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/technology.html"><span class="drop-label">Technology</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/robotics.html"><span class="drop-label">Robotics</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-industry.html"><span class="drop-label">AI Industry</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tin-tuc-ai/">Xem tất cả Tin tức AI →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-ngoai-ngu">Ngoại ngữ<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-ngoai-ngu">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/english.html"><span class="drop-label">English</span><span class="drop-desc">Lộ trình 700 TOEIC, phương pháp học, giáo trình HF-700TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chinese.html"><span class="drop-label">Chinese</span><span class="drop-desc">Lộ trình HSK3, phương pháp học, giáo trình HF-HSK3</span></a></li></ul></div></div>
+  <a class="panel-all" href="../ngoai-ngu/">Xem tất cả Ngoại ngữ →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tai-nguyen">Tài nguyên<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tai-nguyen">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tai-nguyen/source-code.html"><span class="drop-label">Source Code</span><span class="drop-desc">Mã nguồn mẫu đi kèm bài học</span></a></li><li><a class="drop-link" href="../tai-nguyen/dataset.html"><span class="drop-label">Dataset</span><span class="drop-desc">Bộ dữ liệu ảnh để luyện tập</span></a></li><li><a class="drop-link" href="../tai-nguyen/cheat-sheets.html"><span class="drop-label">Cheat Sheets</span><span class="drop-desc">Tóm tắt nhanh trong một trang</span></a></li><li><a class="drop-link" href="../tai-nguyen/documentation.html"><span class="drop-label">Documentation</span><span class="drop-desc">Tài liệu tra cứu thư viện, API</span></a></li><li><a class="drop-link" href="../tai-nguyen/ebook.html"><span class="drop-label">Ebook / Tài liệu</span><span class="drop-desc">Sách và tài liệu tham khảo</span></a></li><li><a class="drop-link" href="../tai-nguyen/ai-tools.html"><span class="drop-label">AI Tools</span><span class="drop-desc">Công cụ AI hữu ích cho việc học</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tai-nguyen/">Xem tất cả Tài nguyên →</a>
+</div></li></ul>
+        <div class="drawer-foot">
+          <a class="btn ghost" href="../dang-nhap.html">Đăng nhập</a>
+          <a class="btn" href="../lo-trinh/">Bắt đầu học</a>
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+<div class="search-dialog" hidden>
+  <div class="search-scrim"></div>
+  <div class="search-box" role="dialog" aria-modal="true" aria-label="Tìm kiếm">
+    <form class="search-form" action="../search.html" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" placeholder="Tìm bài học, chủ đề, bài viết…" autocomplete="off" aria-label="Từ khóa tìm kiếm" aria-controls="search-suggest">
+      <button type="button" class="icon-btn search-close" aria-label="Đóng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </form>
+    <div class="search-suggest" id="search-suggest" aria-live="polite">
+      <div class="search-empty">
+        <p class="search-group-title">Chủ đề phổ biến</p>
+        <div class="chips"><a class="chip" href="../hoc/python.html">Python</a><a class="chip" href="../hoc/opencv.html">OpenCV</a><a class="chip" href="../hoc/machine-vision.html">Machine Vision</a><a class="chip" href="../hoc/deep-learning.html">Deep Learning</a><a class="chip" href="../hoc/ai-vision.html">AI Vision</a><a class="chip" href="../hoc/object-detection.html">Object Detection</a><a class="chip" href="../hoc/pytorch.html">PyTorch</a><a class="chip" href="../ngoai-ngu/english.html">English</a></div>
+        <p class="search-group-title">Lộ trình nổi bật</p>
+        <a class="search-item" href="../lo-trinh/vision-engineer.html"><span class="search-ico" aria-hidden="true">⭐</span><span>Trở thành Vision Engineer<small>Learning Path · Machine Vision + AI Vision + Industrial Automation</small></span></a>
+      </div>
+    </div>
+    <div class="search-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> chọn</span><span><kbd>Enter</kbd> mở</span><span><kbd>Esc</kbd> đóng</span></div>
+  </div>
+</div>
+<main id="main">
+  <div class="container layout article-layout">
+    <article class="article">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../hoc/">Học AI &amp; Lập trình</a></nav>
+      <header class="article-head">
+        <a class="pill cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+        <h1>Image Segmentation: FCN, U-Net, DeepLab, Mask R-CNN</h1>
+        <p class="lead">Phân loại từng pixel: semantic, instance, panoptic; upsampling, transposed convolution, atrous conv, Mask R-CNN, độ đo mIoU, Dice và code PyTorch.</p>
+        <div class="article-meta">
+          <span class="avatar" aria-hidden="true">HF</span>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-14">14/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>12 phút đọc</span></div>
+        </div>
+      </header>
+      <figure class="article-cover">
+        <img src="../assets/images/posts/image-segmentation-unet-mask-rcnn.webp" alt="Image Segmentation: FCN, U-Net, DeepLab, Mask R-CNN" width="1200" height="675" fetchpriority="high" decoding="async">
+      </figure>
+      
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol><li><a href="#ba-kieu-phan-vung-anh">Ba kiểu phân vùng ảnh</a></li><li><a href="#phan-vung-la-phan-loai-tung-pixel">Phân vùng là phân loại từng pixel</a></li><li><a href="#fcn-fully-convolutional-network-2015">FCN: Fully Convolutional Network (2015)</a></li><li><a href="#cac-cach-upsample">Các cách upsample</a></li><li><a href="#u-net-2015-chuan-muc-cua-phan-vung">U-Net (2015): chuẩn mực của phân vùng</a></li><li><a href="#deeplab-giu-do-phan-giai-bang-atrous-convolution">DeepLab: giữ độ phân giải bằng atrous convolution</a></li><li><a href="#mask-r-cnn-instance-segmentation">Mask R-CNN: instance segmentation</a></li><li><a href="#danh-gia-mo-hinh-phan-vung">Đánh giá mô hình phân vùng</a></li><li><a href="#loss-cho-du-lieu-mat-can-bang">Loss cho dữ liệu mất cân bằng</a></li><li><a href="#du-lieu-va-cong-cu">Dữ liệu và công cụ</a></li><li><a href="#tom-tat">Tóm tắt</a></li><li><a href="#tai-lieu-tham-khao">Tài liệu tham khảo</a></li></ol></details>
+      <div class="prose">
+<p>Object detection vẽ một hình chữ nhật quanh con chó. Nhưng hệ thống y tế cần biết <em>chính xác</em> đường viền khối u, xe tự lái cần biết pixel nào là mặt đường, máy kiểm tra cần đo <em>diện tích</em> vết xước. Khi đó ta cần <strong>Image Segmentation</strong> (phân vùng ảnh): gán nhãn cho <strong>từng pixel</strong>. Bài này tương ứng phần "Other topics" (module 06) của bài giảng gốc, và là phần đọc thêm cho chặng Detection / Segmentation / Anomaly Detection.</p>
+<p class="note">Số trang (ví dụ "trang 81") trong bài chỉ tới slide của bài giảng <a href="../tai-nguyen/slide-deep-learning-computer-vision-ban-do-bai-hoc.html">Deep Learning – Computer Vision – NLP</a> (Thang Nguyen, Viet Nguyen); bài này giải thích chi tiết, kiểm chứng và đính chính các slide đó.</p>
+
+<h2 id="ba-kieu-phan-vung-anh">Ba kiểu phân vùng ảnh</h2>
+<div class="table-wrap"><table>
+<tr><th>Kiểu</th><th>Câu hỏi</th><th>Đầu ra</th><th>Ví dụ</th></tr>
+<tr><td><strong>Semantic segmentation</strong></td><td>Pixel này thuộc <em>lớp</em> nào?</td><td>Bản đồ nhãn H×W; hai con chó cạnh nhau có cùng một màu</td><td>Phân vùng cảnh đường phố (trang 100): đường, vỉa hè, nhà, cây, xe</td></tr>
+<tr><td><strong>Instance segmentation</strong></td><td>Pixel này thuộc <em>đối tượng</em> nào?</td><td>Mỗi đối tượng một mask riêng + nhãn + điểm</td><td>Viền riêng của mèo, chó xám, chó vàng (trang 6)</td></tr>
+<tr><td><strong>Panoptic segmentation</strong></td><td>Cả hai</td><td>Mọi pixel có lớp; các vật đếm được ("things": người, xe) còn có ID riêng; vùng nền ("stuff": trời, đường) thì không</td><td>Hiểu toàn cảnh cho xe tự lái</td></tr>
+</table></div>
+
+<h2 id="phan-vung-la-phan-loai-tung-pixel">Phân vùng là phân loại từng pixel</h2>
+<p>Với \(C\) lớp, mô hình semantic segmentation nhận ảnh \(3\times H\times W\) và trả về tensor logits \(C\times H\times W\): mỗi pixel một vector điểm số. Nhãn dự đoán là <code>argmax</code> theo trục kênh. Hàm loss cơ bản chính là cross-entropy, lấy trung bình trên mọi pixel:</p>
+\[ L = -\frac{1}{HW}\sum_{i=1}^{H}\sum_{j=1}^{W} \log p_{ij}\big(y_{ij}\big) \]
+<p>Trong PyTorch, <code>nn.CrossEntropyLoss</code> nhận trực tiếp logits <code>(N, C, H, W)</code> và nhãn <code>(N, H, W)</code> kiểu <code>long</code>.</p>
+<p>Cách ngây thơ: áp dụng sliding window, cắt một mảnh nhỏ quanh <em>mỗi</em> pixel rồi phân loại. Cực kỳ lãng phí vì các mảnh chồng lấn gần như toàn bộ. Ta cần một mạng xử lý cả ảnh một lần và trả ra kết quả cùng độ phân giải.</p>
+
+<h2 id="fcn-fully-convolutional-network-2015">FCN: Fully Convolutional Network (2015)</h2>
+<p>Long, Shelhamer và Darrell nhận thấy lớp fully connected là thứ duy nhất ép CNN nhận đầu vào cố định và mất thông tin vị trí. <strong>FCN</strong>:</p>
+<ol>
+<li>Thay các lớp FC của mạng phân loại (VGG) bằng <strong>conv 1×1</strong>: mạng thành "toàn tích chập", nhận ảnh kích thước bất kỳ và trả về <em>bản đồ</em> điểm số thay vì một vector.</li>
+<li>Bản đồ này nhỏ hơn ảnh 32 lần (do pooling), nên phải <strong>upsample</strong> (phóng to) trở lại kích thước gốc.</li>
+<li>Kết hợp đặc trưng từ các lớp nông hơn (độ phân giải cao, ít ngữ nghĩa) với lớp sâu (ngữ nghĩa mạnh, độ phân giải thấp) qua <strong>skip connection</strong> để viền sắc nét hơn (FCN-32s → 16s → 8s).</li>
+</ol>
+<p>Từ đây hình thành kiến trúc <strong>encoder–decoder</strong> phổ biến: encoder thu nhỏ để hiểu ngữ cảnh ("cái gì"), decoder phóng to để khôi phục chi tiết vị trí ("ở đâu").</p>
+
+<h2 id="cac-cach-upsample">Các cách upsample</h2>
+<div class="table-wrap"><table>
+<tr><th>Cách</th><th>Ý tưởng</th><th>Học được?</th><th>PyTorch</th></tr>
+<tr><td>Nearest neighbor</td><td>Nhân bản mỗi pixel thành khối 2×2</td><td>Không</td><td><code>nn.Upsample(scale_factor=2, mode="nearest")</code></td></tr>
+<tr><td>Bilinear</td><td>Nội suy tuyến tính theo hai chiều, mượt hơn</td><td>Không</td><td><code>F.interpolate(x, scale_factor=2, mode="bilinear")</code></td></tr>
+<tr><td>Max unpooling</td><td>Nhớ vị trí max khi pooling, đặt giá trị trả lại đúng chỗ (SegNet)</td><td>Không</td><td><code>nn.MaxUnpool2d</code></td></tr>
+<tr><td>Transposed convolution</td><td>"Tích chập ngược": mỗi pixel vào được nhân với kernel và rải ra vùng lớn hơn, cộng dồn chỗ chồng lấn</td><td><strong>Có</strong></td><td><code>nn.ConvTranspose2d</code></td></tr>
+</table></div>
+<p>Kích thước đầu ra của transposed convolution:</p>
+\[ O = (N - 1)\cdot S - 2P + K + \text{output\_padding} \]
+<p>Hai cấu hình gấp đôi kích thước hay dùng: \(K = 2, S = 2, P = 0\) và \(K = 4, S = 2, P = 1\) (16 → 32). Transposed conv đôi khi tạo vân "bàn cờ" (checkerboard artifacts) khi kernel không chia hết cho stride; một cách khắc phục là upsample bilinear rồi mới conv 3×3.</p>
+
+<h2 id="u-net-2015-chuan-muc-cua-phan-vung">U-Net (2015): chuẩn mực của phân vùng</h2>
+<figure class="diagram">
+<svg class="dg" viewBox="0 0 620 260" role="img" aria-label="Kiến trúc U-Net hình chữ U với các skip connection nối encoder và decoder">
+  <rect class="bx-c" x="20" y="20" width="90" height="34" rx="5"/><text x="65" y="42" text-anchor="middle" class="sm">H × W, 32</text>
+  <rect class="bx-c" x="70" y="80" width="90" height="34" rx="5"/><text x="115" y="102" text-anchor="middle" class="sm">H/2, 64</text>
+  <rect class="bx-c" x="120" y="140" width="90" height="34" rx="5"/><text x="165" y="162" text-anchor="middle" class="sm">H/4, 128</text>
+  <rect class="bx-a" x="240" y="200" width="140" height="34" rx="5"/><text x="310" y="222" text-anchor="middle" class="sm">bottleneck H/8, 256</text>
+  <rect class="bx-c" x="410" y="140" width="90" height="34" rx="5"/><text x="455" y="162" text-anchor="middle" class="sm">H/4, 128</text>
+  <rect class="bx-c" x="460" y="80" width="90" height="34" rx="5"/><text x="505" y="102" text-anchor="middle" class="sm">H/2, 64</text>
+  <rect class="bx-c" x="510" y="20" width="90" height="34" rx="5"/><text x="555" y="42" text-anchor="middle" class="sm">H × W, 32</text>
+  <path class="ln" d="M65 54L100 80M115 114L150 140M165 174L270 200M350 200L440 174M455 140L490 114M505 80L540 54"/>
+  <path class="ln-a" stroke-dasharray="6 4" d="M110 37H510M160 97H460M210 157H410"/>
+  <text x="30" y="200" class="sm">Encoder: conv + pooling</text>
+  <text x="430" y="250" class="sm">Decoder: upsample + conv</text>
+  <text x="250" y="30" class="sm t-a">skip connection (nối kênh)</text>
+</svg>
+<figcaption>Encoder thu nhỏ, decoder phóng to; đường nét đứt mang chi tiết sắc nét từ encoder sang decoder</figcaption>
+</figure>
+<p>Ronneberger và cộng sự thiết kế <strong>U-Net</strong> cho ảnh y sinh, nơi dữ liệu gán nhãn rất ít. Hai đặc điểm:</p>
+<ul>
+<li><strong>Đối xứng hình chữ U</strong>: mỗi tầng encoder (2 conv 3×3 rồi max pool) có một tầng decoder tương ứng (upsample rồi 2 conv 3×3).</li>
+<li><strong>Skip connection bằng phép nối</strong> (concatenate): feature map của encoder được nối thẳng vào decoder cùng độ phân giải, cung cấp chi tiết biên cạnh mà quá trình pooling đã làm mất.</li>
+</ul>
+<p>Đến nay, U-Net và các biến thể vẫn là lựa chọn mặc định cho ảnh y tế, ảnh vệ tinh, phân vùng lỗi sản phẩm, và cũng là "xương sống" của các mô hình sinh ảnh diffusion.</p>
+<pre><code class="language-python">import torch
+import torch.nn as nn
+
+
+def double_conv(cin, cout):
+    return nn.Sequential(
+        nn.Conv2d(cin, cout, 3, padding=1, bias=False), nn.BatchNorm2d(cout), nn.ReLU(inplace=True),
+        nn.Conv2d(cout, cout, 3, padding=1, bias=False), nn.BatchNorm2d(cout), nn.ReLU(inplace=True),
+    )
+
+
+class UNet(nn.Module):
+    def __init__(self, in_ch=3, num_classes=2, base=32):
+        super().__init__()
+        c = [base, base * 2, base * 4, base * 8]
+        self.enc1, self.enc2, self.enc3 = double_conv(in_ch, c[0]), double_conv(c[0], c[1]), double_conv(c[1], c[2])
+        self.bottleneck = double_conv(c[2], c[3])
+        self.pool = nn.MaxPool2d(2)
+        self.up3, self.dec3 = nn.ConvTranspose2d(c[3], c[2], 2, stride=2), double_conv(c[3], c[2])
+        self.up2, self.dec2 = nn.ConvTranspose2d(c[2], c[1], 2, stride=2), double_conv(c[2], c[1])
+        self.up1, self.dec1 = nn.ConvTranspose2d(c[1], c[0], 2, stride=2), double_conv(c[1], c[0])
+        self.head = nn.Conv2d(c[0], num_classes, 1)          # conv 1x1: mỗi pixel ra num_classes logits
+
+    def forward(self, x):
+        e1 = self.enc1(x)                     # (N, 32, H, W)
+        e2 = self.enc2(self.pool(e1))         # (N, 64, H/2, W/2)
+        e3 = self.enc3(self.pool(e2))         # (N, 128, H/4, W/4)
+        b = self.bottleneck(self.pool(e3))    # (N, 256, H/8, W/8)
+        d3 = self.dec3(torch.cat([self.up3(b), e3], dim=1))    # skip connection: nối kênh
+        d2 = self.dec2(torch.cat([self.up2(d3), e2], dim=1))
+        d1 = self.dec1(torch.cat([self.up1(d2), e1], dim=1))
+        return self.head(d1)                  # (N, num_classes, H, W)
+
+
+model = UNet(num_classes=3)
+logits = model(torch.rand(2, 3, 256, 256))
+print(logits.shape)                           # torch.Size([2, 3, 256, 256])
+
+masks = torch.randint(0, 3, (2, 256, 256))     # nhãn từng pixel
+loss = nn.CrossEntropyLoss()(logits, masks)</code></pre>
+<p>Mô hình này có khoảng 1,93 triệu tham số; kích thước ảnh vào phải chia hết cho 8 (3 lần pooling).</p>
+
+<h2 id="deeplab-giu-do-phan-giai-bang-atrous-convolution">DeepLab: giữ độ phân giải bằng atrous convolution</h2>
+<p>Thay vì thu nhỏ rồi phóng to, họ DeepLab (Google, 2015–2018) <strong>bớt pooling</strong> ở các tầng cuối và dùng <strong>dilated (atrous) convolution</strong> (xem <a href="batchnorm-dropout-receptive-field.html">Batch Normalization, Dropout và Receptive Field</a>) để giữ receptive field lớn mà feature map không bị co lại quá nhiều (chỉ nhỏ hơn ảnh 8 hoặc 16 lần thay vì 32).</p>
+<ul>
+<li><strong>ASPP</strong> (Atrous Spatial Pyramid Pooling): chạy song song nhiều conv atrous với dilation khác nhau (ví dụ 6, 12, 18) cộng global pooling, để nắm ngữ cảnh ở nhiều thang đo.</li>
+<li><strong>DeepLabv3+</strong> thêm một decoder nhẹ để làm sắc viền.</li>
+</ul>
+<pre><code class="language-python">from torchvision.models.segmentation import deeplabv3_resnet50, DeepLabV3_ResNet50_Weights
+
+weights = DeepLabV3_ResNet50_Weights.DEFAULT        # 21 lớp kiểu Pascal VOC (kể cả background)
+model = deeplabv3_resnet50(weights=weights).eval()
+batch = weights.transforms()(img).unsqueeze(0)       # img: tensor ảnh (C, H, W)
+with torch.no_grad():
+    out = model(batch)["out"]                         # (1, 21, H', W')
+mask = out.argmax(dim=1)[0]                          # nhãn cho từng pixel
+# Fine-tune cho dữ liệu riêng: model.classifier[4] = nn.Conv2d(256, num_classes, kernel_size=1)</code></pre>
+
+<h2 id="mask-r-cnn-instance-segmentation">Mask R-CNN: instance segmentation</h2>
+<p>He et al. (2017) mở rộng Faster R-CNN (xem <a href="r-cnn-fast-faster-r-cnn.html">Từ R-CNN đến Faster R-CNN</a>) bằng cách thêm một nhánh thứ ba song song với nhánh phân loại và nhánh hồi quy box: một <strong>FCN nhỏ dự đoán mask nhị phân 28×28</strong> cho mỗi RoI. Hai thay đổi quan trọng:</p>
+<ul>
+<li><strong>RoI Align</strong> thay RoI Pooling: bỏ phép làm tròn, dùng nội suy song tuyến tính, giúp mask khớp đúng vị trí.</li>
+<li>Mask được dự đoán <strong>riêng cho từng lớp</strong> bằng sigmoid (không cạnh tranh giữa các lớp), lớp nào do nhánh phân loại quyết định.</li>
+</ul>
+<pre><code class="language-python">from torchvision.models.detection import maskrcnn_resnet50_fpn_v2, MaskRCNN_ResNet50_FPN_V2_Weights
+
+model = maskrcnn_resnet50_fpn_v2(weights=MaskRCNN_ResNet50_FPN_V2_Weights.DEFAULT).eval()
+with torch.no_grad():
+    pred = model([image])[0]          # image: float tensor (3, H, W), giá trị [0, 1]
+print(pred.keys())                    # boxes, labels, scores, masks
+binary_masks = pred["masks"][:, 0] &gt; 0.5   # (số đối tượng, H, W)
+# Khi huấn luyện, target cần thêm "masks": UInt8Tensor (N, H, W) bên cạnh "boxes" và "labels"</code></pre>
+
+<h2 id="danh-gia-mo-hinh-phan-vung">Đánh giá mô hình phân vùng</h2>
+<p>Ví dụ ảnh 4×4 với 3 lớp:</p>
+<div class="mats">
+<table class="mat"><caption>Nhãn thật</caption>
+<tr><td>0</td><td>0</td><td>1</td><td>1</td></tr><tr><td>0</td><td>0</td><td>1</td><td>1</td></tr>
+<tr><td>0</td><td>2</td><td>2</td><td>1</td></tr><tr><td>0</td><td>2</td><td>2</td><td>2</td></tr></table>
+<table class="mat"><caption>Dự đoán</caption>
+<tr><td>0</td><td>0</td><td>1</td><td>1</td></tr><tr><td>0</td><td class="hl2">1</td><td>1</td><td>1</td></tr>
+<tr><td>0</td><td>2</td><td>2</td><td class="hl2">2</td></tr><tr><td>0</td><td class="hl2">0</td><td>2</td><td>2</td></tr></table>
+</div>
+<ul>
+<li><strong>Pixel accuracy</strong> = 13/16 = 0,8125. Dễ hiểu nhưng <strong>đánh lừa</strong> khi mất cân bằng: nếu 98% ảnh là nền, mô hình đoán toàn nền vẫn đạt 98%.</li>
+<li><strong>IoU từng lớp</strong> = giao / hợp (như IoU của box, nhưng tính trên tập pixel). Lớp 0: 5/7 ≈ 0,714; lớp 1: 4/6 ≈ 0,667; lớp 2: 4/6 ≈ 0,667. <strong>mIoU</strong> (trung bình các lớp) ≈ 0,683: thước đo chuẩn của semantic segmentation.</li>
+<li><strong>Dice coefficient</strong> (F1 trên pixel): \(\text{Dice} = \dfrac{2|A\cap B|}{|A| + |B|}\). Lớp 0: \(2\cdot5/(6+6) \approx 0{,}833\); trung bình ≈ 0,811. Phổ biến trong ảnh y tế. Liên hệ: \(\text{Dice} = \dfrac{2\,\text{IoU}}{1 + \text{IoU}}\).</li>
+<li>Instance segmentation dùng <strong>mask AP</strong> kiểu COCO (giống box AP nhưng IoU tính trên mask).</li>
+</ul>
+<pre><code class="language-python">def miou_dice(pred, target, num_classes):
+    ious, dices = [], []
+    for c in range(num_classes):
+        p, t = pred == c, target == c
+        inter = (p &amp; t).sum().item()
+        union = (p | t).sum().item()
+        if union == 0:              # lớp không xuất hiện ở cả hai: bỏ qua
+            continue
+        ious.append(inter / union)
+        dices.append(2 * inter / (p.sum().item() + t.sum().item()))
+    return sum(ious) / len(ious), sum(dices) / len(dices)
+
+
+target = torch.tensor([[0, 0, 1, 1], [0, 0, 1, 1], [0, 2, 2, 1], [0, 2, 2, 2]])
+pred   = torch.tensor([[0, 0, 1, 1], [0, 1, 1, 1], [0, 2, 2, 2], [0, 0, 2, 2]])
+print(miou_dice(pred, target, 3))   # (0.6825, 0.8111)</code></pre>
+
+<h2 id="loss-cho-du-lieu-mat-can-bang">Loss cho dữ liệu mất cân bằng</h2>
+<p>Khi vùng cần tìm rất nhỏ (vết nứt mảnh, khối u nhỏ), cross-entropy bị số đông pixel nền lấn át. Các lựa chọn:</p>
+<ul>
+<li><strong>Cross-entropy có trọng số lớp</strong>: <code>nn.CrossEntropyLoss(weight=...)</code>.</li>
+<li><strong>Dice loss</strong> \(= 1 - \text{Dice}\) (tính trên xác suất mềm): tối ưu trực tiếp độ chồng lấn, không bị chi phối bởi pixel nền.</li>
+<li><strong>Focal loss</strong>: giảm trọng số các pixel đã dễ đoán đúng.</li>
+<li>Thực tế hay dùng <strong>tổng CE + Dice</strong>.</li>
+</ul>
+
+<h2 id="du-lieu-va-cong-cu">Dữ liệu và công cụ</h2>
+<ul>
+<li>Gán nhãn bằng đa giác (polygon) với CVAT, Label Studio, Labelme; lưu mask dạng ảnh PNG mỗi pixel là chỉ số lớp, hoặc định dạng COCO (polygon/RLE).</li>
+<li>Augmentation hình học phải áp dụng <strong>đồng thời và giống hệt</strong> cho ảnh và mask; khi resize mask dùng nội suy <em>nearest</em> (không dùng bilinear, sẽ sinh ra nhãn "lai" không tồn tại).</li>
+<li>Thư viện <strong>segmentation_models_pytorch</strong> cung cấp sẵn U-Net, FPN, DeepLabV3+ với hàng trăm backbone pretrained.</li>
+<li>Họ mô hình nền tảng <strong>Segment Anything</strong> (SAM, SAM 2… của Meta) phân vùng mọi vật thể theo gợi ý (điểm, box), rất hữu ích để <strong>gán nhãn nhanh</strong> rồi huấn luyện mô hình nhỏ chuyên biệt.</li>
+</ul>
+
+<h2 id="tom-tat">Tóm tắt</h2>
+<ul>
+<li>Semantic: lớp cho từng pixel; instance: mask riêng cho từng đối tượng; panoptic: cả hai.</li>
+<li>FCN: toàn tích chập + upsample + skip; mở đầu kiến trúc encoder–decoder.</li>
+<li>U-Net: encoder–decoder đối xứng, skip connection nối kênh; tốt với ít dữ liệu.</li>
+<li>DeepLab: atrous conv + ASPP giữ độ phân giải và ngữ cảnh rộng.</li>
+<li>Mask R-CNN: Faster R-CNN + nhánh mask + RoI Align.</li>
+<li>Đánh giá bằng mIoU, Dice; cẩn thận với pixel accuracy khi dữ liệu mất cân bằng.</li>
+</ul>
+<p>Thực hành: <a href="unet-phan-doan-anh.html">U-Net cho phân đoạn ảnh</a> và <a href="yolo26-seg-phan-doan-vet-loi.html">Phân đoạn vết lỗi với YOLO26-seg</a>. Đọc thêm: thay vì <em>hiểu</em> ảnh, hãy để máy tính <em>tạo ra</em> ảnh với <a href="gan-mang-doi-sinh.html">GAN – mạng đối sinh</a>.</p>
+
+<h2 id="tai-lieu-tham-khao">Tài liệu tham khảo</h2>
+<ul>
+<li>Long, Shelhamer, Darrell (2015). <em>Fully Convolutional Networks for Semantic Segmentation</em>.</li>
+<li>Ronneberger, Fischer, Brox (2015). <em>U-Net: Convolutional Networks for Biomedical Image Segmentation</em>.</li>
+<li>Chen et al. (2017–2018). <em>Rethinking Atrous Convolution for Semantic Image Segmentation</em> (DeepLabv3), <em>DeepLabv3+</em>.</li>
+<li>He et al. (2017). <em>Mask R-CNN</em>; Kirillov et al. (2019). <em>Panoptic Segmentation</em>; Kirillov et al. (2023). <em>Segment Anything</em>.</li>
+<li>CS231n Lecture: <em>Detection and Segmentation</em>; Dumoulin &amp; Visin (2016). <em>A guide to convolution arithmetic</em> (transposed convolution).</li>
+<li>Tài liệu torchvision: <em>Semantic segmentation</em> và <em>Instance segmentation</em> models.</li>
+</ul>
+
+      </div>
+      
+      <footer class="article-foot">
+        <div class="tags"><a class="tag" href="../search.html?q=Segmentation">#Segmentation</a><a class="tag" href="../search.html?q=PyTorch">#PyTorch</a></div>
+        <div class="share">
+      <span>Chia sẻ:</span>
+      <a class="share-btn fb" href="https://www.facebook.com/sharer/sharer.php?u=https://hocfree.vn/hoc/image-segmentation-unet-mask-rcnn.html" target="_blank" rel="noopener" aria-label="Chia sẻ Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8z"/></svg></a>
+      <a class="share-btn x" href="https://twitter.com/intent/tweet?url=https://hocfree.vn/hoc/image-segmentation-unet-mask-rcnn.html" target="_blank" rel="noopener" aria-label="Chia sẻ X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+      <button class="share-btn copy-link" data-url="https://hocfree.vn/hoc/image-segmentation-unet-mask-rcnn.html" aria-label="Sao chép liên kết"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+    </div>
+      </footer>
+      <div class="author-box">
+        <span class="avatar lg" aria-hidden="true">HF</span>
+        <div>
+          <strong>Ban biên tập HọcFree</strong>
+          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và ngoại ngữ, hoàn toàn miễn phí.</p>
+        </div>
+      </div>
+      <nav class="pager" aria-label="Bài trước/sau"><a class="prev" href="../hoc/gan-mang-doi-sinh.html"><span>← Bài trước</span>GAN – Mạng đối sinh: cho máy tính tự “vẽ” ảnh</a><a class="next" href="../hoc/r-cnn-fast-faster-r-cnn.html"><span>Bài tiếp →</span>Từ R-CNN đến Faster R-CNN: anchor, RoI Pooling, RPN</a></nav>
+    </article>
+    <aside class="sidebar">
+  <section class="widget"><h2 class="widget-title">Đọc nhiều nhất</h2><ol class="popular"><li><a href="../hoc/yolo26-object-detection-nhap-mon.html"><span class="num">1</span><span class="t">Object Detection với YOLO26: chuẩn bị dữ liệu, huấn luyện và xuất mô hình</span></a></li><li><a href="../kien-thuc/chon-camera-ong-kinh-machine-vision.html"><span class="num">2</span><span class="t">Chọn camera và ống kính Machine Vision: độ phân giải, FOV, tiêu cự</span></a></li><li><a href="../projects/phat-hien-loi-be-mat-anomaly-detection.html"><span class="num">3</span><span class="t">Dự án: phát hiện lỗi bề mặt bằng PatchCore, chỉ học từ ảnh OK</span></a></li><li><a href="../hoc/opencv-co-ban-anh-video-camera.html"><span class="num">4</span><span class="t">OpenCV cơ bản: đọc, hiển thị, ghi ảnh, video và camera</span></a></li><li><a href="../kien-thuc/7-kieu-chieu-sang-machine-vision.html"><span class="num">5</span><span class="t">7 kiểu chiếu sáng Machine Vision: chọn đèn theo bề mặt và loại lỗi</span></a></li></ol></section>
+  <section class="widget">
+    <h2 class="widget-title">Chuyên mục</h2>
+    <ul class="cat-list"><li><a href="../hoc/"><span>Học AI &amp; Lập trình</span><span class="count">162 bài</span></a></li><li><a href="../projects/"><span>Projects</span><span class="count">15 bài</span></a></li><li><a href="../kien-thuc/"><span>Kiến thức</span><span class="count">128 bài</span></a></li><li><a href="../tin-tuc-ai/"><span>Tin tức AI</span><span class="count">16 bài</span></a></li><li><a href="../ngoai-ngu/"><span>Ngoại ngữ</span><span class="count">6 bài</span></a></li><li><a href="../tai-nguyen/"><span>Tài nguyên</span><span class="count">32 bài</span></a></li></ul>
+  </section>
+  <section class="widget widget-about">
+    <h2 class="widget-title">Về HọcFree</h2>
+    <p>Nơi học <strong>miễn phí</strong> AI, lập trình, Computer Vision và ngoại ngữ dành cho người Việt. Không quảng cáo, không thu phí.</p>
+    <a class="btn" href="../gioi-thieu.html">Tìm hiểu thêm</a>
+  </section>
+  <section class="widget"><h2 class="widget-title">Thẻ</h2><div class="tags"><a class="tag" href="../search.html?q=.NET">.NET</a><a class="tag" href="../search.html?q=AI Agents">AI Agents</a><a class="tag" href="../search.html?q=AI Industry">AI Industry</a><a class="tag" href="../search.html?q=AI Models">AI Models</a><a class="tag" href="../search.html?q=AI News">AI News</a><a class="tag" href="../search.html?q=AI Project">AI Project</a><a class="tag" href="../search.html?q=AI Tools">AI Tools</a><a class="tag" href="../search.html?q=AI Vision">AI Vision</a><a class="tag" href="../search.html?q=C#">C#</a><a class="tag" href="../search.html?q=Calibration">Calibration</a><a class="tag" href="../search.html?q=Camera">Camera</a><a class="tag" href="../search.html?q=Cheat Sheet">Cheat Sheet</a><a class="tag" href="../search.html?q=Chiếu sáng">Chiếu sáng</a><a class="tag" href="../search.html?q=Computer Vision">Computer Vision</a><a class="tag" href="../search.html?q=CV News">CV News</a><a class="tag" href="../search.html?q=CV Project">CV Project</a><a class="tag" href="../search.html?q=Công cụ">Công cụ</a><a class="tag" href="../search.html?q=Dataset">Dataset</a><a class="tag" href="../search.html?q=Deep Learning">Deep Learning</a><a class="tag" href="../search.html?q=Deployment">Deployment</a><a class="tag" href="../search.html?q=Documentation">Documentation</a><a class="tag" href="../search.html?q=Ebook">Ebook</a><a class="tag" href="../search.html?q=Generative AI">Generative AI</a><a class="tag" href="../search.html?q=Git">Git</a><a class="tag" href="../search.html?q=HSK">HSK</a><a class="tag" href="../search.html?q=Image Processing">Image Processing</a><a class="tag" href="../search.html?q=Industrial Automation">Industrial Automation</a><a class="tag" href="../search.html?q=Industrial Project">Industrial Project</a><a class="tag" href="../search.html?q=Industrial Vision">Industrial Vision</a><a class="tag" href="../search.html?q=Kinh nghiệm">Kinh nghiệm</a><a class="tag" href="../search.html?q=Lens">Lens</a><a class="tag" href="../search.html?q=LLM">LLM</a><a class="tag" href="../search.html?q=Lập trình">Lập trình</a><a class="tag" href="../search.html?q=Machine Learning">Machine Learning</a><a class="tag" href="../search.html?q=Machine Vision">Machine Vision</a><a class="tag" href="../search.html?q=MES">MES</a><a class="tag" href="../search.html?q=NumPy">NumPy</a><a class="tag" href="../search.html?q=Object Detection">Object Detection</a><a class="tag" href="../search.html?q=OCR">OCR</a><a class="tag" href="../search.html?q=OpenCV">OpenCV</a><a class="tag" href="../search.html?q=PLC">PLC</a><a class="tag" href="../search.html?q=Python">Python</a><a class="tag" href="../search.html?q=PyTorch">PyTorch</a><a class="tag" href="../search.html?q=Robot">Robot</a><a class="tag" href="../search.html?q=Robotics">Robotics</a><a class="tag" href="../search.html?q=Segmentation">Segmentation</a><a class="tag" href="../search.html?q=Source Code">Source Code</a><a class="tag" href="../search.html?q=Technology">Technology</a><a class="tag" href="../search.html?q=Tips">Tips</a><a class="tag" href="../search.html?q=Tiếng Anh">Tiếng Anh</a><a class="tag" href="../search.html?q=Tiếng Trung">Tiếng Trung</a><a class="tag" href="../search.html?q=TOEIC">TOEIC</a><a class="tag" href="../search.html?q=Tự học">Tự học</a><a class="tag" href="../search.html?q=VS Code">VS Code</a><a class="tag" href="../search.html?q=YOLO">YOLO</a><a class="tag" href="../search.html?q=Đo lường">Đo lường</a></div></section>
+</aside>
+  </div>
+  <section class="band">
+    <div class="container">
+      <div class="section-title"><h2>Có thể bạn quan tâm</h2></div>
+      <div class="card-grid"><article class="card">
+  <a class="thumb" href="../hoc/tong-quan-deep-learning-computer-vision.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/tong-quan-deep-learning-computer-vision.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/tong-quan-deep-learning-computer-vision.html">Tổng quan Deep Learning cho Computer Vision</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-14">14/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>10 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/linear-classifier-den-neural-network.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/linear-classifier-den-neural-network.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/linear-classifier-den-neural-network.html">Từ Linear Classifier đến Neural Network</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-14">14/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>11 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/loss-function-gradient-descent-optimizer.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/loss-function-gradient-descent-optimizer.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/loss-function-gradient-descent-optimizer.html">Loss function và optimizer: SGD, Momentum, RMSProp, Adam</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-14">14/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>13 phút đọc</span></div>
+</article></div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <a class="logo" href="../"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+      <p>HọcFree.vn – nền tảng học miễn phí về AI, lập trình, Computer Vision, Machine Vision, tin tức AI và ngoại ngữ dành cho người Việt.</p>
+    </div>
+    <div><h3>Học &amp; thực hành</h3><ul><li><a href="../hoc/">Học AI &amp; Lập trình</a></li><li><a href="../projects/">Projects</a></li><li><a href="../lo-trinh/">Learning Paths</a></li></ul></div>
+    <div><h3>Khám phá</h3><ul><li><a href="../kien-thuc/">Kiến thức</a></li><li><a href="../tin-tuc-ai/">Tin tức AI</a></li><li><a href="../ngoai-ngu/">Ngoại ngữ</a></li><li><a href="../tai-nguyen/">Tài nguyên</a></li></ul></div>
+    <div><h3>Bài mới</h3><ul><li><a href="../tai-nguyen/slide-deep-learning-computer-vision-ban-do-bai-hoc.html">Học theo slide Deep Learning – Computer Vision: bản đồ bài học</a></li><li><a href="../hoc/tong-quan-deep-learning-computer-vision.html">Tổng quan Deep Learning cho Computer Vision</a></li><li><a href="../hoc/linear-classifier-den-neural-network.html">Từ Linear Classifier đến Neural Network</a></li><li><a href="../hoc/loss-function-gradient-descent-optimizer.html">Loss function và optimizer: SGD, Momentum, RMSProp, Adam</a></li></ul></div>
+    <div>
+      <h3>HọcFree</h3>
+      <ul>
+        <li><a href="../gioi-thieu.html">Giới thiệu</a></li>
+        <li><a href="../search.html">Tìm kiếm</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">© 2026 HọcFree.vn · Kiến thức là để chia sẻ.</div>
+  </div>
+</footer>
+<button class="to-top" aria-label="Lên đầu trang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<script src="../assets/js/search-data.js?v=20261014" defer></script>
+<script src="../assets/js/main.js?v=20261014" defer></script>
+</body>
+</html>

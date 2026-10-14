@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="vi" data-root="../">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vanishing/Exploding gradient và khởi tạo trọng số | HọcFree</title>
+<meta name="description" content="Vì sao mạng sâu khó huấn luyện: sigmoid và ReLU, khởi tạo Xavier/He đúng công thức qua thí nghiệm 10 lớp, gradient clipping và checklist khi loss NaN.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://hocfree.vn/hoc/vanishing-exploding-gradient-weight-init.html">
+<meta property="og:site_name" content="HọcFree">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Vanishing/Exploding gradient và khởi tạo trọng số">
+<meta property="og:description" content="Vì sao mạng sâu khó huấn luyện: sigmoid và ReLU, khởi tạo Xavier/He đúng công thức qua thí nghiệm 10 lớp, gradient clipping và checklist khi loss NaN.">
+<meta property="og:url" content="https://hocfree.vn/hoc/vanishing-exploding-gradient-weight-init.html">
+<meta property="og:image" content="https://hocfree.vn/assets/images/posts/vanishing-exploding-gradient-weight-init.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="Vanishing/Exploding gradient và khởi tạo trọng số">
+<meta property="og:locale" content="vi_VN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Vanishing/Exploding gradient và khởi tạo trọng số">
+<meta name="twitter:description" content="Vì sao mạng sâu khó huấn luyện: sigmoid và ReLU, khởi tạo Xavier/He đúng công thức qua thí nghiệm 10 lớp, gradient clipping và checklist khi loss NaN.">
+<meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/vanishing-exploding-gradient-weight-init.jpg">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/fonts.css?v=20261014">
+<link rel="stylesheet" href="../assets/css/style.css?v=20261014">
+<script>try{var t=localStorage.getItem('hf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
+<meta property="article:published_time" content="2026-10-14">
+<meta property="article:section" content="Học AI &amp; Lập trình">
+<meta property="article:tag" content="Deep Learning">
+<meta property="article:tag" content="PyTorch">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "Vanishing/Exploding gradient và khởi tạo trọng số", "description": "Vì sao mạng sâu khó huấn luyện: sigmoid và ReLU, khởi tạo Xavier/He đúng công thức qua thí nghiệm 10 lớp, gradient clipping và checklist khi loss NaN.", "image": ["https://hocfree.vn/assets/images/posts/vanishing-exploding-gradient-weight-init.jpg"], "datePublished": "2026-10-14", "dateModified": "2026-10-14", "inLanguage": "vi", "articleSection": "Học AI & Lập trình", "keywords": "Deep Learning, PyTorch", "wordCount": 2177, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/hoc/vanishing-exploding-gradient-weight-init.html"}, "isPartOf": {"@type": "Course", "name": "Trở thành Vision Engineer", "url": "https://hocfree.vn/lo-trinh/vision-engineer.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Learning Paths", "item": "https://hocfree.vn/lo-trinh/"}, {"@type": "ListItem", "position": 3, "name": "Trở thành Vision Engineer", "item": "https://hocfree.vn/lo-trinh/vision-engineer.html"}, {"@type": "ListItem", "position": 4, "name": "Chặng 10: Deep Learning", "item": "https://hocfree.vn/lo-trinh/vision-engineer/deep-learning.html"}, {"@type": "ListItem", "position": 5, "name": "Vanishing/Exploding gradient và khởi tạo trọng số"}]}</script>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/contrib/auto-render.min.js" onload="renderMathInElement(document.querySelector('.prose'),{delimiters:[{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}],throwOnError:false})"></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div class="progress" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="container wide header-top">
+    <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="nav-scrim" hidden></div>
+    <a class="logo" href="../" aria-label="HọcFree – Trang chủ"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+    <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
+    <div class="header-actions">
+      <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="login-link" href="../dang-nhap.html">Đăng nhập</a>
+      <a class="btn start-btn" href="../lo-trinh/">Bắt đầu học</a>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="container wide">
+      <nav class="site-nav" id="site-nav" aria-label="Menu chính">
+        <div class="drawer-head">
+          <a class="logo" href="../" tabindex="-1"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+          <button class="icon-btn nav-close" aria-label="Đóng menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <button type="button" class="drawer-search search-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Tìm bài học, chủ đề…</span></button>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="../">Trang chủ</a></li><li class="nav-item has-panel is-mega"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-hoc">Học AI &amp; Lập trình<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel mega" id="nav-panel-hoc">
+  <div class="container wide mega-inner">
+    <div class="mega-groups"><div class="mega-group"><a class="mega-group-title" href="../hoc/#programming">Programming</a><ul><li><a href="../hoc/python.html">Python</a></li><li><a href="../hoc/csharp.html">C#</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#ai-machine-learning">AI &amp; Machine Learning</a><ul><li><a href="../hoc/machine-learning.html">Machine Learning</a></li><li><a href="../hoc/deep-learning.html">Deep Learning</a></li><li><a href="../hoc/pytorch.html">PyTorch</a></li><li><a href="../hoc/generative-ai.html">Generative AI</a></li><li><a href="../hoc/llm-ai-agents.html">LLM / AI Agents</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#computer-vision">Computer Vision</a><ul><li><a href="../hoc/opencv.html">OpenCV</a></li><li><a href="../hoc/image-processing.html">Image Processing</a></li><li><a href="../hoc/computer-vision.html">Computer Vision</a></li><li><a href="../hoc/ocr.html">OCR</a></li><li><a href="../hoc/object-detection.html">Object Detection</a></li><li><a href="../hoc/segmentation.html">Segmentation</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#vision-engineering">Vision Engineering</a><ul><li><a href="../hoc/machine-vision.html">Machine Vision</a></li><li><a href="../hoc/ai-vision.html">AI Vision</a></li><li><a href="../hoc/industrial-vision.html">Industrial Vision</a></li><li><a href="../hoc/camera-lens.html">Camera &amp; Lens</a></li><li><a href="../hoc/lighting.html">Lighting</a></li><li><a href="../hoc/calibration.html">Calibration</a></li><li><a href="../hoc/plc-robot-mes.html">PLC / Robot / MES</a></li><li><a href="../hoc/vision-deployment.html">Vision Deployment</a></li></ul></div></div>
+    <a class="feature-card" href="../lo-trinh/vision-engineer.html">
+  <span class="feature-eyebrow">⭐ Learning Path nổi bật</span>
+  <span class="feature-title">Trở thành Vision Engineer</span>
+  <span class="feature-sub">Machine Vision + AI Vision + Industrial Automation</span>
+  <span class="feature-desc">Lộ trình thực chiến từ Python, OpenCV và Machine Vision đến Deep Learning, AI Vision, Camera, PLC, Robot và triển khai hệ thống Vision trong nhà máy.</span>
+  <span class="feature-chain" aria-label="Các chặng chính"><span>Python</span><i aria-hidden="true">→</i><span>OpenCV</span><i aria-hidden="true">→</i><span>Machine Vision</span><i aria-hidden="true">→</i><span>AI Vision</span><i aria-hidden="true">→</i><span class="chain-goal">🎯 Vision Engineer</span></span>
+  <span class="feature-meta">14 chặng · 5 giai đoạn · ~12 tháng</span>
+  <span class="feature-cta">Xem lộ trình →</span>
+</a>
+  </div>
+  <div class="mega-foot"><div class="container wide mega-foot-inner"><ol class="journey compact" aria-label="Học, thực hành, trở thành kỹ sư"><li><a href="../hoc/" aria-current="step"><span class="journey-n">1</span><span class="journey-t"><b>Học</b><small>Học AI &amp; Lập trình</small></span></a></li><li><a href="../projects/"><span class="journey-n">2</span><span class="journey-t"><b>Thực hành</b><small>Projects</small></span></a></li><li><a href="../lo-trinh/"><span class="journey-n">3</span><span class="journey-t"><b>Trở thành kỹ sư</b><small>Learning Paths</small></span></a></li></ol><a class="panel-all" href="../hoc/">Xem tất cả Học AI &amp; Lập trình →</a></div></div>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-projects">Projects<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-projects">
+  <p class="panel-kicker"><span>Bước 2 · Thực hành</span>Áp dụng vào dự án thật</p>
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../projects/ai-projects.html"><span class="drop-label">AI Projects</span><span class="drop-desc">Ứng dụng ML và LLM, từ ý tưởng đến bản demo</span></a></li><li><a class="drop-link" href="../projects/computer-vision-projects.html"><span class="drop-label">Computer Vision Projects</span><span class="drop-desc">Phát hiện, nhận dạng và theo dõi đối tượng</span></a></li><li><a class="drop-link" href="../projects/industrial-vision-projects.html"><span class="drop-label">Industrial Vision Projects</span><span class="drop-desc">Đo kích thước, kiểm tra lỗi, đọc mã trên dây chuyền</span></a></li></ul></div></div>
+  <a class="panel-all" href="../projects/">Xem tất cả Projects →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger is-active" aria-expanded="false" aria-controls="nav-panel-lo-trinh" aria-current="true">Learning Paths<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-lo-trinh">
+  <p class="panel-kicker"><span>Bước 3 · Trở thành kỹ sư</span>Định hướng nghề nghiệp</p>
+  <ul class="drop-list"><li><a class="drop-link is-flagship" href="../lo-trinh/vision-engineer.html"><span class="drop-label">⭐ Trở thành Vision Engineer</span><span class="drop-desc">Machine Vision + AI Vision + Industrial Automation · 14 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/#python-developer"><span class="drop-label">Python Developer<span class="badge-soon">Sắp ra mắt</span></span><span class="drop-desc">Python, công cụ, tự động hóa</span></a></li></ul>
+  <a class="panel-all" href="../lo-trinh/">Xem tất cả lộ trình →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-kien-thuc">Kiến thức<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-kien-thuc">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Lĩnh vực</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/programming.html"><span class="drop-label">Programming</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-machine-learning.html"><span class="drop-label">AI / Machine Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/deep-learning.html"><span class="drop-label">Deep Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/machine-vision.html"><span class="drop-label">Machine Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-vision.html"><span class="drop-label">AI Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/industrial-automation.html"><span class="drop-label">Industrial Automation</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Công cụ &amp; mẹo</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/tools-frameworks.html"><span class="drop-label">Tools &amp; Frameworks</span></a></li><li><a class="drop-link" href="../kien-thuc/tips-tricks.html"><span class="drop-label">Tips &amp; Tricks</span></a></li></ul></div></div>
+  <a class="panel-all" href="../kien-thuc/">Xem tất cả Kiến thức →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tin-tuc-ai">Tin tức AI<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tin-tuc-ai">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tin-tuc-ai/ai-news.html"><span class="drop-label">AI News</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-models.html"><span class="drop-label">AI Models</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/technology.html"><span class="drop-label">Technology</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/robotics.html"><span class="drop-label">Robotics</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-industry.html"><span class="drop-label">AI Industry</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tin-tuc-ai/">Xem tất cả Tin tức AI →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-ngoai-ngu">Ngoại ngữ<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-ngoai-ngu">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/english.html"><span class="drop-label">English</span><span class="drop-desc">Lộ trình 700 TOEIC, phương pháp học, giáo trình HF-700TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chinese.html"><span class="drop-label">Chinese</span><span class="drop-desc">Lộ trình HSK3, phương pháp học, giáo trình HF-HSK3</span></a></li></ul></div></div>
+  <a class="panel-all" href="../ngoai-ngu/">Xem tất cả Ngoại ngữ →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tai-nguyen">Tài nguyên<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tai-nguyen">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tai-nguyen/source-code.html"><span class="drop-label">Source Code</span><span class="drop-desc">Mã nguồn mẫu đi kèm bài học</span></a></li><li><a class="drop-link" href="../tai-nguyen/dataset.html"><span class="drop-label">Dataset</span><span class="drop-desc">Bộ dữ liệu ảnh để luyện tập</span></a></li><li><a class="drop-link" href="../tai-nguyen/cheat-sheets.html"><span class="drop-label">Cheat Sheets</span><span class="drop-desc">Tóm tắt nhanh trong một trang</span></a></li><li><a class="drop-link" href="../tai-nguyen/documentation.html"><span class="drop-label">Documentation</span><span class="drop-desc">Tài liệu tra cứu thư viện, API</span></a></li><li><a class="drop-link" href="../tai-nguyen/ebook.html"><span class="drop-label">Ebook / Tài liệu</span><span class="drop-desc">Sách và tài liệu tham khảo</span></a></li><li><a class="drop-link" href="../tai-nguyen/ai-tools.html"><span class="drop-label">AI Tools</span><span class="drop-desc">Công cụ AI hữu ích cho việc học</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tai-nguyen/">Xem tất cả Tài nguyên →</a>
+</div></li></ul>
+        <div class="drawer-foot">
+          <a class="btn ghost" href="../dang-nhap.html">Đăng nhập</a>
+          <a class="btn" href="../lo-trinh/">Bắt đầu học</a>
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+<div class="search-dialog" hidden>
+  <div class="search-scrim"></div>
+  <div class="search-box" role="dialog" aria-modal="true" aria-label="Tìm kiếm">
+    <form class="search-form" action="../search.html" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" placeholder="Tìm bài học, chủ đề, bài viết…" autocomplete="off" aria-label="Từ khóa tìm kiếm" aria-controls="search-suggest">
+      <button type="button" class="icon-btn search-close" aria-label="Đóng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </form>
+    <div class="search-suggest" id="search-suggest" aria-live="polite">
+      <div class="search-empty">
+        <p class="search-group-title">Chủ đề phổ biến</p>
+        <div class="chips"><a class="chip" href="../hoc/python.html">Python</a><a class="chip" href="../hoc/opencv.html">OpenCV</a><a class="chip" href="../hoc/machine-vision.html">Machine Vision</a><a class="chip" href="../hoc/deep-learning.html">Deep Learning</a><a class="chip" href="../hoc/ai-vision.html">AI Vision</a><a class="chip" href="../hoc/object-detection.html">Object Detection</a><a class="chip" href="../hoc/pytorch.html">PyTorch</a><a class="chip" href="../ngoai-ngu/english.html">English</a></div>
+        <p class="search-group-title">Lộ trình nổi bật</p>
+        <a class="search-item" href="../lo-trinh/vision-engineer.html"><span class="search-ico" aria-hidden="true">⭐</span><span>Trở thành Vision Engineer<small>Learning Path · Machine Vision + AI Vision + Industrial Automation</small></span></a>
+      </div>
+    </div>
+    <div class="search-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> chọn</span><span><kbd>Enter</kbd> mở</span><span><kbd>Esc</kbd> đóng</span></div>
+  </div>
+</div>
+<main id="main">
+  <div class="container layout article-layout">
+    <article class="article">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../lo-trinh/">Learning Paths</a><span>/</span><a href="../lo-trinh/vision-engineer.html">Vision Engineer</a><span>/</span><a href="../lo-trinh/vision-engineer/deep-learning.html">Chặng 10: Deep Learning</a></nav>
+      <header class="article-head">
+        <div class="course-bar" data-course="vision-engineer"><a class="course-chip" href="../lo-trinh/vision-engineer/deep-learning.html">⭐ Vision Engineer · Chặng 10</a><span class="lesson-no">Bài 9/12</span><span class="kind kind-lesson">Bài học</span><span class="lesson-min"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></svg>~60 phút</span></div>
+        <h1>Vanishing/Exploding gradient và khởi tạo trọng số</h1>
+        <p class="lead">Vì sao mạng sâu khó huấn luyện: sigmoid và ReLU, khởi tạo Xavier/He đúng công thức qua thí nghiệm 10 lớp, gradient clipping và checklist khi loss NaN.</p>
+        <div class="article-meta">
+          <span class="avatar" aria-hidden="true">HF</span>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-14">14/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>13 phút đọc</span></div>
+        </div>
+      </header>
+      <figure class="article-cover">
+        <img src="../assets/images/posts/vanishing-exploding-gradient-weight-init.webp" alt="Vanishing/Exploding gradient và khởi tạo trọng số" width="1200" height="675" fetchpriority="high" decoding="async">
+      </figure>
+      <section class="lesson-goals" aria-label="Mục tiêu bài học"><h2>Học xong bài này, bạn sẽ</h2><ul><li>Nhận biết vanishing, exploding gradient</li><li>Chọn hàm kích hoạt và khởi tạo Xavier, He</li><li>Dùng gradient clipping theo norm</li></ul><p class="goals-before">Nên học trước: <a href="../hoc/kien-truc-cnn-kinh-dien.html">Các kiến trúc CNN kinh điển: LeNet đến ResNet</a></p></section>
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol><li><a href="#vanishing-gradient-vi-sao-cac-lop-dau-chet">Vanishing gradient: vì sao các lớp đầu &quot;chết&quot;?</a></li><li><a href="#thu-pham-1-ham-kich-hoat-sigmoid">Thủ phạm 1: hàm kích hoạt sigmoid</a></li><li><a href="#lieu-thuoc-1-relu-va-cac-bien-the">Liều thuốc 1: ReLU và các biến thể</a></li><li><a href="#exploding-gradient-mat-con-lai-cua-dong-xu">Exploding gradient: mặt còn lại của đồng xu</a></li><li><a href="#tong-hop-cac-giai-phap">Tổng hợp các giải pháp</a></li><li><a href="#khoi-tao-trong-so-weight-initialization">Khởi tạo trọng số (weight initialization)</a></li><li><a href="#gradient-clipping">Gradient clipping</a></li><li><a href="#checklist-khi-huan-luyen-co-van-de">Checklist khi huấn luyện &quot;có vấn đề&quot;</a></li><li><a href="#tom-tat">Tóm tắt</a></li><li><a href="#tai-lieu-tham-khao">Tài liệu tham khảo</a></li></ol></details>
+      <div class="prose">
+<p>Bạn xây một mạng 20 lớp, bấm huấn luyện, và… loss gần như không nhúc nhích. Hoặc ngược lại, sau vài trăm bước loss bỗng thành <code>NaN</code>. Hai triệu chứng này đến từ cùng một gốc rễ: <strong>gradient biến mất</strong> (vanishing) hoặc <strong>bùng nổ</strong> (exploding) khi lan truyền ngược qua nhiều lớp. Bài này giải thích nguyên nhân bằng toán và thí nghiệm, rồi đi qua các "liều thuốc": hàm kích hoạt phù hợp, khởi tạo trọng số đúng công thức, BatchNorm, skip connection và gradient clipping.</p>
+<p class="note">Số trang (ví dụ "trang 81") trong bài chỉ tới slide của bài giảng <a href="../tai-nguyen/slide-deep-learning-computer-vision-ban-do-bai-hoc.html">Deep Learning – Computer Vision – NLP</a> (Thang Nguyen, Viet Nguyen); bài này giải thích chi tiết, kiểm chứng và đính chính các slide đó.</p>
+
+<h2 id="vanishing-gradient-vi-sao-cac-lop-dau-chet">Vanishing gradient: vì sao các lớp đầu "chết"?</h2>
+<p>Nhắc lại quy tắc chuỗi (bài <a href="backpropagation-lan-truyen-nguoc.html">Backpropagation</a>): gradient tại lớp đầu là <strong>tích</strong> của rất nhiều đạo hàm cục bộ, mỗi lớp góp một thừa số:</p>
+\[ \frac{\partial L}{\partial x} = \frac{\partial L}{\partial a}\cdot\frac{\partial a}{\partial b}\cdot\frac{\partial b}{\partial c}\cdots\frac{\partial g}{\partial x} \]
+<ul>
+<li>Nếu các thừa số thường <strong>nhỏ hơn 1</strong>, tích co lại theo cấp số nhân: gradient ở các lớp đầu gần bằng 0, các lớp này gần như không học (hình "R.I.P." ở trang 118). Mạng sâu nhưng chỉ vài lớp cuối thực sự làm việc.</li>
+<li>Nếu các thừa số thường <strong>lớn hơn 1</strong>, tích phình to theo cấp số nhân: gradient bùng nổ.</li>
+</ul>
+<p>Mỗi thừa số gồm hai phần: đạo hàm của <strong>hàm kích hoạt</strong> và độ lớn của <strong>trọng số</strong>. Vì vậy hai "thủ phạm" chính là activation và cách khởi tạo trọng số.</p>
+
+<h2 id="thu-pham-1-ham-kich-hoat-sigmoid">Thủ phạm 1: hàm kích hoạt sigmoid</h2>
+\[ S(z) = \frac{1}{1+e^{-z}}, \qquad S'(z) = S(z)\,\big(1 - S(z)\big) \]
+<p>Đồ thị đạo hàm ở trang 119 cho thấy \(S'(z)\) đạt cực đại chỉ <strong>0,25</strong> tại \(z = 0\) và gần như bằng 0 khi \(|z| &gt; 5\) (vùng bão hoà). Qua 10 lớp sigmoid, kể cả trong trường hợp tốt nhất, gradient bị nhân với \(0{,}25^{10} \approx 9{,}5\times10^{-7}\). Ngoài ra sigmoid còn hai nhược điểm: đầu ra luôn dương (không zero-centered) khiến cập nhật trọng số bị zigzag, và phép <code>exp</code> tốn kém.</p>
+<p>Tanh tốt hơn (đạo hàm cực đại bằng 1, zero-centered) nhưng vẫn bão hoà ở hai đầu.</p>
+
+<h2 id="lieu-thuoc-1-relu-va-cac-bien-the">Liều thuốc 1: ReLU và các biến thể</h2>
+<h3 id="relu">ReLU</h3>
+\[ R(z) = \max(0, z), \qquad R'(z) = \begin{cases} 1 &amp; z &gt; 0 \\ 0 &amp; z &lt; 0 \end{cases} \]
+<p>Với đầu vào dương, đạo hàm bằng đúng 1: gradient đi qua <strong>không bị co lại</strong> (trang 120). ReLU còn rẻ (chỉ một phép so sánh) và tạo kích hoạt thưa (nhiều neuron bằng 0). Nhược điểm: neuron có đầu vào luôn âm nhận gradient 0 mãi mãi, gọi là <strong>dying ReLU</strong>, hay xảy ra khi learning rate quá lớn. Tại \(z = 0\) đạo hàm không xác định; các framework quy ước bằng 0.</p>
+<h3 id="cac-bien-the">Các biến thể</h3>
+<div class="table-wrap"><table>
+<tr><th>Hàm</th><th>Công thức (với z ≤ 0)</th><th>Đặc điểm</th><th>PyTorch</th></tr>
+<tr><td>Leaky ReLU</td><td>\(\alpha z\), \(\alpha\) nhỏ cố định (0,01)</td><td>Phía âm vẫn có gradient \(\alpha\), tránh dying ReLU (trang 121)</td><td><code>nn.LeakyReLU(0.01)</code></td></tr>
+<tr><td>PReLU</td><td>\(\alpha z\), \(\alpha\) <strong>học được</strong></td><td>Mạng tự chọn độ dốc phía âm (trang 122)</td><td><code>nn.PReLU()</code></td></tr>
+<tr><td>ELU</td><td>\(\alpha(e^{z} - 1)\), đạo hàm \(\alpha e^{z}\)</td><td>Mượt, đầu ra trung bình gần 0, bão hoà về \(-\alpha\)</td><td><code>nn.ELU()</code></td></tr>
+<tr><td>Swish / SiLU</td><td>\(z\cdot\sigma(\beta z)\) (với mọi z)</td><td>Mượt, không đơn điệu (hơi âm quanh \(z \approx -1{,}3\)); \(\beta = 1\) gọi là SiLU. Dùng trong EfficientNet, YOLO (trang 123)</td><td><code>nn.SiLU()</code></td></tr>
+<tr><td>GELU</td><td>\(z\cdot\Phi(z)\) (\(\Phi\): hàm phân phối chuẩn)</td><td>Mặc định của Transformer, ViT, ConvNeXt</td><td><code>nn.GELU()</code></td></tr>
+</table></div>
+<p>Biểu đồ Swish ở trang 123 minh hoạ vai trò của \(\beta\): \(\beta\) nhỏ (0,1) gần như tuyến tính; \(\beta\) lớn (10) gần giống ReLU; \(\beta = 1\) nằm giữa.</p>
+<div class="tip"><strong>Chọn activation thế nào?</strong>Mặc định dùng <strong>ReLU</strong> cho CNN. Gặp dying ReLU thì thử LeakyReLU. Muốn nhích thêm độ chính xác ở mạng hiện đại thì thử SiLU hoặc GELU. Sigmoid chỉ dùng ở <strong>đầu ra</strong> cho bài toán nhị phân/đa nhãn, gần như không dùng cho lớp ẩn.</div>
+
+<h2 id="exploding-gradient-mat-con-lai-cua-dong-xu">Exploding gradient: mặt còn lại của đồng xu</h2>
+<p>Dấu hiệu (trang 124):</p>
+<ul>
+<li>Tham số của mô hình tăng rất nhanh (tăng theo cấp số nhân).</li>
+<li>Tham số hoặc loss trở thành <code>NaN</code> trong lúc huấn luyện.</li>
+<li>Loss vẫn lớn dù đã huấn luyện lâu, hoặc nhảy lên xuống thất thường.</li>
+</ul>
+<p>Nguyên nhân:</p>
+<ul>
+<li>Khởi tạo trọng số không phù hợp (quá lớn), dẫn đến cập nhật trọng số quá lớn.</li>
+<li>Learning rate ban đầu quá cao.</li>
+<li>Hàm loss không phù hợp, cho giá trị loss rất lớn, kéo theo cập nhật trọng số lớn (ví dụ MSE với mục tiêu có giá trị hàng nghìn chưa chuẩn hoá).</li>
+</ul>
+<p>Exploding gradient đặc biệt hay gặp ở mạng hồi quy (RNN) xử lý chuỗi dài, nơi cùng một ma trận trọng số bị nhân lặp lại hàng trăm lần.</p>
+
+<h2 id="tong-hop-cac-giai-phap">Tổng hợp các giải pháp</h2>
+<p>Theo trang 125, kèm theo những gì ta đã học:</p>
+<ol>
+<li><strong>Activation phù hợp</strong>: ReLU và các biến thể.</li>
+<li><strong>Batch Normalization</strong>: giữ activation mỗi lớp ở thang đo ổn định (xem <a href="batchnorm-dropout-receptive-field.html">Batch Normalization, Dropout và Receptive Field</a>).</li>
+<li><strong>Regularization</strong>: weight decay (L2) giữ trọng số nhỏ.</li>
+<li><strong>Khởi tạo trọng số đúng cách</strong>: Xavier, He.</li>
+<li><strong>Gradient clipping</strong> (chống exploding): theo giá trị hoặc theo chuẩn (norm).</li>
+<li><strong>Skip connection</strong>: đường tắt của ResNet cho gradient đi thẳng về các lớp đầu (xem <a href="kien-truc-cnn-kinh-dien.html">Các kiến trúc CNN kinh điển</a>).</li>
+</ol>
+
+<h2 id="khoi-tao-trong-so-weight-initialization">Khởi tạo trọng số (weight initialization)</h2>
+<p>Hiệu năng của CNN/NN phụ thuộc đáng kể vào cách khởi tạo (trang 126). Khởi tạo tốt giúp: kết quả <strong>tái lập được</strong> (cố định seed), mô hình <strong>hội tụ nhanh hơn</strong>, và tránh vanishing/exploding gradient ngay từ bước đầu.</p>
+
+<h3 id="khoi-tao-bang-0-hoac-hang-so-dung-bao-gio-lam">Khởi tạo bằng 0 hoặc hằng số: đừng bao giờ làm</h3>
+<p>Nếu mọi trọng số trong một lớp bằng nhau, mọi neuron của lớp đó nhận cùng đầu vào, tính ra cùng đầu ra, nhận cùng gradient, và được cập nhật giống hệt nhau. Chúng mãi mãi là bản sao của nhau, lớp 512 neuron hoạt động như 1 neuron. Đây là lỗi <strong>không phá vỡ được tính đối xứng</strong> (fail to break symmetry), luôn dẫn đến kết quả tồi (trang 127: "We don't do that here"). Lưu ý: <strong>bias</strong> khởi tạo bằng 0 thì không sao, vì trọng số ngẫu nhiên đã phá đối xứng.</p>
+
+<h3 id="khoi-tao-ngau-nhien-dung-huong-nhung-phai-dung-lieu">Khởi tạo ngẫu nhiên: đúng hướng nhưng phải đúng "liều"</h3>
+<p>Lấy trọng số ngẫu nhiên từ phân phối chuẩn (random normal) hoặc phân phối đều (random uniform) giải quyết được vấn đề đối xứng, nhưng độ lớn sai có thể gây vanishing/exploding (trang 128). Thí nghiệm sau đưa 1.000 mẫu qua mạng 10 lớp, mỗi lớp 500 neuron, và in <strong>độ lệch chuẩn của activation</strong> sau từng lớp:</p>
+<pre><code class="language-python">import torch
+
+torch.manual_seed(0)
+x0 = torch.randn(1000, 500)                  # 1000 mẫu, 500 đặc trưng
+
+
+def run(act, init_std, layers=10, width=500):
+    x = x0
+    stds = []
+    for _ in range(layers):
+        W = torch.randn(width, width) * init_std(width)
+        x = act(x @ W)
+        stds.append(x.std().item())
+    return " ".join(f"{s:.3g}" for s in stds)
+
+
+tanh, relu = torch.tanh, torch.relu
+print("tanh, N(0, 0.01) :", run(tanh, lambda n: 0.01))
+print("tanh, N(0, 1)    :", run(tanh, lambda n: 1.0))
+print("tanh, Xavier     :", run(tanh, lambda n: (2 / (n + n)) ** 0.5))
+print("ReLU, Xavier     :", run(relu, lambda n: (2 / (n + n)) ** 0.5))
+print("ReLU, He         :", run(relu, lambda n: (2 / n) ** 0.5))</code></pre>
+<div class="table-wrap"><table>
+<tr><th>Cấu hình</th><th>Lớp 1</th><th>Lớp 5</th><th>Lớp 10</th><th>Nhận xét</th></tr>
+<tr><td>tanh, \(\mathcal N(0, 0.01^2)\)</td><td>0,213</td><td>5,3·10⁻⁴</td><td>3·10⁻⁷</td><td>Activation teo về 0 → gradient theo trọng số cũng teo: <strong>vanishing</strong></td></tr>
+<tr><td>tanh, \(\mathcal N(0, 1)\)</td><td>0,982</td><td>0,982</td><td>0,982</td><td>~90% neuron bão hoà ở ±1, đạo hàm ≈ 0: cũng <strong>vanishing</strong></td></tr>
+<tr><td>tanh, Xavier</td><td>0,628</td><td>0,322</td><td>0,228</td><td>Giảm chậm, chấp nhận được</td></tr>
+<tr><td>ReLU, Xavier</td><td>0,585</td><td>0,158</td><td>0,026</td><td>Vẫn co dần: Xavier không hợp với ReLU</td></tr>
+<tr><td>ReLU, He</td><td>0,827</td><td>0,838</td><td>0,892</td><td><strong>Ổn định</strong> qua mọi lớp</td></tr>
+</table></div>
+
+<h3 id="xavier-glorot-initialization-cho-sigmoid-tanh">Xavier / Glorot initialization (cho sigmoid, tanh)</h3>
+<p>Ý tưởng: giữ <strong>phương sai</strong> của tín hiệu không đổi khi đi qua mỗi lớp, cả chiều xuôi lẫn chiều ngược. Với neuron \(y = \sum_{i=1}^{n_{in}} w_i x_i\) (trọng số và đầu vào độc lập, trung bình 0):</p>
+\[ \mathrm{Var}(y) = n_{in}\,\mathrm{Var}(w)\,\mathrm{Var}(x) \]
+<p>Muốn \(\mathrm{Var}(y) = \mathrm{Var}(x)\) cần \(\mathrm{Var}(w) = 1/n_{in}\); xét thêm chiều backward cần \(1/n_{out}\); Glorot &amp; Bengio (2010) lấy trung bình hai điều kiện:</p>
+\[ \mathrm{Var}(W) = \frac{2}{n_{in} + n_{out}} \]
+<ul>
+<li><strong>Xavier normal</strong>: \(W \sim \mathcal N\!\left(0,\ \sigma^2\right)\) với \(\sigma = \sqrt{\dfrac{2}{n_{in} + n_{out}}}\).</li>
+<li><strong>Xavier uniform</strong>: \(W \sim U[-x, x]\) với \(x = \sqrt{\dfrac{6}{n_{in} + n_{out}}}\) (phân phối đều trên \([-x, x]\) có phương sai \(x^2/3\)).</li>
+</ul>
+
+<h3 id="he-kaiming-initialization-cho-relu-va-bien-the">He / Kaiming initialization (cho ReLU và biến thể)</h3>
+<p>ReLU đặt một nửa số đầu ra về 0, làm phương sai giảm một nửa sau mỗi lớp (đúng như dòng "ReLU, Xavier" ở trên). He et al. (2015) bù lại bằng cách nhân đôi:</p>
+\[ \mathrm{Var}(W) = \frac{2}{n_{in}} \]
+<ul>
+<li><strong>He normal</strong>: \(W \sim \mathcal N(0, \sigma^2)\) với \(\sigma = \sqrt{2/n_{in}}\).</li>
+<li><strong>He uniform</strong>: \(W \sim U\!\left(-\sqrt{6/n_{in}},\ +\sqrt{6/n_{in}}\right)\).</li>
+</ul>
+<div class="warn"><strong>Đính chính công thức ở trang 130</strong>Slide ghi \(Var(W) = \sqrt{2/n_{in}}\). Đúng phải là <strong>phương sai</strong> \(Var(W) = 2/n_{in}\), hay <strong>độ lệch chuẩn</strong> \(\sigma = \sqrt{2/n_{in}}\). Nhầm hai đại lượng này làm trọng số lớn sai lệch nhiều lần. Công thức He uniform trên slide thì đúng.</div>
+<p>Với lớp conv, \(n_{in}\) (fan-in) \(= C_{in}\times k_h\times k_w\): mỗi neuron đầu ra nhận ngần ấy đầu vào.</p>
+
+<h3 id="khoi-tao-trong-pytorch">Khởi tạo trong PyTorch</h3>
+<p>PyTorch đã khởi tạo sẵn <code>nn.Linear</code> và <code>nn.Conv2d</code> bằng <code>kaiming_uniform_</code> với tham số \(a = \sqrt5\), tương đương \(U(-1/\sqrt{n_{in}},\ 1/\sqrt{n_{in}})\) (lớp <code>Linear(500, 100)</code> có trọng số trong khoảng ±0,0447). Mặc định này dùng được cho đa số trường hợp, nhưng các kiến trúc như ResNet trong torchvision tự khởi tạo lại bằng He normal. Cách tự đặt:</p>
+<pre><code class="language-python">import torch.nn as nn
+
+
+def init_weights(m):
+    if isinstance(m, nn.Conv2d):
+        nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
+        if m.bias is not None:
+            nn.init.zeros_(m.bias)
+    elif isinstance(m, nn.BatchNorm2d):
+        nn.init.ones_(m.weight)      # gamma = 1
+        nn.init.zeros_(m.bias)       # beta = 0
+    elif isinstance(m, nn.Linear):
+        nn.init.xavier_uniform_(m.weight)
+        nn.init.zeros_(m.bias)
+
+
+model.apply(init_weights)            # áp dụng đệ quy cho mọi lớp con</code></pre>
+<p>(<code>mode="fan_out"</code> giữ ổn định phương sai ở chiều backward; cả hai mode đều phổ biến.)</p>
+
+<h2 id="gradient-clipping">Gradient clipping</h2>
+<p>Ngay cả khi mọi thứ đúng, đôi khi một batch "lạ" sinh ra gradient cực lớn và đẩy trọng số văng xa khỏi vùng tốt (trang 131: một bước nhảy vọt ra khỏi vách đá của mặt loss). Gradient clipping chặn độ lớn gradient trước khi cập nhật:</p>
+<ul>
+<li><strong>Theo giá trị</strong> (by value): kẹp từng phần tử vào \([-c, c]\). Đơn giản nhưng làm <strong>đổi hướng</strong> vector gradient.</li>
+<li><strong>Theo chuẩn</strong> (by norm): nếu \(\|g\| &gt; \tau\) thì co cả vector \(g \leftarrow g\cdot\dfrac{\tau}{\|g\|}\). Giữ nguyên hướng, chỉ giảm độ dài. Đây là cách được khuyên dùng.</li>
+</ul>
+<pre><code class="language-python">for images, labels in train_loader:
+    loss = criterion(model(images), labels)
+    optimizer.zero_grad()
+    loss.backward()
+    # đặt GIỮA backward() và step(); trả về norm trước khi clip, hữu ích để ghi log
+    grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+    # hoặc: torch.nn.utils.clip_grad_value_(model.parameters(), clip_value=0.5)
+    optimizer.step()</code></pre>
+<p>Ví dụ: gradient \([30, 40]\) có norm 50; clip với <code>max_norm=5</code> cho \([3, 4]\), cùng hướng, độ dài 5. Clip theo value 1.0 với \([30, -0.5]\) cho \([1, -0.5]\), hướng đã thay đổi. Khi dùng mixed precision (<code>torch.amp</code>), phải gọi <code>scaler.unscale_(optimizer)</code> trước khi clip.</p>
+
+<h2 id="checklist-khi-huan-luyen-co-van-de">Checklist khi huấn luyện "có vấn đề"</h2>
+<ul>
+<li><strong>Loss không giảm</strong>: in norm gradient từng lớp; nếu lớp đầu ~0 thì nghi vanishing (dùng ReLU, BN, skip connection, kiểm tra init).</li>
+<li><strong>Loss thành NaN</strong>: giảm learning rate 3–10 lần; thêm gradient clipping; kiểm tra dữ liệu có NaN/Inf; kiểm tra phép <code>log(0)</code> hay chia 0 trong loss tự viết.</li>
+<li><strong>Loss dao động mạnh</strong>: learning rate quá lớn hoặc batch quá nhỏ; thêm warmup.</li>
+</ul>
+<pre><code class="language-python"># In norm gradient của từng lớp sau loss.backward()
+for name, p in model.named_parameters():
+    if p.grad is not None:
+        print(f"{name:40s} {p.grad.norm().item():.2e}")</code></pre>
+
+<h2 id="tom-tat">Tóm tắt</h2>
+<ul>
+<li>Gradient lớp đầu là tích nhiều thừa số: nhỏ hơn 1 thì biến mất, lớn hơn 1 thì bùng nổ.</li>
+<li>Sigmoid có đạo hàm tối đa 0,25: tránh dùng ở lớp ẩn; dùng ReLU, LeakyReLU, SiLU, GELU.</li>
+<li>Không khởi tạo trọng số bằng hằng số; Xavier cho tanh/sigmoid (\(2/(n_{in}+n_{out})\)), He cho ReLU (\(2/n_{in}\)).</li>
+<li>Gradient clipping theo norm, đặt giữa <code>backward()</code> và <code>step()</code>.</li>
+<li>BatchNorm và skip connection là hai "vũ khí" quan trọng nhất giúp mạng sâu huấn luyện được.</li>
+</ul>
+<p>Bài tiếp theo trong chặng: <a href="deep-learning-5-dataset-dataloader-augmentation.html">Dataset, DataLoader và augmentation</a>. Đọc thêm: <a href="transfer-learning-data-augmentation.html">Transfer Learning và Data Augmentation</a>, hai kỹ thuật giúp bạn đạt kết quả tốt với ít dữ liệu.</p>
+
+<h2 id="tai-lieu-tham-khao">Tài liệu tham khảo</h2>
+<ul>
+<li>Glorot &amp; Bengio (2010). <em>Understanding the difficulty of training deep feedforward neural networks</em>.</li>
+<li>He et al. (2015). <em>Delving Deep into Rectifiers: Surpassing Human-Level Performance on ImageNet Classification</em> (He init, PReLU).</li>
+<li>Ramachandran et al. (2017). <em>Searching for Activation Functions</em> (Swish); Hendrycks &amp; Gimpel (2016). <em>GELU</em>.</li>
+<li>Pascanu et al. (2013). <em>On the difficulty of training recurrent neural networks</em> (gradient clipping).</li>
+<li>CS231n: <em>Neural Networks Part 2: Setting up the Data and the Loss</em> (phần weight initialization).</li>
+<li>Tài liệu PyTorch: <code>torch.nn.init</code>, <code>torch.nn.utils.clip_grad_norm_</code>.</li>
+</ul>
+
+      </div>
+      <section class="practice"><h2><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <circle cx="12" cy="12" r="6" /> <circle cx="12" cy="12" r="2" /></svg>Bài tập thực hành</h2><ol><li>Chạy lại thí nghiệm mạng 10 lớp trong bài với 20 lớp; so sánh độ lệch chuẩn activation theo lớp cho 3 cách khởi tạo.</li></ol><p>Làm xong bài tập mới chuyển sang bài tiếp theo: tự viết code là cách duy nhất để nhớ lâu.</p></section><div class="lesson-done" data-course="vision-engineer"><button type="button" class="lesson-done-btn" data-lesson-done="vanishing-exploding-gradient-weight-init" aria-pressed="false"><span class="box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></span><span class="off">Đánh dấu đã học xong</span><span class="on">Đã học xong bài này</span></button><a class="btn lg" href="../hoc/deep-learning-5-dataset-dataloader-augmentation.html">Bài tiếp theo<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a></div>
+      <footer class="article-foot">
+        <div class="tags"><a class="tag" href="../search.html?q=Deep Learning">#Deep Learning</a><a class="tag" href="../search.html?q=PyTorch">#PyTorch</a></div>
+        <div class="share">
+      <span>Chia sẻ:</span>
+      <a class="share-btn fb" href="https://www.facebook.com/sharer/sharer.php?u=https://hocfree.vn/hoc/vanishing-exploding-gradient-weight-init.html" target="_blank" rel="noopener" aria-label="Chia sẻ Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8z"/></svg></a>
+      <a class="share-btn x" href="https://twitter.com/intent/tweet?url=https://hocfree.vn/hoc/vanishing-exploding-gradient-weight-init.html" target="_blank" rel="noopener" aria-label="Chia sẻ X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+      <button class="share-btn copy-link" data-url="https://hocfree.vn/hoc/vanishing-exploding-gradient-weight-init.html" aria-label="Sao chép liên kết"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+    </div>
+      </footer>
+      <div class="author-box">
+        <span class="avatar lg" aria-hidden="true">HF</span>
+        <div>
+          <strong>Ban biên tập HọcFree</strong>
+          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và ngoại ngữ, hoàn toàn miễn phí.</p>
+        </div>
+      </div>
+      <nav class="pager lesson-pager" aria-label="Bài học trước/sau"><a class="prev" href="../hoc/kien-truc-cnn-kinh-dien.html"><span>← Bài trước · Bài 8</span>Các kiến trúc CNN kinh điển: LeNet đến ResNet</a><a class="next" href="../hoc/deep-learning-5-dataset-dataloader-augmentation.html"><span>Bài tiếp → · Bài 10</span>Dataset, DataLoader và augmentation</a></nav>
+    </article>
+    <aside class="sidebar course-side" data-course="vision-engineer">
+      <section class="widget course-toc">
+        <p class="widget-title">Chặng 10/14 · Vision Engineer</p>
+        <a class="course-toc-title" href="../lo-trinh/vision-engineer/deep-learning.html">Deep Learning</a>
+        <div class="lc" data-lesson-count="machine-learning-la-gi hoi-quy-tuyen-tinh-gradient-descent-numpy deep-learning-3-mang-no-ron-va-cnn pytorch-co-ban-tensor-autograd loss-function-gradient-descent-optimizer backpropagation-lan-truyen-nguoc batchnorm-dropout-receptive-field kien-truc-cnn-kinh-dien vanishing-exploding-gradient-weight-init deep-learning-5-dataset-dataloader-augmentation overfitting-chia-train-val-test phan-loai-anh-ok-ng-transfer-learning-pytorch"><div class="lc-bar"><span data-lc-bar></span></div><span data-lc-text>0/12 bài</span></div>
+        <ol class="toc-lessons"><li data-lesson="machine-learning-la-gi"><a href="../kien-thuc/machine-learning-la-gi.html"><span class="tn">1</span><span class="tt">Machine Learning là gì?</span></a></li><li data-lesson="hoi-quy-tuyen-tinh-gradient-descent-numpy"><a href="../hoc/hoi-quy-tuyen-tinh-gradient-descent-numpy.html"><span class="tn">2</span><span class="tt">Gradient descent từ đầu với NumPy</span></a></li><li data-lesson="deep-learning-3-mang-no-ron-va-cnn"><a href="../hoc/deep-learning-3-mang-no-ron-va-cnn.html"><span class="tn">3</span><span class="tt">Mạng nơ-ron và CNN hoạt động thế nào</span></a></li><li data-lesson="pytorch-co-ban-tensor-autograd"><a href="../hoc/pytorch-co-ban-tensor-autograd.html"><span class="tn">4</span><span class="tt">PyTorch cơ bản: tensor, autograd, vòng lặp huấn luyện</span></a></li><li data-lesson="loss-function-gradient-descent-optimizer"><a href="../hoc/loss-function-gradient-descent-optimizer.html"><span class="tn">5</span><span class="tt">Loss function và các optimizer: SGD, Momentum, Adam</span></a></li><li data-lesson="backpropagation-lan-truyen-nguoc"><a href="../hoc/backpropagation-lan-truyen-nguoc.html"><span class="tn">6</span><span class="tt">Backpropagation: lan truyền ngược</span></a></li><li data-lesson="batchnorm-dropout-receptive-field"><a href="../hoc/batchnorm-dropout-receptive-field.html"><span class="tn">7</span><span class="tt">BatchNorm, Dropout và receptive field</span></a></li><li data-lesson="kien-truc-cnn-kinh-dien"><a href="../hoc/kien-truc-cnn-kinh-dien.html"><span class="tn">8</span><span class="tt">Các kiến trúc CNN kinh điển: LeNet đến ResNet</span></a></li><li data-lesson="vanishing-exploding-gradient-weight-init" class="is-current"><a href="../hoc/vanishing-exploding-gradient-weight-init.html" aria-current="page"><span class="tn">9</span><span class="tt">Vanishing gradient, khởi tạo trọng số, gradient clipping</span></a></li><li data-lesson="deep-learning-5-dataset-dataloader-augmentation"><a href="../hoc/deep-learning-5-dataset-dataloader-augmentation.html"><span class="tn">10</span><span class="tt">Dataset, DataLoader và augmentation</span></a></li><li data-lesson="overfitting-chia-train-val-test"><a href="../kien-thuc/overfitting-chia-train-val-test.html"><span class="tn">11</span><span class="tt">Overfitting và chia train/val/test</span></a></li><li data-lesson="phan-loai-anh-ok-ng-transfer-learning-pytorch"><a href="../hoc/phan-loai-anh-ok-ng-transfer-learning-pytorch.html"><span class="tn">12</span><span class="tt">Dự án chặng 10: phân loại ảnh OK/NG bằng transfer learning</span></a></li></ol>
+        <a class="more" href="../lo-trinh/vision-engineer.html">Xem toàn bộ lộ trình<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a>
+      </section>
+    </aside>
+  </div>
+  <section class="band">
+    <div class="container">
+      <div class="section-title"><h2>Có thể bạn quan tâm</h2></div>
+      <div class="card-grid"><article class="card">
+  <a class="thumb" href="../hoc/tong-quan-deep-learning-computer-vision.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/tong-quan-deep-learning-computer-vision.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/tong-quan-deep-learning-computer-vision.html">Tổng quan Deep Learning cho Computer Vision</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-14">14/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>10 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/linear-classifier-den-neural-network.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/linear-classifier-den-neural-network.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/linear-classifier-den-neural-network.html">Từ Linear Classifier đến Neural Network</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-14">14/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>11 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/loss-function-gradient-descent-optimizer.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/loss-function-gradient-descent-optimizer.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/loss-function-gradient-descent-optimizer.html">Loss function và optimizer: SGD, Momentum, RMSProp, Adam</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-14">14/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>13 phút đọc</span></div>
+</article></div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <a class="logo" href="../"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+      <p>HọcFree.vn – nền tảng học miễn phí về AI, lập trình, Computer Vision, Machine Vision, tin tức AI và ngoại ngữ dành cho người Việt.</p>
+    </div>
+    <div><h3>Học &amp; thực hành</h3><ul><li><a href="../hoc/">Học AI &amp; Lập trình</a></li><li><a href="../projects/">Projects</a></li><li><a href="../lo-trinh/">Learning Paths</a></li></ul></div>
+    <div><h3>Khám phá</h3><ul><li><a href="../kien-thuc/">Kiến thức</a></li><li><a href="../tin-tuc-ai/">Tin tức AI</a></li><li><a href="../ngoai-ngu/">Ngoại ngữ</a></li><li><a href="../tai-nguyen/">Tài nguyên</a></li></ul></div>
+    <div><h3>Bài mới</h3><ul><li><a href="../tai-nguyen/slide-deep-learning-computer-vision-ban-do-bai-hoc.html">Học theo slide Deep Learning – Computer Vision: bản đồ bài học</a></li><li><a href="../hoc/tong-quan-deep-learning-computer-vision.html">Tổng quan Deep Learning cho Computer Vision</a></li><li><a href="../hoc/linear-classifier-den-neural-network.html">Từ Linear Classifier đến Neural Network</a></li><li><a href="../hoc/loss-function-gradient-descent-optimizer.html">Loss function và optimizer: SGD, Momentum, RMSProp, Adam</a></li></ul></div>
+    <div>
+      <h3>HọcFree</h3>
+      <ul>
+        <li><a href="../gioi-thieu.html">Giới thiệu</a></li>
+        <li><a href="../search.html">Tìm kiếm</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">© 2026 HọcFree.vn · Kiến thức là để chia sẻ.</div>
+  </div>
+</footer>
+<button class="to-top" aria-label="Lên đầu trang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<script src="../assets/js/search-data.js?v=20261014" defer></script>
+<script src="../assets/js/main.js?v=20261014" defer></script>
+</body>
+</html>

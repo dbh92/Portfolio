@@ -1,0 +1,205 @@
+<p>Object detection vẽ một hình chữ nhật quanh con chó. Nhưng hệ thống y tế cần biết <em>chính xác</em> đường viền khối u, xe tự lái cần biết pixel nào là mặt đường, máy kiểm tra cần đo <em>diện tích</em> vết xước. Khi đó ta cần <strong>Image Segmentation</strong> (phân vùng ảnh): gán nhãn cho <strong>từng pixel</strong>. Bài này tương ứng phần "Other topics" (module 06) của bài giảng gốc, và là phần đọc thêm cho chặng Detection / Segmentation / Anomaly Detection.</p>
+<p class="note">Số trang (ví dụ "trang 81") trong bài chỉ tới slide của bài giảng <a href="../tai-nguyen/slide-deep-learning-computer-vision-ban-do-bai-hoc.html">Deep Learning – Computer Vision – NLP</a> (Thang Nguyen, Viet Nguyen); bài này giải thích chi tiết, kiểm chứng và đính chính các slide đó.</p>
+
+<h2>Ba kiểu phân vùng ảnh</h2>
+<div class="table-wrap"><table>
+<tr><th>Kiểu</th><th>Câu hỏi</th><th>Đầu ra</th><th>Ví dụ</th></tr>
+<tr><td><strong>Semantic segmentation</strong></td><td>Pixel này thuộc <em>lớp</em> nào?</td><td>Bản đồ nhãn H×W; hai con chó cạnh nhau có cùng một màu</td><td>Phân vùng cảnh đường phố (trang 100): đường, vỉa hè, nhà, cây, xe</td></tr>
+<tr><td><strong>Instance segmentation</strong></td><td>Pixel này thuộc <em>đối tượng</em> nào?</td><td>Mỗi đối tượng một mask riêng + nhãn + điểm</td><td>Viền riêng của mèo, chó xám, chó vàng (trang 6)</td></tr>
+<tr><td><strong>Panoptic segmentation</strong></td><td>Cả hai</td><td>Mọi pixel có lớp; các vật đếm được ("things": người, xe) còn có ID riêng; vùng nền ("stuff": trời, đường) thì không</td><td>Hiểu toàn cảnh cho xe tự lái</td></tr>
+</table></div>
+
+<h2>Phân vùng là phân loại từng pixel</h2>
+<p>Với \(C\) lớp, mô hình semantic segmentation nhận ảnh \(3\times H\times W\) và trả về tensor logits \(C\times H\times W\): mỗi pixel một vector điểm số. Nhãn dự đoán là <code>argmax</code> theo trục kênh. Hàm loss cơ bản chính là cross-entropy, lấy trung bình trên mọi pixel:</p>
+\[ L = -\frac{1}{HW}\sum_{i=1}^{H}\sum_{j=1}^{W} \log p_{ij}\big(y_{ij}\big) \]
+<p>Trong PyTorch, <code>nn.CrossEntropyLoss</code> nhận trực tiếp logits <code>(N, C, H, W)</code> và nhãn <code>(N, H, W)</code> kiểu <code>long</code>.</p>
+<p>Cách ngây thơ: áp dụng sliding window, cắt một mảnh nhỏ quanh <em>mỗi</em> pixel rồi phân loại. Cực kỳ lãng phí vì các mảnh chồng lấn gần như toàn bộ. Ta cần một mạng xử lý cả ảnh một lần và trả ra kết quả cùng độ phân giải.</p>
+
+<h2>FCN: Fully Convolutional Network (2015)</h2>
+<p>Long, Shelhamer và Darrell nhận thấy lớp fully connected là thứ duy nhất ép CNN nhận đầu vào cố định và mất thông tin vị trí. <strong>FCN</strong>:</p>
+<ol>
+<li>Thay các lớp FC của mạng phân loại (VGG) bằng <strong>conv 1×1</strong>: mạng thành "toàn tích chập", nhận ảnh kích thước bất kỳ và trả về <em>bản đồ</em> điểm số thay vì một vector.</li>
+<li>Bản đồ này nhỏ hơn ảnh 32 lần (do pooling), nên phải <strong>upsample</strong> (phóng to) trở lại kích thước gốc.</li>
+<li>Kết hợp đặc trưng từ các lớp nông hơn (độ phân giải cao, ít ngữ nghĩa) với lớp sâu (ngữ nghĩa mạnh, độ phân giải thấp) qua <strong>skip connection</strong> để viền sắc nét hơn (FCN-32s → 16s → 8s).</li>
+</ol>
+<p>Từ đây hình thành kiến trúc <strong>encoder–decoder</strong> phổ biến: encoder thu nhỏ để hiểu ngữ cảnh ("cái gì"), decoder phóng to để khôi phục chi tiết vị trí ("ở đâu").</p>
+
+<h2>Các cách upsample</h2>
+<div class="table-wrap"><table>
+<tr><th>Cách</th><th>Ý tưởng</th><th>Học được?</th><th>PyTorch</th></tr>
+<tr><td>Nearest neighbor</td><td>Nhân bản mỗi pixel thành khối 2×2</td><td>Không</td><td><code>nn.Upsample(scale_factor=2, mode="nearest")</code></td></tr>
+<tr><td>Bilinear</td><td>Nội suy tuyến tính theo hai chiều, mượt hơn</td><td>Không</td><td><code>F.interpolate(x, scale_factor=2, mode="bilinear")</code></td></tr>
+<tr><td>Max unpooling</td><td>Nhớ vị trí max khi pooling, đặt giá trị trả lại đúng chỗ (SegNet)</td><td>Không</td><td><code>nn.MaxUnpool2d</code></td></tr>
+<tr><td>Transposed convolution</td><td>"Tích chập ngược": mỗi pixel vào được nhân với kernel và rải ra vùng lớn hơn, cộng dồn chỗ chồng lấn</td><td><strong>Có</strong></td><td><code>nn.ConvTranspose2d</code></td></tr>
+</table></div>
+<p>Kích thước đầu ra của transposed convolution:</p>
+\[ O = (N - 1)\cdot S - 2P + K + \text{output\_padding} \]
+<p>Hai cấu hình gấp đôi kích thước hay dùng: \(K = 2, S = 2, P = 0\) và \(K = 4, S = 2, P = 1\) (16 → 32). Transposed conv đôi khi tạo vân "bàn cờ" (checkerboard artifacts) khi kernel không chia hết cho stride; một cách khắc phục là upsample bilinear rồi mới conv 3×3.</p>
+
+<h2>U-Net (2015): chuẩn mực của phân vùng</h2>
+<figure class="diagram">
+<svg class="dg" viewBox="0 0 620 260" role="img" aria-label="Kiến trúc U-Net hình chữ U với các skip connection nối encoder và decoder">
+  <rect class="bx-c" x="20" y="20" width="90" height="34" rx="5"/><text x="65" y="42" text-anchor="middle" class="sm">H × W, 32</text>
+  <rect class="bx-c" x="70" y="80" width="90" height="34" rx="5"/><text x="115" y="102" text-anchor="middle" class="sm">H/2, 64</text>
+  <rect class="bx-c" x="120" y="140" width="90" height="34" rx="5"/><text x="165" y="162" text-anchor="middle" class="sm">H/4, 128</text>
+  <rect class="bx-a" x="240" y="200" width="140" height="34" rx="5"/><text x="310" y="222" text-anchor="middle" class="sm">bottleneck H/8, 256</text>
+  <rect class="bx-c" x="410" y="140" width="90" height="34" rx="5"/><text x="455" y="162" text-anchor="middle" class="sm">H/4, 128</text>
+  <rect class="bx-c" x="460" y="80" width="90" height="34" rx="5"/><text x="505" y="102" text-anchor="middle" class="sm">H/2, 64</text>
+  <rect class="bx-c" x="510" y="20" width="90" height="34" rx="5"/><text x="555" y="42" text-anchor="middle" class="sm">H × W, 32</text>
+  <path class="ln" d="M65 54L100 80M115 114L150 140M165 174L270 200M350 200L440 174M455 140L490 114M505 80L540 54"/>
+  <path class="ln-a" stroke-dasharray="6 4" d="M110 37H510M160 97H460M210 157H410"/>
+  <text x="30" y="200" class="sm">Encoder: conv + pooling</text>
+  <text x="430" y="250" class="sm">Decoder: upsample + conv</text>
+  <text x="250" y="30" class="sm t-a">skip connection (nối kênh)</text>
+</svg>
+<figcaption>Encoder thu nhỏ, decoder phóng to; đường nét đứt mang chi tiết sắc nét từ encoder sang decoder</figcaption>
+</figure>
+<p>Ronneberger và cộng sự thiết kế <strong>U-Net</strong> cho ảnh y sinh, nơi dữ liệu gán nhãn rất ít. Hai đặc điểm:</p>
+<ul>
+<li><strong>Đối xứng hình chữ U</strong>: mỗi tầng encoder (2 conv 3×3 rồi max pool) có một tầng decoder tương ứng (upsample rồi 2 conv 3×3).</li>
+<li><strong>Skip connection bằng phép nối</strong> (concatenate): feature map của encoder được nối thẳng vào decoder cùng độ phân giải, cung cấp chi tiết biên cạnh mà quá trình pooling đã làm mất.</li>
+</ul>
+<p>Đến nay, U-Net và các biến thể vẫn là lựa chọn mặc định cho ảnh y tế, ảnh vệ tinh, phân vùng lỗi sản phẩm, và cũng là "xương sống" của các mô hình sinh ảnh diffusion.</p>
+<pre><code class="language-python">import torch
+import torch.nn as nn
+
+
+def double_conv(cin, cout):
+    return nn.Sequential(
+        nn.Conv2d(cin, cout, 3, padding=1, bias=False), nn.BatchNorm2d(cout), nn.ReLU(inplace=True),
+        nn.Conv2d(cout, cout, 3, padding=1, bias=False), nn.BatchNorm2d(cout), nn.ReLU(inplace=True),
+    )
+
+
+class UNet(nn.Module):
+    def __init__(self, in_ch=3, num_classes=2, base=32):
+        super().__init__()
+        c = [base, base * 2, base * 4, base * 8]
+        self.enc1, self.enc2, self.enc3 = double_conv(in_ch, c[0]), double_conv(c[0], c[1]), double_conv(c[1], c[2])
+        self.bottleneck = double_conv(c[2], c[3])
+        self.pool = nn.MaxPool2d(2)
+        self.up3, self.dec3 = nn.ConvTranspose2d(c[3], c[2], 2, stride=2), double_conv(c[3], c[2])
+        self.up2, self.dec2 = nn.ConvTranspose2d(c[2], c[1], 2, stride=2), double_conv(c[2], c[1])
+        self.up1, self.dec1 = nn.ConvTranspose2d(c[1], c[0], 2, stride=2), double_conv(c[1], c[0])
+        self.head = nn.Conv2d(c[0], num_classes, 1)          # conv 1x1: mỗi pixel ra num_classes logits
+
+    def forward(self, x):
+        e1 = self.enc1(x)                     # (N, 32, H, W)
+        e2 = self.enc2(self.pool(e1))         # (N, 64, H/2, W/2)
+        e3 = self.enc3(self.pool(e2))         # (N, 128, H/4, W/4)
+        b = self.bottleneck(self.pool(e3))    # (N, 256, H/8, W/8)
+        d3 = self.dec3(torch.cat([self.up3(b), e3], dim=1))    # skip connection: nối kênh
+        d2 = self.dec2(torch.cat([self.up2(d3), e2], dim=1))
+        d1 = self.dec1(torch.cat([self.up1(d2), e1], dim=1))
+        return self.head(d1)                  # (N, num_classes, H, W)
+
+
+model = UNet(num_classes=3)
+logits = model(torch.rand(2, 3, 256, 256))
+print(logits.shape)                           # torch.Size([2, 3, 256, 256])
+
+masks = torch.randint(0, 3, (2, 256, 256))     # nhãn từng pixel
+loss = nn.CrossEntropyLoss()(logits, masks)</code></pre>
+<p>Mô hình này có khoảng 1,93 triệu tham số; kích thước ảnh vào phải chia hết cho 8 (3 lần pooling).</p>
+
+<h2>DeepLab: giữ độ phân giải bằng atrous convolution</h2>
+<p>Thay vì thu nhỏ rồi phóng to, họ DeepLab (Google, 2015–2018) <strong>bớt pooling</strong> ở các tầng cuối và dùng <strong>dilated (atrous) convolution</strong> (xem <a href="batchnorm-dropout-receptive-field.html">Batch Normalization, Dropout và Receptive Field</a>) để giữ receptive field lớn mà feature map không bị co lại quá nhiều (chỉ nhỏ hơn ảnh 8 hoặc 16 lần thay vì 32).</p>
+<ul>
+<li><strong>ASPP</strong> (Atrous Spatial Pyramid Pooling): chạy song song nhiều conv atrous với dilation khác nhau (ví dụ 6, 12, 18) cộng global pooling, để nắm ngữ cảnh ở nhiều thang đo.</li>
+<li><strong>DeepLabv3+</strong> thêm một decoder nhẹ để làm sắc viền.</li>
+</ul>
+<pre><code class="language-python">from torchvision.models.segmentation import deeplabv3_resnet50, DeepLabV3_ResNet50_Weights
+
+weights = DeepLabV3_ResNet50_Weights.DEFAULT        # 21 lớp kiểu Pascal VOC (kể cả background)
+model = deeplabv3_resnet50(weights=weights).eval()
+batch = weights.transforms()(img).unsqueeze(0)       # img: tensor ảnh (C, H, W)
+with torch.no_grad():
+    out = model(batch)["out"]                         # (1, 21, H', W')
+mask = out.argmax(dim=1)[0]                          # nhãn cho từng pixel
+# Fine-tune cho dữ liệu riêng: model.classifier[4] = nn.Conv2d(256, num_classes, kernel_size=1)</code></pre>
+
+<h2>Mask R-CNN: instance segmentation</h2>
+<p>He et al. (2017) mở rộng Faster R-CNN (xem <a href="r-cnn-fast-faster-r-cnn.html">Từ R-CNN đến Faster R-CNN</a>) bằng cách thêm một nhánh thứ ba song song với nhánh phân loại và nhánh hồi quy box: một <strong>FCN nhỏ dự đoán mask nhị phân 28×28</strong> cho mỗi RoI. Hai thay đổi quan trọng:</p>
+<ul>
+<li><strong>RoI Align</strong> thay RoI Pooling: bỏ phép làm tròn, dùng nội suy song tuyến tính, giúp mask khớp đúng vị trí.</li>
+<li>Mask được dự đoán <strong>riêng cho từng lớp</strong> bằng sigmoid (không cạnh tranh giữa các lớp), lớp nào do nhánh phân loại quyết định.</li>
+</ul>
+<pre><code class="language-python">from torchvision.models.detection import maskrcnn_resnet50_fpn_v2, MaskRCNN_ResNet50_FPN_V2_Weights
+
+model = maskrcnn_resnet50_fpn_v2(weights=MaskRCNN_ResNet50_FPN_V2_Weights.DEFAULT).eval()
+with torch.no_grad():
+    pred = model([image])[0]          # image: float tensor (3, H, W), giá trị [0, 1]
+print(pred.keys())                    # boxes, labels, scores, masks
+binary_masks = pred["masks"][:, 0] &gt; 0.5   # (số đối tượng, H, W)
+# Khi huấn luyện, target cần thêm "masks": UInt8Tensor (N, H, W) bên cạnh "boxes" và "labels"</code></pre>
+
+<h2>Đánh giá mô hình phân vùng</h2>
+<p>Ví dụ ảnh 4×4 với 3 lớp:</p>
+<div class="mats">
+<table class="mat"><caption>Nhãn thật</caption>
+<tr><td>0</td><td>0</td><td>1</td><td>1</td></tr><tr><td>0</td><td>0</td><td>1</td><td>1</td></tr>
+<tr><td>0</td><td>2</td><td>2</td><td>1</td></tr><tr><td>0</td><td>2</td><td>2</td><td>2</td></tr></table>
+<table class="mat"><caption>Dự đoán</caption>
+<tr><td>0</td><td>0</td><td>1</td><td>1</td></tr><tr><td>0</td><td class="hl2">1</td><td>1</td><td>1</td></tr>
+<tr><td>0</td><td>2</td><td>2</td><td class="hl2">2</td></tr><tr><td>0</td><td class="hl2">0</td><td>2</td><td>2</td></tr></table>
+</div>
+<ul>
+<li><strong>Pixel accuracy</strong> = 13/16 = 0,8125. Dễ hiểu nhưng <strong>đánh lừa</strong> khi mất cân bằng: nếu 98% ảnh là nền, mô hình đoán toàn nền vẫn đạt 98%.</li>
+<li><strong>IoU từng lớp</strong> = giao / hợp (như IoU của box, nhưng tính trên tập pixel). Lớp 0: 5/7 ≈ 0,714; lớp 1: 4/6 ≈ 0,667; lớp 2: 4/6 ≈ 0,667. <strong>mIoU</strong> (trung bình các lớp) ≈ 0,683: thước đo chuẩn của semantic segmentation.</li>
+<li><strong>Dice coefficient</strong> (F1 trên pixel): \(\text{Dice} = \dfrac{2|A\cap B|}{|A| + |B|}\). Lớp 0: \(2\cdot5/(6+6) \approx 0{,}833\); trung bình ≈ 0,811. Phổ biến trong ảnh y tế. Liên hệ: \(\text{Dice} = \dfrac{2\,\text{IoU}}{1 + \text{IoU}}\).</li>
+<li>Instance segmentation dùng <strong>mask AP</strong> kiểu COCO (giống box AP nhưng IoU tính trên mask).</li>
+</ul>
+<pre><code class="language-python">def miou_dice(pred, target, num_classes):
+    ious, dices = [], []
+    for c in range(num_classes):
+        p, t = pred == c, target == c
+        inter = (p &amp; t).sum().item()
+        union = (p | t).sum().item()
+        if union == 0:              # lớp không xuất hiện ở cả hai: bỏ qua
+            continue
+        ious.append(inter / union)
+        dices.append(2 * inter / (p.sum().item() + t.sum().item()))
+    return sum(ious) / len(ious), sum(dices) / len(dices)
+
+
+target = torch.tensor([[0, 0, 1, 1], [0, 0, 1, 1], [0, 2, 2, 1], [0, 2, 2, 2]])
+pred   = torch.tensor([[0, 0, 1, 1], [0, 1, 1, 1], [0, 2, 2, 2], [0, 0, 2, 2]])
+print(miou_dice(pred, target, 3))   # (0.6825, 0.8111)</code></pre>
+
+<h2>Loss cho dữ liệu mất cân bằng</h2>
+<p>Khi vùng cần tìm rất nhỏ (vết nứt mảnh, khối u nhỏ), cross-entropy bị số đông pixel nền lấn át. Các lựa chọn:</p>
+<ul>
+<li><strong>Cross-entropy có trọng số lớp</strong>: <code>nn.CrossEntropyLoss(weight=...)</code>.</li>
+<li><strong>Dice loss</strong> \(= 1 - \text{Dice}\) (tính trên xác suất mềm): tối ưu trực tiếp độ chồng lấn, không bị chi phối bởi pixel nền.</li>
+<li><strong>Focal loss</strong>: giảm trọng số các pixel đã dễ đoán đúng.</li>
+<li>Thực tế hay dùng <strong>tổng CE + Dice</strong>.</li>
+</ul>
+
+<h2>Dữ liệu và công cụ</h2>
+<ul>
+<li>Gán nhãn bằng đa giác (polygon) với CVAT, Label Studio, Labelme; lưu mask dạng ảnh PNG mỗi pixel là chỉ số lớp, hoặc định dạng COCO (polygon/RLE).</li>
+<li>Augmentation hình học phải áp dụng <strong>đồng thời và giống hệt</strong> cho ảnh và mask; khi resize mask dùng nội suy <em>nearest</em> (không dùng bilinear, sẽ sinh ra nhãn "lai" không tồn tại).</li>
+<li>Thư viện <strong>segmentation_models_pytorch</strong> cung cấp sẵn U-Net, FPN, DeepLabV3+ với hàng trăm backbone pretrained.</li>
+<li>Họ mô hình nền tảng <strong>Segment Anything</strong> (SAM, SAM 2… của Meta) phân vùng mọi vật thể theo gợi ý (điểm, box), rất hữu ích để <strong>gán nhãn nhanh</strong> rồi huấn luyện mô hình nhỏ chuyên biệt.</li>
+</ul>
+
+<h2>Tóm tắt</h2>
+<ul>
+<li>Semantic: lớp cho từng pixel; instance: mask riêng cho từng đối tượng; panoptic: cả hai.</li>
+<li>FCN: toàn tích chập + upsample + skip; mở đầu kiến trúc encoder–decoder.</li>
+<li>U-Net: encoder–decoder đối xứng, skip connection nối kênh; tốt với ít dữ liệu.</li>
+<li>DeepLab: atrous conv + ASPP giữ độ phân giải và ngữ cảnh rộng.</li>
+<li>Mask R-CNN: Faster R-CNN + nhánh mask + RoI Align.</li>
+<li>Đánh giá bằng mIoU, Dice; cẩn thận với pixel accuracy khi dữ liệu mất cân bằng.</li>
+</ul>
+<p>Thực hành: <a href="unet-phan-doan-anh.html">U-Net cho phân đoạn ảnh</a> và <a href="yolo26-seg-phan-doan-vet-loi.html">Phân đoạn vết lỗi với YOLO26-seg</a>. Đọc thêm: thay vì <em>hiểu</em> ảnh, hãy để máy tính <em>tạo ra</em> ảnh với <a href="gan-mang-doi-sinh.html">GAN – mạng đối sinh</a>.</p>
+
+<h2>Tài liệu tham khảo</h2>
+<ul>
+<li>Long, Shelhamer, Darrell (2015). <em>Fully Convolutional Networks for Semantic Segmentation</em>.</li>
+<li>Ronneberger, Fischer, Brox (2015). <em>U-Net: Convolutional Networks for Biomedical Image Segmentation</em>.</li>
+<li>Chen et al. (2017–2018). <em>Rethinking Atrous Convolution for Semantic Image Segmentation</em> (DeepLabv3), <em>DeepLabv3+</em>.</li>
+<li>He et al. (2017). <em>Mask R-CNN</em>; Kirillov et al. (2019). <em>Panoptic Segmentation</em>; Kirillov et al. (2023). <em>Segment Anything</em>.</li>
+<li>CS231n Lecture: <em>Detection and Segmentation</em>; Dumoulin &amp; Visin (2016). <em>A guide to convolution arithmetic</em> (transposed convolution).</li>
+<li>Tài liệu torchvision: <em>Semantic segmentation</em> và <em>Instance segmentation</em> models.</li>
+</ul>

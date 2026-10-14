@@ -1,0 +1,209 @@
+<p>Phân loại ảnh trả lời câu hỏi "ảnh này là gì?". Nhưng camera giám sát cần biết <em>có bao nhiêu người và mỗi người ở đâu</em>; máy kiểm tra ngoại quan cần biết <em>vết xước nằm chỗ nào</em> trên sản phẩm. Đó là <strong>Object Detection</strong> (phát hiện đối tượng), bài toán được dùng nhiều nhất trong thị giác máy tính công nghiệp. Bài này xây nền móng: bài toán là gì, các khái niệm bounding box, IoU, Non-maximum Suppression, và cách chấm điểm mô hình bằng mAP.</p>
+<p class="note">Số trang (ví dụ "trang 81") trong bài chỉ tới slide của bài giảng <a href="../tai-nguyen/slide-deep-learning-computer-vision-ban-do-bai-hoc.html">Deep Learning – Computer Vision – NLP</a> (Thang Nguyen, Viet Nguyen); bài này giải thích chi tiết, kiểm chứng và đính chính các slide đó.</p>
+
+<h2>Classification và Object Detection</h2>
+<div class="table-wrap"><table>
+<tr><th></th><th>Image Classification</th><th>Object Detection</th></tr>
+<tr><td>Đầu vào</td><td>Một ảnh RGB</td><td>Một ảnh RGB</td></tr>
+<tr><td>Đầu ra</td><td>Một nhãn: "CAT"</td><td>Một <strong>tập</strong> đối tượng: mỗi đối tượng gồm nhãn, bounding box và độ tin cậy, ví dụ "CAT, CAT, DOG, DUCK"</td></tr>
+<tr><td>Số lượng đầu ra</td><td>Cố định</td><td><strong>Thay đổi</strong> theo từng ảnh (0, 1 hay 50 đối tượng)</td></tr>
+</table></div>
+<p>Điểm khó cốt lõi nằm ở dòng cuối: mạng nơ-ron thường có đầu ra kích thước cố định, còn số đối tượng trong ảnh thì không biết trước (trang 145).</p>
+
+<h2>Bounding box: ba định dạng hay gặp</h2>
+<p>Bounding box (khung bao) là hình chữ nhật thẳng trục bao quanh đối tượng. Cùng một box nhưng mỗi bộ dữ liệu/thư viện lưu một kiểu, nhầm lẫn là nguồn lỗi kinh điển:</p>
+<div class="table-wrap"><table>
+<tr><th>Định dạng</th><th>Ý nghĩa</th><th>Dùng ở</th></tr>
+<tr><td><code>xyxy</code></td><td>(x_min, y_min, x_max, y_max), đơn vị pixel</td><td>Pascal VOC, torchvision</td></tr>
+<tr><td><code>xywh</code></td><td>(x_min, y_min, width, height), đơn vị pixel</td><td>MS COCO</td></tr>
+<tr><td><code>cxcywh</code> chuẩn hoá</td><td>(tâm x, tâm y, width, height) chia cho kích thước ảnh, thuộc [0, 1]</td><td>YOLO (Ultralytics)</td></tr>
+</table></div>
+<pre><code class="language-python">import torch
+from torchvision.ops import box_convert
+
+coco_box = torch.tensor([[50., 60., 100., 80.]])            # x, y, w, h
+print(box_convert(coco_box, in_fmt="xywh", out_fmt="xyxy"))  # tensor([[ 50.,  60., 150., 140.]])</code></pre>
+<p>Toạ độ ảnh có gốc ở <strong>góc trên bên trái</strong>, trục y hướng xuống dưới.</p>
+
+<h2>Bước đầu: định vị một đối tượng duy nhất</h2>
+<p>Nếu biết chắc ảnh có đúng một đối tượng, bài toán khá đơn giản (trang 144): dùng một CNN trích ra vector đặc trưng (ví dụ 4096 chiều), rồi gắn <strong>hai "đầu"</strong>:</p>
+<ul>
+<li><strong>What?</strong> FC 4096 → số lớp, cho điểm các lớp; huấn luyện bằng softmax / cross-entropy loss.</li>
+<li><strong>Where?</strong> FC 4096 → 4, cho toạ độ box \((x, y, w, h)\); huấn luyện bằng L2 loss (MSE) so với box đúng \((x', y', w', h')\).</li>
+</ul>
+<p>Hai loss được cộng lại thành <strong>multi-task loss</strong> \(L = L_{cls} + \lambda L_{box}\), với \(\lambda\) cân bằng hai thành phần.</p>
+<pre><code class="language-python">import torch.nn as nn
+from torchvision import models
+
+
+class SingleObjectLocalizer(nn.Module):
+    def __init__(self, num_classes):
+        super().__init__()
+        backbone = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
+        backbone.fc = nn.Identity()                      # lấy vector đặc trưng 512 chiều
+        self.backbone = backbone
+        self.cls_head = nn.Linear(512, num_classes)      # What?
+        self.box_head = nn.Linear(512, 4)                # Where? (toạ độ chuẩn hoá về [0, 1])
+
+    def forward(self, x):
+        f = self.backbone(x)
+        return self.cls_head(f), self.box_head(f).sigmoid()
+
+
+# loss = nn.CrossEntropyLoss()(cls_logits, labels) + lam * nn.MSELoss()(box_pred, box_gt)</code></pre>
+<p>Cách này dùng tốt cho các bài toán như định vị biển số trong ảnh đã cắt sẵn, nhưng không mở rộng được cho nhiều đối tượng.</p>
+
+<h2>Nhiều đối tượng: Sliding Window</h2>
+<p>Ý tưởng ngây thơ (trang 146): trượt một cửa sổ khắp ảnh, mỗi vị trí cắt vùng đó ra và hỏi bộ phân loại "đây là đối tượng nào, hay chỉ là nền (background)?". Vấn đề là đối tượng có thể ở <strong>mọi vị trí, mọi kích thước, mọi tỉ lệ khung</strong>. Số hình chữ nhật có thể có trong ảnh \(W\times H\) là</p>
+\[ \frac{W(W+1)}{2}\cdot\frac{H(H+1)}{2} \]
+<p>Với ảnh 800×600, con số này khoảng <strong>57,8 tỉ</strong> cửa sổ. Chạy CNN trên từng cửa sổ là bất khả thi.</p>
+
+<h2>Region Proposals: Selective Search</h2>
+<p>Giải pháp: chỉ xét những vùng "có vẻ chứa vật thể". <strong>Selective Search</strong> (Uijlings et al., 2013; trang 147) bắt đầu bằng phân đoạn ảnh thành rất nhiều vùng nhỏ (superpixel), rồi gộp dần các vùng giống nhau về màu, kết cấu, kích thước và độ khít, sinh ra các bounding box ứng viên ở nhiều thang đo. Kết quả: khoảng <strong>2.000 vùng đề xuất</strong> (region proposals) mỗi ảnh, chạy vài giây trên CPU, nhưng vẫn bao phủ được hầu hết đối tượng thật (recall cao). Đây là bước đầu tiên của R-CNN, xem bài <a href="r-cnn-fast-faster-r-cnn.html">Từ R-CNN đến Faster R-CNN</a>.</p>
+
+<h2>Intersection over Union (IoU)</h2>
+<p>Làm sao biết một box dự đoán "đúng" hay "sai"? Không thể đòi khớp từng pixel. Ta đo độ chồng lấn bằng <strong>IoU</strong> (trang 152):</p>
+<figure class="diagram">
+<svg class="dg" viewBox="0 0 560 200" role="img" aria-label="IoU bằng diện tích phần giao chia diện tích phần hợp">
+  <rect class="f-c-soft s-c" x="30" y="30" width="120" height="110"/>
+  <rect class="f-a-soft s-a" x="80" y="70" width="120" height="110"/>
+  <rect class="f-ink" x="80" y="70" width="70" height="70"/>
+  <text x="34" y="24" class="sm">dự đoán</text><text x="150" y="196" class="sm">ground truth</text>
+  <text x="250" y="80" font-size="16">IoU =</text>
+  <text x="380" y="68" text-anchor="middle">Diện tích phần giao</text>
+  <path class="ln" d="M300 80H460"/>
+  <text x="380" y="104" text-anchor="middle">Diện tích phần hợp</text>
+  <text x="250" y="150" class="sm">0 = không chạm nhau · 1 = trùng khít</text>
+</svg>
+<figcaption>Hình minh hoạ: phần tô đậm là phần giao (intersection)</figcaption>
+</figure>
+\[ \text{IoU}(A, B) = \frac{|A \cap B|}{|A \cup B|} = \frac{|A\cap B|}{|A| + |B| - |A\cap B|} \]
+<p>Ví dụ \(A = (0, 0, 4, 4)\), \(B = (2, 2, 6, 6)\): phần giao là ô 2×2 = 4, phần hợp \(16 + 16 - 4 = 28\), IoU \(= 4/28 \approx 0{,}14\). Theo ví dụ ở trang 152, IoU 0,40 là kém, 0,73 là tốt, 0,93 là rất tốt. Ngưỡng phổ biến để coi một dự đoán là đúng là <strong>IoU ≥ 0,5</strong>.</p>
+<pre><code class="language-python">def iou(box_a, box_b):
+    """box = (x1, y1, x2, y2). Trả về IoU giữa hai box."""
+    ix1, iy1 = max(box_a[0], box_b[0]), max(box_a[1], box_b[1])
+    ix2, iy2 = min(box_a[2], box_b[2]), min(box_a[3], box_b[3])
+    inter = max(0, ix2 - ix1) * max(0, iy2 - iy1)          # = 0 nếu không giao nhau
+    area_a = (box_a[2] - box_a[0]) * (box_a[3] - box_a[1])
+    area_b = (box_b[2] - box_b[0]) * (box_b[3] - box_b[1])
+    return inter / (area_a + area_b - inter)
+
+
+print(iou((0, 0, 4, 4), (2, 2, 6, 6)))       # 0.142857...
+# Bản vector hoá: torchvision.ops.box_iou(boxes1, boxes2) trả về ma trận IoU (N, M)</code></pre>
+<p>IoU xuất hiện ở khắp nơi trong detection: gán nhãn cho anchor/proposal khi huấn luyện, lọc trùng bằng NMS, và chấm điểm mô hình.</p>
+
+<h2>Non-maximum Suppression (NMS)</h2>
+<p>Detector thường bắn ra <strong>nhiều box chồng lên nhau</strong> cho cùng một đối tượng (trang 153: người đi bộ có các box 96%, 87%, 82%; con chó có 98%, 90%, 82%). NMS giữ lại box tốt nhất và loại các box trùng lặp:</p>
+<ol>
+<li>Bỏ các box có điểm dưới ngưỡng tin cậy (ví dụ 0,05 khi đánh giá, 0,25–0,5 khi triển khai).</li>
+<li>Chọn box có <strong>điểm cao nhất</strong>, đưa vào kết quả.</li>
+<li><strong>Xoá</strong> mọi box còn lại có IoU với box vừa chọn lớn hơn ngưỡng (thường 0,5).</li>
+<li>Lặp lại bước 2–3 với các box còn lại cho đến hết.</li>
+</ol>
+<p>NMS thường chạy <strong>riêng cho từng lớp</strong>: box "người" không xoá box "chó" dù chồng lấn nhau.</p>
+<pre><code class="language-python">import numpy as np
+
+
+def nms_numpy(boxes, scores, iou_thr=0.5):
+    """boxes: (N, 4) dạng x1y1x2y2, scores: (N,). Trả về chỉ số các box được giữ."""
+    order = np.argsort(scores)[::-1]          # sắp xếp điểm giảm dần
+    keep = []
+    while order.size &gt; 0:
+        i = order[0]                          # box điểm cao nhất
+        keep.append(i)
+        rest = order[1:]
+        ious = np.array([iou(boxes[i], boxes[j]) for j in rest])
+        order = rest[ious &lt;= iou_thr]         # bỏ các box chồng lấn quá nhiều
+    return keep
+
+
+boxes = np.array([[100, 100, 210, 210], [105, 110, 215, 220],
+                  [300, 80, 400, 200], [102, 95, 200, 205]], dtype=float)
+scores = np.array([0.90, 0.75, 0.80, 0.60])
+print(nms_numpy(boxes, scores))                # [0, 2]: box 1 và 3 trùng với box 0 (IoU 0.77, 0.82)
+
+# Thực tế dùng bản tối ưu (chạy được trên GPU):
+# from torchvision.ops import nms, batched_nms
+# keep = batched_nms(boxes, scores, labels, iou_threshold=0.5)   # NMS theo từng lớp</code></pre>
+<div class="tip"><strong>Giới hạn của NMS</strong>Khi hai đối tượng thật đứng sát nhau (đám đông), NMS có thể xoá nhầm một trong hai. Các biến thể như <strong>Soft-NMS</strong> giảm điểm thay vì xoá hẳn. Một số detector mới (DETR, YOLOv10, YOLO26) được thiết kế để <strong>không cần NMS</strong>, mỗi đối tượng chỉ sinh đúng một dự đoán.</div>
+
+<h2>Đánh giá detector: Precision, Recall, AP và mAP</h2>
+<h3>TP, FP, FN trong detection</h3>
+<p>Duyệt các dự đoán của một lớp theo thứ tự điểm giảm dần. Mỗi dự đoán được ghép với box thật (ground truth) cùng lớp có IoU cao nhất:</p>
+<ul>
+<li><strong>True Positive (TP)</strong>: IoU ≥ ngưỡng và box thật đó <em>chưa</em> bị dự đoán nào khác ghép.</li>
+<li><strong>False Positive (FP)</strong>: IoU dưới ngưỡng, hoặc box thật đã được ghép rồi (dự đoán trùng lặp).</li>
+<li><strong>False Negative (FN)</strong>: box thật không có dự đoán nào ghép được (bỏ sót).</li>
+</ul>
+\[ \text{Precision} = \frac{TP}{TP + FP}\ \ (\text{trong các box đã báo, bao nhiêu đúng}), \qquad \text{Recall} = \frac{TP}{TP + FN} = \frac{TP}{\#\text{ground truth}}\ \ (\text{tìm được bao nhiêu}) \]
+<h3>Ví dụ ở trang 154: AP của lớp "dog"</h3>
+<p>Có 3 con chó thật, mô hình đưa ra 5 dự đoán. Duyệt lần lượt theo điểm, tính precision và recall tích luỹ:</p>
+<div class="table-wrap"><table>
+<tr><th>Score</th><th>Kết quả (IoU &gt; 0,5)</th><th>TP tích luỹ</th><th>FP tích luỹ</th><th>Precision</th><th>Recall</th></tr>
+<tr><td>0,99</td><td>TP</td><td>1</td><td>0</td><td>1/1 = 1,0</td><td>1/3 = 0,33</td></tr>
+<tr><td>0,95</td><td>TP</td><td>2</td><td>0</td><td>2/2 = 1,0</td><td>2/3 = 0,67</td></tr>
+<tr><td>0,90</td><td>FP</td><td>2</td><td>1</td><td>2/3 = 0,67</td><td>0,67</td></tr>
+<tr><td>0,50</td><td>FP</td><td>2</td><td>2</td><td>2/4 = 0,50</td><td>0,67</td></tr>
+<tr><td>0,10</td><td>TP</td><td>3</td><td>2</td><td>3/5 = 0,60</td><td>3/3 = 1,0</td></tr>
+</table></div>
+<p>Vẽ các điểm (recall, precision) được <strong>đường Precision–Recall</strong>. Trước khi tính diện tích, ta <strong>nội suy</strong>: precision tại mỗi mức recall \(r\) được thay bằng precision lớn nhất ở mọi recall \(\ge r\) (làm đường cong thành dạng bậc thang đi xuống). <strong>Average Precision (AP)</strong> là diện tích dưới đường đó:</p>
+\[ AP = (0{,}33 - 0)\cdot1{,}0 + (0{,}67 - 0{,}33)\cdot1{,}0 + (1{,}0 - 0{,}67)\cdot0{,}6 \approx 0{,}867 \]
+<p>(Hình ở trang 154 ghi "Dog AP = 0.86", làm tròn xuống từ 0,8667.)</p>
+<pre><code class="language-python">import numpy as np
+
+
+def average_precision(is_tp, num_gt):
+    """is_tp: danh sách True/False của các detection đã sắp theo score giảm dần."""
+    tp = np.cumsum(is_tp)
+    fp = np.cumsum(~np.asarray(is_tp))
+    recall = tp / num_gt
+    precision = tp / (tp + fp)
+    # Nội suy: precision tại recall r = max precision với recall &gt;= r
+    mrec = np.concatenate([[0.0], recall, [1.0]])
+    mpre = np.concatenate([[0.0], precision, [0.0]])
+    for k in range(len(mpre) - 2, -1, -1):
+        mpre[k] = max(mpre[k], mpre[k + 1])
+    idx = np.where(mrec[1:] != mrec[:-1])[0]
+    return np.sum((mrec[idx + 1] - mrec[idx]) * mpre[idx + 1])
+
+
+is_tp = np.array([True, True, False, False, True])   # 0.99, 0.95, 0.90, 0.5, 0.1
+print(average_precision(is_tp, num_gt=3))             # 0.8667</code></pre>
+<h3>mAP và các chuẩn đánh giá</h3>
+<p><strong>mAP</strong> (mean Average Precision) là trung bình AP của tất cả các lớp. Các chuẩn khác nhau ở ngưỡng IoU và cách nội suy, nên con số không so sánh trực tiếp được với nhau:</p>
+<div class="table-wrap"><table>
+<tr><th>Chuẩn</th><th>Định nghĩa</th></tr>
+<tr><td>Pascal VOC (mAP@0.5)</td><td>IoU ≥ 0,5; VOC2007 dùng nội suy 11 điểm, VOC2010+ dùng mọi điểm (như ví dụ trên)</td></tr>
+<tr><td>COCO (mAP@[.5:.95])</td><td>Trung bình AP tại 10 ngưỡng IoU 0,50; 0,55; …; 0,95, nội suy 101 điểm. Khắt khe hơn nhiều vì thưởng box định vị chính xác</td></tr>
+<tr><td>COCO AP50, AP75</td><td>AP tại một ngưỡng IoU 0,5 hoặc 0,75</td></tr>
+<tr><td>COCO APs, APm, APl</td><td>AP cho đối tượng nhỏ (&lt; 32² px), vừa, lớn (&gt; 96² px)</td></tr>
+</table></div>
+<p>Khi đi làm, đừng tự viết hàm mAP để báo cáo: dùng <code>pycocotools</code>, <code>torchmetrics.detection.MeanAveragePrecision</code>, hoặc công cụ đánh giá sẵn của Ultralytics. Ngoài mAP, còn theo dõi tốc độ (FPS, độ trễ mỗi ảnh) vì đây luôn là bài toán đánh đổi giữa độ chính xác và tốc độ.</p>
+
+<h2>Bản đồ các họ detector</h2>
+<div class="table-wrap"><table>
+<tr><th>Họ</th><th>Ý tưởng</th><th>Ví dụ</th></tr>
+<tr><td>Two-stage</td><td>Bước 1 đề xuất vùng, bước 2 phân loại + tinh chỉnh từng vùng. Chính xác, chậm hơn</td><td>R-CNN, Fast R-CNN, Faster R-CNN, Mask R-CNN</td></tr>
+<tr><td>One-stage</td><td>Dự đoán trực tiếp box và lớp trên lưới feature map trong một lần chạy. Nhanh, phù hợp thời gian thực</td><td>YOLO, SSD, RetinaNet, FCOS</td></tr>
+<tr><td>Transformer</td><td>Xem detection như bài toán dự đoán tập hợp, không cần anchor và NMS</td><td>DETR, RT-DETR</td></tr>
+</table></div>
+
+<h2>Tóm tắt</h2>
+<ul>
+<li>Detection = phân loại + định vị, với số đối tượng thay đổi theo ảnh.</li>
+<li>Cẩn thận với định dạng box: xyxy, xywh, cxcywh chuẩn hoá.</li>
+<li>Sliding window quá đắt; region proposal (Selective Search) giảm còn khoảng 2.000 vùng.</li>
+<li>IoU = giao / hợp; NMS giữ box điểm cao nhất, xoá box trùng IoU &gt; ngưỡng.</li>
+<li>AP = diện tích dưới đường PR (đã nội suy); mAP = trung bình AP các lớp; COCO lấy trung bình trên IoU 0,5–0,95.</li>
+</ul>
+<p>Đọc tiếp: <a href="r-cnn-fast-faster-r-cnn.html">Từ R-CNN đến Faster R-CNN</a>, hành trình giảm thời gian xử lý từ 50 giây xuống 0,2 giây mỗi ảnh.</p>
+
+<h2>Tài liệu tham khảo</h2>
+<ul>
+<li>Uijlings et al. (2013). <em>Selective Search for Object Recognition</em>.</li>
+<li>Everingham et al. (2010). <em>The PASCAL Visual Object Classes (VOC) Challenge</em>.</li>
+<li>Lin et al. (2014). <em>Microsoft COCO: Common Objects in Context</em>; trang đánh giá cocodataset.org/#detection-eval.</li>
+<li>Bodla et al. (2017). <em>Soft-NMS</em>.</li>
+<li>Tài liệu torchvision: <code>torchvision.ops</code> (<code>box_iou</code>, <code>nms</code>, <code>batched_nms</code>, <code>box_convert</code>).</li>
+</ul>

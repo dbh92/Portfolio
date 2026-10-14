@@ -1,6 +1,221 @@
 /* Tự động sinh bởi tools/build.py – không sửa tay */
 window.HF_POSTS = [
  {
+  "t": "Học theo slide Deep Learning – Computer Vision: bản đồ bài học",
+  "u": "tai-nguyen/slide-deep-learning-computer-vision-ban-do-bai-hoc.html",
+  "e": "Học theo slide Deep Learning – Computer Vision – NLP? Bảng đối chiếu từng nhóm trang với bài học trên HọcFree, kèm các chỗ slide sai đã đính chính.",
+  "c": "tai-nguyen",
+  "cn": "Tài nguyên",
+  "d": "14/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/slide-deep-learning-computer-vision-ban-do-bai-hoc.webp",
+  "tags": [
+   "Ebook",
+   "Deep Learning",
+   "Computer Vision"
+  ]
+ },
+ {
+  "t": "Tổng quan Deep Learning cho Computer Vision",
+  "u": "hoc/tong-quan-deep-learning-computer-vision.html",
+  "e": "ML khác DL ở đâu, ảnh xám và ảnh màu được biểu diễn bằng con số ra sao, và ba bài toán cốt lõi của Computer Vision: phân loại, phát hiện, phân vùng.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "14/10/2026",
+  "m": 10,
+  "img": "assets/images/posts/tong-quan-deep-learning-computer-vision.webp",
+  "tags": [
+   "Deep Learning",
+   "Computer Vision",
+   "Machine Learning"
+  ]
+ },
+ {
+  "t": "Từ Linear Classifier đến Neural Network",
+  "u": "hoc/linear-classifier-den-neural-network.html",
+  "e": "Từ hàm điểm f(x) = Wx + b: trọng số “nhìn” thấy gì, vì sao bắt buộc cần hàm kích hoạt và cách nhiều neuron ghép thành mạng nơ-ron sâu.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "14/10/2026",
+  "m": 11,
+  "img": "assets/images/posts/linear-classifier-den-neural-network.webp",
+  "tags": [
+   "Deep Learning",
+   "Machine Learning"
+  ]
+ },
+ {
+  "t": "Loss function và optimizer: SGD, Momentum, RMSProp, Adam",
+  "u": "hoc/loss-function-gradient-descent-optimizer.html",
+  "e": "MAE, MSE, Huber, cross-entropy; batch, mini-batch SGD; Momentum, Adagrad, RMSProp, Adam với công thức đúng và thí nghiệm PyTorch kiểm chứng.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "14/10/2026",
+  "m": 13,
+  "img": "assets/images/posts/loss-function-gradient-descent-optimizer.webp",
+  "tags": [
+   "Deep Learning",
+   "PyTorch"
+  ]
+ },
+ {
+  "t": "Backpropagation: lan truyền ngược qua ví dụ tính tay",
+  "u": "hoc/backpropagation-lan-truyen-nguoc.html",
+  "e": "Quy tắc chuỗi, đồ thị tính toán, upstream và local gradient: tính tay gradient của f = (x + y)z, tự cài mạng 2 lớp bằng NumPy, đối chiếu autograd.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "14/10/2026",
+  "m": 11,
+  "img": "assets/images/posts/backpropagation-lan-truyen-nguoc.webp",
+  "tags": [
+   "Deep Learning",
+   "PyTorch"
+  ]
+ },
+ {
+  "t": "PyTorch: 7 bước huấn luyện một mạng phân loại ảnh",
+  "u": "hoc/pytorch-huan-luyen-mang-neural.html",
+  "e": "Tensor, Dataset, DataLoader, model, loss, optimizer, vòng lặp train/validate/test: pipeline huấn luyện phân loại ảnh CIFAR-10 hoàn chỉnh từ đầu.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "14/10/2026",
+  "m": 14,
+  "img": "assets/images/posts/pytorch-huan-luyen-mang-neural.webp",
+  "tags": [
+   "PyTorch",
+   "Deep Learning"
+  ]
+ },
+ {
+  "t": "CNN: phép tích chập, padding, stride và pooling",
+  "u": "hoc/cnn-phep-tich-chap-pooling.html",
+  "e": "Vì sao mạng fully connected không hợp với ảnh, tích chập trên ảnh nhiều kênh, công thức kích thước đầu ra và số tham số lớp Conv, kèm ví dụ số.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "14/10/2026",
+  "m": 12,
+  "img": "assets/images/posts/cnn-phep-tich-chap-pooling.webp",
+  "tags": [
+   "Deep Learning",
+   "Computer Vision"
+  ]
+ },
+ {
+  "t": "Batch Normalization, Dropout và Receptive Field",
+  "u": "hoc/batchnorm-dropout-receptive-field.html",
+  "e": "BatchNorm khác nhau thế nào lúc train và lúc suy luận, Dropout chống overfitting ra sao, cách tính receptive field và các mẫu sắp xếp lớp CNN.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "14/10/2026",
+  "m": 14,
+  "img": "assets/images/posts/batchnorm-dropout-receptive-field.webp",
+  "tags": [
+   "Deep Learning",
+   "PyTorch"
+  ]
+ },
+ {
+  "t": "Các kiến trúc CNN kinh điển: LeNet, AlexNet, VGG, ResNet",
+  "u": "hoc/kien-truc-cnn-kinh-dien.html",
+  "e": "Hành trình ImageNet: mỗi kiến trúc giải quyết vấn đề gì, ý tưởng cốt lõi, số tham số, độ chính xác và cách dùng mô hình pretrained trong torchvision.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "14/10/2026",
+  "m": 14,
+  "img": "assets/images/posts/kien-truc-cnn-kinh-dien.webp",
+  "tags": [
+   "Deep Learning",
+   "Computer Vision",
+   "PyTorch"
+  ]
+ },
+ {
+  "t": "Vanishing/Exploding gradient và khởi tạo trọng số",
+  "u": "hoc/vanishing-exploding-gradient-weight-init.html",
+  "e": "Vì sao mạng sâu khó huấn luyện: sigmoid và ReLU, khởi tạo Xavier/He đúng công thức qua thí nghiệm 10 lớp, gradient clipping và checklist khi loss NaN.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "14/10/2026",
+  "m": 13,
+  "img": "assets/images/posts/vanishing-exploding-gradient-weight-init.webp",
+  "tags": [
+   "Deep Learning",
+   "PyTorch"
+  ]
+ },
+ {
+  "t": "Transfer Learning và Data Augmentation khi có ít dữ liệu",
+  "u": "hoc/transfer-learning-data-augmentation.html",
+  "e": "Feature extractor hay fine-tune? Chọn chiến lược theo kích thước và độ tương đồng dữ liệu, kèm kỹ thuật tăng cường ảnh với torchvision.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "14/10/2026",
+  "m": 10,
+  "img": "assets/images/posts/transfer-learning-data-augmentation.webp",
+  "tags": [
+   "Deep Learning",
+   "PyTorch",
+   "Dataset"
+  ]
+ },
+ {
+  "t": "Object Detection cơ bản: bounding box, IoU, NMS và mAP",
+  "u": "hoc/object-detection-iou-nms-map.html",
+  "e": "Định dạng bounding box, sliding window, selective search, IoU, Non-maximum Suppression tự cài và cách tính AP, mAP theo chuẩn VOC và COCO.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "14/10/2026",
+  "m": 12,
+  "img": "assets/images/posts/object-detection-iou-nms-map.webp",
+  "tags": [
+   "Object Detection",
+   "Computer Vision"
+  ]
+ },
+ {
+  "t": "Từ R-CNN đến Faster R-CNN: anchor, RoI Pooling, RPN",
+  "u": "hoc/r-cnn-fast-faster-r-cnn.html",
+  "e": "Họ R-CNN giảm từ 50 giây xuống 0,2 giây mỗi ảnh: bounding box regression, RoI Pooling, anchor, RPN, 4 hàm loss và fine-tune bằng torchvision.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "14/10/2026",
+  "m": 14,
+  "img": "assets/images/posts/r-cnn-fast-faster-r-cnn.webp",
+  "tags": [
+   "Object Detection",
+   "PyTorch"
+  ]
+ },
+ {
+  "t": "Image Segmentation: FCN, U-Net, DeepLab, Mask R-CNN",
+  "u": "hoc/image-segmentation-unet-mask-rcnn.html",
+  "e": "Phân loại từng pixel: semantic, instance, panoptic; upsampling, transposed convolution, atrous conv, Mask R-CNN, độ đo mIoU, Dice và code PyTorch.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "14/10/2026",
+  "m": 12,
+  "img": "assets/images/posts/image-segmentation-unet-mask-rcnn.webp",
+  "tags": [
+   "Segmentation",
+   "PyTorch"
+  ]
+ },
+ {
+  "t": "GAN – Mạng đối sinh: cho máy tính tự “vẽ” ảnh",
+  "u": "hoc/gan-mang-doi-sinh.html",
+  "e": "Generator và Discriminator đấu trí ra sao, hàm minimax, huấn luyện DCGAN bằng PyTorch, mode collapse và các biến thể cGAN, pix2pix, CycleGAN.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "14/10/2026",
+  "m": 12,
+  "img": "assets/images/posts/gan-mang-doi-sinh.webp",
+  "tags": [
+   "Generative AI",
+   "Deep Learning",
+   "PyTorch"
+  ]
+ },
+ {
   "t": "Kiểm thử hàm xử lý ảnh với pytest: bắt lỗi trước khi lên máy",
   "u": "hoc/pytest-kiem-thu-ham-xu-ly-anh.html",
   "e": "Dùng fixture, parametrize, pytest.raises và pytest.approx để khóa chặt các hàm cắt ROI, đếm pixel, đánh giá OK/NG, bắt lỗi ngưỡng trước khi lên máy trạm.",
@@ -2551,28 +2766,28 @@ window.HF_TOPICS = [
   "u": "hoc/machine-learning.html",
   "s": "Học AI & Lập trình",
   "g": "AI & Machine Learning",
-  "n": 7
+  "n": 9
  },
  {
   "t": "Deep Learning",
   "u": "hoc/deep-learning.html",
   "s": "Học AI & Lập trình",
   "g": "AI & Machine Learning",
-  "n": 18
+  "n": 30
  },
  {
   "t": "PyTorch",
   "u": "hoc/pytorch.html",
   "s": "Học AI & Lập trình",
   "g": "AI & Machine Learning",
-  "n": 12
+  "n": 22
  },
  {
   "t": "Generative AI",
   "u": "hoc/generative-ai.html",
   "s": "Học AI & Lập trình",
   "g": "AI & Machine Learning",
-  "n": 6
+  "n": 7
  },
  {
   "t": "LLM / AI Agents",
@@ -2600,7 +2815,7 @@ window.HF_TOPICS = [
   "u": "hoc/computer-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Computer Vision",
-  "n": 11
+  "n": 16
  },
  {
   "t": "OCR",
@@ -2614,14 +2829,14 @@ window.HF_TOPICS = [
   "u": "hoc/object-detection.html",
   "s": "Học AI & Lập trình",
   "g": "Computer Vision",
-  "n": 9
+  "n": 11
  },
  {
   "t": "Segmentation",
   "u": "hoc/segmentation.html",
   "s": "Học AI & Lập trình",
   "g": "Computer Vision",
-  "n": 4
+  "n": 5
  },
  {
   "t": "Machine Vision",
@@ -2712,21 +2927,21 @@ window.HF_TOPICS = [
   "u": "kien-thuc/ai-machine-learning.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 7
+  "n": 9
  },
  {
   "t": "Deep Learning",
   "u": "kien-thuc/deep-learning.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 18
+  "n": 30
  },
  {
   "t": "Computer Vision",
   "u": "kien-thuc/computer-vision.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 11
+  "n": 16
  },
  {
   "t": "Machine Vision",
@@ -2831,7 +3046,7 @@ window.HF_TOPICS = [
   "u": "tai-nguyen/dataset.html",
   "s": "Tài nguyên",
   "g": "",
-  "n": 7
+  "n": 8
  },
  {
   "t": "Cheat Sheets",
@@ -2852,7 +3067,7 @@ window.HF_TOPICS = [
   "u": "tai-nguyen/ebook.html",
   "s": "Tài nguyên",
   "g": "",
-  "n": 7
+  "n": 8
  },
  {
   "t": "AI Tools",
@@ -2944,7 +3159,7 @@ window.HF_TOPICS = [
   "t": "Chặng 10: Deep Learning",
   "u": "lo-trinh/vision-engineer/deep-learning.html",
   "s": "Vision Engineer",
-  "g": "7 bài học",
+  "g": "12 bài học",
   "n": -1
  },
  {
@@ -2958,7 +3173,7 @@ window.HF_TOPICS = [
   "t": "Chặng 12: Detection / Segmentation / Anomaly Detection",
   "u": "lo-trinh/vision-engineer/detection-segmentation-anomaly.html",
   "s": "Vision Engineer",
-  "g": "7 bài học",
+  "g": "8 bài học",
   "n": -1
  },
  {

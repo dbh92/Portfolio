@@ -1,0 +1,175 @@
+<p>Trong bài <a href="pytorch-huan-luyen-mang-neural.html">PyTorch: 7 bước huấn luyện</a>, mạng fully connected (MLP) 2,6 triệu tham số chỉ đạt khoảng 50% trên CIFAR-10. <strong>Convolutional Neural Network</strong> (CNN, mạng nơ-ron tích chập) giải quyết đúng điểm yếu đó bằng cách tôn trọng cấu trúc không gian của ảnh. Đây là kiến trúc nền tảng của gần như mọi hệ thống thị giác máy tính: từ phân loại, phát hiện đối tượng đến phân vùng ảnh.</p>
+<p class="note">Số trang (ví dụ "trang 81") trong bài chỉ tới slide của bài giảng <a href="../tai-nguyen/slide-deep-learning-computer-vision-ban-do-bai-hoc.html">Deep Learning – Computer Vision – NLP</a> (Thang Nguyen, Viet Nguyen); bài này giải thích chi tiết, kiểm chứng và đính chính các slide đó.</p>
+
+<h2>Vì sao mạng fully connected không hợp với ảnh?</h2>
+<p>Trang 78 của tài liệu tóm gọn hai vấn đề:</p>
+<ul>
+<li><strong>Không chịu được biến đổi (variations)</strong>: vị trí, hướng, tỉ lệ. Mỗi neuron FC gắn cứng với từng pixel cụ thể; chữ số "7" dịch sang trái 3 pixel là một đầu vào hoàn toàn khác, mạng phải học lại từ đầu. Ảnh trọng số học được cũng chỉ là các "khuôn mẫu trung bình" mờ nhòe.</li>
+<li><strong>Không mở rộng được (scalable)</strong>: bộ nhớ và tính toán. Ảnh 224×224×3 có 150.528 giá trị; chỉ một lớp FC với 1.000 neuron đã cần hơn 150 triệu trọng số.</li>
+</ul>
+<p>Ảnh có hai tính chất mà FC bỏ qua: <strong>tính cục bộ</strong> (pixel gần nhau liên quan chặt chẽ, tạo thành cạnh, góc, kết cấu) và <strong>tính dừng</strong> (một chiếc tai mèo ở góc trái hay góc phải vẫn là tai mèo). Tích chập khai thác chính hai điều đó.</p>
+
+<h2>Kiến trúc tổng quát của CNN</h2>
+<p>Một CNN điển hình gồm hai phần (trang 77, 80):</p>
+<ol>
+<li><strong>Trích đặc trưng (feature extraction)</strong>: chuỗi các khối <em>Convolution + ReLU</em> xen kẽ <em>Pooling</em>. Mỗi lớp sinh ra các <strong>feature map</strong>: không gian (H, W) nhỏ dần, số kênh (depth) tăng dần.</li>
+<li><strong>Phân loại (classification)</strong>: làm phẳng (flatten) feature map cuối, qua một vài lớp fully connected, rồi softmax ra phân phối xác suất (ví dụ Horse 0.2, Zebra 0.7, Dog 0.1).</li>
+</ol>
+<p>Khác với MLP xếp neuron thành hàng, CNN xếp neuron thành <strong>khối 3 chiều</strong> (width × height × depth), mỗi neuron chỉ "nhìn" một vùng nhỏ của khối trước.</p>
+
+<h2>Phép tích chập (convolution) trên ảnh một kênh</h2>
+<p>Một <strong>filter</strong> (hay kernel) là một ma trận nhỏ, ví dụ 3×3. Ta trượt nó trên ảnh; tại mỗi vị trí, nhân từng phần tử của filter với vùng ảnh bên dưới rồi cộng tất cả lại thành <strong>một</strong> số. Ví dụ ở trang 81: ảnh 6×6, filter phát hiện cạnh dọc:</p>
+<div class="mats">
+<table class="mat"><caption>Input 6×6</caption>
+<tr><td class="hl">4</td><td class="hl">9</td><td class="hl">2</td><td>5</td><td>8</td><td>3</td></tr>
+<tr><td class="hl">5</td><td class="hl">6</td><td class="hl">2</td><td>4</td><td>0</td><td>3</td></tr>
+<tr><td class="hl">2</td><td class="hl">4</td><td class="hl">5</td><td>4</td><td>5</td><td>2</td></tr>
+<tr><td>5</td><td>6</td><td>5</td><td>4</td><td>7</td><td>8</td></tr>
+<tr><td>5</td><td>7</td><td>7</td><td>9</td><td>2</td><td>1</td></tr>
+<tr><td>5</td><td>8</td><td>5</td><td>3</td><td>8</td><td>4</td></tr></table>
+<span class="op">∗</span>
+<table class="mat"><caption>Filter 3×3</caption>
+<tr><td>1</td><td>0</td><td>-1</td></tr><tr><td>1</td><td>0</td><td>-1</td></tr><tr><td>1</td><td>0</td><td>-1</td></tr></table>
+<span class="op">=</span>
+<table class="mat"><caption>Output 4×4</caption>
+<tr><td class="hl">2</td><td>6</td><td>-4</td><td>5</td></tr>
+<tr><td>0</td><td>4</td><td>0</td><td>-1</td></tr>
+<tr><td>-5</td><td>0</td><td>3</td><td>6</td></tr>
+<tr><td>-2</td><td>5</td><td>0</td><td>3</td></tr></table>
+</div>
+<p>Ô đầu tiên: \(4\cdot1 + 9\cdot0 + 2\cdot(-1) + 5\cdot1 + 6\cdot0 + 2\cdot(-1) + 2\cdot1 + 4\cdot0 + 5\cdot(-1) = 2\). Dịch filter sang phải 1 ô: \(9 + 6 + 4 - 5 - 4 - 4 = 6\). Cứ thế đến hết ảnh.</p>
+<p>Filter này cho giá trị dương lớn khi cột trái sáng hơn cột phải, tức là phát hiện <strong>cạnh dọc</strong>. Điều kỳ diệu của CNN: ta không thiết kế tay các filter như vậy; giá trị của filter chính là <strong>trọng số được học</strong> bằng backpropagation. Lớp đầu tự học ra các bộ phát hiện cạnh, màu; lớp sau học các mẫu phức tạp hơn.</p>
+<div class="tip"><strong>Chi tiết kỹ thuật</strong>Về toán học, "convolution" trong deep learning thực ra là <strong>cross-correlation</strong> (không lật kernel trước khi trượt). Vì kernel được học, việc lật hay không không quan trọng, nên mọi framework đều cài đặt cross-correlation nhưng vẫn gọi là convolution.</div>
+
+<h2>Stride và Padding</h2>
+<h3>Stride (bước trượt)</h3>
+<p>Stride \(s\) là số ô filter nhảy mỗi lần. Với \(s = 2\), ví dụ trên chỉ còn 4 vị trí và output là 2×2:</p>
+<div class="mats"><table class="mat"><caption>Output, stride 2</caption><tr><td>2</td><td class="hl2">-4</td></tr><tr><td>-5</td><td>3</td></tr></table></div>
+<div class="warn"><strong>Đính chính hình ở trang 81</strong>Hình minh hoạ stride = 2 ghi ô thứ hai bằng 1. Tính đúng với cửa sổ ở cột 3–5 (giá trị <code>2 5 8 / 2 4 0 / 5 4 5</code>): \(2 + 2 + 5 - 8 - 0 - 5 = -4\). Kết quả \(-4\) đã được kiểm chứng bằng <code>torch.nn.functional.conv2d</code>.</div>
+<h3>Padding (đệm viền)</h3>
+<p>Không đệm, output nhỏ hơn input và pixel ở viền ít được "nhìn" hơn pixel ở giữa. <strong>Zero-padding</strong> \(p\) thêm \(p\) hàng/cột số 0 quanh ảnh. Với \(p = 1, s = 2\), ví dụ trên cho output 3×3 bắt đầu bằng \(-15\) (\(= -9 - 6\), vì cột trái là số 0 đệm). Với stride 1, chọn \(p = (k-1)/2\) (ví dụ \(p = 1\) cho kernel 3×3) giữ nguyên kích thước: gọi là <strong>"same" padding</strong>.</p>
+
+<h2>Công thức kích thước đầu ra</h2>
+\[ O = \left\lfloor \frac{N + 2P - D\,(K - 1) - 1}{S} \right\rfloor + 1 \]
+<p>với \(N\) kích thước vào, \(K\) kernel, \(P\) padding, \(S\) stride, \(D\) dilation (mặc định 1, khi đó công thức rút gọn thành \(\lfloor (N + 2P - K)/S \rfloor + 1\)). Đây đúng là công thức trang 87 và trong tài liệu <code>nn.Conv2d</code>.</p>
+<div class="table-wrap"><table>
+<tr><th>N</th><th>K</th><th>P</th><th>S</th><th>O</th><th>Gặp ở đâu</th></tr>
+<tr><td>6</td><td>3</td><td>0</td><td>1</td><td>4</td><td>ví dụ trên</td></tr>
+<tr><td>6</td><td>3</td><td>1</td><td>2</td><td>3</td><td>ví dụ có padding</td></tr>
+<tr><td>32</td><td>5</td><td>0</td><td>1</td><td>28</td><td>lớp đầu LeNet-5</td></tr>
+<tr><td>227</td><td>11</td><td>0</td><td>4</td><td>55</td><td>lớp đầu AlexNet</td></tr>
+<tr><td>224</td><td>7</td><td>3</td><td>2</td><td>112</td><td>lớp đầu ResNet</td></tr>
+<tr><td>224</td><td>3</td><td>1</td><td>1</td><td>224</td><td>"same" conv trong VGG</td></tr>
+</table></div>
+
+<h2>Tích chập trên khối nhiều kênh</h2>
+<p>Ảnh màu có 3 kênh, nên filter cũng phải có <strong>3 kênh</strong>: filter luôn có độ sâu bằng số kênh đầu vào (trang 83). Tại mỗi vị trí, ta tích chập từng kênh của filter với kênh tương ứng của ảnh, rồi <strong>cộng cả ba kết quả</strong> và cộng bias, được <strong>một</strong> số. Do đó một filter 3×3×3 trên ảnh 6×6×3 cho ra feature map 4×4×<strong>1</strong>.</p>
+<p>Ví dụ có số liệu ở trang 84: kênh R cho 308, kênh G cho −498, kênh B cho 164, bias = 1, tổng \(308 - 498 + 164 + 1 = -25\).</p>
+
+<h2>Nhiều filter, nhiều feature map</h2>
+<p>Một filter chỉ phát hiện một loại mẫu. Dùng \(C_{out}\) filter khác nhau, ta được \(C_{out}\) feature map xếp chồng thành output có độ sâu \(C_{out}\) (trang 85: 2 filter 3×3×3 trên ảnh 6×6×3 cho output 4×4×2). Một <strong>lớp convolution</strong> hoàn chỉnh (trang 87) = tích chập với nhiều filter + bias + hàm kích hoạt (thường ReLU).</p>
+<h3>Đếm tham số của một lớp Conv</h3>
+\[ \#\text{params} = (K_h \cdot K_w \cdot C_{in} + 1)\cdot C_{out} \]
+<p>Lớp ở trang 87 (2 filter 4×4×3): \((4\cdot4\cdot3 + 1)\cdot2 = 98\) tham số. Lưu ý số tham số <strong>không phụ thuộc kích thước ảnh</strong>.</p>
+<pre><code class="language-python">import torch.nn as nn
+
+conv = nn.Conv2d(in_channels=3, out_channels=2, kernel_size=4)
+print(conv.weight.shape)                           # torch.Size([2, 3, 4, 4]) = (C_out, C_in, K_h, K_w)
+print(sum(p.numel() for p in conv.parameters()))   # 98</code></pre>
+
+<h2>Tích chập 1×1</h2>
+<p>Kernel 1×1 nghe vô nghĩa với ảnh một kênh, nhưng với khối nhiều kênh, nó tính tổ hợp tuyến tính của <strong>tất cả các kênh tại cùng một pixel</strong>: như một lớp fully connected nhỏ áp dụng riêng cho từng pixel. Trang 86: input 6×6×5, hai filter 1×1×5 cho output 6×6×2. Công dụng:</p>
+<ul>
+<li><strong>Đổi số kênh</strong> rẻ tiền (giảm 256 kênh xuống 64 trước một conv 3×3 đắt đỏ): "bottleneck" trong Inception, ResNet-50.</li>
+<li><strong>Trộn thông tin giữa các kênh</strong> mà không đụng đến chiều không gian: "pointwise convolution" trong MobileNet.</li>
+<li>Thêm phi tuyến (kèm ReLU) với chi phí thấp.</li>
+</ul>
+
+<h2>Ưu điểm của lớp Convolution</h2>
+<ul>
+<li><strong>Local connectivity (kết nối cục bộ)</strong>: mỗi neuron output chỉ nối với một vùng nhỏ \(K\times K\) của input, không phải toàn bộ ảnh.</li>
+<li><strong>Parameter sharing (chia sẻ tham số)</strong>: cùng một filter dùng cho mọi vị trí. Một bộ phát hiện cạnh hữu ích ở góc trái thì cũng hữu ích ở góc phải.</li>
+<li><strong>Translation equivariance</strong>: dịch ảnh đầu vào thì feature map dịch theo tương ứng. Kết hợp với pooling, mạng đạt được tính bất biến (gần đúng) với dịch chuyển nhỏ: con mèo ở đâu trong ảnh cũng được nhận ra (trang 89).</li>
+</ul>
+<p>So sánh cụ thể, biến input 32×32×3 thành output 32×32×64:</p>
+<div class="table-wrap"><table>
+<tr><th>Cách</th><th>Số tham số</th></tr>
+<tr><td>Fully connected (mỗi output nối mọi input)</td><td>\(3072 \times 65536 \approx 201\) triệu</td></tr>
+<tr><td>Conv 3×3, 64 filter</td><td>\((3\cdot3\cdot3+1)\cdot64 = 1.792\)</td></tr>
+</table></div>
+
+<h2>Pooling layer</h2>
+<p>Pooling giảm kích thước không gian của feature map: tóm tắt mỗi vùng nhỏ bằng một số. Phổ biến nhất là cửa sổ 2×2, stride 2, giảm H và W đi một nửa (giảm 75% số giá trị).</p>
+<div class="mats">
+<table class="mat"><caption>Input 4×4</caption>
+<tr><td class="hl">4</td><td class="hl">9</td><td class="hl2">2</td><td class="hl2">5</td></tr>
+<tr><td class="hl">5</td><td class="hl">6</td><td class="hl2">2</td><td class="hl2">4</td></tr>
+<tr><td>2</td><td>4</td><td>5</td><td>4</td></tr>
+<tr><td>5</td><td>6</td><td>8</td><td>4</td></tr></table>
+<span class="op">→</span>
+<table class="mat"><caption>Max pooling</caption><tr><td class="hl">9</td><td class="hl2">5</td></tr><tr><td>6</td><td>8</td></tr></table>
+<table class="mat"><caption>Average pooling</caption><tr><td class="hl">6.0</td><td class="hl2">3.25</td></tr><tr><td>4.25</td><td>5.25</td></tr></table>
+</div>
+<p>(Hình trang 90 làm tròn thành 3.3, 4.3, 5.3; giá trị chính xác là 3.25, 4.25, 5.25.)</p>
+<ul>
+<li><strong>Không có tham số</strong> để học.</li>
+<li>Áp dụng <strong>độc lập cho từng kênh</strong>: input 6×6×3 cho output 3×3×3, số kênh giữ nguyên.</li>
+<li><strong>Max pooling</strong> giữ lại tín hiệu mạnh nhất ("đặc trưng có xuất hiện trong vùng này không?") và tăng khả năng chịu dịch chuyển nhỏ. Khi backprop, gradient chỉ đi về ô lớn nhất (cổng max ở bài Backpropagation).</li>
+<li><strong>Average pooling</strong> lấy trung bình. Phiên bản <strong>global average pooling</strong> (lấy trung bình cả feature map thành 1 số mỗi kênh) thay cho flatten trong các mạng hiện đại như ResNet, giúp giảm mạnh tham số FC.</li>
+</ul>
+<p>Ngày nay nhiều kiến trúc thay pooling bằng conv stride 2 để mạng tự học cách giảm kích thước.</p>
+
+<h2>Ghép lại: một CNN cho CIFAR-10 trong PyTorch</h2>
+<pre><code class="language-python">import torch
+import torch.nn as nn
+
+net = nn.Sequential(
+    nn.Conv2d(3, 32, kernel_size=3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+    nn.Conv2d(32, 64, kernel_size=3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+    nn.Conv2d(64, 128, kernel_size=3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+    nn.Flatten(),
+    nn.Linear(128 * 4 * 4, 256), nn.ReLU(),
+    nn.Linear(256, 10),
+)
+
+x = torch.rand(1, 3, 32, 32)
+for layer in net:
+    x = layer(x)
+    print(f"{layer.__class__.__name__:10s} {tuple(x.shape)}")
+print(sum(p.numel() for p in net.parameters()))   # 620362</code></pre>
+<p>Kết quả theo dõi kích thước:</p>
+<div class="table-wrap"><table>
+<tr><th>Lớp</th><th>Output</th><th>Tham số</th></tr>
+<tr><td>Conv 3→32, 3×3</td><td>32×32×32</td><td>896</td></tr>
+<tr><td>MaxPool 2×2</td><td>16×16×32</td><td>0</td></tr>
+<tr><td>Conv 32→64, 3×3</td><td>16×16×64</td><td>18.496</td></tr>
+<tr><td>MaxPool 2×2</td><td>8×8×64</td><td>0</td></tr>
+<tr><td>Conv 64→128, 3×3</td><td>8×8×128</td><td>73.856</td></tr>
+<tr><td>MaxPool 2×2</td><td>4×4×128</td><td>0</td></tr>
+<tr><td>Flatten → Linear 2048→256</td><td>256</td><td>524.544</td></tr>
+<tr><td>Linear 256→10</td><td>10</td><td>2.570</td></tr>
+</table></div>
+<p>Tổng khoảng 620 nghìn tham số, ít hơn 4 lần so với MLP ở bài PyTorch 7 bước, nhưng thay vào script huấn luyện của bài đó, mạng này thường đạt khoảng 70–75% sau 20 epoch (so với ~52% của MLP). Để ý: 85% tham số nằm ở lớp FC đầu tiên. Bài <a href="batchnorm-dropout-receptive-field.html">Batch Normalization, Dropout và Receptive Field</a> sẽ thêm các mẹo thiết kế để vượt mốc 85%.</p>
+
+<h2>CNN không chỉ dành cho ảnh</h2>
+<p>Tài liệu (trang 79) còn minh hoạ CNN cho văn bản (Kim, 2014): mỗi từ biểu diễn bằng một vector, câu thành ma trận \(n\times k\); các filter 1D trượt theo chiều chuỗi từ để bắt các cụm 2–5 từ, sau đó max-over-time pooling và lớp FC để phân loại cảm xúc. Cùng một ý tưởng (kết nối cục bộ + chia sẻ trọng số) áp dụng cho âm thanh, chuỗi thời gian và cả ảnh 3D y tế.</p>
+
+<h2>Tóm tắt</h2>
+<ul>
+<li>Tích chập = trượt filter, nhân từng phần tử, cộng lại; filter là trọng số học được.</li>
+<li>Output: \(\lfloor (N + 2P - K)/S \rfloor + 1\); "same" padding \(P = (K-1)/2\).</li>
+<li>Filter có độ sâu bằng số kênh vào; số filter = số kênh ra; tham số \((K^2 C_{in} + 1) C_{out}\).</li>
+<li>Conv 1×1 trộn kênh và đổi số kênh rẻ tiền.</li>
+<li>Local connectivity + parameter sharing: ít tham số, chịu được dịch chuyển.</li>
+<li>Pooling giảm kích thước, không có tham số, áp dụng từng kênh.</li>
+</ul>
+<p>Đọc tiếp: <a href="batchnorm-dropout-receptive-field.html">Batch Normalization, Dropout và Receptive Field</a>.</p>
+
+<h2>Tài liệu tham khảo</h2>
+<ul>
+<li>CS231n: <em>Convolutional Neural Networks: Architectures, Convolution / Pooling Layers</em>.</li>
+<li>Dumoulin &amp; Visin (2016). <em>A guide to convolution arithmetic for deep learning</em> (arXiv:1603.07285).</li>
+<li>Andrew Ng, khoá <em>Convolutional Neural Networks</em> (deeplearning.ai), tuần 1.</li>
+<li>Yoon Kim (2014). <em>Convolutional Neural Networks for Sentence Classification</em>.</li>
+<li>Tài liệu PyTorch: <code>nn.Conv2d</code>, <code>nn.MaxPool2d</code>.</li>
+</ul>

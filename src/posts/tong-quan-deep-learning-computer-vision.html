@@ -1,0 +1,137 @@
+<p>Mỗi ngày chiếc điện thoại của bạn mở khóa bằng khuôn mặt, ứng dụng ngân hàng đọc số CCCD, dây chuyền nhà máy tự loại sản phẩm lỗi, xe tự lái nhận ra người đi bộ. Đằng sau tất cả là <strong>Computer Vision</strong> (thị giác máy tính), lĩnh vực dạy máy tính "hiểu" hình ảnh. Và động cơ chính giúp Computer Vision bùng nổ hơn chục năm qua là <strong>Deep Learning</strong>.</p>
+<p class="note">Số trang (ví dụ "trang 81") trong bài chỉ tới slide của bài giảng <a href="../tai-nguyen/slide-deep-learning-computer-vision-ban-do-bai-hoc.html">Deep Learning – Computer Vision – NLP</a> (Thang Nguyen, Viet Nguyen); bài này giải thích chi tiết, kiểm chứng và đính chính các slide đó.</p>
+<p>Đây là bài đọc thêm của chặng <a href="../lo-trinh/vision-engineer/deep-learning.html">Deep Learning</a> trong lộ trình <a href="../lo-trinh/vision-engineer.html">Trở thành Vision Engineer</a>. Mục tiêu: nắm bức tranh tổng thể trước khi đi vào từng viên gạch là neural network, CNN, object detection…</p>
+
+<h2>Hệ thống thị giác của người và của máy</h2>
+<p>Khi bạn nhìn một giỏ trái cây, <strong>mắt</strong> thu nhận ánh sáng (thiết bị cảm nhận), còn <strong>não</strong> diễn giải tín hiệu đó thành "cái bát, quả cam, chuối, chanh, đào" (thiết bị diễn giải). Một hệ thống Computer Vision có cấu trúc y hệt:</p>
+<div class="table-wrap"><table>
+<tr><th></th><th>Con người</th><th>Máy tính</th></tr>
+<tr><td>Thu nhận</td><td>Mắt</td><td>Camera, cảm biến (sensing device)</td></tr>
+<tr><td>Diễn giải</td><td>Não bộ</td><td>Thuật toán / mô hình chạy trên CPU, GPU (interpreting device)</td></tr>
+<tr><td>Kết quả</td><td>"Có quả cam trong bát"</td><td>Nhãn, toạ độ, mặt nạ (mask)… dạng số liệu</td></tr>
+</table></div>
+<p>Phần camera đã giải quyết từ lâu. Phần khó là "bộ não": biến hàng triệu con số pixel thành ý nghĩa. Đó chính là việc của Vision Engineer.</p>
+
+<h2>Máy tính "nhìn" thấy gì? Ảnh chỉ là những con số</h2>
+<h3>Ảnh xám (grayscale)</h3>
+<p>Với máy tính, một ảnh xám kích thước H×W là một <strong>ma trận</strong> H hàng, W cột. Mỗi phần tử (pixel) thường là số nguyên 8 bit từ <code>0</code> (đen) đến <code>255</code> (trắng). Ảnh chân dung 12×16 pixel ở trang 60 của tài liệu thực chất chỉ là 192 con số như <code>157 153 174 168…</code>.</p>
+<h3>Ảnh màu (RGB)</h3>
+<p>Ảnh màu gồm <strong>3 kênh</strong> (channel) đỏ, lục, lam xếp chồng lên nhau, mỗi kênh là một ma trận H×W. Tổng cộng ảnh là một khối (tensor) 3 chiều kích thước H×W×3. Một ảnh 224×224 màu có 224·224·3 = 150.528 con số.</p>
+<pre><code class="language-python">from PIL import Image
+import numpy as np
+
+img = np.array(Image.open("meo.jpg"))           # đọc ảnh thành mảng numpy
+print(img.shape, img.dtype)                       # (441, 784, 3) uint8  → H, W, C
+print(img[0, 0])                                  # pixel góc trên trái, ví dụ [231 224 218] (R, G, B)
+
+gray = np.array(Image.open("meo.jpg").convert("L"))
+print(gray.shape, gray.min(), gray.max())         # (441, 784) 0 255</code></pre>
+<div class="warn"><strong>Ba quy ước thứ tự cần nhớ ngay từ đầu</strong>
+<ul>
+<li><strong>Pillow / NumPy / Matplotlib</strong>: H×W×C, thứ tự màu <strong>RGB</strong>.</li>
+<li><strong>OpenCV</strong> (<code>cv2.imread</code>): H×W×C nhưng thứ tự màu là <strong>BGR</strong>. Quên đổi sang RGB là lỗi kinh điển khiến mô hình chạy "sai mà không báo lỗi".</li>
+<li><strong>PyTorch</strong>: C×H×W (kênh đứng trước), và một batch ảnh là N×C×H×W.</li>
+</ul></div>
+
+<h3>Khoảng cách ngữ nghĩa (semantic gap)</h3>
+<p>Con người thấy "con mèo", máy chỉ thấy một bảng số. Tệ hơn, cùng một con mèo nhưng các con số thay đổi hoàn toàn khi:</p>
+<ul>
+<li><strong>Góc nhìn</strong> thay đổi (viewpoint): xoay máy ảnh là mọi pixel đổi giá trị.</li>
+<li><strong>Ánh sáng</strong> (illumination): mèo trong phòng tối và ngoài nắng.</li>
+<li><strong>Biến dạng</strong> (deformation): mèo nằm cuộn tròn, mèo vươn vai.</li>
+<li><strong>Che khuất</strong> (occlusion): chỉ thấy cái đuôi sau ghế sofa.</li>
+<li><strong>Nền lẫn lộn</strong> (background clutter): mèo vằn trên thảm vằn.</li>
+<li><strong>Đa dạng trong cùng lớp</strong> (intra-class variation): mèo Ba Tư, mèo mướp, mèo Sphynx.</li>
+</ul>
+<p>Không thể viết tay các luật <code>if…else</code> cho mọi trường hợp. Giải pháp là <strong>học từ dữ liệu</strong> (data-driven approach): thu thập thật nhiều ảnh đã gán nhãn, để thuật toán tự tìm quy luật.</p>
+
+<h2>Machine Learning truyền thống và Deep Learning</h2>
+<figure class="diagram">
+<svg class="dg" viewBox="0 0 720 250" role="img" aria-label="So sánh pipeline Machine Learning và Deep Learning">
+  <text x="10" y="22" font-weight="700">Machine Learning truyền thống</text>
+  <rect class="bx" x="10" y="40" width="120" height="56" rx="8"/><text x="70" y="73" text-anchor="middle">Ảnh đầu vào</text>
+  <rect class="bx-a" x="170" y="40" width="190" height="56" rx="8"/><text x="265" y="64" text-anchor="middle">Trích đặc trưng</text><text class="sm" x="265" y="82" text-anchor="middle">do người thiết kế: HOG, SIFT…</text>
+  <rect class="bx" x="400" y="40" width="150" height="56" rx="8"/><text x="475" y="64" text-anchor="middle">Bộ phân loại</text><text class="sm" x="475" y="82" text-anchor="middle">SVM, Random Forest…</text>
+  <rect class="bx" x="590" y="40" width="120" height="56" rx="8"/><text x="650" y="73" text-anchor="middle">Car / Not car</text>
+  <path class="ln" d="M130 68h36M360 68h36M550 68h36"/>
+  <text x="10" y="150" font-weight="700">Deep Learning</text>
+  <rect class="bx" x="10" y="168" width="120" height="56" rx="8"/><text x="70" y="201" text-anchor="middle">Ảnh đầu vào</text>
+  <rect class="bx-c" x="170" y="168" width="380" height="56" rx="8"/><text x="360" y="192" text-anchor="middle">Trích đặc trưng + Phân loại</text><text class="sm" x="360" y="210" text-anchor="middle">một mạng nơ-ron nhiều lớp, học end-to-end từ dữ liệu</text>
+  <rect class="bx" x="590" y="168" width="120" height="56" rx="8"/><text x="650" y="201" text-anchor="middle">Car / Not car</text>
+  <path class="ln" d="M130 196h36M550 196h36"/>
+</svg>
+<figcaption>Khác biệt cốt lõi: ai là người thiết kế đặc trưng (feature)?</figcaption>
+</figure>
+<p>Trong <strong>Machine Learning truyền thống</strong>, kỹ sư phải tự thiết kế cách trích đặc trưng (feature engineering): biểu đồ màu, cạnh, HOG (histogram of oriented gradients), SIFT… rồi đưa vector đặc trưng vào một bộ phân loại như SVM. Chất lượng hệ thống phụ thuộc rất nhiều vào tay nghề "chế" đặc trưng.</p>
+<p>Trong <strong>Deep Learning</strong>, mạng nơ-ron nhiều lớp nhận trực tiếp pixel và <strong>tự học</strong> cả phần trích đặc trưng lẫn phần phân loại, tối ưu đồng thời từ đầu đến cuối (end-to-end). Đổi lại, nó cần nhiều dữ liệu và sức tính toán (GPU) hơn.</p>
+<div class="table-wrap"><table>
+<tr><th>Tiêu chí</th><th>ML truyền thống</th><th>Deep Learning</th></tr>
+<tr><td>Đặc trưng</td><td>Thiết kế thủ công</td><td>Tự học từ dữ liệu</td></tr>
+<tr><td>Lượng dữ liệu cần</td><td>Ít đến vừa (hàng trăm, nghìn mẫu)</td><td>Nhiều (hàng nghìn đến hàng triệu), hoặc dùng transfer learning</td></tr>
+<tr><td>Phần cứng</td><td>CPU là đủ</td><td>GPU gần như bắt buộc khi huấn luyện</td></tr>
+<tr><td>Độ chính xác với ảnh phức tạp</td><td>Thấp hơn, chững lại sớm</td><td>Cao, tăng tiếp khi thêm dữ liệu</td></tr>
+<tr><td>Khả năng giải thích</td><td>Dễ hơn</td><td>Khó hơn ("hộp đen")</td></tr>
+</table></div>
+<p>Cột mốc lịch sử: năm 2012, mạng <strong>AlexNet</strong> thắng cuộc thi ImageNet (ILSVRC) với tỉ lệ lỗi top-5 khoảng 15,3%, bỏ xa vị trí thứ hai (khoảng 26,2%) dùng đặc trưng thủ công. Từ đó Deep Learning trở thành phương pháp mặc định của Computer Vision.</p>
+
+<h2>Neural Network, Deep Learning và Machine Learning: quan hệ lồng nhau</h2>
+<p>Hình ảnh búp bê Nga trong tài liệu rất chính xác: <strong>AI ⊃ Machine Learning ⊃ Neural Networks ⊃ Deep Learning</strong>.</p>
+<ul>
+<li><strong>Neural network</strong> (mạng nơ-ron) là một họ mô hình trong Machine Learning, gồm lớp đầu vào (input layer), các lớp ẩn (hidden/middle layer) và lớp đầu ra (output layer).</li>
+<li><strong>Deep Learning</strong> là neural network có <strong>nhiều lớp ẩn</strong> (deep = sâu). Không có ngưỡng cứng, nhưng mạng hiện đại thường có hàng chục đến hàng trăm lớp.</li>
+</ul>
+<p>Vì sao "sâu" lại tốt? Mỗi lớp học đặc trưng ở một mức trừu tượng: lớp đầu học <strong>cạnh, góc</strong>; lớp giữa ghép cạnh thành <strong>bộ phận</strong> (mắt, mũi, bánh xe); lớp sau ghép bộ phận thành <strong>đối tượng</strong> (khuôn mặt, ô tô). Học phân cấp (hierarchical features) như vậy hiệu quả hơn nhiều so với cố học mọi thứ trong một lớp duy nhất.</p>
+
+<h2>Ba bài toán cốt lõi của Computer Vision</h2>
+<div class="table-wrap"><table>
+<tr><th>Bài toán</th><th>Câu hỏi</th><th>Đầu ra</th><th>Ví dụ</th></tr>
+<tr><td><strong>Image classification</strong><br>(phân loại ảnh)</td><td>Ảnh này là gì?</td><td>Một nhãn (hoặc phân phối xác suất trên các lớp)</td><td>"Cat" 82%, "dog" 15%…</td></tr>
+<tr><td><strong>Object detection</strong><br>(phát hiện đối tượng)</td><td>Có những vật gì, ở đâu?</td><td>Danh sách (nhãn, bounding box, độ tin cậy)</td><td>Cat tại (x, y, w, h), Dog tại…</td></tr>
+<tr><td><strong>Image segmentation</strong><br>(phân vùng ảnh)</td><td>Pixel nào thuộc vật nào?</td><td>Mặt nạ (mask) cho từng pixel</td><td>Viền chính xác của mèo và chó</td></tr>
+</table></div>
+<p>Phân loại thường giả định ảnh có <strong>một đối tượng chính</strong>; phát hiện và phân vùng xử lý <strong>nhiều đối tượng</strong>. Độ khó và chi phí gán nhãn tăng dần: gán một nhãn cho ảnh mất vài giây, vẽ box mất vài chục giây, tô mask có thể mất vài phút mỗi ảnh. Ngoài ra còn nhiều bài toán khác xây trên nền này: ước lượng tư thế (pose estimation), theo vết (tracking), nhận dạng ký tự (OCR), ước lượng độ sâu, sinh ảnh (GAN, diffusion)…</p>
+
+<h2>Học có giám sát với ảnh được gán nhãn</h2>
+<p>Hầu hết hệ thống thị giác trong thực tế là <strong>học có giám sát</strong> (supervised learning): ta cho mô hình xem hàng nghìn ảnh kèm nhãn đúng ("cat", "dog"…), mô hình dự đoán, so với nhãn, rồi tự điều chỉnh để lần sau đoán đúng hơn. Quy trình chuẩn:</p>
+<ol>
+<li><strong>Thu thập và gán nhãn dữ liệu</strong>, chia thành tập train / validation / test.</li>
+<li><strong>Chọn mô hình</strong> và huấn luyện trên tập train.</li>
+<li><strong>Đánh giá</strong> trên tập validation để chọn siêu tham số, cuối cùng báo cáo trên tập test (chưa từng dùng khi huấn luyện).</li>
+<li><strong>Triển khai</strong> (deploy) và giám sát mô hình khi chạy thật.</li>
+</ol>
+<p>Một số bộ dữ liệu bạn sẽ gặp suốt quá trình học:</p>
+<div class="table-wrap"><table>
+<tr><th>Dataset</th><th>Nội dung</th><th>Dùng cho</th></tr>
+<tr><td>MNIST</td><td>70.000 ảnh chữ số viết tay 28×28 xám, 10 lớp</td><td>Bài tập nhập môn</td></tr>
+<tr><td>CIFAR-10</td><td>60.000 ảnh màu 32×32, 10 lớp (máy bay, ô tô, chim, mèo…)</td><td>Thử nghiệm CNN nhanh</td></tr>
+<tr><td>ImageNet (ILSVRC)</td><td>~1,28 triệu ảnh train, 1.000 lớp</td><td>Benchmark phân loại, nguồn mô hình pretrained</td></tr>
+<tr><td>Pascal VOC</td><td>20 lớp, có box và mask</td><td>Detection, segmentation</td></tr>
+<tr><td>MS COCO</td><td>~330.000 ảnh, 80 lớp, box + mask + keypoint</td><td>Chuẩn đánh giá detection/segmentation hiện nay</td></tr>
+</table></div>
+
+<h2>Vision Engineer làm gì ngoài đời?</h2>
+<ul>
+<li><strong>Sản xuất</strong>: kiểm tra ngoại quan tự động (AOI), phát hiện trầy xước, thiếu linh kiện, đếm sản phẩm trên băng chuyền.</li>
+<li><strong>Bán lẻ, an ninh</strong>: đếm người, nhận diện biển số, phát hiện xâm nhập.</li>
+<li><strong>Y tế</strong>: phân vùng khối u trên ảnh CT/MRI, đọc X-quang.</li>
+<li><strong>Giao thông</strong>: xe tự lái, hệ thống hỗ trợ lái (ADAS), giám sát giao thông.</li>
+<li><strong>Tài liệu</strong>: OCR hoá đơn, CCCD, eKYC.</li>
+</ul>
+<p>Công việc hằng ngày không chỉ là "train model": phần lớn thời gian dành cho <strong>dữ liệu</strong> (thu thập, gán nhãn, làm sạch), <strong>đánh giá</strong> (lỗi sai nằm ở đâu?), và <strong>triển khai</strong> (tối ưu tốc độ trên GPU, thiết bị biên).</p>
+
+<h2>Tóm tắt và bước tiếp theo</h2>
+<ul>
+<li>Ảnh là tensor số: xám H×W, màu H×W×3 (PyTorch dùng C×H×W).</li>
+<li>Deep Learning tự học đặc trưng thay vì thiết kế thủ công, cần nhiều dữ liệu và GPU.</li>
+<li>Deep Learning = neural network nhiều lớp ẩn, học đặc trưng phân cấp từ cạnh đến đối tượng.</li>
+<li>Ba bài toán cốt lõi: classification, detection, segmentation.</li>
+</ul>
+<p>Đọc tiếp: <a href="linear-classifier-den-neural-network.html">từ linear classifier đến neural network</a>, viên gạch nhỏ nhất của mọi mạng nơ-ron.</p>
+
+<h2>Tài liệu tham khảo</h2>
+<ul>
+<li>Stanford CS231n: <em>Image Classification: Data-driven Approach</em> (cs231n.github.io/classification).</li>
+<li>Krizhevsky, Sutskever, Hinton (2012). <em>ImageNet Classification with Deep Convolutional Neural Networks</em>.</li>
+<li>Zeiler &amp; Fergus (2014). <em>Visualizing and Understanding Convolutional Networks</em>: minh hoạ đặc trưng phân cấp.</li>
+<li>Bài giảng "Deep Learning – Computer Vision – NLP" của Thang Nguyen &amp; Viet Nguyen (youtube.com/@vietnh1009).</li>
+</ul>

@@ -1,0 +1,211 @@
+<p>Họ R-CNN là một trong những câu chuyện tiến hoá đẹp nhất của thị giác máy tính: trong vòng hai năm (2014–2015), thời gian phát hiện đối tượng trên một ảnh giảm từ khoảng <strong>50 giây</strong> xuống <strong>0,2 giây</strong>, đồng thời độ chính xác tăng lên. Mỗi bước tiến loại bỏ đúng một "nút thắt" của phiên bản trước. Hiểu họ R-CNN là hiểu những khái niệm nền tảng còn dùng đến hôm nay: bounding box regression, RoI pooling, anchor box, Region Proposal Network.</p>
+<p class="note">Số trang (ví dụ "trang 81") trong bài chỉ tới slide của bài giảng <a href="../tai-nguyen/slide-deep-learning-computer-vision-ban-do-bai-hoc.html">Deep Learning – Computer Vision – NLP</a> (Thang Nguyen, Viet Nguyen); bài này giải thích chi tiết, kiểm chứng và đính chính các slide đó.</p>
+<p>Bài này cần kiến thức về IoU, NMS và mAP ở bài trước, <a href="iou-map-danh-gia-object-detection.html">IoU, mAP: đánh giá Object Detection</a> (đọc thêm: <a href="object-detection-iou-nms-map.html">sliding window, selective search, NMS và cách tính AP</a>).</p>
+
+<h2>R-CNN (2014): Regions with CNN features</h2>
+<p>Ross Girshick và cộng sự ghép hai ý tưởng: region proposals (Selective Search) và đặc trưng CNN mạnh mẽ vừa được AlexNet chứng minh. Quy trình bốn bước (trang 148):</p>
+<ol>
+<li><strong>Ảnh đầu vào.</strong></li>
+<li><strong>Trích khoảng 2.000 vùng đề xuất</strong> bằng Selective Search.</li>
+<li><strong>Tính đặc trưng CNN</strong>: mỗi vùng được <em>bóp méo</em> (warp) về kích thước cố định 227×227, đưa qua CNN (AlexNet) lấy vector đặc trưng 4096 chiều.</li>
+<li><strong>Phân loại vùng</strong>: mỗi lớp có một <strong>SVM</strong> tuyến tính riêng chấm điểm vector đặc trưng (trang 149: SVM[Bird] 0,17, SVM[Dog] 0,87, SVM[Cat] 0,42). Song song, một bộ <strong>bounding box regressor</strong> tinh chỉnh toạ độ vùng (trang 150).</li>
+</ol>
+<p>Kết quả: mAP 53,3% trên Pascal VOC 2012, cải thiện hơn 30% (tương đối) so với kỹ thuật tốt nhất trước đó. Nhưng R-CNN có ba điểm yếu lớn:</p>
+<ul>
+<li><strong>Rất chậm</strong>: 2.000 lần chạy CNN cho mỗi ảnh, khoảng 47–50 giây/ảnh khi suy luận trên GPU.</li>
+<li><strong>Huấn luyện nhiều giai đoạn rời rạc</strong>: fine-tune CNN, rồi huấn luyện SVM, rồi huấn luyện regressor; các phần không tối ưu cùng nhau.</li>
+<li><strong>Tốn bộ nhớ</strong>: đặc trưng của mọi vùng phải ghi ra đĩa (hàng trăm GB cho VOC).</li>
+</ul>
+
+<h2>Bounding box regression</h2>
+<p>Vùng đề xuất \(p\) hiếm khi khít đối tượng. Thay vì dự đoán toạ độ tuyệt đối, mô hình học các <strong>độ dịch tương đối</strong> từ \(p\) sang box thật \(g\) (trang 151). Box biểu diễn bằng tâm và kích thước \((x, y, w, h)\).</p>
+<p><strong>Nhãn huấn luyện</strong> (mục tiêu \(t\)) được tính từ box đề xuất \(p\) và box thật \(g\):</p>
+\[ t_x = \frac{g_x - p_x}{p_w}, \quad t_y = \frac{g_y - p_y}{p_h}, \quad t_w = \log\frac{g_w}{p_w}, \quad t_h = \log\frac{g_h}{p_h} \]
+<p><strong>Dự đoán</strong>: mạng xuất ra \(d(p) = (d_x, d_y, d_w, d_h)\), giải mã thành box dự đoán \(\hat g\):</p>
+\[ \hat g_x = p_w d_x(p) + p_x, \quad \hat g_y = p_h d_y(p) + p_y, \quad \hat g_w = p_w e^{d_w(p)}, \quad \hat g_h = p_h e^{d_h(p)} \]
+<p><strong>Loss</strong>: hồi quy bình phương có điều chuẩn (R-CNN); Fast/Faster R-CNN thay bằng smooth L1 để bền với ngoại lai.</p>
+\[ \mathcal L_{reg} = \sum_{i\in\{x,y,w,h\}} \big(t_i - d_i(p)\big)^2 + \lambda\|w\|^2 \]
+<p>Vì sao thiết kế như vậy? Chia cho \(p_w, p_h\) làm mục tiêu <strong>không phụ thuộc kích thước</strong>: lệch 10 pixel với box nhỏ là nhiều, với box lớn là ít. Dùng \(\log\) cho chiều rộng, cao đảm bảo \(\hat g_w = p_w e^{d_w}\) luôn dương.</p>
+<p><strong>Ví dụ:</strong> \(p = (100, 100, 50, 80)\), \(g = (110, 90, 60, 100)\) cho \(t = (0{,}2;\ -0{,}125;\ \log 1{,}2 \approx 0{,}182;\ \log 1{,}25 \approx 0{,}223)\). Giải mã ngược \(t\) cho lại đúng \(g\).</p>
+<pre><code class="language-python">import math
+
+
+def encode(p, g):
+    """p: anchor/proposal, g: box thật, đều dạng (cx, cy, w, h). Trả về mục tiêu t."""
+    px, py, pw, ph = p
+    gx, gy, gw, gh = g
+    return ((gx - px) / pw, (gy - py) / ph, math.log(gw / pw), math.log(gh / ph))
+
+
+def decode(p, d):
+    """Từ độ dịch d mạng dự đoán, tính box dự đoán."""
+    px, py, pw, ph = p
+    dx, dy, dw, dh = d
+    return (pw * dx + px, ph * dy + py, pw * math.exp(dw), ph * math.exp(dh))
+
+
+t = encode((100, 100, 50, 80), (110, 90, 60, 100))
+print([round(v, 3) for v in t])               # [0.2, -0.125, 0.182, 0.223]
+print(decode((100, 100, 50, 80), t))          # (110.0, 90.0, 60.0, 100.0)</code></pre>
+
+<h2>Fast R-CNN (2015): chạy CNN một lần cho cả ảnh</h2>
+<p>Nhận xét then chốt: 2.000 vùng đề xuất chồng lấn nhau rất nhiều, chạy CNN riêng cho từng vùng là lãng phí. Fast R-CNN (Girshick, 2015) đảo ngược thứ tự (trang 155, 157):</p>
+<ol>
+<li>Đưa <strong>toàn bộ ảnh</strong> qua ConvNet <strong>một lần</strong>, được feature map (ví dụ "conv5").</li>
+<li><strong>Chiếu</strong> các vùng đề xuất (Regions of Interest, RoI) từ Selective Search lên feature map.</li>
+<li><strong>RoI Pooling</strong> cắt phần feature tương ứng mỗi RoI và đưa về kích thước cố định.</li>
+<li>Qua vài lớp <strong>fully connected</strong>, rồi tách hai nhánh: <strong>softmax</strong> phân loại \(K + 1\) lớp (thêm lớp "background") và <strong>bounding-box regressor</strong> cho từng lớp.</li>
+</ol>
+<p>Toàn bộ phần sau region proposal được huấn luyện <strong>end-to-end</strong> với một multi-task loss: \(L = L_{cls} + \lambda\,[u \ge 1]\,L_{loc}\), trong đó \([u \ge 1]\) nghĩa là chỉ tính loss định vị cho vùng không phải background. SVM bị bỏ, không cần ghi đặc trưng ra đĩa. Thời gian suy luận giảm từ khoảng 50 giây xuống 2 giây mỗi ảnh (nhanh hơn ~25 lần), và phần lớn 2 giây đó giờ là của Selective Search.</p>
+
+<h2>RoI Pooling</h2>
+<p>Các RoI có kích thước khác nhau, nhưng lớp FC phía sau cần đầu vào cố định. RoI Pooling giải quyết điều đó (trang 156):</p>
+<ol>
+<li><strong>Chiếu</strong> proposal lên feature map: chia toạ độ cho tổng stride của backbone (ví dụ ảnh 640×480 thành feature 20×15, stride 32).</li>
+<li><strong>"Snap"</strong> (làm tròn) toạ độ về các ô lưới nguyên.</li>
+<li>Chia vùng thành lưới \(H\times W\) ô con xấp xỉ bằng nhau (ví dụ 2×2; thực tế thường 7×7).</li>
+<li><strong>Max-pool</strong> trong từng ô con.</li>
+</ol>
+<p>Kết quả luôn là \(C\times H\times W\) (ví dụ 512×7×7) bất kể RoI lớn hay nhỏ.</p>
+<p><strong>Ví dụ với feature map 8×8 ở trang 156:</strong> RoI phủ hàng 3–7, cột 0–6 (vùng 5×7). Chia 2×2: chiều cao 5 tách thành 2 + 3 hàng, chiều rộng 7 tách thành 3 + 4 cột.</p>
+<div class="mats">
+<table class="mat"><caption>Vùng RoI 5×7 trên feature map</caption>
+<tr><td class="hl">0.85</td><td class="hl">0.24</td><td class="hl">0.84</td><td class="hl2">0.76</td><td class="hl2">0.29</td><td class="hl2">0.75</td><td class="hl2">0.62</td></tr>
+<tr><td class="hl">0.32</td><td class="hl">0.74</td><td class="hl">0.39</td><td class="hl2">0.31</td><td class="hl2">0.34</td><td class="hl2">0.03</td><td class="hl2">0.33</td></tr>
+<tr><td>0.20</td><td>0.69</td><td>0.13</td><td class="hl">0.16</td><td class="hl">0.73</td><td class="hl">0.65</td><td class="hl">0.96</td></tr>
+<tr><td>0.19</td><td>0.14</td><td>0.86</td><td class="hl">0.09</td><td class="hl">0.88</td><td class="hl">0.07</td><td class="hl">0.01</td></tr>
+<tr><td>0.83</td><td>0.24</td><td>0.04</td><td class="hl">0.97</td><td class="hl">0.34</td><td class="hl">0.35</td><td class="hl">0.50</td></tr>
+</table>
+<span class="op">→</span>
+<table class="mat"><caption>Kết quả 2×2</caption><tr><td class="hl">0.85</td><td class="hl2">0.76</td></tr><tr><td>0.86</td><td class="hl">0.97</td></tr></table>
+</div>
+<div class="tip"><strong>RoI Align</strong>Việc làm tròn toạ độ hai lần (khi snap và khi chia ô) gây lệch vài pixel trên feature map, tương đương hàng chục pixel trên ảnh gốc. Với phân loại thì chấp nhận được, nhưng với phân vùng thì không. Mask R-CNN (2017) thay bằng <strong>RoI Align</strong>: không làm tròn, lấy giá trị tại các điểm thực bằng nội suy song tuyến tính. torchvision có cả <code>torchvision.ops.roi_pool</code> và <code>roi_align</code>.</div>
+
+<h2>Faster R-CNN (2015): để mạng tự đề xuất vùng</h2>
+<p>Khi CNN đã nhanh, Selective Search (chạy trên CPU, khoảng 2 giây) trở thành nút thắt. Ren, He, Girshick và Sun đặt câu hỏi: feature map của CNN đã chứa đủ thông tin về "chỗ nào có vật", sao không dùng chính nó để đề xuất vùng? Faster R-CNN thêm một mạng nhỏ là <strong>Region Proposal Network (RPN)</strong> chạy trên cùng feature map (trang 158):</p>
+<figure class="diagram">
+<svg class="dg" viewBox="0 0 680 200" role="img" aria-label="Sơ đồ Faster R-CNN: ảnh, backbone, feature map, RPN, RoI pooling, bộ phân loại">
+  <rect class="bx" x="10" y="80" width="80" height="44" rx="6"/><text x="50" y="107" text-anchor="middle">Ảnh</text>
+  <rect class="bx-c" x="120" y="74" width="110" height="56" rx="6"/><text x="175" y="99" text-anchor="middle">Backbone</text><text x="175" y="117" text-anchor="middle" class="sm">conv layers</text>
+  <rect class="bx" x="260" y="80" width="100" height="44" rx="6"/><text x="310" y="107" text-anchor="middle">Feature map</text>
+  <rect class="bx-a" x="390" y="10" width="110" height="50" rx="6"/><text x="445" y="32" text-anchor="middle">RPN</text><text x="445" y="50" text-anchor="middle" class="sm">anchor → RoI</text>
+  <rect class="bx" x="390" y="140" width="110" height="50" rx="6"/><text x="445" y="170" text-anchor="middle">RoI pooling</text>
+  <rect class="bx-c" x="540" y="140" width="130" height="50" rx="6"/><text x="605" y="162" text-anchor="middle">FC → lớp + box</text><text x="605" y="180" text-anchor="middle" class="sm">classifier</text>
+  <path class="ln" d="M90 102h30M230 102h30M360 102h10V35h20M360 102h10v63h20M445 60v80M500 165h40"/>
+</svg>
+<figcaption>Faster R-CNN = RPN + Fast R-CNN, dùng chung một backbone</figcaption>
+</figure>
+<p>Region proposal giờ gần như "miễn phí" (khoảng 10 ms) vì dùng chung phần tính toán nặng nhất. Toàn hệ thống đạt khoảng 0,2 giây/ảnh (5 FPS với VGG-16 trên GPU thời đó), đồng thời đề xuất học được còn chất lượng hơn Selective Search.</p>
+
+<h3>Anchor boxes</h3>
+<p>Làm sao một lớp conv dự đoán được số lượng box thay đổi? Ý tưởng là <strong>anchor</strong> (trang 159): tại mỗi vị trí trên feature map, đặt sẵn \(k\) box mẫu với nhiều kích thước và tỉ lệ khung. Bài báo gốc dùng 3 kích thước (128², 256², 512² pixel) × 3 tỉ lệ (1:2, 1:1, 2:1) = <strong>9 anchor</strong> mỗi vị trí. Feature map khoảng 60×40 cho khoảng 60·40·9 = 21.600 anchor phủ khắp ảnh. Mạng không dự đoán box từ hư không mà trả lời hai câu hỏi cho <em>từng anchor</em>: "anchor này có chứa vật không?" và "cần dịch, co giãn anchor bao nhiêu để khít vật?" (đúng công thức bounding box regression ở trên).</p>
+
+<h3>Region Proposal Network</h3>
+<p>Theo trang 160, RPN là một mạng tích chập nhỏ:</p>
+<ol>
+<li>Một conv 3×3 trượt trên feature map (sliding window), tạo vector trung gian 256 chiều (ZF-Net) hoặc 512 chiều (VGG) tại mỗi vị trí.</li>
+<li>Hai lớp conv 1×1 song song:
+<ul><li><strong>cls layer</strong>: \(2k\) điểm (có vật / không có vật cho \(k\) anchor).</li>
+<li><strong>reg layer</strong>: \(4k\) toạ độ (độ dịch \(d_x, d_y, d_w, d_h\) cho \(k\) anchor).</li></ul></li>
+</ol>
+<p><strong>Gán nhãn anchor khi huấn luyện</strong>: anchor có IoU &gt; 0,7 với một box thật (hoặc là anchor có IoU cao nhất với box thật đó) là <em>positive</em>; IoU &lt; 0,3 với mọi box thật là <em>negative</em>; còn lại bị bỏ qua. Mỗi ảnh lấy mẫu 256 anchor với tỉ lệ positive:negative tối đa 1:1 để tránh mất cân bằng (background chiếm áp đảo).</p>
+<p><strong>Sinh proposal</strong>: giải mã độ dịch thành box, cắt theo biên ảnh, chạy NMS (IoU 0,7), giữ khoảng 2.000 proposal (khi huấn luyện) hoặc 300 (khi suy luận) để đưa sang nhánh Fast R-CNN.</p>
+
+<h3>Bốn hàm loss</h3>
+<p>Faster R-CNN huấn luyện đồng thời 4 loss (trang 161):</p>
+<div class="table-wrap"><table>
+<tr><th>#</th><th>Loss</th><th>Nhiệm vụ</th><th>Tên trong torchvision</th></tr>
+<tr><td>1</td><td>RPN classification</td><td>Anchor có phải vật thể hay không</td><td><code>loss_objectness</code></td></tr>
+<tr><td>2</td><td>RPN regression</td><td>Dịch anchor thành proposal</td><td><code>loss_rpn_box_reg</code></td></tr>
+<tr><td>3</td><td>Object classification</td><td>Phân loại proposal thành background hoặc một lớp cụ thể</td><td><code>loss_classifier</code></td></tr>
+<tr><td>4</td><td>Object regression</td><td>Tinh chỉnh proposal thành box cuối cùng</td><td><code>loss_box_reg</code></td></tr>
+</table></div>
+<p>Loss của RPN viết gọn (với \(p_i^*\) = 1 nếu anchor là positive):</p>
+\[ L = \frac{1}{N_{cls}}\sum_i L_{cls}(p_i, p_i^*) + \lambda\,\frac{1}{N_{reg}}\sum_i p_i^*\, L_{reg}(t_i, t_i^*) \]
+<p>Chỉ anchor positive mới đóng góp vào loss hồi quy; \(L_{reg}\) là smooth L1.</p>
+
+<h2>So sánh ba thế hệ</h2>
+<div class="table-wrap"><table>
+<tr><th></th><th>R-CNN</th><th>Fast R-CNN</th><th>Faster R-CNN</th></tr>
+<tr><td>Region proposal</td><td>Selective Search (ngoài mạng)</td><td>Selective Search (ngoài mạng)</td><td>RPN (trong mạng, học được)</td></tr>
+<tr><td>Chạy CNN</td><td>~2.000 lần/ảnh</td><td>1 lần/ảnh</td><td>1 lần/ảnh</td></tr>
+<tr><td>Bộ phân loại</td><td>SVM</td><td>Softmax</td><td>Softmax</td></tr>
+<tr><td>Huấn luyện</td><td>Nhiều giai đoạn rời rạc</td><td>End-to-end (trừ proposal)</td><td>End-to-end</td></tr>
+<tr><td>Thời gian/ảnh</td><td>~50 giây</td><td>~2 giây</td><td>~0,2 giây</td></tr>
+<tr><td>Tăng tốc</td><td>1×</td><td>25×</td><td>250×</td></tr>
+</table></div>
+<p>(Số liệu thời gian theo trang 162, đo trên GPU thời điểm 2015.)</p>
+
+<h2>Thực hành: fine-tune Faster R-CNN với torchvision</h2>
+<p>torchvision cung cấp Faster R-CNN với backbone ResNet-50 + <strong>FPN</strong> (Feature Pyramid Network: dùng feature map ở nhiều tầng để phát hiện tốt cả vật nhỏ lẫn vật lớn), đã huấn luyện trên COCO. Để dùng cho dữ liệu riêng, chỉ cần thay lớp dự đoán cuối:</p>
+<pre><code class="language-python">import torch
+from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2, FasterRCNN_ResNet50_FPN_V2_Weights
+from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+
+num_classes = 3                      # 2 loại lỗi + 1 lớp background (bắt buộc tính cả background)
+model = fasterrcnn_resnet50_fpn_v2(weights=FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT)
+in_features = model.roi_heads.box_predictor.cls_score.in_features      # 1024
+model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
+
+# Dataset phải trả về (image, target):
+#   image : tensor float (3, H, W), giá trị [0, 1] (model tự chuẩn hoá và resize)
+#   target: {"boxes": FloatTensor (N, 4) dạng x1y1x2y2 pixel, "labels": Int64Tensor (N,) bắt đầu từ 1}
+def collate_fn(batch):
+    return tuple(zip(*batch))        # ảnh có kích thước khác nhau nên không stack được
+
+# loader = DataLoader(dataset, batch_size=4, shuffle=True, collate_fn=collate_fn)
+params = [p for p in model.parameters() if p.requires_grad]
+optimizer = torch.optim.SGD(params, lr=0.005, momentum=0.9, weight_decay=5e-4)
+
+model.train()
+for images, targets in loader:
+    loss_dict = model(list(images), list(targets))   # 4 loss: loss_classifier, loss_box_reg,
+    loss = sum(loss_dict.values())                   #         loss_objectness, loss_rpn_box_reg
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+
+# Suy luận: trả về list dict {"boxes", "labels", "scores"} cho từng ảnh, đã qua NMS
+model.eval()
+with torch.no_grad():
+    pred = model([image])[0]
+keep = pred["scores"] &gt; 0.5
+print(pred["boxes"][keep], pred["labels"][keep])</code></pre>
+<p>Chi tiết đầy đủ có trong hướng dẫn chính thức <em>TorchVision Object Detection Finetuning Tutorial</em> của PyTorch.</p>
+
+<h2>Sau Faster R-CNN: detector một giai đoạn</h2>
+<p>Faster R-CNN vẫn là chuẩn mực về độ chính xác và là nền của Mask R-CNN (xem <a href="image-segmentation-unet-mask-rcnn.html">Image Segmentation</a>). Nhưng cho ứng dụng thời gian thực, cộng đồng chuyển sang các detector <strong>một giai đoạn</strong> (one-stage), dự đoán lớp và box trực tiếp trên lưới feature map không qua bước proposal:</p>
+<ul>
+<li><strong>YOLO</strong> (2016–nay): chia ảnh thành lưới, mỗi ô dự đoán box và lớp; liên tục cải tiến qua nhiều phiên bản. Phiên bản Ultralytics mới nhất là <strong>YOLO26</strong> (ra mắt tháng 1/2026), suy luận end-to-end không cần NMS, tối ưu cho thiết bị biên.</li>
+<li><strong>SSD</strong> (2016): dự đoán trên nhiều feature map ở các độ phân giải khác nhau.</li>
+<li><strong>RetinaNet</strong> (2017): <strong>focal loss</strong> giải quyết mất cân bằng giữa hàng chục nghìn anchor background và vài anchor chứa vật, giúp one-stage đạt độ chính xác ngang two-stage.</li>
+<li><strong>DETR / RT-DETR</strong>: dùng Transformer, không cần anchor hay NMS.</li>
+</ul>
+<pre><code class="language-python"># pip install ultralytics
+from ultralytics import YOLO
+
+model = YOLO("yolo26n.pt")                                   # bản nano, pretrained trên COCO
+model.train(data="data.yaml", epochs=100, imgsz=640)          # data.yaml: đường dẫn train/val + tên lớp
+results = model("anh_san_pham.jpg")                           # dự đoán
+results[0].show()</code></pre>
+<p>Trong công việc thực tế, YOLO thường là lựa chọn đầu tiên nhờ tốc độ và công cụ hoàn chỉnh. Hiểu R-CNN giúp bạn biết bên trong chúng có gì: anchor (hoặc anchor-free), bounding box regression, IoU, NMS và mAP đều là những khái niệm dùng chung.</p>
+
+<h2>Tóm tắt</h2>
+<ul>
+<li>R-CNN: Selective Search + CNN cho từng vùng + SVM + bbox regression; chính xác nhưng rất chậm.</li>
+<li>Bbox regression học độ dịch tương đối \((t_x, t_y, t_w, t_h)\), không phụ thuộc kích thước.</li>
+<li>Fast R-CNN: một lần CNN cho cả ảnh, RoI Pooling, multi-task loss, end-to-end.</li>
+<li>Faster R-CNN: RPN với 9 anchor mỗi vị trí thay Selective Search; 4 loss; ~0,2 giây/ảnh.</li>
+<li>Thực tế: torchvision Faster R-CNN để học và khi cần độ chính xác; YOLO cho thời gian thực.</li>
+</ul>
+<p>Bài tiếp theo trong chặng đi từ "khung bao" xuống mức từng pixel: <a href="../kien-thuc/phan-doan-anh-semantic-instance-panoptic.html">Phân đoạn ảnh: semantic, instance, panoptic</a>. Đọc thêm về FCN, DeepLab và Mask R-CNN: <a href="image-segmentation-unet-mask-rcnn.html">Image Segmentation</a>.</p>
+
+<h2>Tài liệu tham khảo</h2>
+<ul>
+<li>Girshick et al. (2014). <em>Rich feature hierarchies for accurate object detection and semantic segmentation</em> (R-CNN).</li>
+<li>Girshick (2015). <em>Fast R-CNN</em>.</li>
+<li>Ren, He, Girshick, Sun (2015). <em>Faster R-CNN: Towards Real-Time Object Detection with Region Proposal Networks</em>.</li>
+<li>Lin et al. (2017). <em>Feature Pyramid Networks for Object Detection</em>; <em>Focal Loss for Dense Object Detection</em>.</li>
+<li>Lilian Weng (2017). <em>Object Detection for Dummies Part 3: R-CNN Family</em> (lilianweng.github.io).</li>
+<li>PyTorch: <em>TorchVision Object Detection Finetuning Tutorial</em>; Ultralytics docs: docs.ultralytics.com.</li>
+</ul>
