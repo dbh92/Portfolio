@@ -273,10 +273,11 @@ print("đã lưu unet_ket_qua.png: hàng 1 ảnh gốc, hàng 2 bản đồ xác
 
 <h2>8. Đi xa hơn với dữ liệu thật</h2>
 <ul>
-  <li><strong>Encoder pretrained</strong>: thay nhánh encoder tự viết bằng ResNet, EfficientNet đã huấn luyện trên ImageNet giúp hội tụ nhanh hơn và tốt hơn khi dữ liệu ít. Các thư viện mã nguồn mở về segmentation cho PyTorch cung cấp sẵn U-Net với nhiều encoder để thử nhanh.</li>
+  <li><strong>Encoder pretrained</strong>: thay nhánh encoder tự viết bằng ResNet, EfficientNet đã huấn luyện trên ImageNet giúp hội tụ nhanh hơn và tốt hơn khi dữ liệu ít. Các thư viện mã nguồn mở về segmentation cho PyTorch, ví dụ <code>segmentation_models_pytorch</code> (smp), cung cấp sẵn U-Net, FPN, DeepLabV3+ với nhiều encoder pretrained để thử nhanh.</li>
   <li><strong>Cắt ô</strong>: ảnh camera vài megapixel không đưa nguyên vào U-Net được (bộ nhớ). Huấn luyện trên ô 256–512 px cắt ngẫu nhiên, ưu tiên lấy nhiều ô chứa lỗi; khi dự đoán, trượt cửa sổ có chồng lấn rồi ghép bản đồ xác suất.</li>
   <li><strong>Chọn ngưỡng xác suất và diện tích tối thiểu</strong> trên tập kiểm định theo escape/overkill, không mặc định 0,5 và 5 px.</li>
   <li><strong>Nhiều lớp lỗi</strong>: đầu ra <code>n_lop</code> kênh với softmax và cross-entropy (kèm Dice nhiều lớp), mặt nạ là ảnh mã lớp lưu PNG.</li>
+<li><strong>Vân bàn cờ</strong>: nếu mặt nạ dự đoán có hoa văn ô vuông đều đặn, nguyên nhân thường là <code>ConvTranspose2d</code> có kernel không chia hết cho stride; thay bằng <code>nn.Upsample(scale_factor=2, mode="bilinear")</code> rồi conv 3×3.</li>
 </ul>
 
 <h2>9. Sai lầm thường gặp</h2>

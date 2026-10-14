@@ -195,6 +195,30 @@ print(f"OK mới bị báo bất thường: {bao_ok:.1%} | NG mới bị phát h
   <li><strong>Deep Learning</strong> là nhánh của ML dùng mạng nơ-ron nhiều lớp, tự học đặc trưng từ dữ liệu thô (pixel). Cần nhiều dữ liệu và tính toán hơn, nhưng vượt trội với ảnh có biến động lớn.</li>
 </ul>
 <p>Với dữ liệu dạng bảng (thông số máy, kết quả đo, đặc trưng blob), ML cổ điển thường vẫn là lựa chọn tốt nhất: nhanh, cần ít dữ liệu, dễ giải thích. Với ảnh thô, Deep Learning chiếm ưu thế. Trong một trạm thực tế, ba cách thường <strong>kết hợp</strong>: luật cổ điển định vị chi tiết và đo kích thước, mạng nơ-ron phân loại lỗi bề mặt trong ROI, luật nghiệp vụ tổng hợp kết quả gửi PLC. Bài "Rule-based hay Deep Learning?" ở chặng 11 đi sâu vào cách chọn.</p>
+<h3>Deep Learning cho Computer Vision: máy "nhìn" ảnh như thế nào?</h3>
+<p>Hệ thống thị giác của người có hai phần: <strong>mắt</strong> thu ánh sáng (thiết bị cảm nhận) và <strong>não</strong> diễn giải tín hiệu thành "một cái bát, vài quả cam, quả chuối". Hệ thống thị giác máy có cấu trúc y hệt: <strong>camera</strong> là thiết bị cảm nhận, <strong>thuật toán chạy trên máy tính</strong> là thiết bị diễn giải, đầu ra là dữ liệu (nhãn, tọa độ, mặt nạ) để PLC hay phần mềm dùng tiếp. Phần camera, ống kính, chiếu sáng bạn đã học ở chặng 6; phần khó là "bộ não".</p>
+<p>Với máy tính, ảnh chỉ là mảng số (bài <a href="../hoc/numpy-anh-la-mang-so.html">Ảnh là mảng số</a> ở chặng 1): ảnh xám là ma trận H×W giá trị 0–255, ảnh màu là khối H×W×3. Cùng một con vít nhưng mọi con số đổi hoàn toàn khi: góc nhìn đổi, ánh sáng đổi, vật bị biến dạng hoặc che khuất một phần, nền lẫn lộn, hay đơn giản là các con vít trong cùng một lớp khác nhau chút ít. Khoảng cách giữa "bảng số" và "ý nghĩa" này gọi là <strong>khoảng cách ngữ nghĩa</strong> (semantic gap). Không thể viết tay luật cho mọi trường hợp, nên ta để thuật toán <strong>học từ ảnh đã gán nhãn</strong>.</p>
+<h3>Pipeline ML truyền thống và Deep Learning trên ảnh</h3>
+<div class="table-wrap"><table>
+<tr><th></th><th>ML truyền thống</th><th>Deep Learning</th></tr>
+<tr><td>Quy trình</td><td>Ảnh → <strong>trích đặc trưng thủ công</strong> (HOG, SIFT, LBP, histogram màu, đặc trưng blob) → bộ phân loại (SVM, random forest) → nhãn</td><td>Ảnh → một mạng nhiều lớp học <strong>đồng thời</strong> cả trích đặc trưng lẫn phân loại (end-to-end) → nhãn</td></tr>
+<tr><td>Ai thiết kế đặc trưng</td><td>Kỹ sư</td><td>Mạng tự học từ dữ liệu</td></tr>
+<tr><td>Dữ liệu cần</td><td>Ít đến vừa</td><td>Nhiều, hoặc ít nếu dùng transfer learning (dự án cuối chặng)</td></tr>
+<tr><td>Phần cứng</td><td>CPU là đủ</td><td>GPU gần như bắt buộc khi huấn luyện</td></tr>
+<tr><td>Ảnh biến động lớn</td><td>Độ chính xác chững lại sớm</td><td>Tiếp tục tăng khi thêm dữ liệu</td></tr>
+<tr><td>Giải thích</td><td>Dễ hơn</td><td>Khó hơn, cần công cụ như Grad-CAM</td></tr>
+</table></div>
+<p>Vì sao "sâu" lại hiệu quả? Mạng học <strong>đặc trưng phân cấp</strong>: các lớp đầu học cạnh, đốm màu; lớp giữa ghép chúng thành góc, vân, bộ phận; lớp sau ghép thành đối tượng như "vết xước", "con vít". Mốc lịch sử: năm 2012, mạng AlexNet thắng cuộc thi ImageNet (ILSVRC) với top-5 error khoảng 15,3%, bỏ xa đội hạng nhì (khoảng 26,2%) dùng đặc trưng thủ công. Từ đó Deep Learning trở thành cách làm mặc định của Computer Vision (bài <a href="../hoc/kien-truc-cnn-kinh-dien.html">Các kiến trúc CNN kinh điển</a> kể tiếp câu chuyện này).</p>
+<h3>Các bộ dữ liệu bạn sẽ gặp</h3>
+<div class="table-wrap"><table>
+<tr><th>Dataset</th><th>Nội dung</th><th>Dùng để</th></tr>
+<tr><td>MNIST / Fashion-MNIST</td><td>70.000 ảnh xám 28×28, 10 lớp (chữ số / quần áo)</td><td>Bài tập nhập môn</td></tr>
+<tr><td>CIFAR-10</td><td>60.000 ảnh màu 32×32, 10 lớp</td><td>Thử nhanh một CNN</td></tr>
+<tr><td>ImageNet (ILSVRC)</td><td>Khoảng 1,28 triệu ảnh huấn luyện, 1.000 lớp</td><td>Benchmark phân loại; nguồn trọng số pretrained</td></tr>
+<tr><td>Pascal VOC, MS COCO</td><td>20 lớp / 80 lớp, có hộp và mặt nạ</td><td>Chuẩn đánh giá phát hiện và phân đoạn</td></tr>
+<tr><td>MVTec AD</td><td>Ảnh sản phẩm công nghiệp OK/lỗi, 15 loại</td><td>Phát hiện bất thường (chặng 12)</td></tr>
+</table></div>
+<p class="note">Đọc sâu hơn: <a href="../hoc/tong-quan-deep-learning-computer-vision.html">Tổng quan Deep Learning cho Computer Vision</a> (bám theo trang 1–8, 60–61 của slide bài giảng).</p>
 
 <h2>6. Quy trình một dự án Machine Learning trong nhà máy</h2>
 <table>
