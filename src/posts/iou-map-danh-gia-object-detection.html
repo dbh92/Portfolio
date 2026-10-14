@@ -1,4 +1,4 @@
-<p>Ở bài "Object Detection với YOLO26", lệnh <code>model.val()</code> in ra precision, recall, mAP50, mAP50-95 và bạn được yêu cầu báo cáo mAP50. Nhưng mAP50 = 0,92 nghĩa là gì? Vì sao mAP50-95 chỉ 0,61? Mô hình đang bỏ sót, báo nhầm hay chỉ khoanh hộp chưa khít? Bài này trả lời bằng cách <strong>tự tính mọi con số bằng NumPy</strong> trên một tập dự đoán nhỏ mà bạn có thể kiểm tra bằng tay: IoU, NMS, ghép dự đoán với nhãn thật, precision và recall theo ngưỡng, đường cong PR, AP, mAP50 và mAP50-95. Sau đó ta mô phỏng bốn "mô hình" có bệnh khác nhau để học cách chẩn đoán từ chỉ số, và nối mAP với ngôn ngữ của nhà máy: escape và overkill ở một ngưỡng cố định. Bài sau, "Phân đoạn ảnh: semantic, instance, panoptic", dùng lại IoU nhưng tính trên mặt nạ thay vì hộp.</p>
+<p>Ở bài "Object Detection với YOLO26", lệnh <code>model.val()</code> in ra precision, recall, mAP50, mAP50-95 và bạn được yêu cầu báo cáo mAP50. Nhưng mAP50 = 0,92 nghĩa là gì? Vì sao mAP50-95 chỉ 0,61? Mô hình đang bỏ sót, báo nhầm hay chỉ khoanh hộp chưa khít? Bài này trả lời bằng cách <strong>tự tính mọi con số bằng NumPy</strong> trên một tập dự đoán nhỏ mà bạn có thể kiểm tra bằng tay: IoU, NMS, ghép dự đoán với nhãn thật, precision và recall theo ngưỡng, đường cong PR, AP, mAP50 và mAP50-95. Sau đó ta mô phỏng bốn "mô hình" có bệnh khác nhau để học cách chẩn đoán từ chỉ số, và nối mAP với ngôn ngữ của nhà máy: escape và overkill ở một ngưỡng cố định. Bài sau, "Từ R-CNN đến Faster R-CNN", mở bên trong một detector để thấy IoU và NMS được dùng ở đâu; tiếp đó bài "Phân đoạn ảnh: semantic, instance, panoptic" dùng lại IoU nhưng tính trên mặt nạ thay vì hộp.</p>
 <div class="tip"><strong>Mục tiêu cuối bài</strong>Tự viết hàm IoU và kiểm tra với các cặp hộp cho trước; hiểu vì sao IoU khắt khe với vật nhỏ; cài NMS; ghép dự đoán với nhãn thật để có TP, FP, FN ở một ngưỡng IoU; tính precision, recall theo ngưỡng tin cậy, AP (nội suy toàn điểm và 101 điểm), mAP50, mAP50-95; đọc đúng các con số của Ultralytics; chẩn đoán mô hình từ tổ hợp chỉ số; đổi sang escape/overkill cấp ảnh cho nhà máy.</div>
 
 <h2>1. IoU: hai hộp trùng nhau bao nhiêu</h2>
@@ -341,7 +341,7 @@ for a, b, tay in cap:
 <pre><code class="language-text">(0, 0, 40, 40) vs (20, 0, 60, 40): 0.3333 (tay 0.3333) khớp
 (10, 10, 110, 60) vs (10, 10, 60, 110): 0.3333 (tay 0.3333) khớp
 (0, 0, 50, 50) vs (0, 0, 25, 25): 0.2500 (tay 0.2500) khớp</code></pre>
-<p>Cặp (b) đáng nhớ: hai hộp cùng diện tích, cùng góc trên trái, chỉ xoay hướng dài, IoU chỉ còn 1/3. Đó là lý do vật dài, mảnh và nghiêng (vết xước chéo) đánh giá bằng hộp thẳng rất kém; bài sau giới thiệu phân đoạn.</p>
+<p>Cặp (b) đáng nhớ: hai hộp cùng diện tích, cùng góc trên trái, chỉ xoay hướng dài, IoU chỉ còn 1/3. Đó là lý do vật dài, mảnh và nghiêng (vết xước chéo) đánh giá bằng hộp thẳng rất kém; bài "Phân đoạn ảnh: semantic, instance, panoptic" của chặng này giới thiệu phân đoạn.</p>
 </details>
 </div>
 <div class="ex">
@@ -372,4 +372,4 @@ print("AP =", round(ap_tu_pr(tc / (tc + fc), tc / 4), 4))</code></pre>
   <li>mAP50 dễ dãi về vị trí; mAP50-95 đòi hộp khít. Chẩn đoán: mAP50-95 ≪ mAP50 là hộp lỏng; R thấp là bỏ sót; P thấp là báo nhầm.</li>
   <li>mAP để so mô hình; nhà máy cần escape, overkill cấp ảnh ở ngưỡng chạy thật.</li>
 </ul>
-<p>Bài tiếp theo: <strong>Phân đoạn ảnh: semantic, instance, panoptic</strong>, khi hộp bao không đủ và cần biết chính xác từng pixel thuộc vết lỗi nào.</p>
+<p>Bài tiếp theo: <strong>Từ R-CNN đến Faster R-CNN</strong>, bên trong một detector hai giai đoạn: anchor, RoI Pooling, Region Proposal Network. Sau đó là <strong>Phân đoạn ảnh: semantic, instance, panoptic</strong>, khi hộp bao không đủ và cần biết chính xác từng pixel thuộc vết lỗi nào.</p>

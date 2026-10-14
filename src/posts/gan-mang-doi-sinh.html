@@ -1,0 +1,188 @@
+<p>Hầu hết các bài trong lộ trình dạy máy tính <em>hiểu</em> ảnh: phân loại, phát hiện, phân vùng. <strong>Generative Adversarial Network</strong> (GAN, mạng đối sinh) làm điều ngược lại: <em>tạo ra</em> những bức ảnh chưa từng tồn tại, từ khuôn mặt người, phong cảnh đến ảnh sản phẩm lỗi tổng hợp. Yann LeCun từng gọi GAN là "ý tưởng thú vị nhất trong machine learning của 10 năm qua". Bài này tương ứng phần "Other topics" (module 06) của bài giảng gốc.</p>
+
+<h2>Mô hình phân biệt và mô hình sinh</h2>
+<div class="table-wrap"><table>
+<tr><th></th><th>Mô hình phân biệt (discriminative)</th><th>Mô hình sinh (generative)</th></tr>
+<tr><td>Học gì</td><td>\(p(y \mid x)\): cho ảnh, đoán nhãn</td><td>\(p(x)\): bản thân phân phối của dữ liệu ảnh</td></tr>
+<tr><td>Ví dụ</td><td>ResNet, YOLO, U-Net</td><td>GAN, VAE, diffusion model</td></tr>
+<tr><td>Làm được</td><td>"Ảnh này là mèo"</td><td>"Hãy vẽ một con mèo mới"</td></tr>
+</table></div>
+<p>Học \(p(x)\) trực tiếp cho ảnh 64×64×3 (12.288 chiều) là cực kỳ khó. GAN né bài toán này một cách thông minh: thay vì viết ra công thức xác suất, nó huấn luyện một mạng <strong>biến nhiễu ngẫu nhiên thành ảnh</strong>, và dùng một mạng khác làm "giám khảo".</p>
+
+<h2>Ý tưởng: kẻ làm tiền giả và cảnh sát</h2>
+<p>Goodfellow et al. (2014) mô tả GAN bằng một trò chơi hai người:</p>
+<ul>
+<li><strong>Generator G</strong> (kẻ làm tiền giả): nhận vector nhiễu \(z \sim \mathcal N(0, I)\) (ví dụ 100 chiều) và sinh ra ảnh giả \(G(z)\).</li>
+<li><strong>Discriminator D</strong> (cảnh sát): nhận một ảnh, trả về xác suất \(D(x)\) ảnh đó là <em>thật</em> (lấy từ dữ liệu) thay vì giả.</li>
+</ul>
+<p>D cố phân biệt thật/giả càng giỏi càng tốt; G cố đánh lừa D. Hai bên cùng tiến bộ: tiền giả ngày càng tinh vi, cảnh sát ngày càng tinh mắt. Khi cân bằng lý tưởng, ảnh giả không thể phân biệt với ảnh thật và D chỉ đoán được 50/50.</p>
+<figure class="diagram">
+<svg class="dg" viewBox="0 0 640 218" role="img" aria-label="Sơ đồ GAN: nhiễu z qua Generator thành ảnh giả, cùng ảnh thật đưa vào Discriminator">
+  <rect class="bx" x="10" y="130" width="90" height="44" rx="6"/><text x="55" y="157" text-anchor="middle">Nhiễu z</text>
+  <rect class="bx-a" x="140" y="124" width="120" height="56" rx="6"/><text x="200" y="150" text-anchor="middle">Generator G</text><text x="200" y="168" text-anchor="middle" class="sm">ConvTranspose</text>
+  <rect class="bx" x="300" y="130" width="100" height="44" rx="6"/><text x="350" y="157" text-anchor="middle">Ảnh giả G(z)</text>
+  <rect class="bx" x="300" y="30" width="100" height="44" rx="6"/><text x="350" y="57" text-anchor="middle">Ảnh thật x</text>
+  <rect class="bx-c" x="440" y="76" width="160" height="56" rx="6"/><text x="520" y="102" text-anchor="middle">Discriminator D</text><text x="520" y="120" text-anchor="middle" class="sm">Conv → P("thật")</text>
+  <path class="ln" d="M100 152h40M260 152h40M400 152h20V112h20M400 52h20v40h20M600 104h30"/>
+  <path class="ln-a" stroke-dasharray="5 4" d="M520 132V196H200V180"/>
+  <text x="360" y="212" class="sm t-a" text-anchor="middle">gradient từ D "dạy" G cách làm giả tốt hơn</text>
+</svg>
+<figcaption>G không bao giờ nhìn thấy ảnh thật; nó chỉ học qua tín hiệu gradient từ D</figcaption>
+</figure>
+
+<h2>Hàm mục tiêu minimax</h2>
+\[ \min_G \max_D\ V(D, G) = \mathbb E_{x\sim p_{data}}\big[\log D(x)\big] + \mathbb E_{z\sim p_z}\big[\log\big(1 - D(G(z))\big)\big] \]
+<ul>
+<li>D muốn <strong>tối đa</strong> \(V\): \(D(x) \to 1\) với ảnh thật, \(D(G(z)) \to 0\) với ảnh giả. Đây chính là binary cross-entropy quen thuộc.</li>
+<li>G muốn <strong>tối thiểu</strong> \(V\): làm \(D(G(z)) \to 1\).</li>
+</ul>
+<p>Goodfellow chứng minh: với G cố định, D tối ưu là \(D^*(x) = \dfrac{p_{data}(x)}{p_{data}(x) + p_g(x)}\); khi đó bài toán của G tương đương tối thiểu hoá khoảng cách Jensen–Shannon giữa phân phối ảnh thật \(p_{data}\) và phân phối ảnh sinh \(p_g\). Cực tiểu toàn cục đạt được khi \(p_g = p_{data}\), lúc đó \(D^* = 1/2\) ở mọi nơi và \(V = -\log 4\).</p>
+<div class="tip"><strong>Non-saturating loss: mẹo quan trọng</strong>Lúc đầu G còn kém, D dễ dàng nhận ra ảnh giả, \(D(G(z)) \approx 0\) nên \(\log(1 - D(G(z)))\) gần như phẳng: G hầu như không nhận được gradient. Trong thực tế G được huấn luyện để <strong>tối đa</strong> \(\log D(G(z))\) thay thế: cùng điểm cân bằng nhưng gradient mạnh khi G còn yếu. Viết bằng BCE: loss của G = BCE(D(G(z)), nhãn "thật").</div>
+
+<h2>Thuật toán huấn luyện</h2>
+<p>Lặp lại cho mỗi mini-batch:</p>
+<ol>
+<li><strong>Cập nhật D</strong>: lấy batch ảnh thật (nhãn 1) và batch ảnh giả \(G(z)\) (nhãn 0); loss \(= \text{BCE}(D(x), 1) + \text{BCE}(D(G(z)), 0)\). Ảnh giả được <code>detach()</code> để bước này không cập nhật G.</li>
+<li><strong>Cập nhật G</strong>: loss \(= \text{BCE}(D(G(z)), 1)\); gradient đi xuyên qua D (D không được cập nhật ở bước này) về G.</li>
+</ol>
+
+<h2>DCGAN: GAN dùng mạng tích chập</h2>
+<p>GAN gốc dùng mạng fully connected và rất khó huấn luyện. Radford et al. (2016) đưa ra <strong>DCGAN</strong> với bộ nguyên tắc kiến trúc giúp GAN ổn định trên ảnh, đến nay vẫn là điểm khởi đầu tốt:</p>
+<ul>
+<li>Bỏ pooling: D dùng <strong>conv stride 2</strong> để thu nhỏ, G dùng <strong>transposed conv stride 2</strong> để phóng to.</li>
+<li><strong>BatchNorm</strong> ở cả G và D (trừ lớp ra của G và lớp vào của D).</li>
+<li>G dùng <strong>ReLU</strong>, lớp ra dùng <strong>Tanh</strong> (nên ảnh thật phải chuẩn hoá về [−1, 1]); D dùng <strong>LeakyReLU(0,2)</strong>.</li>
+<li>Bỏ các lớp fully connected ẩn.</li>
+<li>Adam với \(\eta = 0{,}0002\), \(\beta_1 = 0{,}5\); khởi tạo trọng số \(\mathcal N(0;\ 0{,}02^2)\).</li>
+</ul>
+<pre><code class="language-python">import torch
+import torch.nn as nn
+
+nz, ngf, ndf = 100, 64, 64        # kích thước vector nhiễu, số kênh cơ sở của G và D
+
+
+class Generator(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.net = nn.Sequential(
+            # z: (N, 100, 1, 1) -&gt; (N, 512, 4, 4)
+            nn.ConvTranspose2d(nz, ngf * 8, 4, 1, 0, bias=False), nn.BatchNorm2d(ngf * 8), nn.ReLU(True),
+            nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False), nn.BatchNorm2d(ngf * 4), nn.ReLU(True),  # 8x8
+            nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False), nn.BatchNorm2d(ngf * 2), nn.ReLU(True),  # 16x16
+            nn.ConvTranspose2d(ngf * 2, ngf, 4, 2, 1, bias=False), nn.BatchNorm2d(ngf), nn.ReLU(True),              # 32x32
+            nn.ConvTranspose2d(ngf, 3, 4, 2, 1, bias=False), nn.Tanh(),                                             # 64x64, [-1, 1]
+        )
+
+    def forward(self, z):
+        return self.net(z)
+
+
+class Discriminator(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Conv2d(3, ndf, 4, 2, 1, bias=False), nn.LeakyReLU(0.2, True),                                    # 32x32
+            nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False), nn.BatchNorm2d(ndf * 2), nn.LeakyReLU(0.2, True),      # 16x16
+            nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False), nn.BatchNorm2d(ndf * 4), nn.LeakyReLU(0.2, True),  # 8x8
+            nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False), nn.BatchNorm2d(ndf * 8), nn.LeakyReLU(0.2, True),  # 4x4
+            nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),                                                           # 1x1: logit
+        )
+
+    def forward(self, x):
+        return self.net(x).view(-1)
+
+
+def weights_init(m):                     # khởi tạo theo bài báo DCGAN: N(0, 0.02)
+    if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
+        nn.init.normal_(m.weight, 0.0, 0.02)
+    elif isinstance(m, nn.BatchNorm2d):
+        nn.init.normal_(m.weight, 1.0, 0.02)
+        nn.init.zeros_(m.bias)
+
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+G, D = Generator().to(device), Discriminator().to(device)
+G.apply(weights_init); D.apply(weights_init)
+criterion = nn.BCEWithLogitsLoss()     # D trả logit, BCEWithLogits ổn định số học hơn Sigmoid + BCELoss
+opt_g = torch.optim.Adam(G.parameters(), lr=2e-4, betas=(0.5, 0.999))
+opt_d = torch.optim.Adam(D.parameters(), lr=2e-4, betas=(0.5, 0.999))
+fixed_z = torch.randn(64, nz, 1, 1, device=device)    # để theo dõi ảnh sinh qua các epoch
+
+for epoch in range(num_epochs):
+    for real, _ in loader:                 # real: ảnh 64x64 đã chuẩn hoá về [-1, 1]
+        real = real.to(device)
+        b = real.size(0)
+        ones, zeros = torch.ones(b, device=device), torch.zeros(b, device=device)
+
+        # (1) Cập nhật D: maximize log D(x) + log(1 - D(G(z)))
+        z = torch.randn(b, nz, 1, 1, device=device)
+        fake = G(z)
+        loss_d = criterion(D(real), ones) + criterion(D(fake.detach()), zeros)   # detach: không cập nhật G ở bước này
+        opt_d.zero_grad()
+        loss_d.backward()
+        opt_d.step()
+
+        # (2) Cập nhật G: maximize log D(G(z))  (non-saturating loss)
+        loss_g = criterion(D(fake), ones)      # G muốn D tin ảnh giả là thật
+        opt_g.zero_grad()
+        loss_g.backward()
+        opt_g.step()
+    print(f"epoch {epoch}: loss_D {loss_d.item():.3f}  loss_G {loss_g.item():.3f}")</code></pre>
+<p>Dữ liệu chuẩn bị với <code>transforms.Compose([Resize(64), CenterCrop(64), ToTensor(), Normalize((0.5,)*3, (0.5,)*3)])</code> để đưa ảnh về [−1, 1]. Generator có khoảng 3,58 triệu tham số, Discriminator khoảng 2,77 triệu. Huấn luyện trên bộ khuôn mặt CelebA vài epoch trên GPU đã cho ra những khuôn mặt nhận ra được.</p>
+<div class="tip"><strong>Đọc loss của GAN thế nào?</strong>Khác với phân loại, loss của GAN <strong>không giảm đều</strong>: G và D giằng co nên loss dao động là bình thường. Đừng dựa vào loss để dừng huấn luyện; hãy lưu ảnh sinh từ <code>fixed_z</code> sau mỗi epoch và nhìn bằng mắt, kèm chỉ số FID. Dấu hiệu xấu: loss_D về 0 rất nhanh (D thắng tuyệt đối, G hết gradient), hoặc ảnh sinh ra giống hệt nhau.</div>
+
+<h2>Những khó khăn kinh điển của GAN</h2>
+<ul>
+<li><strong>Mode collapse</strong>: G phát hiện vài mẫu ảnh đánh lừa được D và chỉ sinh đi sinh lại những mẫu đó (ví dụ chỉ sinh chữ số "1"), bỏ qua sự đa dạng của dữ liệu.</li>
+<li><strong>Không hội tụ / dao động</strong>: bài toán minimax không có "đáy" rõ ràng như tối thiểu hoá thông thường; hai mạng có thể đuổi nhau mãi.</li>
+<li><strong>Vanishing gradient cho G</strong> khi D quá mạnh.</li>
+<li><strong>Nhạy siêu tham số</strong>: learning rate, kiến trúc, tỉ lệ cập nhật G/D.</li>
+<li><strong>Khó đánh giá</strong>: không có loss nào phản ánh trực tiếp chất lượng ảnh.</li>
+</ul>
+<p>Các cải tiến nổi bật:</p>
+<ul>
+<li><strong>WGAN, WGAN-GP</strong> (2017): thay JS divergence bằng khoảng cách Wasserstein, D thành "critic" cho điểm không giới hạn, kèm gradient penalty; huấn luyện ổn định hơn nhiều và loss có ý nghĩa hơn.</li>
+<li><strong>Spectral Normalization</strong> (2018): giới hạn hằng số Lipschitz của D.</li>
+<li>Các mẹo nhỏ: one-sided label smoothing (nhãn thật = 0,9), learning rate khác nhau cho G và D (TTUR).</li>
+</ul>
+<p><strong>Đánh giá</strong>: <strong>FID</strong> (Fréchet Inception Distance) so sánh phân phối đặc trưng Inception-v3 của ảnh thật và ảnh sinh; càng thấp càng tốt, đo cả chất lượng lẫn độ đa dạng. Inception Score (IS) cũ hơn, ít dùng hơn.</p>
+
+<h2>Các biến thể GAN nổi bật</h2>
+<div class="table-wrap"><table>
+<tr><th>Mô hình</th><th>Năm</th><th>Ý tưởng</th><th>Ứng dụng</th></tr>
+<tr><td>Conditional GAN</td><td>2014</td><td>Đưa thêm nhãn \(y\) vào cả G và D: \(G(z, y)\)</td><td>Sinh ảnh theo lớp chỉ định ("sinh số 7")</td></tr>
+<tr><td>pix2pix</td><td>2017</td><td>cGAN cho dữ liệu <strong>có cặp</strong>; G là U-Net, D là PatchGAN (chấm thật/giả từng mảng nhỏ); loss GAN + L1</td><td>Bản phác thảo → ảnh, bản đồ → ảnh vệ tinh, ảnh đen trắng → màu</td></tr>
+<tr><td>CycleGAN</td><td>2017</td><td>Dữ liệu <strong>không cần cặp</strong>; hai cặp G/D và cycle-consistency loss: A → B → A phải về lại ảnh gốc</td><td>Ngựa ↔ ngựa vằn, ảnh ↔ tranh Monet, ngày ↔ đêm</td></tr>
+<tr><td>ProGAN</td><td>2018</td><td>Huấn luyện tăng dần độ phân giải 4×4 → 1024×1024</td><td>Ảnh độ phân giải cao</td></tr>
+<tr><td>StyleGAN 1/2/3</td><td>2019–2021</td><td>Mạng ánh xạ z sang không gian "style", điều khiển từng tầng chi tiết</td><td>Khuôn mặt siêu thực (thispersondoesnotexist)</td></tr>
+<tr><td>SRGAN / ESRGAN</td><td>2017–2018</td><td>GAN cho siêu phân giải, kết hợp perceptual loss</td><td>Phóng to ảnh, phục hồi ảnh cũ</td></tr>
+</table></div>
+
+<h2>GAN có ích gì cho một Vision Engineer?</h2>
+<ul>
+<li><strong>Tăng cường dữ liệu tổng hợp</strong>: sinh thêm ảnh cho lớp hiếm (lỗi sản phẩm hiếm gặp). Cần kiểm chứng kỹ: ảnh tổng hợp kém chất lượng có thể làm mô hình học sai.</li>
+<li><strong>Phát hiện bất thường</strong> (anomaly detection): huấn luyện GAN chỉ trên ảnh <em>bình thường</em>; ảnh lỗi sẽ khó được tái tạo, sai số tái tạo cao (AnoGAN, GANomaly). Hữu ích khi gần như không có mẫu lỗi.</li>
+<li><strong>Chuyển đổi miền ảnh</strong>: biến ảnh mô phỏng thành ảnh trông như thật (sim-to-real), ngày sang đêm để tăng cường dữ liệu cho xe tự lái.</li>
+<li><strong>Siêu phân giải, khử nhiễu, phục hồi ảnh.</strong></li>
+</ul>
+<div class="tip"><strong>Bối cảnh hiện nay</strong>Từ khoảng 2021, <strong>diffusion model</strong> (DDPM, Stable Diffusion, và các mô hình tạo ảnh từ văn bản) đã vượt GAN về chất lượng và độ đa dạng của ảnh sinh, đồng thời huấn luyện ổn định hơn. GAN vẫn có chỗ đứng nhờ <strong>tốc độ</strong> (sinh ảnh chỉ bằng một lần forward, trong khi diffusion cần nhiều bước khử nhiễu), và ý tưởng huấn luyện đối kháng vẫn được dùng làm thành phần trong nhiều hệ thống hiện đại (ví dụ discriminator trong các bộ mã hoá ảnh, chưng cất diffusion thành mô hình ít bước).</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+<li>GAN = Generator sinh ảnh từ nhiễu + Discriminator phân biệt thật/giả, huấn luyện đối kháng.</li>
+<li>Mục tiêu minimax; cân bằng lý tưởng khi \(p_g = p_{data}\) và \(D = 1/2\); dùng non-saturating loss cho G.</li>
+<li>DCGAN: conv stride 2, transposed conv, BatchNorm, ReLU/LeakyReLU, Tanh, Adam(2e-4, β₁ = 0,5).</li>
+<li>Khó khăn: mode collapse, dao động, khó đánh giá; WGAN-GP, spectral norm giúp ổn định; đánh giá bằng FID.</li>
+<li>Biến thể: cGAN, pix2pix, CycleGAN, StyleGAN; ứng dụng: dữ liệu tổng hợp, phát hiện bất thường, chuyển miền ảnh.</li>
+</ul>
+<p>GAN là một trong các cách tạo dữ liệu tổng hợp; xem cách làm thực tế, rẻ hơn trong bài <a href="du-lieu-tong-hop-synthetic-data-ai-vision.html">Khi thiếu ảnh lỗi: augmentation và dữ liệu tổng hợp</a>, và quay lại <a href="../lo-trinh/vision-engineer.html">lộ trình Vision Engineer</a> để học tiếp.</p>
+
+<h2>Tài liệu tham khảo</h2>
+<ul>
+<li>Goodfellow et al. (2014). <em>Generative Adversarial Nets</em>.</li>
+<li>Radford, Metz, Chintala (2016). <em>Unsupervised Representation Learning with Deep Convolutional GANs</em> (DCGAN).</li>
+<li>Arjovsky et al. (2017). <em>Wasserstein GAN</em>; Gulrajani et al. (2017). <em>Improved Training of Wasserstein GANs</em>.</li>
+<li>Isola et al. (2017). <em>pix2pix</em>; Zhu et al. (2017). <em>CycleGAN</em>; Karras et al. (2019). <em>StyleGAN</em>.</li>
+<li>Heusel et al. (2017). <em>GANs Trained by a Two Time-Scale Update Rule Converge to a Local Nash Equilibrium</em> (FID).</li>
+<li>PyTorch Tutorials: <em>DCGAN Tutorial</em>.</li>
+</ul>

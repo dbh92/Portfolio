@@ -1,0 +1,179 @@
+<p>ImageNet có 1,28 triệu ảnh; dự án của bạn ở nhà máy có lẽ chỉ có vài trăm ảnh sản phẩm lỗi. Huấn luyện ResNet-50 (25 triệu tham số) từ đầu trên vài trăm ảnh gần như chắc chắn overfitting. Hai kỹ thuật giúp vượt qua giới hạn đó, và được dùng trong gần như mọi dự án thị giác máy tính thực tế: <strong>Transfer Learning</strong> (mượn kiến thức từ mô hình đã học trên dữ liệu lớn) và <strong>Data Augmentation</strong> (tạo thêm biến thể từ dữ liệu sẵn có).</p>
+<p class="note">Số trang (ví dụ "trang 81") trong bài chỉ tới slide của bài giảng <a href="../tai-nguyen/slide-deep-learning-computer-vision-ban-do-bai-hoc.html">Deep Learning – Computer Vision – NLP</a> (Thang Nguyen, Viet Nguyen); bài này giải thích chi tiết, kiểm chứng và đính chính các slide đó.</p>
+
+<h2>Transfer Learning là gì?</h2>
+<p>Trang 132 so sánh hai cách làm:</p>
+<ul>
+<li><strong>Training from scratch</strong>: khởi tạo ngẫu nhiên, mạng phải tự học từ con số 0 mọi thứ, từ cạnh, kết cấu đến hình dạng đối tượng. Cần rất nhiều dữ liệu và thời gian.</li>
+<li><strong>Transfer learning</strong>: lấy một mạng đã được huấn luyện sẵn (pretrained) trên bài toán lớn (ImageNet), giữ lại kiến thức "nhìn" chung của nó, rồi điều chỉnh cho bài toán mới.</li>
+</ul>
+<p>Vì sao hiệu quả? Nhớ lại đặc trưng phân cấp ở bài <a href="tong-quan-deep-learning-computer-vision.html">Tổng quan Deep Learning cho Computer Vision</a>: các lớp đầu học <strong>cạnh, màu, kết cấu</strong>, những thứ chung cho gần như mọi loại ảnh; chỉ các lớp sâu mới chuyên biệt cho 1.000 lớp ImageNet. Ta tái sử dụng phần chung và chỉ học lại phần chuyên biệt.</p>
+
+<h2>Cách 1: CNN làm bộ trích đặc trưng cố định (feature extractor)</h2>
+<p>Trang 133: "cắt" bỏ phần phân loại cũ, <strong>đóng băng</strong> (freeze) toàn bộ các lớp convolution, chỉ huấn luyện bộ phân loại mới gắn ở cuối.</p>
+<pre><code class="language-python">import torch
+import torch.nn as nn
+from torchvision import models
+
+weights = models.ResNet50_Weights.DEFAULT
+model = models.resnet50(weights=weights)
+
+for p in model.parameters():          # đóng băng toàn bộ backbone
+    p.requires_grad = False
+
+num_classes = 5
+model.fc = nn.Linear(model.fc.in_features, num_classes)   # lớp mới, mặc định requires_grad=True
+
+trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+print(trainable)                       # 10245 = 2048*5 + 5, so với 25,6 triệu của cả mạng
+
+optimizer = torch.optim.Adam(model.fc.parameters(), lr=1e-3)</code></pre>
+<p>Ưu điểm: huấn luyện rất nhanh, ít nguy cơ overfitting, chạy được cả trên CPU. Có thể tính sẵn đặc trưng 2048 chiều của mọi ảnh một lần rồi huấn luyện bộ phân loại (thậm chí bằng logistic regression hay SVM).</p>
+
+<h2>Cách 2: Fine-tune CNN</h2>
+<p>Trang 134: sao chép (copy) trọng số các lớp 1 đến L−1 từ mô hình nguồn, lớp đầu ra mới khởi tạo ngẫu nhiên và học từ đầu, sau đó <strong>tiếp tục huấn luyện cả mạng</strong> (hoặc một phần) trên dữ liệu mới với learning rate nhỏ.</p>
+<p>Các mẹo quan trọng khi fine-tune:</p>
+<ul>
+<li><strong>Learning rate nhỏ</strong> cho phần pretrained (thường nhỏ hơn 10–100 lần so với huấn luyện từ đầu), để không "phá" kiến thức sẵn có.</li>
+<li><strong>Learning rate khác nhau</strong> theo nhóm tham số (discriminative learning rate): backbone nhỏ, lớp mới lớn.</li>
+<li><strong>Hai giai đoạn</strong>: huấn luyện lớp mới vài epoch khi backbone còn đóng băng, sau đó mới mở băng (unfreeze) dần từ các lớp sâu. Tránh để gradient lớn từ lớp đầu ra ngẫu nhiên làm hỏng backbone.</li>
+<li><strong>Tiền xử lý</strong> phải giống lúc mô hình được pretrain (kích thước, mean/std ImageNet).</li>
+</ul>
+<pre><code class="language-python">model = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
+model.fc = nn.Linear(2048, num_classes)
+
+# Chỉ mở băng stage cuối (layer4) và lớp fc
+for name, p in model.named_parameters():
+    p.requires_grad = name.startswith(("layer4", "fc"))
+
+# Learning rate khác nhau cho từng nhóm tham số
+optimizer = torch.optim.AdamW([
+    {"params": model.layer4.parameters(), "lr": 1e-4},
+    {"params": model.fc.parameters(), "lr": 1e-3},
+], weight_decay=1e-4)</code></pre>
+<div class="tip"><strong>BatchNorm khi fine-tune với batch nhỏ</strong>Nếu batch size rất nhỏ (dưới ~8), thống kê batch nhiễu có thể làm hỏng running mean/var đã học trên ImageNet. Có thể giữ các lớp BN ở chế độ <code>eval()</code> trong lúc huấn luyện (đóng băng BN), như cách torchvision vẫn làm với backbone của Faster R-CNN.</div>
+
+<h2>Chọn chiến lược nào?</h2>
+<p>Hai câu hỏi quyết định (bảng trang 135): dữ liệu của bạn <strong>nhiều hay ít</strong>, và <strong>giống hay khác</strong> ImageNet?</p>
+<div class="table-wrap"><table>
+<tr><th></th><th>Dữ liệu tương tự (ảnh tự nhiên: động vật, đồ vật…)</th><th>Dữ liệu khác biệt (X-quang, ảnh vi mạch, ảnh vệ tinh…)</th></tr>
+<tr><td><strong>Ít dữ liệu</strong></td><td>Feature extractor: dùng đặc trưng mức cao (lớp cuối) + bộ phân loại mới</td><td>Dùng đặc trưng mức thấp hơn (cắt sớm hơn, ở giữa mạng) + bộ phân loại; cân nhắc fine-tune nhẹ</td></tr>
+<tr><td><strong>Nhiều dữ liệu</strong></td><td>Fine-tune toàn bộ mạng</td><td>Fine-tune toàn bộ (khởi tạo từ pretrained vẫn thường hội tụ nhanh và tốt hơn huấn luyện từ đầu)</td></tr>
+</table></div>
+<p>Lý do cho ô "ít dữ liệu, khác biệt": các đặc trưng mức cao của ImageNet (mắt chó, bánh xe) vô dụng với ảnh X-quang, nhưng đặc trưng mức thấp (cạnh, kết cấu) vẫn có ích.</p>
+
+<h2>Data Augmentation: tạo thêm dữ liệu "miễn phí"</h2>
+<p>Ý tưởng: áp dụng các phép biến đổi <strong>ngẫu nhiên</strong> mà <strong>không làm thay đổi nhãn</strong> lên ảnh huấn luyện. Ô tô lật ngang vẫn là ô tô, ô tô hơi tối vẫn là ô tô (trang 136). Mỗi epoch, mạng thấy một phiên bản hơi khác của mỗi ảnh, nên khó "học thuộc" và buộc phải học đặc trưng bất biến với các biến đổi đó. Augmentation là một dạng <strong>regularization</strong> rất mạnh.</p>
+<h3>Biến đổi hình học (position manipulation / geometric transformations)</h3>
+<p>Trang 137:</p>
+<ul>
+<li><strong>Lật</strong> (flip) ngang; lật dọc chỉ khi hợp lý (ảnh vệ tinh, ảnh vi mạch có, ảnh chân dung thì không).</li>
+<li><strong>Xoay</strong> (rotation) một góc nhỏ.</li>
+<li><strong>Co giãn</strong> (scaling) và <strong>cắt ngẫu nhiên</strong> (random crop, trang 140), <strong>dịch chuyển</strong>.</li>
+<li><strong>Biến dạng</strong> (deformation): affine, perspective, elastic (trang 140).</li>
+</ul>
+<h3>Biến đổi màu (color manipulation / color distortion)</h3>
+<p>Trang 138–139: thay đổi độ sáng (brightness), độ tương phản (contrast), độ bão hoà (saturation), sắc độ (hue), chuyển ảnh xám (greyscale); thêm làm mờ, làm nét (sharpening), nhiễu.</p>
+<h3>Che khuất ngẫu nhiên</h3>
+<p><strong>Random erasing</strong> / Cutout: xoá một hình chữ nhật ngẫu nhiên, buộc mạng nhìn vào nhiều phần của đối tượng chứ không chỉ một chi tiết dễ nhận.</p>
+<h3>Code với torchvision</h3>
+<pre><code class="language-python">from torchvision import transforms as T
+
+IMAGENET_MEAN, IMAGENET_STD = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
+
+train_tf = T.Compose([
+    T.RandomResizedCrop(224, scale=(0.6, 1.0)),     # cắt + co giãn ngẫu nhiên
+    T.RandomHorizontalFlip(),                        # lật ngang, p = 0.5
+    T.RandomRotation(15),                            # xoay ±15 độ
+    T.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.05),
+    T.ToTensor(),
+    T.Normalize(IMAGENET_MEAN, IMAGENET_STD),
+    T.RandomErasing(p=0.25),                         # áp dụng trên tensor nên đặt sau ToTensor
+])
+
+# Validation / test: KHÔNG augment, chỉ resize + crop giữa + normalize
+eval_tf = T.Compose([
+    T.Resize(256),
+    T.CenterCrop(224),
+    T.ToTensor(),
+    T.Normalize(IMAGENET_MEAN, IMAGENET_STD),
+])</code></pre>
+<div class="warn"><strong>Ba lỗi hay gặp</strong>
+<ol>
+<li>Augment cả tập validation/test: làm kết quả đánh giá nhiễu và không phản ánh thực tế. Augmentation chỉ dành cho tập train.</li>
+<li>Augmentation làm <strong>đổi nhãn</strong>: lật ngang chữ "b" thành "d", xoay 180° số "6" thành "9", đổi hue khi màu sắc chính là dấu hiệu lỗi (vết cháy, đổi màu).</li>
+<li>Với detection/segmentation, biến đổi hình học phải áp dụng <strong>đồng thời</strong> cho ảnh và box/mask. Dùng <code>torchvision.transforms.v2</code> (hỗ trợ <code>tv_tensors.BoundingBoxes</code>, <code>Mask</code>) hoặc thư viện Albumentations.</li>
+</ol></div>
+<h3>Augmentation tự động và kỹ thuật trộn ảnh</h3>
+<ul>
+<li><strong>AutoAugment, RandAugment, TrivialAugmentWide</strong>: chọn ngẫu nhiên phép biến đổi từ một danh sách đã được tối ưu, gần như không cần tinh chỉnh (<code>T.TrivialAugmentWide()</code>).</li>
+<li><strong>Mixup</strong>: trộn tuyến tính hai ảnh và nhãn của chúng; <strong>CutMix</strong>: dán một mảng ảnh này lên ảnh kia, nhãn theo tỉ lệ diện tích. Có sẵn trong <code>torchvision.transforms.v2.MixUp</code> và <code>CutMix</code>, áp dụng trên cả batch.</li>
+<li><strong>Mosaic</strong>: ghép 4 ảnh thành 1, rất phổ biến khi huấn luyện YOLO.</li>
+</ul>
+
+<h2>Ví dụ trọn vẹn: phân loại 5 loại lỗi sản phẩm với ~500 ảnh</h2>
+<pre><code class="language-python">import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader
+from torchvision import datasets, models
+
+# Dữ liệu sắp xếp theo thư mục: data/train/&lt;tên_lớp&gt;/*.jpg, data/val/&lt;tên_lớp&gt;/*.jpg
+train_ds = datasets.ImageFolder("data/train", transform=train_tf)
+val_ds = datasets.ImageFolder("data/val", transform=eval_tf)
+train_loader = DataLoader(train_ds, batch_size=32, shuffle=True, num_workers=4)
+val_loader = DataLoader(val_ds, batch_size=64, num_workers=4)
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
+model.fc = nn.Linear(model.fc.in_features, len(train_ds.classes))
+model = model.to(device)
+criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
+
+# Giai đoạn 1: chỉ huấn luyện lớp fc (5 epoch)
+for p in model.parameters():
+    p.requires_grad = False
+for p in model.fc.parameters():
+    p.requires_grad = True
+optimizer = torch.optim.AdamW(model.fc.parameters(), lr=1e-3)
+# ... gọi train_one_epoch / evaluate như bài PyTorch 7 bước ...
+
+# Giai đoạn 2: mở băng toàn bộ, learning rate nhỏ cho backbone (15 epoch)
+for p in model.parameters():
+    p.requires_grad = True
+backbone = [p for n, p in model.named_parameters() if not n.startswith("fc.")]
+optimizer = torch.optim.AdamW([
+    {"params": backbone, "lr": 1e-4},
+    {"params": model.fc.parameters(), "lr": 1e-3},
+], weight_decay=1e-4)
+scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=15)
+# ... train tiếp, lưu checkpoint tốt nhất theo val accuracy ...</code></pre>
+<p>Hàm <code>train_one_epoch</code> và <code>evaluate</code> dùng lại nguyên văn từ bài <a href="pytorch-huan-luyen-mang-neural.html">PyTorch: 7 bước huấn luyện</a>. Với vài trăm ảnh mỗi lớp, cách làm này thường cho kết quả tốt hơn hẳn huấn luyện từ đầu, và hội tụ chỉ sau vài chục epoch.</p>
+
+<h2>Overfitting: nhận biết và xử lý</h2>
+<p>Dấu hiệu: train accuracy tiếp tục tăng còn val accuracy chững lại hoặc giảm; khoảng cách giữa hai đường ngày càng rộng. Các biện pháp, xếp theo mức hiệu quả thường gặp:</p>
+<ol>
+<li>Thêm <strong>dữ liệu thật</strong> (luôn là tốt nhất), làm sạch nhãn sai.</li>
+<li><strong>Transfer learning</strong> thay cho huấn luyện từ đầu.</li>
+<li><strong>Data augmentation</strong> mạnh hơn.</li>
+<li><strong>Regularization</strong>: weight decay, Dropout, label smoothing.</li>
+<li>Mô hình nhỏ hơn; <strong>early stopping</strong> (dừng khi val không cải thiện sau N epoch).</li>
+</ol>
+
+<h2>Tóm tắt</h2>
+<ul>
+<li>Transfer learning tái sử dụng đặc trưng chung đã học trên ImageNet.</li>
+<li>Feature extractor: đóng băng backbone, chỉ học lớp mới; fine-tune: học tiếp cả mạng với learning rate nhỏ.</li>
+<li>Chọn chiến lược theo kích thước dữ liệu và độ tương đồng với ImageNet.</li>
+<li>Augmentation: hình học, màu sắc, che khuất; chỉ áp dụng cho tập train, không được làm đổi nhãn.</li>
+</ul>
+<p>Áp dụng ngay trong <a href="phan-loai-anh-ok-ng-transfer-learning-pytorch.html">dự án chặng 10: phân loại ảnh OK/NG bằng transfer learning</a>. Bước tiếp theo của Vision Engineer: không chỉ biết "ảnh có gì" mà còn biết "nó ở đâu", <a href="object-detection-iou-nms-map.html">Object Detection cơ bản</a>.</p>
+
+<h2>Tài liệu tham khảo</h2>
+<ul>
+<li>CS231n: <em>Transfer Learning</em> (cs231n.github.io/transfer-learning).</li>
+<li>Yosinski et al. (2014). <em>How transferable are features in deep neural networks?</em></li>
+<li>PyTorch Tutorials: <em>Transfer Learning for Computer Vision</em>.</li>
+<li>Shorten &amp; Khoshgoftaar (2019). <em>A survey on Image Data Augmentation for Deep Learning</em>.</li>
+<li>Cubuk et al. (2020). <em>RandAugment</em>; Yun et al. (2019). <em>CutMix</em>; Zhang et al. (2018). <em>mixup</em>.</li>
+<li>Tài liệu torchvision: <em>Transforming and augmenting images</em> (transforms v2).</li>
+</ul>

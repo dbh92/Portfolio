@@ -1,0 +1,174 @@
+<p>Ở bài <a href="deep-learning-3-mang-no-ron-va-cnn.html">Mạng nơ-ron và CNN hoạt động thế nào</a>, mạng nơ-ron đã biết "đoán" bằng forward pass; bài <a href="hoi-quy-tuyen-tinh-gradient-descent-numpy.html">Gradient descent từ đầu với NumPy</a> đã cho thấy cách giảm loss cho một mô hình tuyến tính. Nhưng với trọng số ngẫu nhiên, nó đoán bừa. Để mạng <strong>học</strong>, ta cần ba thứ: một con số đo mức độ sai (<strong>loss function</strong>), hướng sửa sai (<strong>gradient</strong>), và chiến lược bước đi (<strong>optimizer</strong>). Bài này đi qua cả ba, kèm công thức chính xác và code PyTorch kiểm chứng.</p>
+<p class="note">Số trang (ví dụ "trang 81") trong bài chỉ tới slide của bài giảng <a href="../tai-nguyen/slide-deep-learning-computer-vision-ban-do-bai-hoc.html">Deep Learning – Computer Vision – NLP</a> (Thang Nguyen, Viet Nguyen); bài này giải thích chi tiết, kiểm chứng và đính chính các slide đó.</p>
+
+<h2>Loss function: đo mức độ sai</h2>
+<p>Hàm mất mát (loss function, còn gọi cost/objective function) so sánh dự đoán \(\hat{y}\) (<code>y_pred</code>) với giá trị đúng \(y\) (target) và trả về <strong>một con số</strong>: càng nhỏ càng tốt.</p>
+\[ \text{Loss} = J(\hat{y}, y), \qquad \text{Huấn luyện:}\ \ \min_{W}\ \frac{1}{N}\sum_{i=1}^{N} J\big(f(x_i; W),\, y_i\big) \]
+<p>Chọn loss phù hợp với loại bài toán: <strong>hồi quy</strong> (dự đoán số thực: toạ độ box, tuổi, giá) hay <strong>phân loại</strong> (dự đoán lớp).</p>
+
+<h3>Loss cho bài toán hồi quy</h3>
+<div class="table-wrap"><table>
+<tr><th>Loss</th><th>Công thức</th><th>Đặc điểm</th><th>PyTorch</th></tr>
+<tr><td>MAE (L1)</td><td>\(\frac{1}{n}\sum |y_i-\hat y_i|\)</td><td>Bền với ngoại lai (outlier); gradient có độ lớn không đổi, không khả vi tại 0.</td><td><code>nn.L1Loss()</code></td></tr>
+<tr><td>MSE (L2)</td><td>\(\frac{1}{n}\sum (y_i-\hat y_i)^2\)</td><td>Phạt nặng sai số lớn (bình phương), mượt, nhưng nhạy với ngoại lai.</td><td><code>nn.MSELoss()</code></td></tr>
+<tr><td>Huber</td><td>xem bên dưới</td><td>Giống MSE khi sai số nhỏ, giống MAE khi sai số lớn: lấy ưu điểm của cả hai.</td><td><code>nn.HuberLoss(delta=1.0)</code></td></tr>
+</table></div>
+\[ \text{Huber}_\delta(y,\hat y) = \begin{cases} \tfrac12 (y-\hat y)^2 & \text{nếu } |y-\hat y| \le \delta \\[2pt] \delta\left(|y-\hat y| - \tfrac12\delta\right) & \text{nếu } |y-\hat y| &gt; \delta \end{cases} \]
+<p>Ví dụ với \(\delta = 1\), hai sai số 0.5 và 3: phần thứ nhất \(\tfrac12\cdot0.5^2 = 0.125\), phần thứ hai \(1\cdot(3-0.5) = 2.5\), trung bình \(1.3125\). Nếu dùng MSE, sai số 3 đóng góp tới \(9\) và "kéo" cả mô hình về phía điểm ngoại lai. Biến thể <code>nn.SmoothL1Loss</code> (dùng trong Faster R-CNN để hồi quy bounding box) trùng với Huber khi \(\delta=\beta=1\).</p>
+<pre><code class="language-python">import torch
+import torch.nn as nn
+
+pred   = torch.randn(3, 5, requires_grad=True)
+target = torch.randn(3, 5)
+
+mae = nn.L1Loss()(pred, target)
+mse = nn.MSELoss()(pred, target)
+hub = nn.HuberLoss(delta=1.0)(pred, target)
+mse.backward()                 # tính gradient của loss theo pred
+print(mae.item(), mse.item(), hub.item())</code></pre>
+
+<h3>Loss cho bài toán phân loại: Softmax + Cross-Entropy</h3>
+<p>Mạng cho ra các điểm số thô gọi là <strong>logits</strong> (có thể âm, tổng không bằng 1). Hàm <strong>softmax</strong> biến chúng thành phân phối xác suất:</p>
+\[ p_i = \text{softmax}(z)_i = \frac{e^{z_i}}{\sum_{j=1}^{K} e^{z_j}} \]
+<p><strong>Cross-entropy</strong> đo khoảng cách giữa phân phối dự đoán \(p\) và nhãn đúng \(t\) (dạng one-hot):</p>
+\[ L_{CE} = -\sum_{i=1}^{K} t_i \log p_i = -\log p_{\text{lớp đúng}} \]
+<p><strong>Ví dụ ở trang 25:</strong> ảnh chó, logits \([3.2,\ 1.3,\ 0.2,\ 0.8]\) cho các lớp Dog, Cat, Horse, Cheetah.</p>
+<div class="table-wrap"><table>
+<tr><th>Lớp</th><th>Logit</th><th>\(e^{z}\)</th><th>Xác suất</th><th>Nhãn t</th></tr>
+<tr><td>Dog</td><td>3.2</td><td>24.53</td><td><strong>0.775</strong></td><td>1</td></tr>
+<tr><td>Cat</td><td>1.3</td><td>3.67</td><td>0.116</td><td>0</td></tr>
+<tr><td>Horse</td><td>0.2</td><td>1.22</td><td>0.039</td><td>0</td></tr>
+<tr><td>Cheetah</td><td>0.8</td><td>2.23</td><td>0.070</td><td>0</td></tr>
+</table></div>
+<p>Loss \(= -\log(0.775) \approx 0.255\). Nếu mô hình chỉ cho Dog xác suất 0.01, loss \(= -\log 0.01 \approx 4.6\): đoán sai một cách tự tin bị phạt rất nặng.</p>
+<div class="tip"><strong>Mẹo kiểm tra nhanh (sanity check)</strong>Mô hình mới khởi tạo đoán gần đều \(1/K\) cho mọi lớp, nên loss ban đầu xấp xỉ \(\log K\). Với CIFAR-10, loss epoch đầu phải quanh \(\ln 10 \approx 2.30\). Nếu thấy 15 hay 0.01 ngay từ đầu, gần như chắc chắn có lỗi (chuẩn hoá dữ liệu, nhãn, hay softmax hai lần).</div>
+<pre><code class="language-python">logits = torch.tensor([[3.2, 1.3, 0.2, 0.8]])
+target = torch.tensor([0])                      # chỉ số lớp đúng (Dog), KHÔNG phải one-hot
+
+loss = nn.CrossEntropyLoss()(logits, target)
+manual = -torch.log_softmax(logits, dim=1)[0, 0]
+print(loss.item(), manual.item())               # 0.2547 0.2547</code></pre>
+<div class="warn"><strong>Lỗi rất phổ biến</strong><code>nn.CrossEntropyLoss</code> đã <strong>bao gồm sẵn</strong> log-softmax. Đầu vào phải là <strong>logits thô</strong>, nhãn là chỉ số lớp kiểu <code>torch.long</code>. Đừng thêm <code>nn.Softmax</code> ở cuối mô hình rồi đưa vào loss: mô hình vẫn chạy nhưng học chậm và kém hơn. Với bài toán nhị phân hay đa nhãn (một ảnh nhiều nhãn), dùng <code>nn.BCEWithLogitsLoss</code>.</div>
+
+<h2>Gradient: hướng dốc nhất</h2>
+<p>Gradient của hàm nhiều biến là <strong>vector các đạo hàm riêng</strong>:</p>
+\[ \nabla f(x, y, z) = \left\langle \frac{\partial f}{\partial x},\ \frac{\partial f}{\partial y},\ \frac{\partial f}{\partial z} \right\rangle \]
+<ul>
+<li>Gradient là một <strong>vector</strong>.</li>
+<li>Nó chỉ theo <strong>hướng tăng nhanh nhất</strong> của hàm; độ lớn của nó là tốc độ tăng lớn nhất.</li>
+<li>Vậy muốn giảm loss nhanh nhất, ta đi <strong>ngược hướng gradient</strong>.</li>
+</ul>
+<p>Với mạng nơ-ron, "biến" chính là hàng triệu trọng số; gradient \(\partial L/\partial W\) cho biết tăng nhẹ từng trọng số thì loss thay đổi ra sao. Cách tính gradient hiệu quả cho mạng nhiều lớp là chủ đề của bài <a href="backpropagation-lan-truyen-nguoc.html">Backpropagation</a>.</p>
+
+<h2>Gradient Descent: xuống núi trong sương mù</h2>
+<p>Hình dung bạn đứng trên sườn núi trong sương mù dày, chỉ cảm nhận được độ dốc dưới chân. Chiến lược: dò hướng dốc nhất đi xuống, bước một bước, lặp lại cho đến khi xuống thung lũng. Đó là <strong>gradient descent</strong>:</p>
+\[ W_{\text{new}} = W_{\text{old}} - \eta\, \frac{\partial L}{\partial W_{\text{old}}} \]
+<p>\(\eta &gt; 0\) là <strong>learning rate</strong> (tốc độ học), siêu tham số quan trọng nhất:</p>
+<ul>
+<li><strong>Quá nhỏ</strong>: cần rất nhiều bước mới tới đáy, huấn luyện lâu.</li>
+<li><strong>Vừa phải</strong>: tới đáy nhanh và ổn định.</li>
+<li><strong>Quá lớn</strong>: bước nhảy vọt qua đáy, loss dao động hoặc tăng vọt (phân kỳ), có thể thành NaN.</li>
+</ul>
+<p>Với linear regression + MSE, mặt loss là một "cái bát" lồi (convex): chỉ có một đáy, gradient descent chắc chắn tới nơi. Với neural network, mặt loss <strong>không lồi</strong>, gồ ghề với vô số đồi, hố, yên ngựa (trang 31, 34 của tài liệu). Kỳ lạ là trên thực tế gradient descent vẫn tìm được lời giải rất tốt cho mạng sâu.</p>
+
+<h2>Ba phiên bản Gradient Descent</h2>
+<div class="table-wrap"><table>
+<tr><th>Phiên bản</th><th>Mỗi lần cập nhật dùng</th><th>Ưu điểm</th><th>Nhược điểm</th></tr>
+<tr><td><strong>Batch GD</strong></td><td>Toàn bộ dữ liệu</td><td>Gradient chính xác, đường đi mượt</td><td>Rất chậm, không vừa bộ nhớ với dữ liệu lớn</td></tr>
+<tr><td><strong>Stochastic GD</strong></td><td>1 mẫu</td><td>Cập nhật rất nhanh, nhiễu giúp thoát hố nông</td><td>Đường đi zigzag mạnh, không tận dụng được GPU</td></tr>
+<tr><td><strong>Mini-batch GD</strong></td><td>N mẫu (vd. 32–256)</td><td>Cân bằng: tận dụng GPU, nhiễu vừa phải</td><td>Thêm siêu tham số batch size</td></tr>
+</table></div>
+<p>Trong thực tế "SGD" hầu như luôn có nghĩa là <strong>mini-batch SGD</strong>. Ba thuật ngữ cần phân biệt (trang 58): với 1.000 mẫu và <strong>batch size</strong> = 100, cần 10 <strong>iteration</strong> (lần cập nhật) để đi hết dữ liệu một lượt, tức 1 <strong>epoch</strong>.</p>
+
+<h2>Những thách thức của Gradient Descent</h2>
+<ul>
+<li><strong>Cực tiểu địa phương</strong> (local minima): gradient bằng 0 ở một hố không phải sâu nhất; GD thuần dừng lại ở đó.</li>
+<li><strong>Điểm yên ngựa</strong> (saddle point): gradient bằng 0, theo hướng này là đáy nhưng hướng kia là đỉnh. Ở không gian hàng triệu chiều, điểm yên ngựa và vùng bằng phẳng (plateau) phổ biến hơn cực tiểu địa phương nhiều (Dauphin et al., 2014), làm huấn luyện chững lại.</li>
+<li><strong>Khe hẹp</strong> (ravine): mặt loss dốc đứng theo một hướng nhưng thoải theo hướng khác. GD dao động qua lại giữa hai vách thay vì lao thẳng xuống lòng khe.</li>
+<li>Một learning rate chung cho <strong>mọi</strong> tham số, dù có tham số cần bước lớn, có tham số cần bước nhỏ.</li>
+</ul>
+<p>Các optimizer dưới đây sinh ra để giải quyết lần lượt những vấn đề này.</p>
+
+<h2>Momentum: thêm quán tính</h2>
+<p>Thay vì bước theo gradient hiện tại, ta tích luỹ một "vận tốc" giống quả bóng lăn xuống dốc:</p>
+\[ v_t = \gamma\, v_{t-1} + \eta \nabla_w L(w_t), \qquad w_{t+1} = w_t - v_t \]
+<p>\(\gamma\) (thường 0.9) là hệ số quán tính. Hiệu quả:</p>
+<ul>
+<li>Ở khe hẹp, các thành phần gradient đổi dấu liên tục sẽ triệt tiêu nhau, còn thành phần dọc lòng khe cộng dồn: bớt zigzag, tăng tốc.</li>
+<li>Quán tính giúp "lăn vượt" qua các hố nông và điểm yên ngựa.</li>
+</ul>
+<p><strong>Thí nghiệm ở trang 39</strong>: tối thiểu hoá \(f(x) = x^2 + 10\sin x\) từ \(x_0 = 5\), \(\eta = 0.1\). Mình chạy thử với PyTorch:</p>
+<pre><code class="language-python">import torch
+
+def f(x):
+    return x**2 + 10 * torch.sin(x)
+
+def run(**kw):
+    x = torch.tensor(5.0, requires_grad=True)
+    opt = torch.optim.SGD([x], **kw)
+    for _ in range(100):
+        opt.zero_grad()
+        f(x).backward()
+        opt.step()
+    return x.item(), f(x).item()
+
+print(run(lr=0.1))                 # (3.837, 8.316)  -&gt; kẹt ở cực tiểu địa phương
+print(run(lr=0.1, momentum=0.9))   # (-1.31, -7.946) -&gt; tới cực tiểu toàn cục</code></pre>
+<p>GD thường dừng ở hố \(x \approx 3.84\); có momentum, "quả bóng" vượt đồi và tới đáy thật \(x \approx -1.31\).</p>
+<div class="tip"><strong>Công thức trong PyTorch hơi khác</strong><code>torch.optim.SGD</code> cài đặt \(v_t = \mu v_{t-1} + g_t\), \(w \leftarrow w - \eta v_t\) (learning rate nhân ở ngoài). Khi \(\eta\) không đổi, hai cách viết tương đương. Tham số <code>nesterov=True</code> bật biến thể Nesterov: "nhìn trước" vị trí sắp tới rồi mới tính gradient.</div>
+
+<h2>Adagrad: learning rate riêng cho từng tham số</h2>
+\[ \theta_{t+1,i} = \theta_{t,i} - \frac{\eta}{\sqrt{G_{t,ii} + \epsilon}}\, g_{t,i}, \qquad G_{t,ii} = \sum_{\tau=1}^{t} g_{\tau,i}^2 \]
+<ul>
+<li>\(g_{t,i}\): gradient của tham số \(\theta_i\) tại bước \(t\).</li>
+<li>\(G_t\): ma trận đường chéo, phần tử \((i,i)\) là <strong>tổng bình phương mọi gradient trong quá khứ</strong> của \(\theta_i\).</li>
+<li>\(\epsilon \approx 10^{-8}\): tránh chia cho 0.</li>
+</ul>
+<p>Tham số nào đã nhận gradient lớn thường xuyên sẽ bị giảm bước; tham số hiếm khi được cập nhật (đặc trưng thưa) được bước lớn hơn. Nhược điểm chí mạng: \(G\) <strong>chỉ tăng, không giảm</strong>, nên learning rate hiệu dụng teo dần về 0 và việc học dừng sớm. (PyTorch đặt \(\epsilon\) ngoài căn: \(\eta/(\sqrt{G}+\epsilon)\); khác biệt không đáng kể.)</p>
+
+<h2>RMSProp: Adagrad có "trí nhớ ngắn hạn"</h2>
+<p>RMSProp (Hinton) thay tổng tích luỹ bằng <strong>trung bình động hàm mũ</strong> của bình phương gradient, nên quá khứ xa dần bị quên:</p>
+\[ E[g^2]_t = \gamma\, E[g^2]_{t-1} + (1-\gamma)\, g_t^2, \qquad \theta_{t+1} = \theta_t - \frac{\eta}{\sqrt{E[g^2]_t} + \epsilon}\, g_t \]
+<p>Giá trị khuyến nghị: \(\gamma = 0.9\), \(\eta = 10^{-3}\) (PyTorch mặc định <code>alpha=0.99</code>, <code>lr=0.01</code>).</p>
+<div class="warn"><strong>Đính chính công thức ở trang 45</strong>Slide ghi mẫu số là \(\sqrt{(1-\gamma)g_{t-1}^2 + \gamma g_t + \varepsilon}\): vừa đảo vai trò của \(\gamma\), vừa thiếu bình phương ở \(g_t\), và chỉ dùng gradient của bước trước thay vì trung bình động tích luỹ. Hãy dùng công thức ở trên (theo bài giảng gốc của Hinton và tài liệu PyTorch).</div>
+
+<h2>Adam: Momentum + RMSProp</h2>
+<p>Adam (Kingma &amp; Ba, 2015) kết hợp trung bình động của gradient (moment bậc 1, như momentum) và của bình phương gradient (moment bậc 2, như RMSProp), kèm hiệu chỉnh độ lệch cho các bước đầu:</p>
+\[ m_t = \beta_1 m_{t-1} + (1-\beta_1) g_t, \qquad v_t = \beta_2 v_{t-1} + (1-\beta_2) g_t^2 \]
+\[ \hat m_t = \frac{m_t}{1-\beta_1^t}, \quad \hat v_t = \frac{v_t}{1-\beta_2^t}, \qquad \theta_{t+1} = \theta_t - \frac{\eta\, \hat m_t}{\sqrt{\hat v_t} + \epsilon} \]
+<p>Mặc định: \(\eta = 10^{-3}\), \(\beta_1 = 0.9\), \(\beta_2 = 0.999\), \(\epsilon = 10^{-8}\). <strong>AdamW</strong> tách weight decay ra khỏi bước cập nhật gradient (Loshchilov &amp; Hutter, 2019) và là lựa chọn mặc định cho rất nhiều mô hình hiện đại (ViT, DETR, ConvNeXt…).</p>
+
+<h2>So sánh và chọn optimizer</h2>
+<div class="table-wrap"><table>
+<tr><th>Optimizer</th><th>Ý tưởng</th><th>Khi nào dùng</th><th>PyTorch</th></tr>
+<tr><td>SGD + Momentum</td><td>Quán tính</td><td>Huấn luyện CNN phân loại từ đầu; thường tổng quát hoá rất tốt khi đi kèm lịch giảm learning rate</td><td><code>SGD(params, lr=0.1, momentum=0.9, weight_decay=5e-4)</code></td></tr>
+<tr><td>Adagrad</td><td>LR riêng, tích luỹ mãi</td><td>Dữ liệu thưa; ít dùng cho CNN</td><td><code>Adagrad(params, lr=0.01)</code></td></tr>
+<tr><td>RMSProp</td><td>LR riêng, trung bình động</td><td>Một số mô hình (MobileNet, EfficientNet gốc), RL</td><td><code>RMSprop(params, lr=1e-3)</code></td></tr>
+<tr><td>Adam / AdamW</td><td>Momentum + RMSProp</td><td>Mặc định "chạy được ngay", fine-tuning, Transformer</td><td><code>AdamW(params, lr=1e-3, weight_decay=0.01)</code></td></tr>
+</table></div>
+<p>Learning rate hiếm khi giữ nguyên suốt quá trình. Các <strong>scheduler</strong> phổ biến trong <code>torch.optim.lr_scheduler</code>: <code>StepLR</code> (giảm 10 lần sau mỗi số epoch cố định), <code>CosineAnnealingLR</code> (giảm mượt theo hình cos), <code>OneCycleLR</code>; thường kèm vài epoch <strong>warmup</strong> tăng dần learning rate lúc đầu.</p>
+<pre><code class="language-python">model = torch.nn.Linear(10, 2)
+optimizer = torch.optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
+scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100)
+
+for epoch in range(100):
+    # ... train một epoch: zero_grad -&gt; forward -&gt; loss -&gt; backward -&gt; optimizer.step()
+    scheduler.step()          # cập nhật learning rate sau mỗi epoch</code></pre>
+
+<h2>Tóm tắt</h2>
+<ul>
+<li>Hồi quy: MAE, MSE, Huber. Phân loại: softmax + cross-entropy (đưa logits vào <code>nn.CrossEntropyLoss</code>).</li>
+<li>Gradient chỉ hướng tăng nhanh nhất; GD đi ngược nó với bước \(\eta\).</li>
+<li>Mini-batch SGD là chuẩn; phân biệt batch size, iteration, epoch.</li>
+<li>Momentum chống zigzag và thoát hố nông; Adagrad/RMSProp cho learning rate riêng từng tham số; Adam gộp cả hai.</li>
+</ul>
+<p>Còn một mảnh ghép: tính \(\partial L/\partial W\) cho hàng triệu trọng số thế nào cho nhanh? Mời đọc tiếp <a href="backpropagation-lan-truyen-nguoc.html">Backpropagation qua ví dụ tính tay</a>.</p>
+
+<h2>Tài liệu tham khảo</h2>
+<ul>
+<li>Sebastian Ruder (2016). <em>An overview of gradient descent optimization algorithms</em> (arXiv:1609.04747).</li>
+<li>Kingma &amp; Ba (2015). <em>Adam: A Method for Stochastic Optimization</em>; Loshchilov &amp; Hutter (2019). <em>Decoupled Weight Decay Regularization</em>.</li>
+<li>Geoffrey Hinton, bài giảng Coursera <em>Neural Networks for Machine Learning</em>, Lecture 6e (RMSProp).</li>
+<li>Dauphin et al. (2014). <em>Identifying and attacking the saddle point problem in high-dimensional non-convex optimization</em>.</li>
+<li>Tài liệu PyTorch: <code>torch.nn</code> (loss functions) và <code>torch.optim</code>.</li>
+</ul>

@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="vi" data-root="../">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Các kiến trúc CNN kinh điển: LeNet, AlexNet, VGG, ResNet | HọcFree</title>
+<meta name="description" content="Hành trình ImageNet: mỗi kiến trúc giải quyết vấn đề gì, ý tưởng cốt lõi, số tham số, độ chính xác và cách dùng mô hình pretrained trong torchvision.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://hocfree.vn/hoc/kien-truc-cnn-kinh-dien.html">
+<meta property="og:site_name" content="HọcFree">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Các kiến trúc CNN kinh điển: LeNet, AlexNet, VGG, ResNet">
+<meta property="og:description" content="Hành trình ImageNet: mỗi kiến trúc giải quyết vấn đề gì, ý tưởng cốt lõi, số tham số, độ chính xác và cách dùng mô hình pretrained trong torchvision.">
+<meta property="og:url" content="https://hocfree.vn/hoc/kien-truc-cnn-kinh-dien.html">
+<meta property="og:image" content="https://hocfree.vn/assets/images/posts/kien-truc-cnn-kinh-dien.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="Các kiến trúc CNN kinh điển: LeNet, AlexNet, VGG, ResNet">
+<meta property="og:locale" content="vi_VN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Các kiến trúc CNN kinh điển: LeNet, AlexNet, VGG, ResNet">
+<meta name="twitter:description" content="Hành trình ImageNet: mỗi kiến trúc giải quyết vấn đề gì, ý tưởng cốt lõi, số tham số, độ chính xác và cách dùng mô hình pretrained trong torchvision.">
+<meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/kien-truc-cnn-kinh-dien.jpg">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/fonts.css?v=20261014">
+<link rel="stylesheet" href="../assets/css/style.css?v=20261014">
+<script>try{var t=localStorage.getItem('hf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
+<meta property="article:published_time" content="2026-10-14">
+<meta property="article:section" content="Học AI &amp; Lập trình">
+<meta property="article:tag" content="Deep Learning">
+<meta property="article:tag" content="Computer Vision">
+<meta property="article:tag" content="PyTorch">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "Các kiến trúc CNN kinh điển: LeNet, AlexNet, VGG, ResNet", "description": "Hành trình ImageNet: mỗi kiến trúc giải quyết vấn đề gì, ý tưởng cốt lõi, số tham số, độ chính xác và cách dùng mô hình pretrained trong torchvision.", "image": ["https://hocfree.vn/assets/images/posts/kien-truc-cnn-kinh-dien.jpg"], "datePublished": "2026-10-14", "dateModified": "2026-10-14", "inLanguage": "vi", "articleSection": "Học AI & Lập trình", "keywords": "Deep Learning, Computer Vision, PyTorch", "wordCount": 2366, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/hoc/kien-truc-cnn-kinh-dien.html"}, "isPartOf": {"@type": "Course", "name": "Trở thành Vision Engineer", "url": "https://hocfree.vn/lo-trinh/vision-engineer.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Learning Paths", "item": "https://hocfree.vn/lo-trinh/"}, {"@type": "ListItem", "position": 3, "name": "Trở thành Vision Engineer", "item": "https://hocfree.vn/lo-trinh/vision-engineer.html"}, {"@type": "ListItem", "position": 4, "name": "Chặng 10: Deep Learning", "item": "https://hocfree.vn/lo-trinh/vision-engineer/deep-learning.html"}, {"@type": "ListItem", "position": 5, "name": "Các kiến trúc CNN kinh điển: LeNet, AlexNet, VGG, ResNet"}]}</script>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/contrib/auto-render.min.js" onload="renderMathInElement(document.querySelector('.prose'),{delimiters:[{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}],throwOnError:false})"></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div class="progress" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="container wide header-top">
+    <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="nav-scrim" hidden></div>
+    <a class="logo" href="../" aria-label="HọcFree – Trang chủ"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+    <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
+    <div class="header-actions">
+      <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="login-link" href="../dang-nhap.html">Đăng nhập</a>
+      <a class="btn start-btn" href="../lo-trinh/">Bắt đầu học</a>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="container wide">
+      <nav class="site-nav" id="site-nav" aria-label="Menu chính">
+        <div class="drawer-head">
+          <a class="logo" href="../" tabindex="-1"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+          <button class="icon-btn nav-close" aria-label="Đóng menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <button type="button" class="drawer-search search-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Tìm bài học, chủ đề…</span></button>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="../">Trang chủ</a></li><li class="nav-item has-panel is-mega"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-hoc">Học AI &amp; Lập trình<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel mega" id="nav-panel-hoc">
+  <div class="container wide mega-inner">
+    <div class="mega-groups"><div class="mega-group"><a class="mega-group-title" href="../hoc/#programming">Programming</a><ul><li><a href="../hoc/python.html">Python</a></li><li><a href="../hoc/csharp.html">C#</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#ai-machine-learning">AI &amp; Machine Learning</a><ul><li><a href="../hoc/machine-learning.html">Machine Learning</a></li><li><a href="../hoc/deep-learning.html">Deep Learning</a></li><li><a href="../hoc/pytorch.html">PyTorch</a></li><li><a href="../hoc/generative-ai.html">Generative AI</a></li><li><a href="../hoc/llm-ai-agents.html">LLM / AI Agents</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#computer-vision">Computer Vision</a><ul><li><a href="../hoc/opencv.html">OpenCV</a></li><li><a href="../hoc/image-processing.html">Image Processing</a></li><li><a href="../hoc/computer-vision.html">Computer Vision</a></li><li><a href="../hoc/ocr.html">OCR</a></li><li><a href="../hoc/object-detection.html">Object Detection</a></li><li><a href="../hoc/segmentation.html">Segmentation</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#vision-engineering">Vision Engineering</a><ul><li><a href="../hoc/machine-vision.html">Machine Vision</a></li><li><a href="../hoc/ai-vision.html">AI Vision</a></li><li><a href="../hoc/industrial-vision.html">Industrial Vision</a></li><li><a href="../hoc/camera-lens.html">Camera &amp; Lens</a></li><li><a href="../hoc/lighting.html">Lighting</a></li><li><a href="../hoc/calibration.html">Calibration</a></li><li><a href="../hoc/plc-robot-mes.html">PLC / Robot / MES</a></li><li><a href="../hoc/vision-deployment.html">Vision Deployment</a></li></ul></div></div>
+    <a class="feature-card" href="../lo-trinh/vision-engineer.html">
+  <span class="feature-eyebrow">⭐ Learning Path nổi bật</span>
+  <span class="feature-title">Trở thành Vision Engineer</span>
+  <span class="feature-sub">Machine Vision + AI Vision + Industrial Automation</span>
+  <span class="feature-desc">Lộ trình thực chiến từ Python, OpenCV và Machine Vision đến Deep Learning, AI Vision, Camera, PLC, Robot và triển khai hệ thống Vision trong nhà máy.</span>
+  <span class="feature-chain" aria-label="Các chặng chính"><span>Python</span><i aria-hidden="true">→</i><span>OpenCV</span><i aria-hidden="true">→</i><span>Machine Vision</span><i aria-hidden="true">→</i><span>AI Vision</span><i aria-hidden="true">→</i><span class="chain-goal">🎯 Vision Engineer</span></span>
+  <span class="feature-meta">14 chặng · 5 giai đoạn · ~12 tháng</span>
+  <span class="feature-cta">Xem lộ trình →</span>
+</a>
+  </div>
+  <div class="mega-foot"><div class="container wide mega-foot-inner"><ol class="journey compact" aria-label="Học, thực hành, trở thành kỹ sư"><li><a href="../hoc/" aria-current="step"><span class="journey-n">1</span><span class="journey-t"><b>Học</b><small>Học AI &amp; Lập trình</small></span></a></li><li><a href="../projects/"><span class="journey-n">2</span><span class="journey-t"><b>Thực hành</b><small>Projects</small></span></a></li><li><a href="../lo-trinh/"><span class="journey-n">3</span><span class="journey-t"><b>Trở thành kỹ sư</b><small>Learning Paths</small></span></a></li></ol><a class="panel-all" href="../hoc/">Xem tất cả Học AI &amp; Lập trình →</a></div></div>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-projects">Projects<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-projects">
+  <p class="panel-kicker"><span>Bước 2 · Thực hành</span>Áp dụng vào dự án thật</p>
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../projects/ai-projects.html"><span class="drop-label">AI Projects</span><span class="drop-desc">Ứng dụng ML và LLM, từ ý tưởng đến bản demo</span></a></li><li><a class="drop-link" href="../projects/computer-vision-projects.html"><span class="drop-label">Computer Vision Projects</span><span class="drop-desc">Phát hiện, nhận dạng và theo dõi đối tượng</span></a></li><li><a class="drop-link" href="../projects/industrial-vision-projects.html"><span class="drop-label">Industrial Vision Projects</span><span class="drop-desc">Đo kích thước, kiểm tra lỗi, đọc mã trên dây chuyền</span></a></li></ul></div></div>
+  <a class="panel-all" href="../projects/">Xem tất cả Projects →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger is-active" aria-expanded="false" aria-controls="nav-panel-lo-trinh" aria-current="true">Learning Paths<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-lo-trinh">
+  <p class="panel-kicker"><span>Bước 3 · Trở thành kỹ sư</span>Định hướng nghề nghiệp</p>
+  <ul class="drop-list"><li><a class="drop-link is-flagship" href="../lo-trinh/vision-engineer.html"><span class="drop-label">⭐ Trở thành Vision Engineer</span><span class="drop-desc">Machine Vision + AI Vision + Industrial Automation · 14 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/#python-developer"><span class="drop-label">Python Developer<span class="badge-soon">Sắp ra mắt</span></span><span class="drop-desc">Python, công cụ, tự động hóa</span></a></li></ul>
+  <a class="panel-all" href="../lo-trinh/">Xem tất cả lộ trình →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-kien-thuc">Kiến thức<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-kien-thuc">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Lĩnh vực</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/programming.html"><span class="drop-label">Programming</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-machine-learning.html"><span class="drop-label">AI / Machine Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/deep-learning.html"><span class="drop-label">Deep Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/machine-vision.html"><span class="drop-label">Machine Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-vision.html"><span class="drop-label">AI Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/industrial-automation.html"><span class="drop-label">Industrial Automation</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Công cụ &amp; mẹo</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/tools-frameworks.html"><span class="drop-label">Tools &amp; Frameworks</span></a></li><li><a class="drop-link" href="../kien-thuc/tips-tricks.html"><span class="drop-label">Tips &amp; Tricks</span></a></li></ul></div></div>
+  <a class="panel-all" href="../kien-thuc/">Xem tất cả Kiến thức →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tin-tuc-ai">Tin tức AI<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tin-tuc-ai">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tin-tuc-ai/ai-news.html"><span class="drop-label">AI News</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-models.html"><span class="drop-label">AI Models</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/technology.html"><span class="drop-label">Technology</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/robotics.html"><span class="drop-label">Robotics</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-industry.html"><span class="drop-label">AI Industry</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tin-tuc-ai/">Xem tất cả Tin tức AI →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-ngoai-ngu">Ngoại ngữ<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-ngoai-ngu">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/english.html"><span class="drop-label">English</span><span class="drop-desc">Lộ trình 700 TOEIC, phương pháp học, giáo trình HF-700TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chinese.html"><span class="drop-label">Chinese</span><span class="drop-desc">Lộ trình HSK3, phương pháp học, giáo trình HF-HSK3</span></a></li></ul></div></div>
+  <a class="panel-all" href="../ngoai-ngu/">Xem tất cả Ngoại ngữ →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tai-nguyen">Tài nguyên<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tai-nguyen">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tai-nguyen/source-code.html"><span class="drop-label">Source Code</span><span class="drop-desc">Mã nguồn mẫu đi kèm bài học</span></a></li><li><a class="drop-link" href="../tai-nguyen/dataset.html"><span class="drop-label">Dataset</span><span class="drop-desc">Bộ dữ liệu ảnh để luyện tập</span></a></li><li><a class="drop-link" href="../tai-nguyen/cheat-sheets.html"><span class="drop-label">Cheat Sheets</span><span class="drop-desc">Tóm tắt nhanh trong một trang</span></a></li><li><a class="drop-link" href="../tai-nguyen/documentation.html"><span class="drop-label">Documentation</span><span class="drop-desc">Tài liệu tra cứu thư viện, API</span></a></li><li><a class="drop-link" href="../tai-nguyen/ebook.html"><span class="drop-label">Ebook / Tài liệu</span><span class="drop-desc">Sách và tài liệu tham khảo</span></a></li><li><a class="drop-link" href="../tai-nguyen/ai-tools.html"><span class="drop-label">AI Tools</span><span class="drop-desc">Công cụ AI hữu ích cho việc học</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tai-nguyen/">Xem tất cả Tài nguyên →</a>
+</div></li></ul>
+        <div class="drawer-foot">
+          <a class="btn ghost" href="../dang-nhap.html">Đăng nhập</a>
+          <a class="btn" href="../lo-trinh/">Bắt đầu học</a>
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+<div class="search-dialog" hidden>
+  <div class="search-scrim"></div>
+  <div class="search-box" role="dialog" aria-modal="true" aria-label="Tìm kiếm">
+    <form class="search-form" action="../search.html" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" placeholder="Tìm bài học, chủ đề, bài viết…" autocomplete="off" aria-label="Từ khóa tìm kiếm" aria-controls="search-suggest">
+      <button type="button" class="icon-btn search-close" aria-label="Đóng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </form>
+    <div class="search-suggest" id="search-suggest" aria-live="polite">
+      <div class="search-empty">
+        <p class="search-group-title">Chủ đề phổ biến</p>
+        <div class="chips"><a class="chip" href="../hoc/python.html">Python</a><a class="chip" href="../hoc/opencv.html">OpenCV</a><a class="chip" href="../hoc/machine-vision.html">Machine Vision</a><a class="chip" href="../hoc/deep-learning.html">Deep Learning</a><a class="chip" href="../hoc/ai-vision.html">AI Vision</a><a class="chip" href="../hoc/object-detection.html">Object Detection</a><a class="chip" href="../hoc/pytorch.html">PyTorch</a><a class="chip" href="../ngoai-ngu/english.html">English</a></div>
+        <p class="search-group-title">Lộ trình nổi bật</p>
+        <a class="search-item" href="../lo-trinh/vision-engineer.html"><span class="search-ico" aria-hidden="true">⭐</span><span>Trở thành Vision Engineer<small>Learning Path · Machine Vision + AI Vision + Industrial Automation</small></span></a>
+      </div>
+    </div>
+    <div class="search-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> chọn</span><span><kbd>Enter</kbd> mở</span><span><kbd>Esc</kbd> đóng</span></div>
+  </div>
+</div>
+<main id="main">
+  <div class="container layout article-layout">
+    <article class="article">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../lo-trinh/">Learning Paths</a><span>/</span><a href="../lo-trinh/vision-engineer.html">Vision Engineer</a><span>/</span><a href="../lo-trinh/vision-engineer/deep-learning.html">Chặng 10: Deep Learning</a></nav>
+      <header class="article-head">
+        <div class="course-bar" data-course="vision-engineer"><a class="course-chip" href="../lo-trinh/vision-engineer/deep-learning.html">⭐ Vision Engineer · Chặng 10</a><span class="lesson-no">Bài 8/12</span><span class="kind kind-lesson">Bài học</span><span class="lesson-min"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></svg>~60 phút</span></div>
+        <h1>Các kiến trúc CNN kinh điển: LeNet, AlexNet, VGG, ResNet</h1>
+        <p class="lead">Hành trình ImageNet: mỗi kiến trúc giải quyết vấn đề gì, ý tưởng cốt lõi, số tham số, độ chính xác và cách dùng mô hình pretrained trong torchvision.</p>
+        <div class="article-meta">
+          <span class="avatar" aria-hidden="true">HF</span>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-14">14/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>14 phút đọc</span></div>
+        </div>
+      </header>
+      <figure class="article-cover">
+        <img src="../assets/images/posts/kien-truc-cnn-kinh-dien.webp" alt="Các kiến trúc CNN kinh điển: LeNet, AlexNet, VGG, ResNet" width="1200" height="675" fetchpriority="high" decoding="async">
+      </figure>
+      <section class="lesson-goals" aria-label="Mục tiêu bài học"><h2>Học xong bài này, bạn sẽ</h2><ul><li>Nắm ý tưởng chính của LeNet, AlexNet, VGG, ResNet</li><li>Hiểu vì sao skip connection giúp mạng sâu</li><li>Dùng mô hình pretrained với weights= của torchvision</li></ul><p class="goals-before">Nên học trước: <a href="../hoc/batchnorm-dropout-receptive-field.html">BatchNorm, Dropout và receptive field</a></p></section>
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol><li><a href="#lam-sao-de-thiet-ke-kien-truc-cnn">Làm sao để thiết kế kiến trúc CNN?</a></li><li><a href="#imagenet-va-cuoc-thi-ilsvrc">ImageNet và cuộc thi ILSVRC</a></li><li><a href="#lenet-5-1998-to-tien-cua-cnn">LeNet-5 (1998): tổ tiên của CNN</a></li><li><a href="#alexnet-2012-khoanh-khac-bung-no">AlexNet (2012): khoảnh khắc bùng nổ</a></li><li><a href="#vggnet-2014-don-gian-va-sau">VGGNet (2014): đơn giản và sâu</a></li><li><a href="#googlenet-inception-2014-rong-thay-vi-chi-sau">GoogLeNet / Inception (2014): rộng thay vì chỉ sâu</a></li><li><a href="#van-de-mang-cang-sau-lai-cang-kem">Vấn đề: mạng càng sâu lại càng kém?</a></li><li><a href="#resnet-2015-duong-tat-cho-gradient">ResNet (2015): đường tắt cho gradient</a></li><li><a href="#sau-resnet-cac-huong-phat-trien-chinh">Sau ResNet: các hướng phát triển chính</a></li><li><a href="#dung-mo-hinh-pretrained-trong-torchvision">Dùng mô hình pretrained trong torchvision</a></li><li><a href="#tom-tat">Tóm tắt</a></li><li><a href="#tai-lieu-tham-khao">Tài liệu tham khảo</a></li></ol></details>
+      <div class="prose">
+<p>Đến đây bạn đã tự lắp được một CNN. Nhưng các kỹ sư thị giác máy tính hiếm khi thiết kế kiến trúc từ đầu: họ đứng trên vai những mạng đã được kiểm chứng qua hàng triệu ảnh. Bài này đi qua các kiến trúc kinh điển theo dòng thời gian, mỗi mạng giải quyết vấn đề gì, ý tưởng nào còn sống đến ngày nay, và cách dùng chúng trong PyTorch.</p>
+<p class="note">Số trang (ví dụ "trang 81") trong bài chỉ tới slide của bài giảng <a href="../tai-nguyen/slide-deep-learning-computer-vision-ban-do-bai-hoc.html">Deep Learning – Computer Vision – NLP</a> (Thang Nguyen, Viet Nguyen); bài này giải thích chi tiết, kiểm chứng và đính chính các slide đó.</p>
+
+<h2 id="lam-sao-de-thiet-ke-kien-truc-cnn">Làm sao để thiết kế kiến trúc CNN?</h2>
+<p><strong>Quy tắc 1: "Don't be a hero"</strong> (Andrej Karpathy, trang 106). Đừng tự sáng chế kiến trúc. Hãy chọn mạng đang hoạt động tốt nhất trên ImageNet phù hợp với ngân sách tính toán của bạn, tải trọng số pretrained về và fine-tune trên dữ liệu của mình. Thư viện <code>torchvision.models</code> có sẵn hàng chục kiến trúc: AlexNet, VGG, ResNet, SqueezeNet, DenseNet, Inception v3, GoogLeNet, ShuffleNet v2, MobileNet v2/v3, ResNeXt, Wide ResNet, MNASNet, EfficientNet, RegNet, ConvNeXt, ViT…</p>
+<p><strong>Quy tắc 2</strong> (trang 107): chỉ khi quy tắc 1 không đáp ứng (thiết bị quá yếu, ảnh đặc thù như ảnh y tế 3D, ảnh hồng ngoại một kênh…), mới tự trả lời các câu hỏi:</p>
+<ul>
+<li>Mô hình nên có bao nhiêu layer?</li>
+<li>Mỗi lớp conv có bao nhiêu kênh, kernel size bao nhiêu? Dùng activation gì?</li>
+<li>Pooling kernel size bao nhiêu? Flatten feature map ở đâu? Bao nhiêu lớp fully connected?</li>
+<li>Có dùng BatchNorm, Dropout… không?</li>
+</ul>
+<p>Hiểu các kiến trúc kinh điển chính là cách tốt nhất để trả lời những câu hỏi này.</p>
+
+<h2 id="imagenet-va-cuoc-thi-ilsvrc">ImageNet và cuộc thi ILSVRC</h2>
+<p><strong>ImageNet Large Scale Visual Recognition Challenge</strong> (ILSVRC, 2010–2017) là "đấu trường" thúc đẩy cả ngành: khoảng 1,28 triệu ảnh huấn luyện, 50.000 ảnh validation, 1.000 lớp. Thước đo là <strong>top-5 error</strong>: tỉ lệ ảnh mà nhãn đúng không nằm trong 5 dự đoán đầu.</p>
+<div class="table-wrap"><table>
+<tr><th>Năm</th><th>Mô hình thắng cuộc</th><th>Top-5 error</th><th>Số lớp</th></tr>
+<tr><td>2010</td><td>NEC (đặc trưng thủ công + SVM)</td><td>28,2%</td><td>nông</td></tr>
+<tr><td>2011</td><td>XRCE (Fisher vectors)</td><td>25,8%</td><td>nông</td></tr>
+<tr><td><strong>2012</strong></td><td><strong>AlexNet</strong></td><td><strong>16,4%</strong></td><td>8</td></tr>
+<tr><td>2013</td><td>ZFNet (Clarifai)</td><td>11,7%</td><td>8</td></tr>
+<tr><td>2014</td><td>GoogLeNet (hạng nhì: VGG 7,3%)</td><td>6,7%</td><td>22</td></tr>
+<tr><td>2015</td><td>ResNet</td><td>3,57%</td><td>152</td></tr>
+<tr><td>2017</td><td>SENet</td><td>2,25%</td><td>152+</td></tr>
+</table></div>
+<p>Để tham khảo, sai số của con người (Karpathy tự thử nghiệm) vào khoảng 5,1%. Năm 2015, máy tính đã vượt qua mức này trên benchmark ImageNet.</p>
+<p>Dòng thời gian ở trang 108: ConvNet (1989) → LeNet (1998) → AlexNet (2012) → ZFNet, GoogLeNet, VGG, Inception (2013–2014) → ResNet (2015) → DenseNet (2016) → ResNeXt (2017) → Channel Boosted CNN (2018) → EfficientNet (2019/20).</p>
+
+<h2 id="lenet-5-1998-to-tien-cua-cnn">LeNet-5 (1998): tổ tiên của CNN</h2>
+<p>Yann LeCun và cộng sự thiết kế LeNet-5 để đọc chữ số viết tay trên séc ngân hàng, và nó đã được triển khai thương mại vào cuối thập niên 1990.</p>
+<div class="table-wrap"><table>
+<tr><th>Lớp</th><th>Loại</th><th>Feature map</th><th>Kích thước</th><th>Kernel</th><th>Stride</th><th>Activation</th></tr>
+<tr><td>Input</td><td>Ảnh</td><td>1</td><td>32×32</td><td>-</td><td>-</td><td>-</td></tr>
+<tr><td>1</td><td>Convolution</td><td>6</td><td>28×28</td><td>5×5</td><td>1</td><td>tanh</td></tr>
+<tr><td>2</td><td>Average pooling</td><td>6</td><td>14×14</td><td>2×2</td><td>2</td><td>tanh</td></tr>
+<tr><td>3</td><td>Convolution</td><td>16</td><td>10×10</td><td>5×5</td><td>1</td><td>tanh</td></tr>
+<tr><td>4</td><td>Average pooling</td><td>16</td><td>5×5</td><td>2×2</td><td>2</td><td>tanh</td></tr>
+<tr><td>5</td><td>Convolution (≡ FC)</td><td>120</td><td>1×1</td><td>5×5</td><td>1</td><td>tanh</td></tr>
+<tr><td>6</td><td>Fully connected</td><td>-</td><td>84</td><td>-</td><td>-</td><td>tanh</td></tr>
+<tr><td>Output</td><td>Fully connected</td><td>-</td><td>10</td><td>-</td><td>-</td><td>softmax</td></tr>
+</table></div>
+<pre><code class="language-python">import torch.nn as nn
+
+lenet5 = nn.Sequential(
+    nn.Conv2d(1, 6, kernel_size=5), nn.Tanh(), nn.AvgPool2d(2),      # 32 -&gt; 28 -&gt; 14
+    nn.Conv2d(6, 16, kernel_size=5), nn.Tanh(), nn.AvgPool2d(2),     # 14 -&gt; 10 -&gt; 5
+    nn.Flatten(),                                                     # 16*5*5 = 400
+    nn.Linear(400, 120), nn.Tanh(),
+    nn.Linear(120, 84), nn.Tanh(),
+    nn.Linear(84, 10),
+)
+print(sum(p.numel() for p in lenet5.parameters()))   # 61706</code></pre>
+<p>Chỉ khoảng 61,7 nghìn tham số, nhưng đã có đủ "công thức" của CNN hiện đại: conv → pooling → conv → pooling → FC. (Bảng ở trang 112 là biến thể phổ biến trong sách dạy học: đầu vào 28×28 có padding 2 và dùng sigmoid.)</p>
+
+<h2 id="alexnet-2012-khoanh-khac-bung-no">AlexNet (2012): khoảnh khắc bùng nổ</h2>
+<p>Krizhevsky, Sutskever và Hinton giảm top-5 error từ ~26% xuống 16,4%, mở ra kỷ nguyên deep learning.</p>
+<div class="table-wrap"><table>
+<tr><th>Lớp</th><th>Loại</th><th>Output</th><th>Kernel / stride</th></tr>
+<tr><td>Input</td><td>Ảnh</td><td>227×227×3</td><td>-</td></tr>
+<tr><td>1</td><td>Conv + ReLU</td><td>55×55×96</td><td>11×11 / 4</td></tr>
+<tr><td></td><td>Max pooling</td><td>27×27×96</td><td>3×3 / 2</td></tr>
+<tr><td>2</td><td>Conv + ReLU (pad 2)</td><td>27×27×256</td><td>5×5 / 1</td></tr>
+<tr><td></td><td>Max pooling</td><td>13×13×256</td><td>3×3 / 2</td></tr>
+<tr><td>3, 4, 5</td><td>Conv + ReLU (pad 1)</td><td>13×13×384, 384, 256</td><td>3×3 / 1</td></tr>
+<tr><td></td><td>Max pooling → flatten</td><td>6×6×256 = 9216</td><td>3×3 / 2</td></tr>
+<tr><td>6, 7</td><td>FC + ReLU + Dropout 0.5</td><td>4096, 4096</td><td>-</td></tr>
+<tr><td>8</td><td>FC + softmax</td><td>1000</td><td>-</td></tr>
+</table></div>
+<p>Những đóng góp còn nguyên giá trị:</p>
+<ul>
+<li><strong>ReLU</strong> thay cho tanh/sigmoid: huấn luyện nhanh hơn nhiều lần.</li>
+<li><strong>Dropout</strong> ở các lớp FC chống overfitting.</li>
+<li><strong>Data augmentation</strong>: cắt ngẫu nhiên, lật ngang, nhiễu màu.</li>
+<li>Huấn luyện trên <strong>GPU</strong> (2 card GTX 580 3GB, mạng được chia đôi giữa hai GPU).</li>
+<li>Max pooling chồng lấn (3×3 stride 2); Local Response Normalization (về sau bị BatchNorm thay thế).</li>
+</ul>
+<p>AlexNet có khoảng 61 triệu tham số, trong đó hơn 58 triệu nằm ở 3 lớp FC. (Bài báo gốc ghi đầu vào 224×224, nhưng chỉ 227×227 mới cho ra đúng 55×55 với công thức \((227 - 11)/4 + 1 = 55\).)</p>
+
+<h2 id="vggnet-2014-don-gian-va-sau">VGGNet (2014): đơn giản và sâu</h2>
+<p>Nhóm Visual Geometry Group (Oxford) đặt câu hỏi: nếu chỉ dùng <strong>một loại</strong> lớp conv duy nhất thì sao? VGG chỉ gồm conv <strong>3×3, stride 1, padding 1</strong> và max pooling <strong>2×2, stride 2</strong>, xếp thành 5 khối với số kênh 64 → 128 → 256 → 512 → 512 (trang 113–114).</p>
+<ul>
+<li><strong>VGG-16</strong>: 13 conv + 3 FC; <strong>VGG-19</strong>: 16 conv + 3 FC.</li>
+<li>Xếp chồng conv 3×3 thay cho kernel lớn: hai lớp 3×3 có receptive field 5×5, ba lớp 3×3 có receptive field 7×7, ít tham số hơn và nhiều phi tuyến hơn (đã phân tích ở <a href="batchnorm-dropout-receptive-field.html">bài trước</a>).</li>
+<li>Nhược điểm: khoảng 138 triệu tham số (VGG-16), riêng lớp FC đầu tiên \(25088\times4096 + 4096 \approx 102,8\) triệu; nặng về bộ nhớ và tính toán (~15,5 GFLOPs).</li>
+</ul>
+<p>Cấu trúc đều đặn khiến VGG rất được ưa chuộng làm <strong>bộ trích đặc trưng</strong>: "cắt" bỏ các lớp FC, giữ phần conv đã học trên ImageNet, gắn lớp FC mới cho bài toán riêng, ví dụ nhận diện 7 cảm xúc khuôn mặt (trang 114). Đây chính là transfer learning (xem <a href="transfer-learning-data-augmentation.html">Transfer Learning và Data Augmentation</a> và dự án cuối chặng).</p>
+
+<h2 id="googlenet-inception-2014-rong-thay-vi-chi-sau">GoogLeNet / Inception (2014): rộng thay vì chỉ sâu</h2>
+<p>Thay vì chọn kernel 1×1, 3×3 hay 5×5, <strong>module Inception</strong> dùng <strong>tất cả song song</strong> rồi nối (concatenate) kết quả theo chiều kênh, để mạng tự chọn thang đo phù hợp. Chìa khoá giúp nó không quá đắt là conv <strong>1×1 làm "nút cổ chai"</strong> giảm số kênh trước các conv 3×3, 5×5. GoogLeNet sâu 22 lớp nhưng chỉ khoảng 6,6–6,8 triệu tham số (ít hơn AlexNet 9 lần), nhờ thay các lớp FC bằng <strong>global average pooling</strong>. Các phiên bản sau (Inception v2, v3, v4) thêm BatchNorm và phân rã kernel (5×5 thành hai 3×3, 3×3 thành 1×3 + 3×1).</p>
+
+<h2 id="van-de-mang-cang-sau-lai-cang-kem">Vấn đề: mạng càng sâu lại càng kém?</h2>
+<p>Theo định lý xấp xỉ vạn năng (trang 115, xem <a href="linear-classifier-den-neural-network.html">Từ Linear Classifier đến Neural Network</a>), mạng đủ lớn có thể biểu diễn mọi hàm, và thực nghiệm cho thấy thêm độ sâu giúp ích. Nhưng khi xếp chồng các lớp conv "trơn" lên quá 20–30 lớp, He et al. (2015) quan sát thấy mạng 56 lớp có <strong>lỗi huấn luyện</strong> cao hơn mạng 20 lớp. Đây không phải overfitting (lỗi trên tập train cũng cao hơn), mà là mạng sâu <strong>khó tối ưu</strong>: gradient phải đi qua quá nhiều phép nhân và suy yếu dần (vanishing gradient, trang 118). Về lý thuyết, mạng 56 lớp ít nhất phải làm được như mạng 20 lớp bằng cách cho 36 lớp thừa học hàm đồng nhất (identity), nhưng trên thực tế SGD không tìm được lời giải đó.</p>
+
+<h2 id="resnet-2015-duong-tat-cho-gradient">ResNet (2015): đường tắt cho gradient</h2>
+<figure class="diagram">
+<svg class="dg" viewBox="0 0 520 300" role="img" aria-label="Khối residual: hai lớp trọng số và đường tắt identity cộng vào đầu ra">
+  <text x="160" y="22" text-anchor="middle">x</text>
+  <path class="ln" d="M160 30V58"/>
+  <rect class="bx-c" x="90" y="60" width="140" height="40" rx="6"/><text x="160" y="85" text-anchor="middle">weight layer</text>
+  <path class="ln" d="M160 100V128"/><text x="172" y="120" class="sm">ReLU</text>
+  <rect class="bx-c" x="90" y="130" width="140" height="40" rx="6"/><text x="160" y="155" text-anchor="middle">weight layer</text>
+  <text x="40" y="120" text-anchor="middle">F(x)</text>
+  <path class="ln" d="M160 170V208"/>
+  <circle class="bx-a" cx="160" cy="224" r="16"/><text x="160" y="230" text-anchor="middle" font-size="18">+</text>
+  <path class="ln-a" d="M160 40H330V224H176"/><text class="t-a" x="342" y="130">identity x</text>
+  <path class="ln" d="M160 240V270"/><text x="172" y="262" class="sm">ReLU</text>
+  <text x="160" y="292" text-anchor="middle">H(x) = F(x) + x</text>
+</svg>
+<figcaption>Khối residual (trang 117): các lớp chỉ cần học phần "dư" F(x) = H(x) − x</figcaption>
+</figure>
+<p>Ý tưởng của Kaiming He và cộng sự: thay vì bắt hai lớp học trực tiếp ánh xạ mong muốn \(H(x)\), cho chúng học phần dư \(F(x) = H(x) - x\), rồi cộng lại đầu vào qua một <strong>đường tắt</strong> (skip/shortcut connection):</p>
+\[ H(x) = F(x) + x \]
+<ul>
+<li>Nếu ánh xạ tối ưu gần với identity, mạng chỉ cần đẩy \(F(x)\) về 0, việc rất dễ (trọng số nhỏ).</li>
+<li>Khi lan truyền ngược: \(\dfrac{\partial H}{\partial x} = \dfrac{\partial F}{\partial x} + 1\). Số "+1" đảm bảo gradient luôn có đường đi thẳng về các lớp đầu, không bị triệt tiêu dù mạng sâu hàng trăm lớp.</li>
+</ul>
+<p>Kết quả: ResNet-152 thắng ILSVRC 2015 với top-5 error 3,57%, và về sau còn huấn luyện được cả mạng hơn 1.000 lớp.</p>
+<h3 id="hai-loai-khoi-residual">Hai loại khối residual</h3>
+<ul>
+<li><strong>Basic block</strong> (ResNet-18/34): hai conv 3×3.</li>
+<li><strong>Bottleneck block</strong> (ResNet-50/101/152): conv 1×1 giảm kênh (256 → 64), conv 3×3, conv 1×1 tăng lại (64 → 256): rẻ hơn nhiều so với hai conv 3×3 trên 256 kênh.</li>
+<li>Khi số kênh hoặc kích thước thay đổi giữa hai stage, đường tắt dùng <strong>conv 1×1 (có stride)</strong> để khớp kích thước (nhánh "Conv1×1 B" ở hình (b) trang 116).</li>
+</ul>
+<pre><code class="language-python">import torch
+import torch.nn as nn
+
+
+class BasicBlock(nn.Module):
+    """Khối residual của ResNet-18/34: hai conv 3x3 + đường tắt (shortcut)."""
+
+    def __init__(self, cin, cout, stride=1):
+        super().__init__()
+        self.conv1 = nn.Conv2d(cin, cout, 3, stride=stride, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(cout)
+        self.conv2 = nn.Conv2d(cout, cout, 3, stride=1, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(cout)
+        self.shortcut = nn.Identity()
+        if stride != 1 or cin != cout:      # kích thước đổi -&gt; dùng conv 1x1 để khớp
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(cin, cout, 1, stride=stride, bias=False), nn.BatchNorm2d(cout))
+
+    def forward(self, x):
+        out = torch.relu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
+        return torch.relu(out + self.shortcut(x))     # H(x) = F(x) + x
+
+
+block = BasicBlock(64, 128, stride=2)
+print(block(torch.rand(1, 64, 56, 56)).shape)        # torch.Size([1, 128, 28, 28])</code></pre>
+<h3 id="cau-hinh-cac-phien-ban-resnet">Cấu hình các phiên bản ResNet</h3>
+<p>Mọi ResNet chung phần đầu (conv 7×7, 64 kênh, stride 2 → max pool 3×3 stride 2) và phần cuối (global average pool → FC 1000), khác nhau ở số khối trong 4 stage <code>conv2_x</code> … <code>conv5_x</code> (bảng trang 116):</p>
+<div class="table-wrap"><table>
+<tr><th>Mô hình</th><th>Loại khối</th><th>Số khối mỗi stage</th><th>Tham số</th><th>FLOPs</th><th>Top-1 ImageNet (torchvision)</th></tr>
+<tr><td>ResNet-18</td><td>Basic</td><td>2, 2, 2, 2</td><td>11,7M</td><td>1,8×10⁹</td><td>69,8%</td></tr>
+<tr><td>ResNet-34</td><td>Basic</td><td>3, 4, 6, 3</td><td>21,8M</td><td>3,6×10⁹</td><td>73,3%</td></tr>
+<tr><td>ResNet-50</td><td>Bottleneck</td><td>3, 4, 6, 3</td><td>25,6M</td><td>3,8×10⁹</td><td>76,1% (V1) / 80,9% (V2)</td></tr>
+<tr><td>ResNet-101</td><td>Bottleneck</td><td>3, 4, 23, 3</td><td>44,5M</td><td>7,6×10⁹</td><td>77,4% / 81,9%</td></tr>
+<tr><td>ResNet-152</td><td>Bottleneck</td><td>3, 8, 36, 3</td><td>60,2M</td><td>11,3×10⁹</td><td>78,3% / 82,3%</td></tr>
+</table></div>
+<p>(V2 là trọng số huấn luyện lại năm 2021 với "công thức" hiện đại: nhiều augmentation hơn, label smoothing, huấn luyện lâu hơn. Cùng một kiến trúc, độ chính xác tăng gần 5%: kỹ thuật huấn luyện quan trọng không kém kiến trúc.)</p>
+
+<h2 id="sau-resnet-cac-huong-phat-trien-chinh">Sau ResNet: các hướng phát triển chính</h2>
+<div class="table-wrap"><table>
+<tr><th>Mô hình</th><th>Năm</th><th>Ý tưởng chính</th></tr>
+<tr><td>DenseNet</td><td>2016–17</td><td>Mỗi lớp nhận đầu vào là <strong>nối</strong> (concat) đầu ra của <em>mọi</em> lớp trước trong khối; tái sử dụng đặc trưng, ít tham số (DenseNet-121: 8M, 74,4%).</td></tr>
+<tr><td>ResNeXt</td><td>2017</td><td>Bottleneck dùng <strong>grouped convolution</strong> (32 nhóm): tăng "cardinality" thay vì độ sâu/độ rộng.</td></tr>
+<tr><td>SENet</td><td>2017</td><td>Khối Squeeze-and-Excitation: học trọng số chú ý cho từng <strong>kênh</strong>; thắng ILSVRC 2017.</td></tr>
+<tr><td>MobileNet v1/v2/v3</td><td>2017–19</td><td>Depthwise separable conv, inverted residual; chạy trên điện thoại (v3-Large: 5,5M tham số, ~0,22 GFLOPs, 75,3%).</td></tr>
+<tr><td>EfficientNet</td><td>2019</td><td><strong>Compound scaling</strong>: tăng đồng thời độ sâu, độ rộng, độ phân giải theo một hệ số chung. B0: 5,3M tham số, 77,7%.</td></tr>
+<tr><td>Vision Transformer (ViT)</td><td>2020</td><td>Cắt ảnh thành các patch 16×16, xử lý như chuỗi từ bằng Transformer; mạnh khi có dữ liệu cực lớn.</td></tr>
+<tr><td>ConvNeXt</td><td>2022</td><td>"Hiện đại hoá" ResNet theo các bài học từ Transformer (kernel depthwise 7×7, LayerNorm, GELU); ConvNeXt-Tiny 82,5%.</td></tr>
+</table></div>
+<div class="tip"><strong>Chọn backbone nào khi đi làm?</strong>
+<ul>
+<li>Cần nhanh, chạy trên thiết bị biên (camera, điện thoại, Jetson): MobileNetV3, EfficientNet-B0, hoặc ResNet-18.</li>
+<li>Cân bằng, dễ dùng, nhiều tài liệu: ResNet-50 (trọng số V2).</li>
+<li>Cần độ chính xác cao, có GPU tốt: ConvNeXt, EfficientNetV2, ViT/Swin.</li>
+</ul>
+Luôn đo trên dữ liệu và phần cứng thực tế của bạn; con số ImageNet chỉ là điểm khởi đầu.</div>
+
+<h2 id="dung-mo-hinh-pretrained-trong-torchvision">Dùng mô hình pretrained trong torchvision</h2>
+<div class="warn"><strong>API đã thay đổi so với slide</strong>Cách viết <code>models.resnet18(pretrained=True)</code> ở trang 106 đã bị <strong>deprecated</strong> từ torchvision 0.13. Cách mới dùng tham số <code>weights</code>, và mỗi bộ trọng số đi kèm đúng phép tiền xử lý đã dùng khi huấn luyện.</div>
+<pre><code class="language-python">import torch
+from torchvision import models
+from torchvision.io import read_image
+
+weights = models.ResNet50_Weights.DEFAULT          # hiện là IMAGENET1K_V2
+model = models.resnet50(weights=weights).eval()
+preprocess = weights.transforms()                  # resize, crop, normalize đúng chuẩn
+
+img = read_image("dog.jpg")                         # tensor uint8 (C, H, W)
+batch = preprocess(img).unsqueeze(0)
+with torch.no_grad():
+    probs = model(batch).softmax(dim=1)[0]
+top5 = probs.topk(5)
+for p, i in zip(top5.values, top5.indices):
+    print(f"{weights.meta['categories'][i]:25s} {p:.1%}")
+
+print(models.list_models(module=models)[:10])       # liệt kê các kiến trúc phân loại có sẵn</code></pre>
+
+<h2 id="tom-tat">Tóm tắt</h2>
+<ul>
+<li>Đừng tự chế kiến trúc nếu chưa cần: chọn backbone pretrained đã kiểm chứng.</li>
+<li>LeNet đặt nền móng; AlexNet mang ReLU, Dropout, GPU; VGG chứng minh "3×3 xếp chồng" là đủ.</li>
+<li>Inception: song song nhiều kernel + bottleneck 1×1 + global average pooling.</li>
+<li>ResNet: \(H(x) = F(x) + x\) giải quyết bài toán tối ưu mạng rất sâu; là backbone phổ biến nhất.</li>
+<li>Dùng <code>weights=...</code> và <code>weights.transforms()</code> với torchvision hiện đại.</li>
+</ul>
+<p>Vì sao mạng sâu khó huấn luyện, và còn những "vũ khí" nào khác ngoài skip connection? Xem <a href="vanishing-exploding-gradient-weight-init.html">Vanishing/Exploding gradient</a>.</p>
+
+<h2 id="tai-lieu-tham-khao">Tài liệu tham khảo</h2>
+<ul>
+<li>LeCun et al. (1998). <em>Gradient-Based Learning Applied to Document Recognition</em>.</li>
+<li>Krizhevsky et al. (2012). <em>ImageNet Classification with Deep Convolutional Neural Networks</em>.</li>
+<li>Simonyan &amp; Zisserman (2015). <em>Very Deep Convolutional Networks for Large-Scale Image Recognition</em>.</li>
+<li>Szegedy et al. (2015). <em>Going Deeper with Convolutions</em>.</li>
+<li>He et al. (2016). <em>Deep Residual Learning for Image Recognition</em>.</li>
+<li>Tan &amp; Le (2019). <em>EfficientNet</em>; Liu et al. (2022). <em>A ConvNet for the 2020s</em>.</li>
+<li>Tài liệu torchvision: <em>Models and pre-trained weights</em> (số tham số và độ chính xác lấy từ metadata chính thức).</li>
+</ul>
+
+      </div>
+      <section class="practice"><h2><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <circle cx="12" cy="12" r="6" /> <circle cx="12" cy="12" r="2" /></svg>Bài tập thực hành</h2><ol><li>Chạy ResNet-18 và MobileNetV3 pretrained trên 10 ảnh của bạn; so sánh top-5, số tham số và thời gian suy luận trên CPU.</li></ol><p>Làm xong bài tập mới chuyển sang bài tiếp theo: tự viết code là cách duy nhất để nhớ lâu.</p></section><div class="lesson-done" data-course="vision-engineer"><button type="button" class="lesson-done-btn" data-lesson-done="kien-truc-cnn-kinh-dien" aria-pressed="false"><span class="box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></span><span class="off">Đánh dấu đã học xong</span><span class="on">Đã học xong bài này</span></button><a class="btn lg" href="../hoc/vanishing-exploding-gradient-weight-init.html">Bài tiếp theo<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a></div>
+      <footer class="article-foot">
+        <div class="tags"><a class="tag" href="../search.html?q=Deep Learning">#Deep Learning</a><a class="tag" href="../search.html?q=Computer Vision">#Computer Vision</a><a class="tag" href="../search.html?q=PyTorch">#PyTorch</a></div>
+        <div class="share">
+      <span>Chia sẻ:</span>
+      <a class="share-btn fb" href="https://www.facebook.com/sharer/sharer.php?u=https://hocfree.vn/hoc/kien-truc-cnn-kinh-dien.html" target="_blank" rel="noopener" aria-label="Chia sẻ Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8z"/></svg></a>
+      <a class="share-btn x" href="https://twitter.com/intent/tweet?url=https://hocfree.vn/hoc/kien-truc-cnn-kinh-dien.html" target="_blank" rel="noopener" aria-label="Chia sẻ X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+      <button class="share-btn copy-link" data-url="https://hocfree.vn/hoc/kien-truc-cnn-kinh-dien.html" aria-label="Sao chép liên kết"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+    </div>
+      </footer>
+      <div class="author-box">
+        <span class="avatar lg" aria-hidden="true">HF</span>
+        <div>
+          <strong>Ban biên tập HọcFree</strong>
+          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và ngoại ngữ, hoàn toàn miễn phí.</p>
+        </div>
+      </div>
+      <nav class="pager lesson-pager" aria-label="Bài học trước/sau"><a class="prev" href="../hoc/batchnorm-dropout-receptive-field.html"><span>← Bài trước · Bài 7</span>BatchNorm, Dropout và receptive field</a><a class="next" href="../hoc/vanishing-exploding-gradient-weight-init.html"><span>Bài tiếp → · Bài 9</span>Vanishing gradient, khởi tạo trọng số, gradient clipping</a></nav>
+    </article>
+    <aside class="sidebar course-side" data-course="vision-engineer">
+      <section class="widget course-toc">
+        <p class="widget-title">Chặng 10/14 · Vision Engineer</p>
+        <a class="course-toc-title" href="../lo-trinh/vision-engineer/deep-learning.html">Deep Learning</a>
+        <div class="lc" data-lesson-count="machine-learning-la-gi hoi-quy-tuyen-tinh-gradient-descent-numpy deep-learning-3-mang-no-ron-va-cnn pytorch-co-ban-tensor-autograd loss-function-gradient-descent-optimizer backpropagation-lan-truyen-nguoc batchnorm-dropout-receptive-field kien-truc-cnn-kinh-dien vanishing-exploding-gradient-weight-init deep-learning-5-dataset-dataloader-augmentation overfitting-chia-train-val-test phan-loai-anh-ok-ng-transfer-learning-pytorch"><div class="lc-bar"><span data-lc-bar></span></div><span data-lc-text>0/12 bài</span></div>
+        <ol class="toc-lessons"><li data-lesson="machine-learning-la-gi"><a href="../kien-thuc/machine-learning-la-gi.html"><span class="tn">1</span><span class="tt">Machine Learning là gì?</span></a></li><li data-lesson="hoi-quy-tuyen-tinh-gradient-descent-numpy"><a href="../hoc/hoi-quy-tuyen-tinh-gradient-descent-numpy.html"><span class="tn">2</span><span class="tt">Gradient descent từ đầu với NumPy</span></a></li><li data-lesson="deep-learning-3-mang-no-ron-va-cnn"><a href="../hoc/deep-learning-3-mang-no-ron-va-cnn.html"><span class="tn">3</span><span class="tt">Mạng nơ-ron và CNN hoạt động thế nào</span></a></li><li data-lesson="pytorch-co-ban-tensor-autograd"><a href="../hoc/pytorch-co-ban-tensor-autograd.html"><span class="tn">4</span><span class="tt">PyTorch cơ bản: tensor, autograd, vòng lặp huấn luyện</span></a></li><li data-lesson="loss-function-gradient-descent-optimizer"><a href="../hoc/loss-function-gradient-descent-optimizer.html"><span class="tn">5</span><span class="tt">Loss function và các optimizer: SGD, Momentum, Adam</span></a></li><li data-lesson="backpropagation-lan-truyen-nguoc"><a href="../hoc/backpropagation-lan-truyen-nguoc.html"><span class="tn">6</span><span class="tt">Backpropagation: lan truyền ngược</span></a></li><li data-lesson="batchnorm-dropout-receptive-field"><a href="../hoc/batchnorm-dropout-receptive-field.html"><span class="tn">7</span><span class="tt">BatchNorm, Dropout và receptive field</span></a></li><li data-lesson="kien-truc-cnn-kinh-dien" class="is-current"><a href="../hoc/kien-truc-cnn-kinh-dien.html" aria-current="page"><span class="tn">8</span><span class="tt">Các kiến trúc CNN kinh điển: LeNet đến ResNet</span></a></li><li data-lesson="vanishing-exploding-gradient-weight-init"><a href="../hoc/vanishing-exploding-gradient-weight-init.html"><span class="tn">9</span><span class="tt">Vanishing gradient, khởi tạo trọng số, gradient clipping</span></a></li><li data-lesson="deep-learning-5-dataset-dataloader-augmentation"><a href="../hoc/deep-learning-5-dataset-dataloader-augmentation.html"><span class="tn">10</span><span class="tt">Dataset, DataLoader và augmentation</span></a></li><li data-lesson="overfitting-chia-train-val-test"><a href="../kien-thuc/overfitting-chia-train-val-test.html"><span class="tn">11</span><span class="tt">Overfitting và chia train/val/test</span></a></li><li data-lesson="phan-loai-anh-ok-ng-transfer-learning-pytorch"><a href="../hoc/phan-loai-anh-ok-ng-transfer-learning-pytorch.html"><span class="tn">12</span><span class="tt">Dự án chặng 10: phân loại ảnh OK/NG bằng transfer learning</span></a></li></ol>
+        <a class="more" href="../lo-trinh/vision-engineer.html">Xem toàn bộ lộ trình<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a>
+      </section>
+    </aside>
+  </div>
+  <section class="band">
+    <div class="container">
+      <div class="section-title"><h2>Có thể bạn quan tâm</h2></div>
+      <div class="card-grid"><article class="card">
+  <a class="thumb" href="../hoc/tong-quan-deep-learning-computer-vision.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/tong-quan-deep-learning-computer-vision.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/tong-quan-deep-learning-computer-vision.html">Tổng quan Deep Learning cho Computer Vision</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-14">14/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>10 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/linear-classifier-den-neural-network.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/linear-classifier-den-neural-network.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/linear-classifier-den-neural-network.html">Từ Linear Classifier đến Neural Network</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-14">14/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>11 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/loss-function-gradient-descent-optimizer.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/loss-function-gradient-descent-optimizer.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/loss-function-gradient-descent-optimizer.html">Loss function và optimizer: SGD, Momentum, RMSProp, Adam</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-14">14/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>13 phút đọc</span></div>
+</article></div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <a class="logo" href="../"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+      <p>HọcFree.vn – nền tảng học miễn phí về AI, lập trình, Computer Vision, Machine Vision, tin tức AI và ngoại ngữ dành cho người Việt.</p>
+    </div>
+    <div><h3>Học &amp; thực hành</h3><ul><li><a href="../hoc/">Học AI &amp; Lập trình</a></li><li><a href="../projects/">Projects</a></li><li><a href="../lo-trinh/">Learning Paths</a></li></ul></div>
+    <div><h3>Khám phá</h3><ul><li><a href="../kien-thuc/">Kiến thức</a></li><li><a href="../tin-tuc-ai/">Tin tức AI</a></li><li><a href="../ngoai-ngu/">Ngoại ngữ</a></li><li><a href="../tai-nguyen/">Tài nguyên</a></li></ul></div>
+    <div><h3>Bài mới</h3><ul><li><a href="../tai-nguyen/slide-deep-learning-computer-vision-ban-do-bai-hoc.html">Học theo slide Deep Learning – Computer Vision: bản đồ bài học</a></li><li><a href="../hoc/tong-quan-deep-learning-computer-vision.html">Tổng quan Deep Learning cho Computer Vision</a></li><li><a href="../hoc/linear-classifier-den-neural-network.html">Từ Linear Classifier đến Neural Network</a></li><li><a href="../hoc/loss-function-gradient-descent-optimizer.html">Loss function và optimizer: SGD, Momentum, RMSProp, Adam</a></li></ul></div>
+    <div>
+      <h3>HọcFree</h3>
+      <ul>
+        <li><a href="../gioi-thieu.html">Giới thiệu</a></li>
+        <li><a href="../search.html">Tìm kiếm</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">© 2026 HọcFree.vn · Kiến thức là để chia sẻ.</div>
+  </div>
+</footer>
+<button class="to-top" aria-label="Lên đầu trang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<script src="../assets/js/search-data.js?v=20261014" defer></script>
+<script src="../assets/js/main.js?v=20261014" defer></script>
+</body>
+</html>

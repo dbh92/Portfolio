@@ -247,6 +247,17 @@ ORG = {"@type": "Organization", "name": SITE["name"], "url": SITE["domain"] + "/
 PRELOAD_FONTS = ["be-vietnam-pro-latin-400-normal", "be-vietnam-pro-vietnamese-400-normal", "be-vietnam-pro-latin-800-normal"]
 
 
+def math_head(root):
+    """KaTeX tự host (assets/vendor/katex, v0.16.11) cho bài có "math": true.
+    Công thức viết trong bài bằng \\( … \\) (cùng dòng) và \\[ … \\] (dòng riêng); bỏ qua pre/code."""
+    k = f"{root}assets/vendor/katex"
+    return (f'<link rel="stylesheet" href="{k}/katex.min.css">\n'
+            f'<script defer src="{k}/katex.min.js"></script>\n'
+            f'<script defer src="{k}/contrib/auto-render.min.js" onload="renderMathInElement('
+            "document.querySelector('.prose'),{delimiters:[{left:'\\\\[',right:'\\\\]',display:true},"
+            "{left:'\\\\(',right:'\\\\)',display:false}],throwOnError:false})\"></script>\n")
+
+
 def head(root, title, desc, canonical, image, og_type="website", extra="", robots=None):
     robots = robots or "index, follow, max-image-preview:large"
     if title == SITE["name"]:
@@ -901,6 +912,8 @@ def build_post(p):
                 f'<meta property="article:section" content="{e(p["cat"]["name"])}">\n'
                 + "".join(f'<meta property="article:tag" content="{e(t)}">\n' for t in p["tags"]))
     extra = og_extra + ld_json(article_ld, crumb_ld)
+    if p.get("math"):
+        extra += math_head(root)
 
     page = head(root, p["title"], p["excerpt"], url, og_img(p), og_type="article", extra=extra)
     page += header(root, active="lo-trinh" if course else p["cat"]["section"])

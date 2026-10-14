@@ -1,0 +1,341 @@
+<p>Lý thuyết về neuron, loss, gradient descent và backprop đã đủ. Bài này chuyển sang thực hành: dùng <strong>PyTorch</strong>, framework phổ biến nhất trong nghiên cứu và ngày càng nhiều trong công nghiệp, để xây dựng trọn vẹn một pipeline huấn luyện phân loại ảnh CIFAR-10. Khung 7 bước ở đây dùng lại được cho CNN, transfer learning, detection…</p>
+<p class="note">Số trang (ví dụ "trang 81") trong bài chỉ tới slide của bài giảng <a href="../tai-nguyen/slide-deep-learning-computer-vision-ban-do-bai-hoc.html">Deep Learning – Computer Vision – NLP</a> (Thang Nguyen, Viet Nguyen); bài này giải thích chi tiết, kiểm chứng và đính chính các slide đó.</p>
+<p>Yêu cầu: biết Python cơ bản (xem chủ đề <a href="python.html">Python</a> và chặng 1 của lộ trình), cài <code>pip install torch torchvision</code> (chọn bản có CUDA tại pytorch.org nếu máy có GPU NVIDIA), hoặc dùng Google Colab.</p>
+
+<h2>Bản đồ 7 bước</h2>
+<div class="table-wrap"><table>
+<tr><th>Bước</th><th>Việc cần làm</th><th>Công cụ PyTorch</th></tr>
+<tr><td>1. Setup a dataset</td><td>Xây dựng dataset từ tập ảnh</td><td><code>torchvision.datasets</code>, <code>Dataset</code>, <code>DataLoader</code>, <code>transforms</code></td></tr>
+<tr><td>2. Define a model</td><td>Định nghĩa mô hình</td><td><code>torch.nn</code>, <code>torchvision.models</code></td></tr>
+<tr><td>3. Define a loss function</td><td>Chọn hoặc tự xây một (vài) hàm loss</td><td><code>nn.CrossEntropyLoss</code>…</td></tr>
+<tr><td>4. Define an optimizer</td><td>Chọn optimizer</td><td><code>torch.optim</code></td></tr>
+<tr><td>5. Train</td><td>Huấn luyện với training data</td><td>vòng lặp + <code>autograd</code></td></tr>
+<tr><td>6. Validate</td><td>Đánh giá trong quá trình huấn luyện với validation data</td><td><code>model.eval()</code>, <code>torch.no_grad()</code></td></tr>
+<tr><td>7. Test</td><td>Đánh giá mô hình cuối cùng với test data</td><td>như bước 6, chỉ chạy <strong>một lần</strong></td></tr>
+</table></div>
+<p>Toàn bộ nằm trên nền <code>torch.autograd</code>: dữ liệu đi qua <strong>Data → Dataset → DataLoader</strong>, vào <strong>Model → Loss</strong>, rồi <strong>Optimizer</strong> cập nhật trọng số (trang 76).</p>
+
+<h2>Tensor: "mảng NumPy chạy được trên GPU"</h2>
+<p>Tensor trong PyTorch tương đương <code>ndarray</code> của NumPy, cộng thêm hai siêu năng lực: chạy trên GPU và tự tính gradient (autograd).</p>
+<div class="table-wrap"><table>
+<tr><th>Rank (ndim)</th><th>Tên gọi</th><th>Ví dụ</th><th>Trong Computer Vision</th></tr>
+<tr><td>0</td><td>scalar</td><td><code>torch.tensor(3)</code></td><td>giá trị loss</td></tr>
+<tr><td>1</td><td>vector</td><td><code>torch.tensor([1.0, 2.0, 3.0])</code></td><td>nhãn của một batch, logits một ảnh</td></tr>
+<tr><td>2</td><td>matrix</td><td><code>torch.tensor([[1., 2.], [3., 4.]])</code></td><td>ảnh xám H×W, trọng số Linear</td></tr>
+<tr><td>3</td><td>tensor 3 chiều</td><td>shape <code>(3, 224, 224)</code></td><td>một ảnh màu C×H×W</td></tr>
+<tr><td>4</td><td>tensor 4 chiều</td><td>shape <code>(16, 3, 32, 32)</code></td><td>một batch ảnh N×C×H×W</td></tr>
+</table></div>
+<pre><code class="language-python">import torch
+
+tensor = torch.tensor([[[1, 2, 3],
+                        [3, 6, 9],
+                        [2, 4, 5]]])
+print(tensor.shape)    # torch.Size([1, 3, 3])  ← dim 0 có 1 phần tử, dim 1 và dim 2 mỗi chiều 3
+print(tensor.ndim)     # 3
+print(tensor.dtype)    # torch.int64
+print(tensor.device)   # cpu
+
+# Các thao tác hay dùng
+x = torch.rand(2, 3, 32, 32)            # batch 2 ảnh màu 32x32
+print(x.view(2, -1).shape)              # (2, 3072): duỗi phẳng, -1 = tự suy ra
+print(x.permute(0, 2, 3, 1).shape)      # (2, 32, 32, 3): đổi thứ tự trục NCHW -&gt; NHWC
+print(x[0].unsqueeze(0).shape)          # (1, 3, 32, 32): thêm trục batch
+device = "cuda" if torch.cuda.is_available() else "cpu"
+x = x.to(device)                         # chuyển sang GPU (nếu có)</code></pre>
+<p>Cách đọc "dim": <code>dim=0</code> là cặp ngoặc ngoài cùng, <code>dim=1</code> là cấp ngoặc tiếp theo… Phần tử cuối của <code>shape</code> luôn ứng với cặp ngoặc trong cùng.</p>
+
+<h2>Từ ảnh đến tensor</h2>
+<p>Hai cách đọc ảnh ở trang 67 cho ra tensor <strong>khác nhau</strong>, rất đáng để ý:</p>
+<div class="table-wrap"><table>
+<tr><th>Cách đọc</th><th>Shape</th><th>Kiểu, khoảng giá trị</th><th>Thứ tự màu</th></tr>
+<tr><td><code>torch.from_numpy(cv2.imread(...))</code></td><td>(441, 784, 3): H×W×C</td><td><code>uint8</code>, 0–255</td><td>BGR</td></tr>
+<tr><td><code>ToTensor()(Image.open(...))</code></td><td>(3, 441, 784): C×H×W</td><td><code>float32</code>, 0.0–1.0</td><td>RGB</td></tr>
+</table></div>
+<pre><code class="language-python">import cv2
+import torch
+from PIL import Image
+from torchvision.transforms import ToTensor
+
+# Cách 1: Pillow + ToTensor (khuyên dùng với torchvision)
+img = ToTensor()(Image.open("cat.jpg").convert("RGB"))     # (3, H, W), float [0, 1]
+
+# Cách 2: OpenCV -&gt; phải tự đổi màu, đổi trục và chuẩn hoá
+bgr = cv2.imread("cat.jpg")                                 # (H, W, 3) uint8, BGR
+rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+img2 = torch.from_numpy(rgb).permute(2, 0, 1).float() / 255.0  # (3, H, W) float [0, 1]
+print(torch.allclose(img, img2, atol=1/255))                # gần như bằng nhau</code></pre>
+
+<h2>Tiền xử lý dữ liệu: zero-center và normalize</h2>
+<p>Như minh hoạ ở trang 62: dữ liệu gốc lệch tâm và trải dài không đều; trừ trung bình (<strong>zero-centered</strong>) đưa nó về quanh gốc toạ độ, chia độ lệch chuẩn (<strong>normalized</strong>) đưa các chiều về cùng thang đo. Với ảnh, ta chuẩn hoá <strong>từng kênh màu</strong>:</p>
+\[ x' = \frac{x - \mu_c}{\sigma_c} \]
+<p>Dữ liệu chuẩn hoá giúp mặt loss "tròn" hơn, gradient descent hội tụ nhanh và ổn định hơn. Hai bộ giá trị phổ biến:</p>
+<ul>
+<li><strong>CIFAR-10</strong>: mean ≈ (0.4914, 0.4822, 0.4465), std ≈ (0.2470, 0.2435, 0.2616).</li>
+<li><strong>ImageNet</strong> (dùng khi fine-tune mô hình pretrained): mean (0.485, 0.456, 0.406), std (0.229, 0.224, 0.225).</li>
+</ul>
+<div class="warn"><strong>Chỉ tính thống kê trên tập train</strong>Mean và std phải tính trên <strong>tập train</strong> rồi áp dụng nguyên cho validation, test và khi triển khai. Tính trên cả tập test là rò rỉ dữ liệu (data leakage).</div>
+<pre><code class="language-python">from torchvision import datasets, transforms
+
+raw = datasets.CIFAR10("./data", train=True, download=True, transform=transforms.ToTensor())
+x = torch.stack([img for img, _ in raw])        # (50000, 3, 32, 32), tốn ~600MB RAM
+print(x.mean(dim=(0, 2, 3)), x.std(dim=(0, 2, 3)))   # tính theo từng kênh</code></pre>
+
+<h2>Bước 1: Dataset và DataLoader</h2>
+<h3>Cách 1: dataset có sẵn trong torchvision</h3>
+<p><code>torchvision.datasets</code> có sẵn MNIST, CIFAR-10/100, ImageNet, COCO, VOC… Mỗi phần tử trả về một cặp <code>(ảnh, nhãn)</code>:</p>
+<pre><code class="language-python">from torchvision.datasets import CIFAR10
+
+train_dataset = CIFAR10(root="./cifar", train=True, download=True)
+test_dataset = CIFAR10(root="./cifar", train=False, download=True)
+image, label = train_dataset[1009]       # tương đương train_dataset.__getitem__(1009)
+print(image.size, label)                  # (32, 32) 2  ← ảnh PIL 32x32, nhãn 2 = 'bird'
+print(train_dataset.classes)              # ['airplane', 'automobile', 'bird', ...]
+print(train_dataset.class_to_idx)         # {'airplane': 0, 'automobile': 1, ...}</code></pre>
+<h3>Cách 2: ImageFolder, khi ảnh đã chia theo thư mục</h3>
+<p>Nếu dữ liệu được sắp xếp mỗi lớp một thư mục, <code>ImageFolder</code> tự gán nhãn theo tên thư mục (sắp xếp theo thứ tự chữ cái):</p>
+<pre><code class="language-text">butterfly/
+├── train/
+│   ├── ADONIS/        1.jpg, 2.jpg, ...
+│   └── ATLAS MOTH/    1.jpg, 2.jpg, ...
+├── valid/ ...
+└── test/  ...</code></pre>
+<pre><code class="language-python">from torchvision.datasets import ImageFolder
+
+train_dataset = ImageFolder(root="butterfly/train")
+val_dataset = ImageFolder(root="butterfly/valid")
+image, label = train_dataset[1009]
+print(image.size, label, train_dataset.classes[label])</code></pre>
+<h3>Cách 3: tự viết Dataset</h3>
+<p>Dữ liệu thực tế hiếm khi đúng khuôn. Một custom dataset chỉ cần (trang 71): kế thừa <code>torch.utils.data.Dataset</code>, cài đặt <code>__len__</code> (số mẫu) và <code>__getitem__</code> (trả về mẫu thứ <code>idx</code>). Ví dụ đọc ảnh lỗi sản phẩm với nhãn trong file CSV:</p>
+<pre><code class="language-python">import os
+import pandas as pd
+from PIL import Image
+from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms
+
+
+class DefectDataset(Dataset):
+    """Đọc ảnh trong thư mục images/ và nhãn từ file CSV (cột filename, label)."""
+
+    def __init__(self, root, csv_file, transform=None):
+        self.root = root
+        self.df = pd.read_csv(os.path.join(root, csv_file))
+        self.classes = sorted(self.df["label"].unique())
+        self.class_to_idx = {c: i for i, c in enumerate(self.classes)}
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, idx):
+        row = self.df.iloc[idx]
+        image = Image.open(os.path.join(self.root, "images", row["filename"])).convert("RGB")
+        label = self.class_to_idx[row["label"]]
+        if self.transform:
+            image = self.transform(image)
+        return image, label
+
+
+tf = transforms.Compose([transforms.Resize((224, 224)), transforms.ToTensor()])
+ds = DefectDataset("data/defects", "labels.csv", transform=tf)
+loader = DataLoader(ds, batch_size=4, shuffle=True)
+images, labels = next(iter(loader))
+print(images.shape)    # torch.Size([4, 3, 224, 224])</code></pre>
+<div class="tip"><strong>Mẹo</strong>Chỉ lưu <strong>đường dẫn</strong> trong <code>__init__</code>, đọc ảnh trong <code>__getitem__</code>. Nạp cả nghìn ảnh vào RAM từ đầu sẽ làm chậm và dễ tràn bộ nhớ.</div>
+<h3>DataLoader: gom batch, xáo trộn, đọc song song</h3>
+<pre><code class="language-python">from torch.utils.data import DataLoader
+
+train_loader = DataLoader(train_set, batch_size=16, shuffle=True,
+                          num_workers=8, drop_last=True, pin_memory=True)
+test_loader = DataLoader(test_set, batch_size=4, shuffle=False, num_workers=8)
+
+for images, labels in train_loader:
+    print(images.shape, labels.shape)    # torch.Size([16, 3, 32, 32]) torch.Size([16])
+    break</code></pre>
+<ul>
+<li><code>shuffle=True</code> cho tập train (mỗi epoch thứ tự khác nhau), <code>False</code> cho val/test.</li>
+<li><code>num_workers</code>: số tiến trình đọc dữ liệu song song. Trên Windows, code phải nằm trong khối <code>if __name__ == "__main__":</code>, nếu không sẽ lỗi.</li>
+<li><code>drop_last=True</code>: bỏ batch cuối bị thiếu (hữu ích khi có BatchNorm).</li>
+<li><code>pin_memory=True</code>: tăng tốc chép dữ liệu sang GPU.</li>
+</ul>
+<div class="tip"><strong>Đính chính đoạn code ở trang 70</strong>Slide gán <code>dataset = torchvision.datasets.ImageNet(...)</code> nhưng lại truyền <code>imagenet_data</code> vào <code>DataLoader</code>: hai tên biến phải trùng nhau. Ngoài ra ImageNet không tự tải về được; bạn phải đăng ký tải file gốc từ image-net.org rồi trỏ <code>root</code> vào đó.</div>
+
+<h2>Bước 2: Định nghĩa mô hình</h2>
+<p>Mọi mô hình kế thừa <code>nn.Module</code>: khai báo các layer trong <code>__init__</code>, mô tả luồng dữ liệu trong <code>forward</code>. Hai cách viết ở trang 73 là tương đương; cách dùng <code>nn.Sequential</code> gọn hơn:</p>
+<pre><code class="language-python">import torch
+import torch.nn as nn
+
+
+class SimpleNeuralNetwork(nn.Module):
+    def __init__(self, num_classes=10):
+        super().__init__()
+        self.flatten = nn.Flatten()
+        self.layers = nn.Sequential(
+            nn.Linear(3 * 32 * 32, 512), nn.ReLU(),
+            nn.Linear(512, 1024), nn.ReLU(),
+            nn.Linear(1024, 512), nn.ReLU(),
+            nn.Linear(512, num_classes),        # đầu ra là logits, KHÔNG thêm softmax
+        )
+
+    def forward(self, x):
+        return self.layers(self.flatten(x))
+
+
+model = SimpleNeuralNetwork()
+random_image = torch.rand(1, 3, 32, 32)          # [B, C, H, W]
+print(model(random_image).shape)                  # torch.Size([1, 10])
+print(sum(p.numel() for p in model.parameters()))  # 2628618 tham số</code></pre>
+<p>Gần 2,63 triệu tham số, phần lớn nằm ở lớp đầu (3072×512). Con số này sẽ là điểm so sánh khi ta chuyển sang CNN.</p>
+
+<h2>Bước 3 và 4: Loss function và Optimizer</h2>
+<pre><code class="language-python">import torch.nn as nn
+from torch.optim import SGD
+
+criterion = nn.CrossEntropyLoss()
+optimizer = SGD(model.parameters(), lr=0.001, momentum=0.9)</code></pre>
+<p>Lý do chọn và các lựa chọn khác đã phân tích ở bài <a href="loss-function-gradient-descent-optimizer.html">Loss function và Optimizer</a>.</p>
+
+<h2>Bước 5, 6, 7: Train, Validate, Test (script hoàn chỉnh)</h2>
+<p>Ba tập dữ liệu có vai trò khác nhau, nhầm lẫn là lỗi phương pháp nghiêm trọng:</p>
+<ul>
+<li><strong>Train</strong>: dùng để cập nhật trọng số.</li>
+<li><strong>Validation</strong>: theo dõi trong lúc huấn luyện, chọn siêu tham số, chọn checkpoint tốt nhất, phát hiện overfitting. CIFAR-10 không có sẵn tập validation, nên ta tách 5.000 ảnh từ tập train.</li>
+<li><strong>Test</strong>: chỉ chạy <strong>một lần</strong> ở cuối để báo cáo kết quả khách quan.</li>
+</ul>
+<pre><code class="language-python">import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader, random_split
+from torchvision import datasets, transforms
+
+MEAN, STD = (0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)
+
+
+class SimpleNeuralNetwork(nn.Module):
+    def __init__(self, num_classes=10):
+        super().__init__()
+        self.flatten = nn.Flatten()
+        self.layers = nn.Sequential(
+            nn.Linear(3 * 32 * 32, 512), nn.ReLU(),
+            nn.Linear(512, 1024), nn.ReLU(),
+            nn.Linear(1024, 512), nn.ReLU(),
+            nn.Linear(512, num_classes),
+        )
+
+    def forward(self, x):
+        return self.layers(self.flatten(x))
+
+
+def train_one_epoch(model, loader, criterion, optimizer, device):
+    model.train()                                   # bật chế độ huấn luyện (Dropout, BatchNorm)
+    total_loss, correct, n = 0.0, 0, 0
+    for images, labels in loader:
+        images, labels = images.to(device), labels.to(device)
+        outputs = model(images)                     # forward
+        loss = criterion(outputs, labels)
+        optimizer.zero_grad()                       # xoá gradient cũ
+        loss.backward()                             # backward
+        optimizer.step()                            # cập nhật trọng số
+        total_loss += loss.item() * images.size(0)
+        correct += (outputs.argmax(1) == labels).sum().item()
+        n += images.size(0)
+    return total_loss / n, correct / n
+
+
+@torch.no_grad()                                     # không cần tính gradient khi đánh giá
+def evaluate(model, loader, criterion, device):
+    model.eval()                                    # tắt Dropout, BatchNorm dùng thống kê đã lưu
+    total_loss, correct, n = 0.0, 0, 0
+    for images, labels in loader:
+        images, labels = images.to(device), labels.to(device)
+        outputs = model(images)
+        total_loss += criterion(outputs, labels).item() * images.size(0)
+        correct += (outputs.argmax(1) == labels).sum().item()
+        n += images.size(0)
+    return total_loss / n, correct / n
+
+
+def main():
+    torch.manual_seed(42)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    # ---- Bước 1: dataset + dataloader ----
+    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize(MEAN, STD)])
+    full_train = datasets.CIFAR10("./data", train=True, download=True, transform=transform)
+    test_set = datasets.CIFAR10("./data", train=False, download=True, transform=transform)
+    train_set, val_set = random_split(full_train, [45000, 5000],
+                                      generator=torch.Generator().manual_seed(42))
+    train_loader = DataLoader(train_set, batch_size=128, shuffle=True, num_workers=2, drop_last=True)
+    val_loader = DataLoader(val_set, batch_size=256, shuffle=False, num_workers=2)
+    test_loader = DataLoader(test_set, batch_size=256, shuffle=False, num_workers=2)
+
+    # ---- Bước 2, 3, 4: model, loss, optimizer ----
+    model = SimpleNeuralNetwork(num_classes=10).to(device)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+
+    # ---- Bước 5, 6: train + validate ----
+    best_acc = 0.0
+    for epoch in range(20):
+        tr_loss, tr_acc = train_one_epoch(model, train_loader, criterion, optimizer, device)
+        va_loss, va_acc = evaluate(model, val_loader, criterion, device)
+        print(f"epoch {epoch + 1:2d} | train loss {tr_loss:.3f} acc {tr_acc:.3f} "
+              f"| val loss {va_loss:.3f} acc {va_acc:.3f}")
+        if va_acc &gt; best_acc:                       # lưu checkpoint tốt nhất theo validation
+            best_acc = va_acc
+            torch.save(model.state_dict(), "best_model.pt")
+
+    # ---- Bước 7: test với checkpoint tốt nhất ----
+    model.load_state_dict(torch.load("best_model.pt", map_location=device))
+    te_loss, te_acc = evaluate(model, test_loader, criterion, device)
+    print(f"TEST loss {te_loss:.3f} acc {te_acc:.3f}")
+
+
+if __name__ == "__main__":      # bắt buộc trên Windows khi num_workers &gt; 0
+    main()</code></pre>
+<p>Kỳ vọng: loss epoch đầu bắt đầu quanh 2.30 (\(\ln 10\)), val accuracy của mạng MLP này dừng ở khoảng 50–55%, trong khi train accuracy tiếp tục tăng: dấu hiệu <strong>overfitting</strong>. MLP coi ảnh như một dãy số rời rạc, bỏ qua cấu trúc không gian. Một CNN nhỏ với số tham số ít hơn có thể vượt 80%: đó là lý do ra đời của <a href="cnn-phep-tich-chap-pooling.html">CNN</a>.</p>
+<h3>Hai chế độ <code>train()</code> và <code>eval()</code></h3>
+<ul>
+<li><code>model.train()</code>: Dropout bật, BatchNorm dùng thống kê của batch hiện tại và cập nhật trung bình chạy.</li>
+<li><code>model.eval()</code>: Dropout tắt, BatchNorm dùng trung bình chạy đã lưu. Quên gọi <code>eval()</code> khi đánh giá là lỗi rất hay gặp, cho kết quả dao động khó hiểu.</li>
+<li><code>torch.no_grad()</code>: không xây đồ thị autograd, tiết kiệm bộ nhớ và tăng tốc khi đánh giá/suy luận.</li>
+</ul>
+
+<h2>Dự đoán một ảnh mới (inference)</h2>
+<pre><code class="language-python">from PIL import Image
+
+classes = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
+tf = transforms.Compose([transforms.Resize((32, 32)), transforms.ToTensor(), transforms.Normalize(MEAN, STD)])
+
+model.eval()
+x = tf(Image.open("my_cat.jpg").convert("RGB")).unsqueeze(0).to(device)   # thêm trục batch
+with torch.no_grad():
+    probs = torch.softmax(model(x), dim=1)[0]
+top3 = probs.topk(3)
+for p, i in zip(top3.values, top3.indices):
+    print(f"{classes[i]}: {p:.1%}")</code></pre>
+<p>Lưu ý ảnh khi suy luận phải qua <strong>đúng phép tiền xử lý</strong> như lúc huấn luyện (cùng kích thước, cùng mean/std).</p>
+
+<h2>Mẹo gỡ lỗi khi huấn luyện</h2>
+<ul>
+<li><strong>Overfit một batch</strong>: lấy 1 batch nhỏ, huấn luyện lặp lại; loss phải về gần 0. Nếu không, pipeline có lỗi.</li>
+<li><strong>Kiểm tra dữ liệu bằng mắt</strong>: vẽ vài ảnh sau transform kèm nhãn trước khi huấn luyện.</li>
+<li><strong>Cố định seed</strong> (<code>torch.manual_seed</code>) để so sánh thí nghiệm công bằng.</li>
+<li><strong>Ghi log</strong> loss/accuracy mỗi epoch (TensorBoard, Weights &amp; Biases) và vẽ đồ thị train vs val.</li>
+</ul>
+
+<h2>Tóm tắt</h2>
+<ul>
+<li>Tensor ảnh trong PyTorch: C×H×W, batch N×C×H×W, float đã chuẩn hoá.</li>
+<li>Dataset trả về một mẫu; DataLoader gom batch, xáo trộn, đọc song song.</li>
+<li>Model kế thừa <code>nn.Module</code>; đầu ra là logits.</li>
+<li>Vòng lặp: <code>train()</code> → forward → loss → <code>zero_grad</code> → <code>backward</code> → <code>step</code>; đánh giá với <code>eval()</code> + <code>no_grad()</code>.</li>
+<li>Train để học, validation để chọn, test để báo cáo một lần.</li>
+</ul>
+<p>Đọc tiếp: <a href="cnn-phep-tich-chap-pooling.html">Convolutional Neural Network: phép tích chập và pooling</a>.</p>
+
+<h2>Tài liệu tham khảo</h2>
+<ul>
+<li>PyTorch Tutorials: <em>Learn the Basics</em>, <em>Datasets &amp; DataLoaders</em>, <em>Training a Classifier</em> (pytorch.org/tutorials).</li>
+<li>Tài liệu torchvision: <em>Datasets</em> và <em>Transforms</em>.</li>
+<li>Andrej Karpathy (2019). <em>A Recipe for Training Neural Networks</em> (karpathy.github.io).</li>
+</ul>

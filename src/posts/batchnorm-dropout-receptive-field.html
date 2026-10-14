@@ -1,0 +1,194 @@
+<p>Bài <a href="deep-learning-3-mang-no-ron-va-cnn.html">Mạng nơ-ron và CNN hoạt động thế nào</a> đã có các "viên gạch" chính của CNN: convolution và pooling. Nhưng xếp chồng thật nhiều lớp conv thì mạng lại khó huấn luyện và dễ overfitting. Bài này giới thiệu các lớp bổ trợ đã trở thành tiêu chuẩn (<strong>Batch Normalization</strong>, <strong>Dropout</strong>), cùng khái niệm then chốt để thiết kế kiến trúc: <strong>receptive field</strong> và các mẫu sắp xếp layer phổ biến.</p>
+<p class="note">Số trang (ví dụ "trang 81") trong bài chỉ tới slide của bài giảng <a href="../tai-nguyen/slide-deep-learning-computer-vision-ban-do-bai-hoc.html">Deep Learning – Computer Vision – NLP</a> (Thang Nguyen, Viet Nguyen); bài này giải thích chi tiết, kiểm chứng và đính chính các slide đó.</p>
+
+<h2>Internal Covariate Shift: trò chơi "tam sao thất bản"</h2>
+<p>Hình minh hoạ ở trang 91 là trò chơi truyền tai: "peas" thành "bees", rồi "knees", "cheese", cuối cùng thành "fleas?". Trong mạng sâu, mỗi lớp nhận đầu vào là đầu ra của lớp trước. Khi lớp trước cập nhật trọng số, <strong>phân phối</strong> đầu vào của lớp sau thay đổi theo; lớp sau liên tục phải thích nghi với một "mục tiêu di động". Ioffe &amp; Szegedy (2015) gọi hiện tượng này là <strong>internal covariate shift</strong> và đề xuất Batch Normalization để khắc phục.</p>
+<p>Một lý do khác (trang 93): với activation như sigmoid, đầu vào có giá trị tuyệt đối lớn rơi vào vùng bão hoà, nơi đạo hàm gần 0. Chuẩn hoá kéo các giá trị về quanh 0, vùng mà gradient lớn nhất, nên mạng học nhanh hơn.</p>
+<div class="tip"><strong>Cập nhật từ nghiên cứu</strong>Santurkar et al. (2018, <em>How Does Batch Normalization Help Optimization?</em>) cho thấy BatchNorm hiệu quả chủ yếu vì nó làm <strong>mặt loss trơn hơn</strong> (gradient ổn định, dự đoán được), hơn là vì giảm internal covariate shift. Dù giải thích thế nào, hiệu quả thực nghiệm của BatchNorm là không bàn cãi.</div>
+
+<h2>Batch Normalization hoạt động thế nào?</h2>
+<p>Với feature map kích thước \(N\times C\times H\times W\), BatchNorm (BN) chuẩn hoá <strong>riêng từng kênh</strong> \(c\), lấy thống kê trên cả batch và toàn bộ vị trí không gian (trang 92):</p>
+\[ \mu_c = \frac{1}{NHW}\sum_{n,h,w} x_{nchw}, \qquad \sigma_c^2 = \frac{1}{NHW}\sum_{n,h,w}\left(x_{nchw} - \mu_c\right)^2 \]
+\[ \hat x = \frac{x - \mu_c}{\sqrt{\sigma_c^2 + \epsilon}}, \qquad y = \gamma_c\, \hat x + \beta_c \]
+<p>\(\gamma\) (scale) và \(\beta\) (shift) là <strong>tham số học được</strong>. Chúng cho phép mạng tự "huỷ" phép chuẩn hoá nếu cần (với \(\gamma = \sigma, \beta = \mu\) ta lấy lại đúng \(x\)), nên BN không làm giảm khả năng biểu diễn.</p>
+
+<h3>Giai đoạn huấn luyện (training)</h3>
+<p>Theo sơ đồ 5 bước ở trang 94:</p>
+<ol>
+<li>Nhận mini-batch activation.</li>
+<li>Tính mean và độ lệch chuẩn của <strong>batch hiện tại</strong> cho từng kênh.</li>
+<li>Chuẩn hoá.</li>
+<li>Scale và shift bằng \(\gamma, \beta\).</li>
+<li>Cập nhật <strong>trung bình chạy</strong> (moving/running average) của mean và variance để dùng về sau.</li>
+</ol>
+<div class="warn"><strong>Quy ước "momentum" trong PyTorch</strong>Slide viết \(\mu_{mov} = \alpha\,\mu_{mov} + (1-\alpha)\,\mu\) với \(\alpha\) là trọng số của giá trị cũ. PyTorch dùng quy ước ngược: \(\hat x_{new} = (1 - \text{momentum})\cdot\hat x + \text{momentum}\cdot x_t\), mặc định <code>momentum=0.1</code> (tương đương \(\alpha = 0.9\)). PyTorch lưu <strong>variance</strong> (không phải std) và dùng ước lượng không chệch (chia \(n-1\)) cho running variance, còn khi chuẩn hoá trong lúc train thì dùng variance chệch (chia \(n\)).</div>
+
+<h3>Giai đoạn suy luận (inference)</h3>
+<p>Khi dự đoán, ta có thể chỉ có một ảnh, và kết quả của một ảnh không được phép phụ thuộc vào các ảnh khác trong batch. Vì vậy BN dùng <strong>running mean/variance</strong> đã tích luỹ, không dùng thống kê batch (trang 95). Lúc này BN chỉ là một phép biến đổi tuyến tính cố định, thậm chí có thể "gộp" (fuse) vào lớp conv phía trước để tăng tốc khi triển khai.</p>
+<pre><code class="language-python">import torch
+import torch.nn as nn
+
+torch.manual_seed(0)
+bn = nn.BatchNorm2d(3)
+print([n for n, _ in bn.named_parameters()])  # ['weight', 'bias']  = gamma, beta (học được)
+print([n for n, _ in bn.named_buffers()])     # ['running_mean', 'running_var', 'num_batches_tracked']
+
+x = torch.randn(8, 3, 4, 4) * 5 + 10          # dữ liệu có mean ≈ 10, std ≈ 5
+
+bn.train()
+y = bn(x)
+print(y.mean(dim=(0, 2, 3)))                   # ≈ [0, 0, 0]: chuẩn hoá theo thống kê batch
+print(bn.running_mean)                         # ≈ [1.02, 1.04, 1.00] = 0.9*0 + 0.1*10.2
+
+bn.eval()
+print(bn(x).mean(dim=(0, 2, 3)))               # ≈ [4.86, 5.31, 5.25]: running stats chưa hội tụ!</code></pre>
+<p>Ví dụ trên cho thấy hai bài học: (1) <code>model.train()</code> và <code>model.eval()</code> cho kết quả <strong>khác nhau</strong>; (2) running stats cần nhiều batch để hội tụ, nên huấn luyện quá ít bước rồi đánh giá sẽ cho kết quả tệ khó hiểu.</p>
+
+<h3>Lưu ý thực hành với BatchNorm</h3>
+<ul>
+<li>Đặt <code>bias=False</code> cho lớp Conv/Linear ngay trước BN: bias bị trừ đi khi trừ mean, \(\beta\) đã đảm nhận vai trò đó.</li>
+<li>Thứ tự phổ biến: <strong>Conv → BN → ReLU</strong>.</li>
+<li>BN cần batch đủ lớn (thường ≥ 16). Batch quá nhỏ (detection, segmentation ảnh lớn chỉ vừa 1–2 ảnh/GPU) làm thống kê nhiễu: hãy dùng GroupNorm hoặc "đóng băng" BN.</li>
+<li>Lợi ích: cho phép learning rate lớn hơn, ít nhạy với khởi tạo trọng số, có tác dụng điều chuẩn (regularization) nhẹ.</li>
+</ul>
+
+<h2>Các kiểu Normalization khác</h2>
+<p>Bốn khối lập phương ở trang 96 khác nhau ở <strong>tập giá trị dùng để tính mean/variance</strong> (trục N: các mẫu trong batch, C: kênh, H,W: không gian):</p>
+<div class="table-wrap"><table>
+<tr><th>Loại</th><th>Chuẩn hoá trên</th><th>Phụ thuộc batch?</th><th>Dùng nhiều ở</th><th>PyTorch</th></tr>
+<tr><td>Batch Norm</td><td>N, H, W (mỗi kênh)</td><td>Có</td><td>CNN phân loại</td><td><code>nn.BatchNorm2d(C)</code></td></tr>
+<tr><td>Layer Norm</td><td>C, H, W (mỗi mẫu)</td><td>Không</td><td>Transformer, RNN</td><td><code>nn.LayerNorm(shape)</code></td></tr>
+<tr><td>Instance Norm</td><td>H, W (mỗi mẫu, mỗi kênh)</td><td>Không</td><td>Style transfer, GAN</td><td><code>nn.InstanceNorm2d(C)</code></td></tr>
+<tr><td>Group Norm</td><td>nhóm kênh, H, W (mỗi mẫu)</td><td>Không</td><td>Detection, segmentation batch nhỏ</td><td><code>nn.GroupNorm(G, C)</code></td></tr>
+</table></div>
+<p>Group Norm là "trung gian": với \(G = 1\) nó thành Layer Norm, với \(G = C\) thành Instance Norm.</p>
+
+<h2>Dropout: chống overfitting bằng cách "tắt ngẫu nhiên"</h2>
+<p>Trong lúc huấn luyện, mỗi neuron bị đặt bằng 0 với xác suất \(p\) (trang 97). Mỗi bước, mạng thực chất là một mạng con khác nhau. Hệ quả:</p>
+<ul>
+<li>Neuron không thể dựa dẫm vào một vài neuron cụ thể khác (giảm <strong>co-adaptation</strong>), buộc phải học đặc trưng bền vững hơn.</li>
+<li>Có thể xem như huấn luyện đồng thời một <strong>tập hợp (ensemble)</strong> khổng lồ các mạng con chia sẻ trọng số.</li>
+</ul>
+<p>PyTorch cài đặt <strong>inverted dropout</strong>: lúc train, các neuron còn lại được nhân \(1/(1-p)\) để kỳ vọng đầu ra không đổi; lúc suy luận Dropout không làm gì cả.</p>
+<pre><code class="language-python">d = nn.Dropout(p=0.5)
+t = torch.ones(1, 8)
+d.train(); print(d(t))   # tensor([[2., 2., 0., 2., 0., 0., 0., 0.]])  ← ngẫu nhiên, nhân 1/(1-0.5)=2
+d.eval();  print(d(t))   # tensor([[1., 1., 1., 1., 1., 1., 1., 1.]])  ← không làm gì</code></pre>
+<p>Thực hành: dùng Dropout chủ yếu trước các lớp fully connected (AlexNet, VGG dùng \(p = 0.5\)). Trong phần conv, nếu cần, dùng <code>nn.Dropout2d</code> (tắt cả kênh). Mạng có BN thường cần ít hoặc không cần Dropout ở phần conv.</p>
+
+<h2>Mẫu sắp xếp layer phổ biến của CNN</h2>
+<p>Trang 98 tóm tắt "công thức" kinh điển:</p>
+<ol>
+<li>Một vài block <strong>Conv → (BatchNorm) → ReLU</strong>.</li>
+<li><strong>Max-pooling</strong>.</li>
+<li>Lặp lại bước 1 và 2 cho đến khi feature map đủ bé.</li>
+<li><strong>Flatten</strong> (làm phẳng) feature map (hoặc global average pooling).</li>
+<li>Một (vài) lớp <strong>fully connected</strong>.</li>
+</ol>
+<p>Nguyên tắc thường gặp: mỗi lần pooling giảm H, W một nửa thì <strong>tăng gấp đôi số kênh</strong> (64 → 128 → 256…), giữ khối lượng tính toán mỗi tầng tương đối cân bằng.</p>
+
+<h2>Receptive Field: một neuron "nhìn thấy" bao nhiêu?</h2>
+<p><strong>Receptive field</strong> (vùng tiếp nhận) của một neuron là vùng trên ảnh đầu vào có ảnh hưởng đến giá trị của neuron đó. Một neuron sau conv 3×3 nhìn 3×3 pixel; một neuron ở lớp conv 3×3 thứ hai nhìn 3×3 neuron của lớp trước, tức <strong>5×5</strong> pixel của ảnh gốc (trang 99).</p>
+<p>Vì sao quan trọng? Để nhận ra một chiếc ô tô, neuron ở lớp cuối phải "nhìn" đủ rộng để bao trùm chiếc xe. Trong phân vùng ảnh (trang 100), để biết một pixel thuộc "xe" hay "đường", mô hình cần ngữ cảnh rộng xung quanh pixel đó.</p>
+<p>Công thức tính dần qua từng lớp \(l\) (kernel \(k_l\), stride \(s_l\)):</p>
+\[ r_l = r_{l-1} + (k_l - 1)\cdot j_{l-1}, \qquad j_l = j_{l-1}\cdot s_l, \qquad r_0 = j_0 = 1 \]
+<p>\(j\) là "bước nhảy" tích luỹ: sau mỗi lớp có stride, mỗi bước trên feature map tương ứng nhiều pixel hơn trên ảnh gốc. Áp dụng cho phần trích đặc trưng của CNN ở cuối bài:</p>
+<div class="table-wrap"><table>
+<tr><th>Lớp</th><th>k</th><th>s</th><th>Receptive field r</th><th>Bước nhảy j</th></tr>
+<tr><td>conv 3×3</td><td>3</td><td>1</td><td>3</td><td>1</td></tr>
+<tr><td>conv 3×3</td><td>3</td><td>1</td><td>5</td><td>1</td></tr>
+<tr><td>maxpool 2×2</td><td>2</td><td>2</td><td>6</td><td>2</td></tr>
+<tr><td>conv 3×3</td><td>3</td><td>1</td><td>10</td><td>2</td></tr>
+<tr><td>conv 3×3</td><td>3</td><td>1</td><td>14</td><td>2</td></tr>
+<tr><td>maxpool 2×2</td><td>2</td><td>2</td><td>16</td><td>4</td></tr>
+<tr><td>conv 3×3</td><td>3</td><td>1</td><td>24</td><td>4</td></tr>
+<tr><td>conv 3×3</td><td>3</td><td>1</td><td>32</td><td>4</td></tr>
+<tr><td>maxpool 2×2</td><td>2</td><td>2</td><td>36</td><td>8</td></tr>
+</table></div>
+<p>Sau 6 lớp conv và 3 lớp pooling, mỗi neuron đã nhìn vùng 36×36, bao trùm toàn bộ ảnh CIFAR 32×32. Để ý: conv sau pooling làm receptive field tăng nhanh hơn hẳn (+8 thay vì +2).</p>
+
+<h3>Effective Receptive Field</h3>
+<p>Không phải pixel nào trong receptive field cũng đóng góp như nhau (trang 103). Pixel ở trung tâm có nhiều "đường đi" tới neuron đầu ra hơn pixel ở rìa, nên ảnh hưởng mạnh hơn nhiều. Luo et al. (2016) chỉ ra <strong>effective receptive field</strong> có dạng gần Gauss và nhỏ hơn đáng kể so với receptive field lý thuyết. Vì vậy trên thực tế người ta thiết kế receptive field lý thuyết lớn hơn kích thước đối tượng cần nhận.</p>
+
+<h2>Bốn cách tăng receptive field</h2>
+<p>Theo trang 101:</p>
+<h3>1. Thêm lớp conv (mạng sâu hơn)</h3>
+<p>Mỗi conv 3×3 (stride 1) cộng thêm 2 vào receptive field. Đây cũng là lý do của nguyên tắc ở trang 102: <strong>nhiều conv kernel nhỏ tốt hơn một conv kernel lớn</strong>.</p>
+<div class="table-wrap"><table>
+<tr><th></th><th>2 lớp conv 3×3</th><th>1 lớp conv 5×5</th></tr>
+<tr><td>Receptive field</td><td class="c" colspan="2">5×5</td></tr>
+<tr><td>Số tham số (C kênh vào/ra)</td><td>\(2\cdot3\cdot3\cdot C^2 = 18C^2\)</td><td>\(5\cdot5\cdot C^2 = 25C^2\)</td></tr>
+<tr><td>Số lớp phi tuyến</td><td>2</td><td>1</td></tr>
+</table></div>
+<p>Tương tự, ba conv 3×3 có receptive field 7×7 với \(27C^2\) tham số, so với \(49C^2\) của một conv 7×7. Đây chính là triết lý thiết kế của VGG.</p>
+<h3>2. Thêm pooling hoặc stride (sub-sampling)</h3>
+<p>Pooling 2×2 nhân đôi bước nhảy \(j\), khiến mọi lớp phía sau "nhìn xa" gấp đôi (trang 104). Đổi lại là mất độ phân giải không gian, điều bất lợi cho phân vùng ảnh.</p>
+<h3>3. Dilated (Atrous) Convolution</h3>
+<p>Chèn "lỗ hổng" giữa các phần tử của kernel (trang 105). Kernel 3×3 với dilation \(d\) phủ vùng \(k + (k-1)(d-1)\): với \(d = 2\) phủ 5×5, \(d = 4\) phủ 9×9, nhưng vẫn chỉ 9 tham số và <strong>không giảm độ phân giải</strong>. Được dùng nhiều trong phân vùng ảnh (DeepLab) và xử lý âm thanh (WaveNet).</p>
+<pre><code class="language-python">dil = nn.Conv2d(64, 64, kernel_size=3, dilation=2, padding=2)   # padding = dilation để giữ kích thước
+print(dil(torch.rand(1, 64, 32, 32)).shape)                    # torch.Size([1, 64, 32, 32])</code></pre>
+<p>Nhược điểm: xếp chồng nhiều lớp cùng dilation có thể gây hiện tượng "lưới" (gridding), bỏ sót pixel; nên xen kẽ các mức dilation khác nhau (1, 2, 5…).</p>
+<h3>4. Depthwise (separable) Convolution</h3>
+<p>Bản thân depthwise conv không làm receptive field lớn hơn conv thường cùng kích thước kernel. Lợi ích của nó là <strong>rẻ</strong>: tách một conv chuẩn thành hai bước, (a) <em>depthwise</em>: mỗi kênh một filter riêng (<code>groups=C_in</code>), (b) <em>pointwise</em>: conv 1×1 trộn các kênh.</p>
+\[ \underbrace{K^2 C_{in} C_{out}}_{\text{conv chuẩn}} \quad\text{so với}\quad \underbrace{K^2 C_{in} + C_{in} C_{out}}_{\text{depthwise separable}} \]
+<p>Với \(K = 3, C_{in} = C_{out} = 256\): 589.824 so với 67.840 tham số (ít hơn khoảng 8,7 lần). Nhờ rẻ như vậy, các kiến trúc như MobileNet chạy được trên điện thoại, và ConvNeXt dùng được kernel depthwise lớn 7×7 để có receptive field rộng mà không tốn kém.</p>
+<pre><code class="language-python">depthwise_separable = nn.Sequential(
+    nn.Conv2d(256, 256, kernel_size=3, padding=1, groups=256, bias=False),   # depthwise
+    nn.Conv2d(256, 256, kernel_size=1, bias=False),                          # pointwise
+)</code></pre>
+
+<h2>Ghép lại: CNN kiểu VGG có BatchNorm cho CIFAR-10</h2>
+<pre><code class="language-python">import torch.nn as nn
+
+
+def conv_bn(cin, cout):
+    return nn.Sequential(
+        nn.Conv2d(cin, cout, kernel_size=3, padding=1, bias=False),
+        nn.BatchNorm2d(cout),
+        nn.ReLU(inplace=True),
+    )
+
+
+class CifarCNN(nn.Module):
+    def __init__(self, num_classes=10):
+        super().__init__()
+        self.features = nn.Sequential(
+            conv_bn(3, 64), conv_bn(64, 64), nn.MaxPool2d(2),        # 32 -&gt; 16
+            conv_bn(64, 128), conv_bn(128, 128), nn.MaxPool2d(2),    # 16 -&gt; 8
+            conv_bn(128, 256), conv_bn(256, 256), nn.MaxPool2d(2),   # 8 -&gt; 4
+        )
+        self.classifier = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),      # global average pooling: (N, 256, 4, 4) -&gt; (N, 256, 1, 1)
+            nn.Flatten(),
+            nn.Dropout(0.3),
+            nn.Linear(256, num_classes),
+        )
+
+    def forward(self, x):
+        return self.classifier(self.features(x))
+
+
+model = CifarCNN()
+print(sum(p.numel() for p in model.parameters()))   # 1148874</code></pre>
+<p>Khoảng 1,15 triệu tham số, nhưng gần như toàn bộ nằm ở các lớp conv; nhờ global average pooling, lớp FC chỉ còn 2.570 tham số. Thay model này vào script huấn luyện của bài <a href="pytorch-huan-luyen-mang-neural.html">PyTorch: 7 bước huấn luyện</a>, dùng learning rate 0.05–0.1 (BN cho phép learning rate lớn) và thêm data augmentation (xem <a href="deep-learning-5-dataset-dataloader-augmentation.html">Dataset, DataLoader và augmentation</a>), mạng thường đạt khoảng 88–91% trên CIFAR-10 sau vài chục epoch.</p>
+
+<h2>Tóm tắt</h2>
+<ul>
+<li>BatchNorm: chuẩn hoá từng kênh theo thống kê batch khi train, theo running stats khi suy luận; \(\gamma, \beta\) học được.</li>
+<li>Luôn gọi <code>model.train()</code>/<code>model.eval()</code> đúng lúc; batch nhỏ thì cân nhắc GroupNorm.</li>
+<li>Dropout tắt ngẫu nhiên neuron khi train, không làm gì khi suy luận.</li>
+<li>Mẫu kinh điển: [Conv → BN → ReLU] × n → Pool, lặp lại, rồi GAP/Flatten → FC.</li>
+<li>Receptive field tăng nhờ thêm lớp, pooling/stride, dilated conv; nhiều kernel 3×3 tốt hơn một kernel lớn.</li>
+</ul>
+<p>Tiếp theo: <a href="kien-truc-cnn-kinh-dien.html">Các kiến trúc CNN kinh điển: LeNet, AlexNet, VGG, ResNet</a>.</p>
+
+<h2>Tài liệu tham khảo</h2>
+<ul>
+<li>Ioffe &amp; Szegedy (2015). <em>Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift</em>.</li>
+<li>Santurkar et al. (2018). <em>How Does Batch Normalization Help Optimization?</em></li>
+<li>Wu &amp; He (2018). <em>Group Normalization</em>.</li>
+<li>Srivastava et al. (2014). <em>Dropout: A Simple Way to Prevent Neural Networks from Overfitting</em>.</li>
+<li>Luo et al. (2016). <em>Understanding the Effective Receptive Field in Deep Convolutional Neural Networks</em>.</li>
+<li>Yu &amp; Koltun (2016). <em>Multi-Scale Context Aggregation by Dilated Convolutions</em>; Howard et al. (2017). <em>MobileNets</em>.</li>
+<li>Tài liệu PyTorch: <code>nn.BatchNorm2d</code>, <code>nn.Dropout</code>.</li>
+</ul>

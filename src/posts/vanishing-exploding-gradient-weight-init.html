@@ -1,0 +1,185 @@
+<p>Bạn xây một mạng 20 lớp, bấm huấn luyện, và… loss gần như không nhúc nhích. Hoặc ngược lại, sau vài trăm bước loss bỗng thành <code>NaN</code>. Hai triệu chứng này đến từ cùng một gốc rễ: <strong>gradient biến mất</strong> (vanishing) hoặc <strong>bùng nổ</strong> (exploding) khi lan truyền ngược qua nhiều lớp. Bài này giải thích nguyên nhân bằng toán và thí nghiệm, rồi đi qua các "liều thuốc": hàm kích hoạt phù hợp, khởi tạo trọng số đúng công thức, BatchNorm, skip connection và gradient clipping.</p>
+<p class="note">Số trang (ví dụ "trang 81") trong bài chỉ tới slide của bài giảng <a href="../tai-nguyen/slide-deep-learning-computer-vision-ban-do-bai-hoc.html">Deep Learning – Computer Vision – NLP</a> (Thang Nguyen, Viet Nguyen); bài này giải thích chi tiết, kiểm chứng và đính chính các slide đó.</p>
+
+<h2>Vanishing gradient: vì sao các lớp đầu "chết"?</h2>
+<p>Nhắc lại quy tắc chuỗi (bài <a href="backpropagation-lan-truyen-nguoc.html">Backpropagation</a>): gradient tại lớp đầu là <strong>tích</strong> của rất nhiều đạo hàm cục bộ, mỗi lớp góp một thừa số:</p>
+\[ \frac{\partial L}{\partial x} = \frac{\partial L}{\partial a}\cdot\frac{\partial a}{\partial b}\cdot\frac{\partial b}{\partial c}\cdots\frac{\partial g}{\partial x} \]
+<ul>
+<li>Nếu các thừa số thường <strong>nhỏ hơn 1</strong>, tích co lại theo cấp số nhân: gradient ở các lớp đầu gần bằng 0, các lớp này gần như không học (hình "R.I.P." ở trang 118). Mạng sâu nhưng chỉ vài lớp cuối thực sự làm việc.</li>
+<li>Nếu các thừa số thường <strong>lớn hơn 1</strong>, tích phình to theo cấp số nhân: gradient bùng nổ.</li>
+</ul>
+<p>Mỗi thừa số gồm hai phần: đạo hàm của <strong>hàm kích hoạt</strong> và độ lớn của <strong>trọng số</strong>. Vì vậy hai "thủ phạm" chính là activation và cách khởi tạo trọng số.</p>
+
+<h2>Thủ phạm 1: hàm kích hoạt sigmoid</h2>
+\[ S(z) = \frac{1}{1+e^{-z}}, \qquad S'(z) = S(z)\,\big(1 - S(z)\big) \]
+<p>Đồ thị đạo hàm ở trang 119 cho thấy \(S'(z)\) đạt cực đại chỉ <strong>0,25</strong> tại \(z = 0\) và gần như bằng 0 khi \(|z| &gt; 5\) (vùng bão hoà). Qua 10 lớp sigmoid, kể cả trong trường hợp tốt nhất, gradient bị nhân với \(0{,}25^{10} \approx 9{,}5\times10^{-7}\). Ngoài ra sigmoid còn hai nhược điểm: đầu ra luôn dương (không zero-centered) khiến cập nhật trọng số bị zigzag, và phép <code>exp</code> tốn kém.</p>
+<p>Tanh tốt hơn (đạo hàm cực đại bằng 1, zero-centered) nhưng vẫn bão hoà ở hai đầu.</p>
+
+<h2>Liều thuốc 1: ReLU và các biến thể</h2>
+<h3>ReLU</h3>
+\[ R(z) = \max(0, z), \qquad R'(z) = \begin{cases} 1 &amp; z &gt; 0 \\ 0 &amp; z &lt; 0 \end{cases} \]
+<p>Với đầu vào dương, đạo hàm bằng đúng 1: gradient đi qua <strong>không bị co lại</strong> (trang 120). ReLU còn rẻ (chỉ một phép so sánh) và tạo kích hoạt thưa (nhiều neuron bằng 0). Nhược điểm: neuron có đầu vào luôn âm nhận gradient 0 mãi mãi, gọi là <strong>dying ReLU</strong>, hay xảy ra khi learning rate quá lớn. Tại \(z = 0\) đạo hàm không xác định; các framework quy ước bằng 0.</p>
+<h3>Các biến thể</h3>
+<div class="table-wrap"><table>
+<tr><th>Hàm</th><th>Công thức (với z ≤ 0)</th><th>Đặc điểm</th><th>PyTorch</th></tr>
+<tr><td>Leaky ReLU</td><td>\(\alpha z\), \(\alpha\) nhỏ cố định (0,01)</td><td>Phía âm vẫn có gradient \(\alpha\), tránh dying ReLU (trang 121)</td><td><code>nn.LeakyReLU(0.01)</code></td></tr>
+<tr><td>PReLU</td><td>\(\alpha z\), \(\alpha\) <strong>học được</strong></td><td>Mạng tự chọn độ dốc phía âm (trang 122)</td><td><code>nn.PReLU()</code></td></tr>
+<tr><td>ELU</td><td>\(\alpha(e^{z} - 1)\), đạo hàm \(\alpha e^{z}\)</td><td>Mượt, đầu ra trung bình gần 0, bão hoà về \(-\alpha\)</td><td><code>nn.ELU()</code></td></tr>
+<tr><td>Swish / SiLU</td><td>\(z\cdot\sigma(\beta z)\) (với mọi z)</td><td>Mượt, không đơn điệu (hơi âm quanh \(z \approx -1{,}3\)); \(\beta = 1\) gọi là SiLU. Dùng trong EfficientNet, YOLO (trang 123)</td><td><code>nn.SiLU()</code></td></tr>
+<tr><td>GELU</td><td>\(z\cdot\Phi(z)\) (\(\Phi\): hàm phân phối chuẩn)</td><td>Mặc định của Transformer, ViT, ConvNeXt</td><td><code>nn.GELU()</code></td></tr>
+</table></div>
+<p>Biểu đồ Swish ở trang 123 minh hoạ vai trò của \(\beta\): \(\beta\) nhỏ (0,1) gần như tuyến tính; \(\beta\) lớn (10) gần giống ReLU; \(\beta = 1\) nằm giữa.</p>
+<div class="tip"><strong>Chọn activation thế nào?</strong>Mặc định dùng <strong>ReLU</strong> cho CNN. Gặp dying ReLU thì thử LeakyReLU. Muốn nhích thêm độ chính xác ở mạng hiện đại thì thử SiLU hoặc GELU. Sigmoid chỉ dùng ở <strong>đầu ra</strong> cho bài toán nhị phân/đa nhãn, gần như không dùng cho lớp ẩn.</div>
+
+<h2>Exploding gradient: mặt còn lại của đồng xu</h2>
+<p>Dấu hiệu (trang 124):</p>
+<ul>
+<li>Tham số của mô hình tăng rất nhanh (tăng theo cấp số nhân).</li>
+<li>Tham số hoặc loss trở thành <code>NaN</code> trong lúc huấn luyện.</li>
+<li>Loss vẫn lớn dù đã huấn luyện lâu, hoặc nhảy lên xuống thất thường.</li>
+</ul>
+<p>Nguyên nhân:</p>
+<ul>
+<li>Khởi tạo trọng số không phù hợp (quá lớn), dẫn đến cập nhật trọng số quá lớn.</li>
+<li>Learning rate ban đầu quá cao.</li>
+<li>Hàm loss không phù hợp, cho giá trị loss rất lớn, kéo theo cập nhật trọng số lớn (ví dụ MSE với mục tiêu có giá trị hàng nghìn chưa chuẩn hoá).</li>
+</ul>
+<p>Exploding gradient đặc biệt hay gặp ở mạng hồi quy (RNN) xử lý chuỗi dài, nơi cùng một ma trận trọng số bị nhân lặp lại hàng trăm lần.</p>
+
+<h2>Tổng hợp các giải pháp</h2>
+<p>Theo trang 125, kèm theo những gì ta đã học:</p>
+<ol>
+<li><strong>Activation phù hợp</strong>: ReLU và các biến thể.</li>
+<li><strong>Batch Normalization</strong>: giữ activation mỗi lớp ở thang đo ổn định (xem <a href="batchnorm-dropout-receptive-field.html">Batch Normalization, Dropout và Receptive Field</a>).</li>
+<li><strong>Regularization</strong>: weight decay (L2) giữ trọng số nhỏ.</li>
+<li><strong>Khởi tạo trọng số đúng cách</strong>: Xavier, He.</li>
+<li><strong>Gradient clipping</strong> (chống exploding): theo giá trị hoặc theo chuẩn (norm).</li>
+<li><strong>Skip connection</strong>: đường tắt của ResNet cho gradient đi thẳng về các lớp đầu (xem <a href="kien-truc-cnn-kinh-dien.html">Các kiến trúc CNN kinh điển</a>).</li>
+</ol>
+
+<h2>Khởi tạo trọng số (weight initialization)</h2>
+<p>Hiệu năng của CNN/NN phụ thuộc đáng kể vào cách khởi tạo (trang 126). Khởi tạo tốt giúp: kết quả <strong>tái lập được</strong> (cố định seed), mô hình <strong>hội tụ nhanh hơn</strong>, và tránh vanishing/exploding gradient ngay từ bước đầu.</p>
+
+<h3>Khởi tạo bằng 0 hoặc hằng số: đừng bao giờ làm</h3>
+<p>Nếu mọi trọng số trong một lớp bằng nhau, mọi neuron của lớp đó nhận cùng đầu vào, tính ra cùng đầu ra, nhận cùng gradient, và được cập nhật giống hệt nhau. Chúng mãi mãi là bản sao của nhau, lớp 512 neuron hoạt động như 1 neuron. Đây là lỗi <strong>không phá vỡ được tính đối xứng</strong> (fail to break symmetry), luôn dẫn đến kết quả tồi (trang 127: "We don't do that here"). Lưu ý: <strong>bias</strong> khởi tạo bằng 0 thì không sao, vì trọng số ngẫu nhiên đã phá đối xứng.</p>
+
+<h3>Khởi tạo ngẫu nhiên: đúng hướng nhưng phải đúng "liều"</h3>
+<p>Lấy trọng số ngẫu nhiên từ phân phối chuẩn (random normal) hoặc phân phối đều (random uniform) giải quyết được vấn đề đối xứng, nhưng độ lớn sai có thể gây vanishing/exploding (trang 128). Thí nghiệm sau đưa 1.000 mẫu qua mạng 10 lớp, mỗi lớp 500 neuron, và in <strong>độ lệch chuẩn của activation</strong> sau từng lớp:</p>
+<pre><code class="language-python">import torch
+
+torch.manual_seed(0)
+x0 = torch.randn(1000, 500)                  # 1000 mẫu, 500 đặc trưng
+
+
+def run(act, init_std, layers=10, width=500):
+    x = x0
+    stds = []
+    for _ in range(layers):
+        W = torch.randn(width, width) * init_std(width)
+        x = act(x @ W)
+        stds.append(x.std().item())
+    return " ".join(f"{s:.3g}" for s in stds)
+
+
+tanh, relu = torch.tanh, torch.relu
+print("tanh, N(0, 0.01) :", run(tanh, lambda n: 0.01))
+print("tanh, N(0, 1)    :", run(tanh, lambda n: 1.0))
+print("tanh, Xavier     :", run(tanh, lambda n: (2 / (n + n)) ** 0.5))
+print("ReLU, Xavier     :", run(relu, lambda n: (2 / (n + n)) ** 0.5))
+print("ReLU, He         :", run(relu, lambda n: (2 / n) ** 0.5))</code></pre>
+<div class="table-wrap"><table>
+<tr><th>Cấu hình</th><th>Lớp 1</th><th>Lớp 5</th><th>Lớp 10</th><th>Nhận xét</th></tr>
+<tr><td>tanh, \(\mathcal N(0, 0.01^2)\)</td><td>0,213</td><td>5,3·10⁻⁴</td><td>3·10⁻⁷</td><td>Activation teo về 0 → gradient theo trọng số cũng teo: <strong>vanishing</strong></td></tr>
+<tr><td>tanh, \(\mathcal N(0, 1)\)</td><td>0,982</td><td>0,982</td><td>0,982</td><td>~90% neuron bão hoà ở ±1, đạo hàm ≈ 0: cũng <strong>vanishing</strong></td></tr>
+<tr><td>tanh, Xavier</td><td>0,628</td><td>0,322</td><td>0,228</td><td>Giảm chậm, chấp nhận được</td></tr>
+<tr><td>ReLU, Xavier</td><td>0,585</td><td>0,158</td><td>0,026</td><td>Vẫn co dần: Xavier không hợp với ReLU</td></tr>
+<tr><td>ReLU, He</td><td>0,827</td><td>0,838</td><td>0,892</td><td><strong>Ổn định</strong> qua mọi lớp</td></tr>
+</table></div>
+
+<h3>Xavier / Glorot initialization (cho sigmoid, tanh)</h3>
+<p>Ý tưởng: giữ <strong>phương sai</strong> của tín hiệu không đổi khi đi qua mỗi lớp, cả chiều xuôi lẫn chiều ngược. Với neuron \(y = \sum_{i=1}^{n_{in}} w_i x_i\) (trọng số và đầu vào độc lập, trung bình 0):</p>
+\[ \mathrm{Var}(y) = n_{in}\,\mathrm{Var}(w)\,\mathrm{Var}(x) \]
+<p>Muốn \(\mathrm{Var}(y) = \mathrm{Var}(x)\) cần \(\mathrm{Var}(w) = 1/n_{in}\); xét thêm chiều backward cần \(1/n_{out}\); Glorot &amp; Bengio (2010) lấy trung bình hai điều kiện:</p>
+\[ \mathrm{Var}(W) = \frac{2}{n_{in} + n_{out}} \]
+<ul>
+<li><strong>Xavier normal</strong>: \(W \sim \mathcal N\!\left(0,\ \sigma^2\right)\) với \(\sigma = \sqrt{\dfrac{2}{n_{in} + n_{out}}}\).</li>
+<li><strong>Xavier uniform</strong>: \(W \sim U[-x, x]\) với \(x = \sqrt{\dfrac{6}{n_{in} + n_{out}}}\) (phân phối đều trên \([-x, x]\) có phương sai \(x^2/3\)).</li>
+</ul>
+
+<h3>He / Kaiming initialization (cho ReLU và biến thể)</h3>
+<p>ReLU đặt một nửa số đầu ra về 0, làm phương sai giảm một nửa sau mỗi lớp (đúng như dòng "ReLU, Xavier" ở trên). He et al. (2015) bù lại bằng cách nhân đôi:</p>
+\[ \mathrm{Var}(W) = \frac{2}{n_{in}} \]
+<ul>
+<li><strong>He normal</strong>: \(W \sim \mathcal N(0, \sigma^2)\) với \(\sigma = \sqrt{2/n_{in}}\).</li>
+<li><strong>He uniform</strong>: \(W \sim U\!\left(-\sqrt{6/n_{in}},\ +\sqrt{6/n_{in}}\right)\).</li>
+</ul>
+<div class="warn"><strong>Đính chính công thức ở trang 130</strong>Slide ghi \(Var(W) = \sqrt{2/n_{in}}\). Đúng phải là <strong>phương sai</strong> \(Var(W) = 2/n_{in}\), hay <strong>độ lệch chuẩn</strong> \(\sigma = \sqrt{2/n_{in}}\). Nhầm hai đại lượng này làm trọng số lớn sai lệch nhiều lần. Công thức He uniform trên slide thì đúng.</div>
+<p>Với lớp conv, \(n_{in}\) (fan-in) \(= C_{in}\times k_h\times k_w\): mỗi neuron đầu ra nhận ngần ấy đầu vào.</p>
+
+<h3>Khởi tạo trong PyTorch</h3>
+<p>PyTorch đã khởi tạo sẵn <code>nn.Linear</code> và <code>nn.Conv2d</code> bằng <code>kaiming_uniform_</code> với tham số \(a = \sqrt5\), tương đương \(U(-1/\sqrt{n_{in}},\ 1/\sqrt{n_{in}})\) (lớp <code>Linear(500, 100)</code> có trọng số trong khoảng ±0,0447). Mặc định này dùng được cho đa số trường hợp, nhưng các kiến trúc như ResNet trong torchvision tự khởi tạo lại bằng He normal. Cách tự đặt:</p>
+<pre><code class="language-python">import torch.nn as nn
+
+
+def init_weights(m):
+    if isinstance(m, nn.Conv2d):
+        nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
+        if m.bias is not None:
+            nn.init.zeros_(m.bias)
+    elif isinstance(m, nn.BatchNorm2d):
+        nn.init.ones_(m.weight)      # gamma = 1
+        nn.init.zeros_(m.bias)       # beta = 0
+    elif isinstance(m, nn.Linear):
+        nn.init.xavier_uniform_(m.weight)
+        nn.init.zeros_(m.bias)
+
+
+model.apply(init_weights)            # áp dụng đệ quy cho mọi lớp con</code></pre>
+<p>(<code>mode="fan_out"</code> giữ ổn định phương sai ở chiều backward; cả hai mode đều phổ biến.)</p>
+
+<h2>Gradient clipping</h2>
+<p>Ngay cả khi mọi thứ đúng, đôi khi một batch "lạ" sinh ra gradient cực lớn và đẩy trọng số văng xa khỏi vùng tốt (trang 131: một bước nhảy vọt ra khỏi vách đá của mặt loss). Gradient clipping chặn độ lớn gradient trước khi cập nhật:</p>
+<ul>
+<li><strong>Theo giá trị</strong> (by value): kẹp từng phần tử vào \([-c, c]\). Đơn giản nhưng làm <strong>đổi hướng</strong> vector gradient.</li>
+<li><strong>Theo chuẩn</strong> (by norm): nếu \(\|g\| &gt; \tau\) thì co cả vector \(g \leftarrow g\cdot\dfrac{\tau}{\|g\|}\). Giữ nguyên hướng, chỉ giảm độ dài. Đây là cách được khuyên dùng.</li>
+</ul>
+<pre><code class="language-python">for images, labels in train_loader:
+    loss = criterion(model(images), labels)
+    optimizer.zero_grad()
+    loss.backward()
+    # đặt GIỮA backward() và step(); trả về norm trước khi clip, hữu ích để ghi log
+    grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+    # hoặc: torch.nn.utils.clip_grad_value_(model.parameters(), clip_value=0.5)
+    optimizer.step()</code></pre>
+<p>Ví dụ: gradient \([30, 40]\) có norm 50; clip với <code>max_norm=5</code> cho \([3, 4]\), cùng hướng, độ dài 5. Clip theo value 1.0 với \([30, -0.5]\) cho \([1, -0.5]\), hướng đã thay đổi. Khi dùng mixed precision (<code>torch.amp</code>), phải gọi <code>scaler.unscale_(optimizer)</code> trước khi clip.</p>
+
+<h2>Checklist khi huấn luyện "có vấn đề"</h2>
+<ul>
+<li><strong>Loss không giảm</strong>: in norm gradient từng lớp; nếu lớp đầu ~0 thì nghi vanishing (dùng ReLU, BN, skip connection, kiểm tra init).</li>
+<li><strong>Loss thành NaN</strong>: giảm learning rate 3–10 lần; thêm gradient clipping; kiểm tra dữ liệu có NaN/Inf; kiểm tra phép <code>log(0)</code> hay chia 0 trong loss tự viết.</li>
+<li><strong>Loss dao động mạnh</strong>: learning rate quá lớn hoặc batch quá nhỏ; thêm warmup.</li>
+</ul>
+<pre><code class="language-python"># In norm gradient của từng lớp sau loss.backward()
+for name, p in model.named_parameters():
+    if p.grad is not None:
+        print(f"{name:40s} {p.grad.norm().item():.2e}")</code></pre>
+
+<h2>Tóm tắt</h2>
+<ul>
+<li>Gradient lớp đầu là tích nhiều thừa số: nhỏ hơn 1 thì biến mất, lớn hơn 1 thì bùng nổ.</li>
+<li>Sigmoid có đạo hàm tối đa 0,25: tránh dùng ở lớp ẩn; dùng ReLU, LeakyReLU, SiLU, GELU.</li>
+<li>Không khởi tạo trọng số bằng hằng số; Xavier cho tanh/sigmoid (\(2/(n_{in}+n_{out})\)), He cho ReLU (\(2/n_{in}\)).</li>
+<li>Gradient clipping theo norm, đặt giữa <code>backward()</code> và <code>step()</code>.</li>
+<li>BatchNorm và skip connection là hai "vũ khí" quan trọng nhất giúp mạng sâu huấn luyện được.</li>
+</ul>
+<p>Bài tiếp theo trong chặng: <a href="deep-learning-5-dataset-dataloader-augmentation.html">Dataset, DataLoader và augmentation</a>. Đọc thêm: <a href="transfer-learning-data-augmentation.html">Transfer Learning và Data Augmentation</a>, hai kỹ thuật giúp bạn đạt kết quả tốt với ít dữ liệu.</p>
+
+<h2>Tài liệu tham khảo</h2>
+<ul>
+<li>Glorot &amp; Bengio (2010). <em>Understanding the difficulty of training deep feedforward neural networks</em>.</li>
+<li>He et al. (2015). <em>Delving Deep into Rectifiers: Surpassing Human-Level Performance on ImageNet Classification</em> (He init, PReLU).</li>
+<li>Ramachandran et al. (2017). <em>Searching for Activation Functions</em> (Swish); Hendrycks &amp; Gimpel (2016). <em>GELU</em>.</li>
+<li>Pascanu et al. (2013). <em>On the difficulty of training recurrent neural networks</em> (gradient clipping).</li>
+<li>CS231n: <em>Neural Networks Part 2: Setting up the Data and the Loss</em> (phần weight initialization).</li>
+<li>Tài liệu PyTorch: <code>torch.nn.init</code>, <code>torch.nn.utils.clip_grad_norm_</code>.</li>
+</ul>
