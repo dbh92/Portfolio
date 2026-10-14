@@ -179,7 +179,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "14/10/2026",
-  "m": 14,
+  "m": 16,
   "img": "assets/images/posts/r-cnn-fast-faster-r-cnn.webp",
   "tags": [
    "Object Detection",
@@ -917,7 +917,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "09/10/2026",
-  "m": 33,
+  "m": 39,
   "img": "assets/images/posts/deep-learning-3-mang-no-ron-va-cnn.webp",
   "tags": [
    "Deep Learning",
@@ -932,7 +932,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "09/10/2026",
-  "m": 31,
+  "m": 33,
   "img": "assets/images/posts/deep-learning-5-dataset-dataloader-augmentation.webp",
   "tags": [
    "PyTorch",
@@ -1893,7 +1893,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "19/09/2026",
-  "m": 28,
+  "m": 30,
   "img": "assets/images/posts/iou-map-danh-gia-object-detection.webp",
   "tags": [
    "Object Detection",
@@ -2128,7 +2128,7 @@ window.HF_POSTS = [
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "12/09/2026",
-  "m": 20,
+  "m": 22,
   "img": "assets/images/posts/phan-doan-anh-semantic-instance-panoptic.webp",
   "tags": [
    "Segmentation",
@@ -2158,7 +2158,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "11/09/2026",
-  "m": 28,
+  "m": 29,
   "img": "assets/images/posts/phan-loai-anh-ok-ng-transfer-learning-pytorch.webp",
   "tags": [
    "PyTorch",
@@ -2391,7 +2391,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "04/09/2026",
-  "m": 30,
+  "m": 32,
   "img": "assets/images/posts/pytorch-co-ban-tensor-autograd.webp",
   "tags": [
    "PyTorch",
@@ -2724,7 +2724,7 @@ window.HF_POSTS = [
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "21/08/2026",
-  "m": 27,
+  "m": 30,
   "img": "assets/images/posts/machine-learning-la-gi.webp",
   "tags": [
    "Machine Learning",
@@ -3166,7 +3166,7 @@ window.HF_TOPICS = [
   "t": "Chặng 11: AI Vision",
   "u": "lo-trinh/vision-engineer/ai-vision.html",
   "s": "Vision Engineer",
-  "g": "6 bài học",
+  "g": "7 bài học",
   "n": -1
  },
  {

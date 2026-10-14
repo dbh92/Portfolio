@@ -366,6 +366,30 @@ brightness=0.20: 10.2% ảnh OK trông như NG bạc màu
 brightness=0.30: 23.8% ảnh OK trông như NG bạc màu</code></pre>
 <p>Biên độ ±5% an toàn, ±10% gần như an toàn (dưới 1%); ±20–30%, giá trị hay gặp trong ví dụ trên mạng, biến 10–24% ảnh OK thành "NG mang nhãn OK", dạy mô hình bỏ qua đúng loại lỗi bạn cần bắt (escape). Biên độ augmentation nên lấy từ <strong>dữ liệu đo thật</strong>: độ sáng trung bình của ảnh OK dao động bao nhiêu giữa các ca, các lô, trong 3 tháng.</p>
 <div class="tip"><strong>Augmentation cho detection và segmentation</strong>Khi nhãn là khung bao hoặc mặt nạ, mọi phép hình học phải áp cùng lúc cho ảnh và nhãn. <code>transforms.v2</code> làm việc này tự động nếu bạn bọc nhãn bằng <code>tv_tensors.BoundingBoxes</code> hoặc <code>tv_tensors.Mask</code> như ví dụ trên. Bài "U-Net cho phân đoạn ảnh" ở chặng 12 dùng lại kỹ thuật này.</div>
+<h3>Augmentation tự động và trộn ảnh</h3>
+<p>Ngoài tự chọn từng phép biến đổi, torchvision có sẵn các <strong>chính sách augmentation tự động</strong>: <code>AutoAugment</code>, <code>RandAugment</code>, <code>TrivialAugmentWide</code> chọn ngẫu nhiên một (hoặc vài) phép biến đổi với cường độ ngẫu nhiên cho mỗi ảnh, gần như không cần tinh chỉnh. Hai kỹ thuật khác <strong>trộn hai ảnh</strong> với nhau và trộn cả nhãn: <strong>MixUp</strong> cộng hai ảnh theo tỉ lệ λ, <strong>CutMix</strong> dán một mảng ảnh này lên ảnh kia, nhãn chia theo tỉ lệ diện tích. Chúng áp dụng trên cả <em>batch</em>, sau DataLoader:</p>
+<pre><code class="language-python">import torch
+import torch.nn as nn
+from torchvision.transforms import v2
+
+tf_tu_dong = v2.Compose([
+    v2.ToImage(),
+    v2.TrivialAugmentWide(),                 # mỗi ảnh: 1 phép biến đổi ngẫu nhiên, cường độ ngẫu nhiên
+    v2.ToDtype(torch.float32, scale=True),
+])
+anh = torch.randint(0, 256, (3, 64, 64), dtype=torch.uint8)
+print(tf_tu_dong(anh).shape)
+
+so_lop = 3
+cutmix_hoac_mixup = v2.RandomChoice([v2.CutMix(num_classes=so_lop), v2.MixUp(num_classes=so_lop)])
+images = torch.rand(8, 3, 64, 64)            # một batch lấy ra từ DataLoader
+labels = torch.randint(0, so_lop, (8,))
+images, labels = cutmix_hoac_mixup(images, labels)
+print(images.shape, labels.shape)            # nhãn thành xác suất: (8, 3)
+logits = torch.randn(8, so_lop)
+print(nn.CrossEntropyLoss()(logits, labels))  # CrossEntropyLoss nhận được nhãn dạng xác suất</code></pre>
+<p>Với detection, YOLO (Ultralytics) bật sẵn <strong>Mosaic</strong>: ghép 4 ảnh thành 1 để mô hình thấy nhiều vật, nhiều tỉ lệ trong một lần. Áp lại nguyên tắc ở bảng trên trước khi dùng các chính sách tự động cho ảnh công nghiệp: chính sách ngẫu nhiên có thể đổi màu, đảo ảnh, làm sai nhãn của lỗi định nghĩa bằng màu hay hướng; MixUp giữa ảnh OK và ảnh có vết lỗi mờ có thể tạo ra ảnh "nửa lỗi" khó hiểu. Hãy so sánh bằng recall lớp NG trên tập val, không phải bằng cảm giác.</p>
+<p class="note">Đọc sâu hơn: <a href="transfer-learning-data-augmentation.html">Transfer Learning và Data Augmentation khi có ít dữ liệu</a> (trang 132–140 của slide).</p>
 
 <h2>8. Augmentation chỉ cho tập train</h2>
 <p>Tập val và test dùng để đo hiệu năng trên ảnh <em>như trạm sẽ thấy</em>, nên không được augment. Lỗi hay gặp: chia một Dataset duy nhất bằng <code>random_split</code>, rồi gán transform cho Dataset gốc, vô tình augment cả val. Cách an toàn: tạo <strong>hai</strong> đối tượng Dataset trên cùng danh sách ảnh, một có augmentation và một không, rồi lấy tập con theo chỉ số:</p>

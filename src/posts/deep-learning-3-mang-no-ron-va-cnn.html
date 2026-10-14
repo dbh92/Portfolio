@@ -20,11 +20,14 @@ print(f"ReLU(z) = {relu:.2f} | sigmoid(z) = {sigmoid:.4f}")</code></pre>
 <pre><code class="language-text">z = -1.5*0.8 + 4.0*0.35 + 2.0*0.6 + (-1.0) = 0.40
 ReLU(z) = 0.40 | sigmoid(z) = 0.5987</code></pre>
 <p>Đọc kết quả: trọng số dương lớn (4,0) cho "diện tích vết tối" nghĩa là đặc trưng này đẩy mạnh về phía NG; trọng số âm cho độ sáng nghĩa là sản phẩm càng sáng càng ít nghi ngờ. Sigmoid biến <code>z</code> thành số trong khoảng (0, 1), có thể đọc như "xác suất NG" ≈ 0,60. Trong mạng thật, không ai đặt tay các trọng số này: gradient descent tìm ra chúng từ dữ liệu.</p>
+<h3>Neuron sinh học và neuron nhân tạo</h3>
+<p>Tên gọi "neuron" mượn từ sinh học. Một tế bào thần kinh nhận tín hiệu qua các <strong>sợi nhánh</strong> (dendrite), tổng hợp ở <strong>thân tế bào</strong>, và khi tổng đủ mạnh thì phát xung theo <strong>sợi trục</strong> (axon) sang tế bào khác qua khớp nối (synapse). Neuron nhân tạo mô phỏng thô sơ điều đó: đầu vào <code>xᵢ</code> là tín hiệu tới, trọng số <code>wᵢ</code> là "độ mạnh khớp nối", tổng <code>Σ wᵢxᵢ + b</code> là phần tổng hợp ở thân tế bào, hàm kích hoạt <code>f</code> đóng vai "có phát xung hay không, mạnh bao nhiêu". Phép so sánh chỉ để dễ nhớ: neuron thật phức tạp hơn rất nhiều. Cách nhớ chính xác hơn: <strong>neuron = linear classifier + hàm kích hoạt</strong> (xem mục 3).</p>
 
 <h2>2. Hàm kích hoạt: ReLU, sigmoid, softmax</h2>
 <table>
   <tr><th>Hàm</th><th>Công thức</th><th>Khoảng giá trị</th><th>Dùng ở đâu</th></tr>
   <tr><td>ReLU</td><td><code>max(0, z)</code></td><td>[0, +∞)</td><td>Các lớp ẩn của hầu hết CNN: rẻ, gradient không bị nhỏ dần khi z dương</td></tr>
+<tr><td>Leaky ReLU</td><td><code>max(εz, z)</code>, ε nhỏ (thường 0,01)</td><td>(−∞, +∞)</td><td>Thay ReLU khi nhiều neuron "chết" (luôn ra 0 vì đầu vào luôn âm): phía âm vẫn có gradient ε. Các biến thể PReLU, ELU, SiLU/Swish ở bài <a href="vanishing-exploding-gradient-weight-init.html">Vanishing gradient</a>.</td></tr>
   <tr><td>Sigmoid</td><td><code>1 / (1 + e^(−z))</code></td><td>(0, 1)</td><td>Đầu ra nhị phân (một điểm "xác suất NG"), đầu ra đa nhãn, mặt nạ phân đoạn</td></tr>
   <tr><td>Tanh</td><td><code>(e^z − e^(−z)) / (e^z + e^(−z))</code></td><td>(−1, 1)</td><td>Ít gặp trong CNN hiện đại</td></tr>
   <tr><td>Softmax</td><td><code>e^(zi) / Σ e^(zj)</code></td><td>(0, 1), tổng = 1</td><td>Đầu ra nhiều lớp loại trừ nhau: OK / xước / móp / bẩn</td></tr>
@@ -110,6 +113,30 @@ số tham số: 32 = (3+1)*5 + (5+1)*2 = 32</code></pre>
   <li>Số tham số của một lớp Linear: <code>(số đầu vào + 1) × số neuron</code>, "+1" là bias.</li>
   <li>Trọng số còn ngẫu nhiên nên P(NG) ở trên chưa có ý nghĩa gì. Mạng chỉ "thông minh" sau khi học.</li>
 </ul>
+<h3>Góc nhìn linear classifier: mỗi lớp đầu ra là một "khuôn mẫu"</h3>
+<p>Bỏ lớp ẩn đi, chỉ còn một lớp Linear nối thẳng pixel với K lớp đầu ra, ta có <strong>linear classifier</strong> (bộ phân loại tuyến tính): duỗi ảnh thành vector <code>x</code> (D số), mô hình tính <strong>điểm số cho từng lớp</strong> <code>f(x) = W·x + b</code> với <code>W</code> kích thước K×D; lớp có điểm cao nhất là dự đoán. Ví dụ đồ chơi ở trang 11 của slide: ảnh 4 pixel, 3 lớp:</p>
+<pre><code class="language-python">import numpy as np
+
+W = np.array([[0.2, -0.5, 0.1, 2.0],    # hàng 0: khuôn mẫu "mèo"
+              [1.5, 1.3, 2.1, 0.0],     # hàng 1: khuôn mẫu "chó"
+              [0.0, 0.25, 0.2, -0.3]])  # hàng 2: khuôn mẫu "tàu"
+b = np.array([1.1, 3.2, -1.2])
+x = np.array([56, 231, 24, 2])          # ảnh 4 pixel đã duỗi thành vector
+diem = W @ x + b
+print(diem)                              # [-96.8  437.9   60.75]
+print(["mèo", "chó", "tàu"][diem.argmax()])</code></pre>
+<pre><code class="language-text">[-96.8  437.9   60.75]
+chó</code></pre>
+<p>(Hình gốc trong slide ghi điểm "tàu" là 61,95 vì quên cộng bias −1,2; con số đúng là 60,75.) Mô hình với bộ trọng số này đoán sai ảnh mèo thành chó; huấn luyện chính là tìm <code>W</code>, <code>b</code> để lớp đúng luôn có điểm cao nhất. Có ba cách hiểu cùng một phép tính:</p>
+<ul>
+<li><strong>Nhân ma trận và nhân từng phần tử</strong>: điểm của lớp k là tích vô hướng giữa hàng k của <code>W</code> và ảnh, tức nhân từng cặp phần tử (element-wise) rồi cộng lại.</li>
+<li><strong>Khuôn mẫu</strong>: mỗi hàng của <code>W</code> có đúng kích thước ảnh. Sắp 784 trọng số của một hàng thành lưới 28×28 rồi vẽ ra (trang 13–16), ta thấy "khuôn" của lớp đó: khuôn số 0 trên MNIST là một vòng sáng có tâm tối; trên CIFAR-10 khuôn "máy bay" ám xanh da trời, khuôn "ngựa" như con ngựa có <em>hai đầu</em> vì dữ liệu có ngựa quay cả trái lẫn phải mà mỗi lớp chỉ có một khuôn.</li>
+<li><strong>Hình học</strong>: mỗi ảnh là một điểm trong không gian D chiều; mỗi phương trình <code>wₖ·x + bₖ = 0</code> là một siêu phẳng chia không gian. Bias cho phép siêu phẳng không phải đi qua gốc tọa độ.</li>
+</ul>
+<p>Giới hạn của linear classifier chính là lý do cần lớp ẩn và CNN: chỉ <strong>một khuôn cho mỗi lớp</strong> (không biểu diễn được nhiều biến thể), ranh giới <strong>chỉ là mặt phẳng</strong> (không tách được dữ liệu kiểu XOR), và <strong>nhạy với vị trí</strong> (vật dịch vài pixel là lệch khuôn, mục 4).</p>
+<h3>Định lý xấp xỉ vạn năng và vì sao cần mạng sâu</h3>
+<p><strong>Định lý xấp xỉ vạn năng</strong> (universal approximation theorem, trang 115) nói rằng một MLP chỉ với <em>một</em> lớp ẩn, đủ nhiều neuron và hàm kích hoạt phi tuyến, có thể xấp xỉ mọi hàm liên tục trên một miền giới hạn với sai số nhỏ tùy ý. Nhưng định lý chỉ nói bộ trọng số tốt <em>tồn tại</em>, không nói làm sao tìm ra nó, và số neuron cần có thể lớn khủng khiếp. Trên thực tế, mạng <strong>sâu</strong> biểu diễn cùng một hàm hiệu quả hơn nhiều nhờ tái sử dụng đặc trưng theo tầng (cạnh → góc, vân → bộ phận → vật), đúng như các feature map ở mục 7 cho thấy.</p>
+<p class="note">Đọc sâu hơn: <a href="linear-classifier-den-neural-network.html">Từ Linear Classifier đến Neural Network</a> (trang 9–23 của slide).</p>
 
 <h2>4. Vì sao MLP không hợp với ảnh</h2>
 <p>Muốn đưa ảnh vào MLP, ta phải "duỗi" ảnh thành một vector dài. Ảnh 224×224 RGB, kích thước đầu vào phổ biến của các mạng phân loại, thành vector 150.528 phần tử. Một lớp ẩn 1000 neuron sẽ cần:</p>
@@ -246,6 +273,7 @@ W=224 K=7 S=2 P=3: (224+6-7)//2+1 = 112 | PyTorch: 112  (7×7 stride 2: lớp đ
 W= 64 K=5 S=1 P=0: (64+0-5)//1+1 =  60 | PyTorch:  60  (5×5, không đệm)
 W= 65 K=3 S=2 P=1: (65+2-3)//2+1 =  33 | PyTorch:  33  (ảnh lẻ, stride 2)</code></pre>
 <p>Trường hợp ảnh lẻ 65 cho 33: phép chia lấy phần nguyên làm "mất" hoặc "thêm" một pixel. Khi ghép mạng kiểu U-Net (nối đặc trưng encoder với decoder) mà ảnh có kích thước không chia hết cho 2, 4, 8…, các tensor sẽ lệch nhau một pixel và báo lỗi. Đó là lý do người ta chọn ROI kích thước 64, 128, 224, 256, 640.</p>
+<p>Công thức đầy đủ trong tài liệu <code>nn.Conv2d</code> còn có <strong>dilation</strong> <code>D</code> (độ giãn của kernel, mặc định 1): <code>(W + 2P − D·(K − 1) − 1) // S + 1</code>. Với <code>D = 1</code> nó trở về công thức trên. Kernel 3×3 với <code>D = 2</code> phủ vùng 5×5 nhưng vẫn chỉ 9 trọng số; tích chập giãn (dilated/atrous) được giải thích ở bài <a href="batchnorm-dropout-receptive-field.html">BatchNorm, Dropout và receptive field</a>.</p>
 
 <h2>7. Nhiều kênh: feature map</h2>
 <p>Ảnh màu có 3 kênh. Một kernel của lớp Conv khi đó có kích thước <code>k × k × Cin</code> (ví dụ 3×3×3): nó nhìn đồng thời cả ba kênh trong một vùng 3×3 và cho <strong>một</strong> số. Lớp có <code>Cout</code> kernel như vậy cho <code>Cout</code> ảnh đầu ra, mỗi ảnh gọi là một <strong>feature map</strong> (bản đồ đặc trưng): kernel nào "thích" cạnh dọc sẽ cho feature map sáng ở chỗ có cạnh dọc.</p>
@@ -298,6 +326,16 @@ feature map 0 (cạnh dọc)  : mạnh nhất ở cột 9, max 0.91
 feature map 1 (cạnh ngang): mạnh nhất ở hàng 35, max 0.94
 đã lưu feature_maps.png (ảnh gốc | cạnh dọc | cạnh ngang)</code></pre>
 <p>Feature map 0 phản hồi mạnh nhất ở cột 9: mép trái của vết xước dọc (vết vẽ quanh x = 12, dày khoảng 3 pixel; feature map lệch 1 pixel so với ảnh gốc vì không đệm biên). Feature map 1 phản hồi mạnh nhất ở hàng 35, mép dưới của vết xước ngang ở y = 34. Bộ lọc cạnh cho phản hồi ở <em>hai mép</em> của vết (một mép âm, một mép dương, ta lấy trị tuyệt đối). Mở <code>feature_maps.png</code> để thấy: mỗi feature map là "ảnh" của một loại đặc trưng. Lớp Conv đầu tiên của một CNN đã huấn luyện thường học ra những kernel giống bộ lọc cạnh, đốm, màu; các lớp sau kết hợp feature map của lớp trước thành đặc trưng phức tạp hơn: góc, vân, rồi "vết xước", "vết móp".</p>
+<h3>Tích chập 1×1: trộn kênh tại từng pixel</h3>
+<p>Kernel 1×1 nghe vô nghĩa với ảnh một kênh, nhưng với khối nhiều kênh nó tính một tổ hợp tuyến tính của <strong>tất cả các kênh tại cùng một pixel</strong>: giống một lớp Linear nhỏ áp dụng riêng cho từng pixel. Công dụng: đổi số kênh rất rẻ (giảm 256 kênh xuống 64 trước một conv 3×3 đắt đỏ, chính là khối "bottleneck" của ResNet-50), trộn thông tin giữa các kênh (bước "pointwise" của MobileNet), thêm phi tuyến khi đi kèm ReLU.</p>
+<pre><code class="language-python">import torch
+import torch.nn as nn
+
+x = torch.rand(8, 64, 32, 32)
+conv1x1 = nn.Conv2d(64, 16, kernel_size=1)
+print(conv1x1(x).shape)                                # torch.Size([8, 16, 32, 32])
+print(sum(p.numel() for p in conv1x1.parameters()))   # (64 + 1) * 16 = 1040</code></pre>
+<p>Kích thước không gian giữ nguyên, chỉ số kênh đổi từ 64 thành 16, với 1.040 tham số (một conv 3×3 cùng số kênh cần (9·64 + 1)·16 = 9.232).</p>
 
 <h2>8. Pooling: giảm kích thước, chịu được xê dịch nhỏ</h2>
 <p><strong>Max pooling 2×2, stride 2</strong> chia feature map thành các ô 2×2 không chồng nhau và giữ giá trị lớn nhất mỗi ô. Kích thước giảm một nửa mỗi chiều, không có tham số nào để học. <strong>Average pooling</strong> lấy trung bình thay vì max. <strong>Global average pooling</strong> (GAP) lấy trung bình cả feature map, biến <code>(C, H, W)</code> thành vector <code>C</code> số.</p>
@@ -440,6 +478,15 @@ print("tổng số tham số:", sum(p.numel() for p in mang_gap.parameters()))</
 ảnh 200×200 → đầu ra (1, 2)
 tổng số tham số: 5954</code></pre>
 <p>Đây chính là cấu trúc của ResNet mà bạn sẽ dùng trong dự án cuối chặng: thân là nhiều khối Conv, cuối là global average pooling và một lớp Linear. Transfer learning chỉ thay lớp Linear cuối đó cho khớp số lớp của bạn.</p>
+<h3>CNN không chỉ dành cho ảnh</h3>
+<p>Ý tưởng kết nối cục bộ và dùng chung trọng số áp dụng cho mọi dữ liệu có cấu trúc lân cận. Slide (trang 79) minh họa CNN cho <strong>văn bản</strong> (Kim, 2014): mỗi từ là một vector, câu thành ma trận; các kernel 1 chiều trượt dọc chuỗi từ để bắt cụm 2–5 từ, rồi max pooling và lớp Linear để phân loại cảm xúc. Trong nhà máy, cùng cách đó dùng cho <strong>tín hiệu 1 chiều</strong> như rung động, dòng điện động cơ:</p>
+<pre><code class="language-python">import torch
+import torch.nn as nn
+
+tin_hieu = torch.rand(4, 1, 1000)          # 4 mẫu, 1 kênh, 1000 điểm đo
+conv = nn.Conv1d(1, 8, kernel_size=9, padding=4)
+print(conv(tin_hieu).shape)                 # torch.Size([4, 8, 1000])</code></pre>
+<p class="note">Đọc sâu hơn: <a href="cnn-phep-tich-chap-pooling.html">CNN: phép tích chập, padding, stride và pooling</a> (trang 77–90 của slide, kèm ví dụ số tính tay và đính chính).</p>
 
 <h2>12. Sai lầm thường gặp</h2>
 <ul>

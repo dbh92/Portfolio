@@ -236,6 +236,19 @@ bước 20: loss 0.07884
 bước 40: loss 0.00105
 w_gốc = 0.04818 mm/px, b_gốc = 0.3686 mm</code></pre>
 <p>Loss ban đầu khác đoạn trước vì <code>nn.Linear</code> khởi tạo trọng số ngẫu nhiên thay vì bằng 0, nhưng điểm hội tụ giống hệt. Bốn bước <strong>forward → loss → backward → step</strong> (cùng <code>zero_grad</code> trước <code>backward</code>) lặp lại không đổi từ ví dụ hai tham số này đến mô hình hàng trăm triệu tham số. Chỉ có mô hình, hàm loss và cách nạp dữ liệu thay đổi.</p>
+<h3>Toàn cảnh: 7 bước của mọi dự án huấn luyện</h3>
+<p>Vòng lặp 4 bước ở trên nằm trong một khung lớn hơn gồm 7 bước (trang 63 của slide). Bảng dưới cho biết mỗi bước dùng công cụ gì và được dạy kỹ ở bài nào trong chặng này:</p>
+<div class="table-wrap"><table>
+<tr><th>Bước</th><th>Việc cần làm</th><th>PyTorch</th><th>Học kỹ ở</th></tr>
+<tr><td>1. Dataset</td><td>Đọc ảnh, nhãn, tiền xử lý</td><td><code>Dataset</code>, <code>DataLoader</code>, <code>transforms</code></td><td>Mục 8 bài này; bài Dataset, DataLoader và augmentation</td></tr>
+<tr><td>2. Model</td><td>Định nghĩa mạng</td><td><code>nn.Module</code>, <code>torchvision.models</code></td><td>Mục 7; bài Các kiến trúc CNN kinh điển</td></tr>
+<tr><td>3. Loss</td><td>Đo mức độ sai</td><td><code>nn.CrossEntropyLoss</code>…</td><td>Bài Loss function và các optimizer</td></tr>
+<tr><td>4. Optimizer</td><td>Cách cập nhật trọng số</td><td><code>torch.optim</code></td><td>Bài Loss function và các optimizer</td></tr>
+<tr><td>5. Train</td><td>Học trên tập train</td><td><code>model.train()</code>, vòng lặp 4 bước</td><td>Mục 6 và 8</td></tr>
+<tr><td>6. Validate</td><td>Theo dõi sau mỗi epoch, chọn checkpoint</td><td><code>model.eval()</code>, <code>torch.no_grad()</code></td><td>Mục 8, 9; bài Overfitting và chia train/val/test</td></tr>
+<tr><td>7. Test</td><td>Đánh giá cuối cùng, <strong>một lần</strong></td><td>như bước 6</td><td>Dự án cuối chặng</td></tr>
+</table></div>
+<p>Ba tập dữ liệu có vai trò khác nhau: tập <strong>train</strong> để cập nhật trọng số, tập <strong>validation</strong> để chọn siêu tham số và checkpoint, tập <strong>test</strong> chỉ dùng một lần ở cuối để báo cáo khách quan. Dùng tập test để chọn mô hình là tự lừa mình.</p>
 
 <h2>7. Định nghĩa mạng bằng nn.Module</h2>
 <p>Mạng của bạn là một lớp kế thừa <code>nn.Module</code>: khai báo các lớp con trong <code>__init__</code>, mô tả đường đi của dữ liệu trong <code>forward</code>. PyTorch tự tìm mọi tham số của các lớp con, nên <code>model.parameters()</code> trả về đủ để đưa cho optimizer. Đây là CNN nhỏ của bài "Mạng nơ-ron và CNN hoạt động thế nào", nhận ảnh xám 32×32:</p>
@@ -378,6 +391,41 @@ epoch 6: train loss 0.095 | val loss 0.066 | val đúng 98.5%
 epoch 7: train loss 0.052 | val loss 0.052 | val đúng 100.0%
 epoch 8: train loss 0.048 | val loss 0.088 | val đúng 96.5%</code></pre>
 <p>Con số cụ thể có thể lệch đôi chút giữa các máy và phiên bản thư viện, nhưng xu hướng sẽ giống: epoch đầu mô hình gần như đoán mò (53%), rồi "bắt" được đặc trưng vết xước và vượt 94% từ epoch 2. Độ chính xác val dao động vài phần trăm ở cuối (100% rồi 96,5%) vì tập val chỉ có 200 ảnh và learning rate giữ cố định; bài "Overfitting và chia train/val/test" dạy cách đọc và xử lý những dao động này. Hai chi tiết nhỏ nhưng quan trọng: <code>model.train()</code> / <code>model.eval()</code> chuyển chế độ cho các lớp như Dropout và BatchNorm (mạng này chưa có, nhưng hãy tập thói quen); <code>loss.item()</code> thay vì cộng thẳng tensor <code>loss</code>, nếu không bạn giữ lại toàn bộ đồ thị của mọi batch trong bộ nhớ.</p>
+<h3>Hai phép kiểm tra nhanh trước khi huấn luyện lâu</h3>
+<ul>
+<li><strong>Loss ban đầu ≈ ln K.</strong> Mô hình mới khởi tạo đoán gần đều 1/K cho mỗi lớp, nên cross-entropy ban đầu xấp xỉ <code>ln K</code>: 0,693 với 2 lớp OK/NG, 2,303 với 10 lớp. Loss ban đầu 15 hay 0,01 gần như chắc chắn là lỗi (quên chuẩn hóa, nhãn sai, áp softmax hai lần).</li>
+<li><strong>Overfit một batch.</strong> Lấy đúng một batch và huấn luyện lặp trên nó: một pipeline đúng phải đưa loss về gần 0. Nếu không, lỗi nằm ở code chứ không phải ở dữ liệu hay siêu tham số.</li>
+</ul>
+<pre><code class="language-python">import math
+import torch
+import torch.nn as nn
+
+
+def kiem_tra_overfit_mot_batch(model, images, labels, so_buoc=200, lr=1e-3):
+    """Huấn luyện lặp trên đúng một batch; pipeline đúng thì loss phải về gần 0."""
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    model.train()
+    for buoc in range(so_buoc):
+        loss = criterion(model(images), labels)
+        if buoc == 0:
+            so_lop = model(images).shape[1]
+            print(f"loss ban đầu {loss.item():.3f}, kỳ vọng ≈ ln({so_lop}) = {math.log(so_lop):.3f}")
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+    print(f"loss sau {so_buoc} bước: {loss.item():.4f}")
+
+
+torch.manual_seed(0)
+mo_hinh = nn.Sequential(nn.Conv2d(1, 8, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+                        nn.Flatten(), nn.Linear(8 * 16 * 16, 2))
+anh = torch.randn(16, 1, 32, 32)            # một batch 16 ảnh (ở đây là dữ liệu giả)
+nhan = torch.randint(0, 2, (16,))
+kiem_tra_overfit_mot_batch(mo_hinh, anh, nhan)</code></pre>
+<pre><code class="language-text">loss ban đầu 0.766, kỳ vọng ≈ ln(2) = 0.693
+loss sau 200 bước: 0.0029</code></pre>
+<p class="note">Đọc sâu hơn: <a href="pytorch-huan-luyen-mang-neural.html">PyTorch: 7 bước huấn luyện một mạng phân loại ảnh</a> (trang 59–76 của slide: tensor, dataset có sẵn, ImageFolder, custom Dataset, script train/validate/test hoàn chỉnh trên CIFAR-10).</p>
 
 <h2>9. Lưu và nạp mô hình: state_dict</h2>
 <p>Cách lưu được khuyến nghị là lưu <strong><code>state_dict</code></strong>: một từ điển tên tham số → tensor. File không chứa code của lớp mạng; khi nạp, bạn tạo lại đối tượng cùng lớp rồi đổ trọng số vào.</p>

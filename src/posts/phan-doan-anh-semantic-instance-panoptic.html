@@ -189,13 +189,26 @@ RLE            : 99 số, giải mã khớp hoàn toàn: True</code></pre>
 <h2>7. Các mô hình phổ biến</h2>
 <table>
   <tr><th>Mô hình</th><th>Loại</th><th>Ghi chú thực tế</th></tr>
-  <tr><td><strong>U-Net</strong> (2015)</td><td>Semantic</td><td>Encoder–decoder với skip connection; hiệu quả với ít dữ liệu, dễ tự cài và tùy biến; rất phổ biến cho lỗi bề mặt. Bài "U-Net cho phân đoạn ảnh".</td></tr>
+  <tr><td><strong>FCN</strong> (2015)</td><td>Semantic</td><td>Mạng đầu tiên phân đoạn "toàn tích chập": thay lớp Linear của mạng phân loại bằng conv 1×1, phóng to bản đồ điểm số về kích thước ảnh và nối thêm đặc trưng tầng nông (FCN-32s, 16s, 8s). Mở đầu kiến trúc encoder–decoder.</td></tr>
+<tr><td><strong>U-Net</strong> (2015)</td><td>Semantic</td><td>Encoder–decoder với skip connection; hiệu quả với ít dữ liệu, dễ tự cài và tùy biến; rất phổ biến cho lỗi bề mặt. Bài "U-Net cho phân đoạn ảnh".</td></tr>
   <tr><td><strong>DeepLabv3+</strong></td><td>Semantic</td><td>Dùng tích chập giãn (atrous) để nhìn rộng; có sẵn trong torchvision (DeepLabv3) và các thư viện phân đoạn.</td></tr>
   <tr><td><strong>Mask R-CNN</strong> (2017)</td><td>Instance</td><td>Hai giai đoạn: phát hiện hộp rồi dự đoán mặt nạ trong hộp; chính xác, chậm hơn YOLO; có trong torchvision, Detectron2.</td></tr>
   <tr><td><strong>YOLO-seg</strong> (YOLO26-seg…)</td><td>Instance</td><td>Một giai đoạn, thời gian thực, quy trình huấn luyện giống hệt YOLO phát hiện. Bài "Phân đoạn vết lỗi với YOLO26-seg".</td></tr>
   <tr><td><strong>Mask2Former</strong> và các mô hình "universal"</td><td>Semantic, instance và panoptic</td><td>Một kiến trúc cho cả ba loại; mạnh nhưng nặng, thường dùng trong nghiên cứu hoặc khi có GPU mạnh.</td></tr>
   <tr><td><strong>SAM</strong> (Segment Anything) và các phiên bản sau</td><td>Phân đoạn theo gợi ý (điểm, hộp)</td><td>Mô hình nền tảng không cần huấn luyện cho từng bài; rất hữu ích để <strong>gán nhãn nhanh</strong> (bấm một điểm ra mặt nạ) trong các công cụ như CVAT, Label Studio; ít khi dùng trực tiếp làm mô hình kiểm tra lỗi vì nó không biết "lỗi" là gì.</td></tr>
 </table>
+<h3>Từ mạng phân loại sang mạng phân đoạn: phóng to bản đồ đặc trưng</h3>
+<p>Mạng phân loại thu nhỏ ảnh 32 lần; mạng phân đoạn phải trả về đúng kích thước ảnh, nên nửa sau của mạng (decoder) cần <strong>phóng to</strong> (upsample). Bốn cách hay gặp:</p>
+<div class="table-wrap"><table>
+<tr><th>Cách</th><th>Ý tưởng</th><th>Học được?</th><th>PyTorch</th></tr>
+<tr><td>Nearest neighbor</td><td>Nhân bản mỗi điểm thành khối 2×2</td><td>Không</td><td><code>nn.Upsample(scale_factor=2, mode="nearest")</code></td></tr>
+<tr><td>Bilinear</td><td>Nội suy tuyến tính theo hai chiều, mượt hơn</td><td>Không</td><td><code>F.interpolate(x, scale_factor=2, mode="bilinear")</code></td></tr>
+<tr><td>Max unpooling</td><td>Nhớ vị trí max lúc pooling, trả giá trị về đúng chỗ (SegNet)</td><td>Không</td><td><code>nn.MaxUnpool2d</code></td></tr>
+<tr><td>Transposed convolution</td><td>Mỗi điểm vào nhân với kernel rồi "rải" ra vùng lớn hơn, cộng dồn chỗ chồng lấn</td><td>Có</td><td><code>nn.ConvTranspose2d</code></td></tr>
+</table></div>
+<p>Kích thước ra của transposed convolution: <code>(N − 1)·S − 2P + K + output_padding</code>. Hai cấu hình gấp đôi kích thước thường dùng là <code>K = 2, S = 2, P = 0</code> (U-Net) và <code>K = 4, S = 2, P = 1</code>. Khi kernel không chia hết cho stride, transposed conv dễ tạo vân <strong>bàn cờ</strong> (checkerboard); cách tránh là phóng to bilinear rồi mới conv 3×3.</p>
+<p>Nhóm DeepLab đi theo hướng ngược lại: <strong>bớt</strong> thu nhỏ ở các tầng cuối và dùng tích chập giãn để giữ tầm nhìn rộng, kèm khối <strong>ASPP</strong> (nhiều conv giãn với độ giãn 6, 12, 18 chạy song song) để nắm ngữ cảnh ở nhiều thang đo. Mask R-CNN thì thêm một nhánh FCN nhỏ dự đoán mặt nạ 28×28 cho từng vùng, và thay RoI Pooling bằng <strong>RoI Align</strong> (không làm tròn tọa độ) để mặt nạ khớp đúng vị trí; xem bài <a href="../hoc/r-cnn-fast-faster-r-cnn.html">Từ R-CNN đến Faster R-CNN</a>.</p>
+<p class="note">Đọc sâu hơn: <a href="../hoc/image-segmentation-unet-mask-rcnn.html">Image Segmentation: FCN, U-Net, DeepLab, Mask R-CNN</a> (có code U-Net, DeepLabV3 và Mask R-CNN của torchvision, ví dụ mIoU và Dice tính tay).</p>
 
 <h2>8. Sai lầm thường gặp</h2>
 <ul>

@@ -2,6 +2,31 @@
 <p class="note">Số trang (ví dụ "trang 81") trong bài chỉ tới slide của bài giảng <a href="../tai-nguyen/slide-deep-learning-computer-vision-ban-do-bai-hoc.html">Deep Learning – Computer Vision – NLP</a> (Thang Nguyen, Viet Nguyen); bài này giải thích chi tiết, kiểm chứng và đính chính các slide đó.</p>
 <p>Bài này cần kiến thức về IoU, NMS và mAP ở bài trước, <a href="iou-map-danh-gia-object-detection.html">IoU, mAP: đánh giá Object Detection</a> (đọc thêm: <a href="object-detection-iou-nms-map.html">sliding window, selective search, NMS và cách tính AP</a>).</p>
 
+<h2>Trước R-CNN: từ một đối tượng đến nhiều đối tượng</h2>
+<p>Phân loại trả lời "ảnh này là gì"; phát hiện đối tượng trả lời "có những vật gì, ở đâu", và số vật thay đổi theo từng ảnh (trang 142–143). Đây chính là chỗ khó: mạng nơ-ron thường có đầu ra kích thước cố định.</p>
+<h3>Định vị một đối tượng: hai "đầu" trên cùng một mạng</h3>
+<p>Nếu biết chắc ảnh có đúng một vật (trang 144), bài toán khá đơn giản: một CNN trích ra vector đặc trưng (ví dụ 4096 chiều), rồi gắn hai đầu ra. Đầu <strong>"What?"</strong> là lớp Linear ra điểm từng lớp, huấn luyện bằng cross-entropy. Đầu <strong>"Where?"</strong> là lớp Linear ra 4 số (x, y, w, h), huấn luyện bằng L2 loss so với hộp thật. Hai loss cộng lại thành <strong>multi-task loss</strong> <code>L = L_cls + λ·L_box</code>.</p>
+<pre><code class="language-python">import torch.nn as nn
+from torchvision import models
+
+
+class DinhViMotVat(nn.Module):
+    def __init__(self, so_lop):
+        super().__init__()
+        backbone = models.resnet18(weights=None)       # dùng weights=ResNet18_Weights.DEFAULT khi có mạng
+        backbone.fc = nn.Identity()                    # lấy vector đặc trưng 512 chiều
+        self.backbone = backbone
+        self.dau_lop = nn.Linear(512, so_lop)          # What?
+        self.dau_hop = nn.Linear(512, 4)               # Where? tọa độ chuẩn hóa về [0, 1]
+
+    def forward(self, x):
+        f = self.backbone(x)
+        return self.dau_lop(f), self.dau_hop(f).sigmoid()</code></pre>
+<h3>Nhiều đối tượng: sliding window quá đắt</h3>
+<p>Cách ngây thơ (trang 146): trượt một cửa sổ khắp ảnh, mỗi vị trí hỏi bộ phân loại "đây là vật gì hay chỉ là nền?". Nhưng vật có thể ở mọi vị trí, mọi kích thước, mọi tỉ lệ khung. Số hình chữ nhật trong ảnh W×H là <code>W(W+1)/2 · H(H+1)/2</code>: với ảnh 800×600 là khoảng <strong>57,8 tỉ</strong> cửa sổ.</p>
+<h3>Region proposal: Selective Search</h3>
+<p>Giải pháp là chỉ xét những vùng "có vẻ chứa vật" (trang 147). <strong>Selective Search</strong> chia ảnh thành rất nhiều vùng nhỏ rồi gộp dần các vùng giống nhau về màu, kết cấu, kích thước, sinh khoảng <strong>2.000 vùng đề xuất</strong> mỗi ảnh trong vài giây trên CPU mà vẫn bao được hầu hết vật thật. R-CNN bắt đầu từ đây.</p>
+
 <h2>R-CNN (2014): Regions with CNN features</h2>
 <p>Ross Girshick và cộng sự ghép hai ý tưởng: region proposals (Selective Search) và đặc trưng CNN mạnh mẽ vừa được AlexNet chứng minh. Quy trình bốn bước (trang 148):</p>
 <ol>
