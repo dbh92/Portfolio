@@ -316,12 +316,13 @@ def journey(root, current=None, cls=""):
 
 
 def feature_card(root, p, big=False):
-    """Card nổi bật cho Learning Path flagship (Vision Engineer)."""
+    """Card nổi bật cho một Learning Path đã có chặng (flagship: Vision Engineer)."""
     arrow = '<i aria-hidden="true">→</i>'
     chain = "".join(f"<span>{e(x)}</span>{arrow}" for x in p["preview"]) + f'<span class="chain-goal">🎯 {e(p["short"])}</span>'
     n_steps, n_phases = len(p["steps"]), len(p["phases"])
+    eyebrow = "⭐ Learning Path nổi bật" if p.get("flagship") else "Learning Path"
     return f"""<a class="feature-card{' big' if big else ''}" href="{root}{path_url(p)}">
-  <span class="feature-eyebrow">⭐ Learning Path nổi bật</span>
+  <span class="feature-eyebrow">{eyebrow}</span>
   <span class="feature-title">{e(p['label'])}</span>
   <span class="feature-sub">{e(p['tagline'])}</span>
   <span class="feature-desc">{e(p['description'])}</span>
@@ -361,6 +362,9 @@ def nav_panel(root, sec):
         for p in PATHS:
             if p.get("flagship"):
                 lis += (f'<li><a class="drop-link is-flagship" href="{root}{path_url(p)}"><span class="drop-label">⭐ {e(p["label"])}</span>'
+                        f'<span class="drop-desc">{e(p["tagline"])} · {len(p["steps"])} chặng</span></a></li>')
+            elif p.get("steps"):
+                lis += (f'<li><a class="drop-link" href="{root}{path_url(p)}"><span class="drop-label">{e(p["label"])}</span>'
                         f'<span class="drop-desc">{e(p["tagline"])} · {len(p["steps"])} chặng</span></a></li>')
             else:
                 lis += (f'<li><a class="drop-link" href="{root}{path_url(p)}"><span class="drop-label">{e(p["label"])}'
@@ -816,8 +820,9 @@ def lesson_parts(root, p):
     practice = ""
     if les.get("practice"):
         items = "".join(f"<li>{e(x)}</li>" for x in les["practice"])
+        note = path.get("practiceNote", "Làm xong bài tập mới chuyển sang bài tiếp theo: tự viết code là cách duy nhất để nhớ lâu.")
         practice = (f'<section class="practice"><h2>{icon("target")}Bài tập thực hành</h2><ol>{items}</ol>'
-                    f'<p>Làm xong bài tập mới chuyển sang bài tiếp theo: tự viết code là cách duy nhất để nhớ lâu.</p></section>')
+                    f'<p>{e(note)}</p></section>')
 
     def nav_link(slug, cls, label):
         if not slug:
@@ -1244,6 +1249,8 @@ def build_paths_index():
         f'<article class="path-card" id="{p["slug"]}"><span class="badge-soon">Sắp ra mắt</span>'
         f'<h3>{e(p["label"])}</h3><p class="path-card-sub">{e(p["tagline"])}</p><p>{e(p["description"])}</p></article>'
         for p in PATHS if not p.get("steps"))
+    live = "".join(f'<div class="hub-feature">{feature_card(root, p, big=True)}</div>'
+                   for p in PATHS if p.get("steps") and not p.get("flagship"))
     page = head(root, "Learning Paths – Lộ trình học", sec["description"], "lo-trinh/", "assets/images/og-default.jpg",
                 extra=ld_json(breadcrumb_ld([("Learning Paths", None)])))
     page += header(root, active="lo-trinh")
@@ -1252,6 +1259,7 @@ def build_paths_index():
   <div class="container hub">
     {journey(root, 'lo-trinh')}
     <div class="hub-feature">{feature_card(root, flag, big=True)}</div>
+    {live}
     {section_title('Lộ trình khác')}
     <div class="path-grid">{others}</div>
   </div>
@@ -1345,7 +1353,7 @@ def build_path(p):
   <div class="page-head path-head">
     <div class="container">
       <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{link(root)}">Trang chủ</a><span>/</span><a href="{root}lo-trinh/">Learning Paths</a><span>/</span><span>{e(p['short'])}</span></nav>
-      <p class="page-kicker">⭐ Learning Path flagship</p>
+      <p class="page-kicker">{'⭐ Learning Path flagship' if p.get('flagship') else 'Learning Path'}</p>
       <h1>{e(p['label'])}</h1>
       <p class="path-tagline">{e(p['tagline'])}</p>
       <p>{e(p['description'])}</p>
@@ -1388,7 +1396,7 @@ def build_path(p):
           <p>{e(g['summary'])}</p>
           <div class="step-cols">
             <div><p class="step-label">Bạn có thể làm</p><ul>{can}</ul></div>
-            <div><p class="step-label">Vị trí có thể ứng tuyển</p><ul class="role-list">{roles}</ul></div>
+            <div><p class="step-label">{e(g.get('rolesLabel', 'Vị trí có thể ứng tuyển'))}</p><ul class="role-list">{roles}</ul></div>
           </div>
         </div>
       </section>

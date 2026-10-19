@@ -29,7 +29,8 @@ def err(*a):
 
 
 # ---------- trang đã build
-pages = [p for p in glob.glob("**/*.html", recursive=True) if not p.startswith(("src/", "tools/", "node_modules/"))]
+pages = [p for p in glob.glob("**/*.html", recursive=True)
+         if not p.replace(os.sep, "/").startswith(("src/", "tools/", "node_modules/"))]  # trên Windows glob trả về dấu \
 ids_cache = {}
 
 

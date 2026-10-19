@@ -1,6 +1,923 @@
 /* Tự động sinh bởi tools/build.py – không sửa tay */
 window.HF_POSTS = [
  {
+  "t": "Cấu trúc đề TOEIC Listening & Reading và cách tính điểm",
+  "u": "ngoai-ngu/toeic-cau-truc-de-va-cach-tinh-diem.html",
+  "e": "200 câu trong 7 Part, điểm quy đổi 10–990, câu sai không bị trừ điểm và cách chia 700 điểm cho hai kỹ năng theo sức người đi làm.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/toeic-cau-truc-de-va-cach-tinh-diem.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC"
+  ]
+ },
+ {
+  "t": "Thi thử TOEIC đầu vào: làm đúng cách và đọc kết quả",
+  "u": "ngoai-ngu/toeic-thi-thu-dau-vao.html",
+  "e": "Cách thi thử đầu vào nghiêm túc, bảng phân tích tỉ lệ đúng từng Part, đọc kết quả để biết nên bắt đầu từ đâu và ưu tiên phần nào.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-thi-thu-dau-vao.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "TOEIC Listening",
+   "TOEIC Reading"
+  ]
+ },
+ {
+  "t": "Lịch học TOEIC cho người đi làm: 60–90 phút, Anki, sổ lỗi sai",
+  "u": "ngoai-ngu/toeic-lich-hoc-cho-nguoi-di-lam.html",
+  "e": "Chia 60–90 phút học thành các khối nhỏ quanh giờ làm, cài Anki và tạo thẻ từ đúng cách, lập sổ lỗi sai để mỗi lần sai đều thành điểm.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-lich-hoc-cho-nguoi-di-lam.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC"
+  ]
+ },
+ {
+  "t": "Phát âm tiếng Anh nền tảng: IPA, âm cuối, trọng âm",
+  "u": "ngoai-ngu/toeic-phat-am-nen-tang.html",
+  "e": "Đọc ký hiệu IPA, sửa lỗi nuốt âm cuối, phát âm đuôi -s và -ed, nhấn đúng trọng âm: nói rõ hơn và nghe TOEIC dễ hơn ngay từ tuần đầu.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/toeic-phat-am-nen-tang.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Phát âm"
+  ]
+ },
+ {
+  "t": "Giới thiệu bản thân và công việc bằng tiếng Anh",
+  "u": "ngoai-ngu/toeic-gioi-thieu-ban-than-va-cong-viec.html",
+  "e": "Khung giới thiệu 4 phần cho người đi làm, mẫu câu mô tả vị trí, bộ phận, công ty và một ngày làm việc, kèm bài mẫu ngành sản xuất và văn phòng.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-gioi-thieu-ban-than-va-cong-viec.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Giao tiếp tiếng Anh"
+  ]
+ },
+ {
+  "t": "Cấu trúc câu tiếng Anh: tìm chủ ngữ và động từ chính",
+  "u": "ngoai-ngu/toeic-cau-truc-cau-tieng-anh.html",
+  "e": "Năm mẫu câu cơ bản, nội động từ, ngoại động từ, động từ nối và cách gạt bỏ cụm giới từ để thấy ngay khung câu trong các câu TOEIC dài.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-cau-truc-cau-tieng-anh.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Ngữ pháp tiếng Anh"
+  ]
+ },
+ {
+  "t": "Từ loại và vị trí trong câu: chìa khóa câu Part 5",
+  "u": "ngoai-ngu/toeic-tu-loai-va-vi-tri-trong-cau.html",
+  "e": "Vị trí của danh từ, động từ, tính từ, trạng từ trong câu, quy trình nhìn hai bên ô trống để chọn từ loại và 15 câu luyện có giải thích.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/toeic-tu-loai-va-vi-tri-trong-cau.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Ngữ pháp tiếng Anh",
+   "TOEIC Reading"
+  ]
+ },
+ {
+  "t": "Nhận diện từ loại qua hậu tố: đoán đúng cả từ chưa biết",
+  "u": "ngoai-ngu/toeic-hau-to-nhan-dien-tu-loai.html",
+  "e": "Bảng hậu tố danh từ, động từ, tính từ, trạng từ theo nhóm, các ngoại lệ hay gài bẫy và cách phân biệt danh từ chỉ người với danh từ chỉ việc.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/toeic-hau-to-nhan-dien-tu-loai.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Ngữ pháp tiếng Anh",
+   "Từ vựng tiếng Anh"
+  ]
+ },
+ {
+  "t": "Thì hiện tại trong TOEIC: đơn, tiếp diễn, hoàn thành",
+  "u": "ngoai-ngu/toeic-thi-hien-tai.html",
+  "e": "Khi nào dùng hiện tại đơn, tiếp diễn, hoàn thành trong bối cảnh công việc, dấu hiệu nhận biết trong câu và các động từ không dùng tiếp diễn.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-thi-hien-tai.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Ngữ pháp tiếng Anh"
+  ]
+ },
+ {
+  "t": "Thì quá khứ và tương lai: dấu hiệu chọn thì trong Part 5",
+  "u": "ngoai-ngu/toeic-thi-qua-khu-va-tuong-lai.html",
+  "e": "Quá khứ đơn, quá khứ hoàn thành, các cách nói tương lai, quy tắc mệnh đề thời gian không dùng will và bảng dấu hiệu chọn thì nhanh.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-thi-qua-khu-va-tuong-lai.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Ngữ pháp tiếng Anh"
+  ]
+ },
+ {
+  "t": "Hòa hợp chủ ngữ và động từ: bẫy số ít, số nhiều",
+  "u": "ngoai-ngu/toeic-hoa-hop-chu-ngu-dong-tu.html",
+  "e": "Tìm chủ ngữ thật giữa cụm giới từ dài, chia động từ với each, every, the number of, danh từ không đếm được và các cấu trúc either, neither.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-hoa-hop-chu-ngu-dong-tu.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Ngữ pháp tiếng Anh"
+  ]
+ },
+ {
+  "t": "Luyện tập 40 câu từ loại và thì kiểu Part 5 có giải thích",
+  "u": "ngoai-ngu/toeic-luyen-tap-tu-loai-va-thi.html",
+  "e": "40 câu tự biên soạn theo định dạng Part 5 về từ loại, thì và hòa hợp chủ vị, chia 2 lượt bấm giờ, đáp án kèm giải thích ngắn từng câu.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 9,
+  "img": "assets/images/posts/toeic-luyen-tap-tu-loai-va-thi.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Ngữ pháp tiếng Anh",
+   "TOEIC Reading"
+  ]
+ },
+ {
+  "t": "Học từ vựng TOEIC theo collocation: 20 từ mỗi ngày",
+  "u": "ngoai-ngu/toeic-hoc-tu-vung-theo-collocation.html",
+  "e": "Vì sao nên học cụm từ thay vì từ đơn, cách chọn từ đáng học, mẫu thẻ Anki hai chiều và nhịp 20 từ mới, 15 phút ôn mỗi ngày cho người bận.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-hoc-tu-vung-theo-collocation.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Từ vựng tiếng Anh"
+  ]
+ },
+ {
+  "t": "Từ vựng TOEIC chủ đề văn phòng và nhân sự",
+  "u": "ngoai-ngu/toeic-tu-vung-van-phong-nhan-su.html",
+  "e": "Khoảng 60 từ và cụm từ về văn phòng, thiết bị, họp hành, tuyển dụng, đào tạo, nghỉ phép, kèm câu ví dụ, cặp paraphrase và bài tập.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/toeic-tu-vung-van-phong-nhan-su.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Từ vựng tiếng Anh"
+  ]
+ },
+ {
+  "t": "Từ vựng TOEIC sản xuất, kho vận, mua hàng cho người nhà máy",
+  "u": "ngoai-ngu/toeic-tu-vung-san-xuat-kho-van-mua-hang.html",
+  "e": "Khoảng 60 từ về sản xuất, kiểm tra chất lượng, kho, vận chuyển, đặt hàng và hóa đơn, kèm mẫu câu báo cáo sự cố và đoạn đọc kiểu đề.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/toeic-tu-vung-san-xuat-kho-van-mua-hang.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Từ vựng tiếng Anh"
+  ]
+ },
+ {
+  "t": "Từ vựng TOEIC tài chính, hợp đồng và đi công tác",
+  "u": "ngoai-ngu/toeic-tu-vung-tai-chinh-hop-dong-cong-tac.html",
+  "e": "Từ vựng ngân sách, chi phí, thanh toán, hợp đồng, đặt vé, khách sạn, hội nghị và hoàn ứng chi phí công tác, kèm đoạn đọc và bài tập.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/toeic-tu-vung-tai-chinh-hop-dong-cong-tac.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Từ vựng tiếng Anh"
+  ]
+ },
+ {
+  "t": "Nghe chép chính tả TOEIC: quy trình 5 bước và nối âm",
+  "u": "ngoai-ngu/toeic-nghe-chep-chinh-ta.html",
+  "e": "Quy trình nghe chép 5 bước, các hiện tượng nối âm, nuốt âm, dạng yếu khiến người Việt nghe sót, và cách tự tạo bài nghe từ transcript.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-nghe-chep-chinh-ta.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "TOEIC Listening"
+  ]
+ },
+ {
+  "t": "Dự án tháng 1: bộ 300 thẻ từ vựng và bài nói 1 phút",
+  "u": "ngoai-ngu/toeic-du-an-thang-1.html",
+  "e": "Dự án cuối tháng 1: hoàn thiện 300 thẻ Anki, bài kiểm tra 30 câu tổng hợp, bài nói 1 phút về công việc và tiêu chí tự chấm điểm.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/toeic-du-an-thang-1.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Từ vựng tiếng Anh",
+   "Ngữ pháp tiếng Anh"
+  ]
+ },
+ {
+  "t": "Câu bị động trong TOEIC: khi nào dùng và cách chọn nhanh",
+  "u": "ngoai-ngu/toeic-cau-bi-dong.html",
+  "e": "Cấu trúc bị động ở các thì, với động từ khuyết thiếu, mẹo nhìn tân ngữ để chọn chủ động hay bị động và các cụm bị động hay gặp trong đề.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-cau-bi-dong.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Ngữ pháp tiếng Anh"
+  ]
+ },
+ {
+  "t": "Đại từ trong TOEIC: nhân xưng, sở hữu, phản thân",
+  "u": "ngoai-ngu/toeic-dai-tu.html",
+  "e": "Bảng 5 dạng đại từ, cách chọn theo vị trí ô trống, đại từ phản thân, cụm on one's own và nhóm other, another, the others dễ nhầm.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/toeic-dai-tu.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Ngữ pháp tiếng Anh"
+  ]
+ },
+ {
+  "t": "Mệnh đề quan hệ: who, which, whose và rút gọn",
+  "u": "ngoai-ngu/toeic-menh-de-quan-he.html",
+  "e": "Chọn đại từ quan hệ theo vai trò trong mệnh đề, whose và whom, mệnh đề có dấu phẩy, rút gọn bằng V-ing và V3, phân biệt that với what.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-menh-de-quan-he.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Ngữ pháp tiếng Anh"
+  ]
+ },
+ {
+  "t": "Liên từ, giới từ, trạng từ liên kết: nhóm câu khó của Part 5",
+  "u": "ngoai-ngu/toeic-lien-tu-gioi-tu-trang-tu-lien-ket.html",
+  "e": "Quy tắc nhìn sau ô trống là mệnh đề hay cụm danh từ để chọn although hay despite, because hay because of, however hay but, kèm 15 câu luyện.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/toeic-lien-tu-gioi-tu-trang-tu-lien-ket.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Ngữ pháp tiếng Anh",
+   "TOEIC Reading"
+  ]
+ },
+ {
+  "t": "So sánh trong tiếng Anh: dấu hiệu chọn đáp án Part 5",
+  "u": "ngoai-ngu/toeic-so-sanh.html",
+  "e": "So sánh hơn, nhất, bằng, so sánh kép, từ nhấn mạnh much, far, by far và dấu hiệu than, of all, ever để chọn đúng dạng tính từ trong vài giây.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-so-sanh.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Ngữ pháp tiếng Anh"
+  ]
+ },
+ {
+  "t": "To V hay V-ing, phân từ -ing và -ed trong TOEIC",
+  "u": "ngoai-ngu/toeic-to-v-v-ing-va-phan-tu.html",
+  "e": "Động từ theo sau bởi to V hoặc V-ing, V-ing sau giới từ, các cụm có to là giới từ, phân biệt interesting và interested, kèm bài luyện.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-to-v-v-ing-va-phan-tu.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Ngữ pháp tiếng Anh"
+  ]
+ },
+ {
+  "t": "Câu điều kiện, đảo ngữ và câu giả định trong TOEIC",
+  "u": "ngoai-ngu/toeic-cau-dieu-kien-va-gia-dinh.html",
+  "e": "Bốn loại câu điều kiện qua tình huống công việc, đảo ngữ Should you need và Had we known, câu giả định sau request that, unless và provided that.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-cau-dieu-kien-va-gia-dinh.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Ngữ pháp tiếng Anh"
+  ]
+ },
+ {
+  "t": "TOEIC Part 5: phân loại câu hỏi và chiến thuật 20 giây",
+  "u": "ngoai-ngu/toeic-part-5-chien-thuat.html",
+  "e": "Nhìn bốn đáp án để biết câu hỏi từ loại, ngữ pháp hay từ vựng, chiến thuật riêng cho từng loại và cách giữ nhịp 10 phút cho cả 30 câu.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-part-5-chien-thuat.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "TOEIC Reading"
+  ]
+ },
+ {
+  "t": "TOEIC Part 5: câu từ vựng, collocation và cặp từ dễ nhầm",
+  "u": "ngoai-ngu/toeic-part-5-cau-tu-vung.html",
+  "e": "Câu từ vựng là phần khó tăng điểm nhất của Part 5: cách dùng collocation, ngữ cảnh, giới từ đi kèm và 20 cặp từ dễ nhầm có ví dụ.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-part-5-cau-tu-vung.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "TOEIC Reading",
+   "Từ vựng tiếng Anh"
+  ]
+ },
+ {
+  "t": "TOEIC Part 6: điền từ và điền câu vào đoạn văn",
+  "u": "ngoai-ngu/toeic-part-6-dien-cau-vao-doan-van.html",
+  "e": "Part 6 khác Part 5 ở chỗ cần ngữ cảnh: cách đọc theo mạch, chọn thì và từ nối dựa vào câu xung quanh, giải câu điền cả câu bằng từ liên kết.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-part-6-dien-cau-vao-doan-van.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "TOEIC Reading"
+  ]
+ },
+ {
+  "t": "Luyện tập TOEIC Part 5–6: 30 câu và 2 đoạn văn bấm giờ",
+  "u": "ngoai-ngu/toeic-luyen-tap-part-5-6.html",
+  "e": "Bộ luyện tự biên soạn gồm 30 câu Part 5 và 2 đoạn Part 6, làm trong 14 phút, đáp án giải thích từng câu và bảng thống kê theo loại câu.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/toeic-luyen-tap-part-5-6.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "TOEIC Reading"
+  ]
+ },
+ {
+  "t": "TOEIC Part 1: mô tả tranh, từ vựng và bẫy thường gặp",
+  "u": "ngoai-ngu/toeic-part-1-mo-ta-tranh.html",
+  "e": "Quy trình 5 giây quan sát tranh, từ vựng tranh người và tranh vật, phân biệt is being placed với has been placed và các bẫy âm giống nhau.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/toeic-part-1-mo-ta-tranh.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "TOEIC Listening"
+  ]
+ },
+ {
+  "t": "TOEIC Part 2: câu hỏi Wh- và câu trả lời gián tiếp",
+  "u": "ngoai-ngu/toeic-part-2-cau-hoi-wh.html",
+  "e": "Bắt từ để hỏi trong 1 giây đầu, đáp án hợp lệ cho What, Where, When, Who, Why, How, cách loại bẫy lặp từ và câu trả lời gián tiếp vẫn đúng.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-part-2-cau-hoi-wh.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "TOEIC Listening"
+  ]
+ },
+ {
+  "t": "TOEIC Part 2: câu Yes/No, câu lựa chọn, đề nghị, trần thuật",
+  "u": "ngoai-ngu/toeic-part-2-cau-hoi-yes-no-va-cau-tran-thuat.html",
+  "e": "Nhóm câu Part 2 khó hơn câu Wh-: Yes/No, câu hỏi đuôi, câu lựa chọn, lời đề nghị và câu trần thuật, kèm mẫu phản hồi để dùng khi giao tiếp.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/toeic-part-2-cau-hoi-yes-no-va-cau-tran-thuat.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "TOEIC Listening",
+   "Giao tiếp tiếng Anh"
+  ]
+ },
+ {
+  "t": "Dự án tháng 2: mini test Part 1, 2, 5, 6 và kế hoạch sửa lỗi",
+  "u": "ngoai-ngu/toeic-du-an-thang-2.html",
+  "e": "Dự án cuối tháng 2: mini test Part 1, 2, 5, 6, so với mốc 500–550, phân tích sổ lỗi sai và viết kế hoạch sửa lỗi cụ thể cho 2 tuần tới.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/toeic-du-an-thang-2.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "TOEIC Listening",
+   "TOEIC Reading"
+  ]
+ },
+ {
+  "t": "TOEIC Part 3: kỹ thuật đọc trước câu hỏi và dự đoán",
+  "u": "ngoai-ngu/toeic-part-3-doc-truoc-cau-hoi.html",
+  "e": "Đọc trước 3 câu hỏi trong thời gian audio đọc câu hỏi cũ, gạch từ khóa, đoán bối cảnh và giữ nhịp suốt 13 đoạn hội thoại của Part 3.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-part-3-doc-truoc-cau-hoi.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "TOEIC Listening"
+  ]
+ },
+ {
+  "t": "TOEIC Part 3: paraphrase và bẫy lặp từ trong đáp án",
+  "u": "ngoai-ngu/toeic-part-3-paraphrase-va-bay.html",
+  "e": "Vì sao đáp án đúng ít khi lặp nguyên từ của bài nghe, 30 cặp paraphrase hay gặp, cách nhận ra bẫy lặp từ và bài tập ghép câu có giải thích.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-part-3-paraphrase-va-bay.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "TOEIC Listening",
+   "Từ vựng tiếng Anh"
+  ]
+ },
+ {
+  "t": "TOEIC Part 3–4: câu hỏi ý định người nói và câu kèm hình",
+  "u": "ngoai-ngu/toeic-part-3-y-dinh-nguoi-noi-va-bieu-do.html",
+  "e": "Hai dạng câu khó của Part 3–4: hỏi ý định khi người nói dùng một câu ngắn, và câu cần đối chiếu lịch, bảng giá, sơ đồ trong đề với bài nghe.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-part-3-y-dinh-nguoi-noi-va-bieu-do.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "TOEIC Listening"
+  ]
+ },
+ {
+  "t": "TOEIC Part 4: thông báo, tin nhắn thoại, quảng cáo, bản tin",
+  "u": "ngoai-ngu/toeic-part-4-bai-noi-ngan.html",
+  "e": "Sáu dạng bài nói của Part 4 và khung nội dung của từng dạng, biết trước thông tin nằm đầu, giữa hay cuối bài để bắt đúng đáp án.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/toeic-part-4-bai-noi-ngan.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "TOEIC Listening"
+  ]
+ },
+ {
+  "t": "Shadowing tiếng Anh: luyện nghe nói 10 phút mỗi ngày",
+  "u": "ngoai-ngu/toeic-shadowing.html",
+  "e": "Shadowing 4 bước với transcript Part 3–4, khác biệt chính giữa giọng Mỹ, Anh, Úc, cách chọn đoạn luyện và lịch 10 phút mỗi ngày.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/toeic-shadowing.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "TOEIC Listening",
+   "Giao tiếp tiếng Anh"
+  ]
+ },
+ {
+  "t": "Luyện tập TOEIC Part 3–4 với transcript và cách chữa bài",
+  "u": "ngoai-ngu/toeic-luyen-tap-part-3-4.html",
+  "e": "Bốn hội thoại và hai bài nói tự biên soạn kiểu Part 3–4 có câu hỏi, đáp án, transcript đánh dấu câu chứa đáp án và quy trình chữa bài 4 bước.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/toeic-luyen-tap-part-3-4.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "TOEIC Listening"
+  ]
+ },
+ {
+  "t": "Small talk tiếng Anh nơi công sở: mở đầu, duy trì, kết thúc",
+  "u": "ngoai-ngu/toeic-giao-tiep-small-talk.html",
+  "e": "Chủ đề an toàn và nên tránh, mẫu câu mở đầu, kỹ thuật trả lời cộng một ý và hỏi lại, cách kết thúc lịch sự, kèm hội thoại mẫu với chuyên gia.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-giao-tiep-small-talk.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Giao tiếp tiếng Anh"
+  ]
+ },
+ {
+  "t": "Gọi điện thoại công việc bằng tiếng Anh: mẫu câu và hội thoại",
+  "u": "ngoai-ngu/toeic-giao-tiep-dien-thoai.html",
+  "e": "Mẫu câu gọi và nhận cuộc gọi, để lại lời nhắn, đánh vần tên, xác nhận số và ngày giờ, xin nhắc lại khi nghe không rõ, kèm 2 hội thoại mẫu.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-giao-tiep-dien-thoai.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Giao tiếp tiếng Anh",
+   "TOEIC Listening"
+  ]
+ },
+ {
+  "t": "Tiếng Anh trong cuộc họp: đưa ý kiến, đồng ý, phản đối",
+  "u": "ngoai-ngu/toeic-giao-tiep-cuoc-hop.html",
+  "e": "Mẫu câu đưa ý kiến, đồng ý, phản đối lịch sự, xin ngắt lời, hỏi lại và chốt hành động sau cuộc họp, kèm đoạn họp mẫu về chậm tiến độ.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-giao-tiep-cuoc-hop.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Giao tiếp tiếng Anh"
+  ]
+ },
+ {
+  "t": "Báo cáo tiến độ và thuyết trình ngắn bằng tiếng Anh",
+  "u": "ngoai-ngu/toeic-giao-tiep-bao-cao-va-thuyet-trinh.html",
+  "e": "Khung báo cáo tiến độ 3 phần, động từ mô tả số liệu tăng giảm, câu chuyển ý và dàn bài thuyết trình 3 phút, kèm bài mẫu báo cáo tỉ lệ lỗi.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/toeic-giao-tiep-bao-cao-va-thuyet-trinh.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Giao tiếp tiếng Anh"
+  ]
+ },
+ {
+  "t": "Tiếp khách, xử lý khiếu nại và báo sự cố bằng tiếng Anh",
+  "u": "ngoai-ngu/toeic-giao-tiep-khach-hang-va-su-co.html",
+  "e": "Mẫu câu đón khách, giới thiệu nhà máy, quy trình 4 bước xử lý khiếu nại, cách xin lỗi đúng mức và báo phương án khắc phục cho đối tác.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-giao-tiep-khach-hang-va-su-co.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Giao tiếp tiếng Anh"
+  ]
+ },
+ {
+  "t": "Dự án tháng 3: ghi âm 3 tình huống giao tiếp công sở",
+  "u": "ngoai-ngu/toeic-du-an-thang-3.html",
+  "e": "Dự án cuối tháng 3: kịch bản 3 tình huống điện thoại, họp, khiếu nại để ghi âm, bảng tự chấm 5 tiêu chí và bài thi thử Listening đầy đủ.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-du-an-thang-3.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Giao tiếp tiếng Anh",
+   "TOEIC Listening"
+  ]
+ },
+ {
+  "t": "TOEIC Part 7: skimming, scanning và đọc câu hỏi trước",
+  "u": "ngoai-ngu/toeic-part-7-skimming-scanning.html",
+  "e": "Kỹ thuật skim lấy ý chính trong 30 giây, scan tìm tên, số, ngày giờ, thứ tự đọc câu hỏi và đoạn văn để làm Part 7 nhanh mà không sót ý.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-part-7-skimming-scanning.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "TOEIC Reading"
+  ]
+ },
+ {
+  "t": "TOEIC Part 7: 6 dạng câu hỏi và cách tìm đáp án",
+  "u": "ngoai-ngu/toeic-part-7-dang-cau-hoi.html",
+  "e": "Câu ý chính, chi tiết, suy luận, NOT true, ý định người viết và mục đích: nhận dạng qua câu chữ và quy trình tìm đáp án riêng cho từng dạng.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/toeic-part-7-dang-cau-hoi.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "TOEIC Reading"
+  ]
+ },
+ {
+  "t": "TOEIC Part 7: câu chọn vị trí điền câu và câu đồng nghĩa",
+  "u": "ngoai-ngu/toeic-part-7-dien-cau-va-tu-dong-nghia.html",
+  "e": "Cách chọn vị trí [1]–[4] cho câu cho sẵn bằng đại từ, từ nối, từ lặp, và chọn từ đồng nghĩa theo ngữ cảnh thay vì theo nghĩa thường gặp.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-part-7-dien-cau-va-tu-dong-nghia.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "TOEIC Reading"
+  ]
+ },
+ {
+  "t": "TOEIC Part 7: đọc email, thông báo, quảng cáo, tin nhắn",
+  "u": "ngoai-ngu/toeic-part-7-email-thong-bao-chat.html",
+  "e": "Bố cục từng loại văn bản trong Part 7: email, thông báo, quảng cáo, bài báo, biểu mẫu, chuỗi tin nhắn, kèm đoạn mẫu và câu hỏi có giải thích.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-part-7-email-thong-bao-chat.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "TOEIC Reading"
+  ]
+ },
+ {
+  "t": "TOEIC Part 7: chiến thuật đoạn kép và đoạn ba",
+  "u": "ngoai-ngu/toeic-part-7-doan-kep-doan-ba.html",
+  "e": "Cách đọc nhóm 2–3 văn bản liên quan, nhận ra câu hỏi cần nối thông tin giữa các đoạn và phân bổ thời gian cho 25 câu cuối của đề.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/toeic-part-7-doan-kep-doan-ba.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "TOEIC Reading"
+  ]
+ },
+ {
+  "t": "Luyện tập TOEIC Part 7: đoạn đơn, đoạn kép bấm giờ",
+  "u": "ngoai-ngu/toeic-luyen-tap-part-7.html",
+  "e": "Ba đoạn đơn và một bộ đoạn kép tự biên soạn với 16 câu hỏi, giới hạn thời gian theo nhịp thi thật, đáp án chỉ rõ câu chứa thông tin.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/toeic-luyen-tap-part-7.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "TOEIC Reading"
+  ]
+ },
+ {
+  "t": "Viết email công việc bằng tiếng Anh: bố cục 5 phần",
+  "u": "ngoai-ngu/toeic-viet-email-cong-viec.html",
+  "e": "Tiêu đề email cụ thể, câu nêu mục đích ngay dòng đầu, bố cục 5 phần, mức độ trang trọng và 10 lỗi người Việt hay mắc khi viết email.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/toeic-viet-email-cong-viec.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Giao tiếp tiếng Anh"
+  ]
+ },
+ {
+  "t": "Mẫu email tiếng Anh: yêu cầu, xác nhận, nhắc việc, xin lỗi",
+  "u": "ngoai-ngu/toeic-email-yeu-cau-xac-nhan-xin-loi.html",
+  "e": "Năm email mẫu thường dùng nhất ở công ty: yêu cầu, xác nhận, nhắc việc, xin lỗi và báo trễ hạn, kèm câu thay thế theo mức độ trang trọng.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-email-yeu-cau-xac-nhan-xin-loi.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Giao tiếp tiếng Anh"
+  ]
+ },
+ {
+  "t": "Dự án tháng 4: viết 5 email và thi thử Reading",
+  "u": "ngoai-ngu/toeic-du-an-thang-4.html",
+  "e": "Dự án cuối tháng 4: 5 tình huống viết email có checklist tự chấm, bài mẫu tham khảo, thi thử Reading đầy đủ và so với mốc 620–660.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/toeic-du-an-thang-4.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Giao tiếp tiếng Anh",
+   "TOEIC Reading"
+  ]
+ },
+ {
+  "t": "Chiến thuật phòng thi TOEIC và phân bổ thời gian",
+  "u": "ngoai-ngu/toeic-chien-thuat-phong-thi.html",
+  "e": "Tận dụng phần hướng dẫn để đọc trước câu hỏi, phân bổ 75 phút Reading, quy tắc bỏ câu và tô đáp án, xử lý khi lỡ một câu hoặc sắp hết giờ.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-chien-thuat-phong-thi.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "TOEIC Listening",
+   "TOEIC Reading"
+  ]
+ },
+ {
+  "t": "Chữa đề TOEIC đúng cách: phân loại lỗi và sổ lỗi sai",
+  "u": "ngoai-ngu/toeic-chua-de-dung-cach.html",
+  "e": "Chữa một đề mất bao lâu, quy trình 4 lớp cho Listening và Reading, phân loại lỗi kiến thức, kỹ năng, tâm lý và cách biến sổ lỗi thành kế hoạch.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-chua-de-dung-cach.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "TOEIC Listening",
+   "TOEIC Reading"
+  ]
+ },
+ {
+  "t": "Kế hoạch 4 tuần luyện đề TOEIC trước ngày thi",
+  "u": "ngoai-ngu/toeic-ke-hoach-4-tuan-luyen-de.html",
+  "e": "Lịch 4 tuần cuối với 2 đề mỗi tuần, ngày chữa đề, ngày luyện phần yếu, mốc điểm cần đạt và cách giảm tải trong tuần thi để giữ phong độ.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/toeic-ke-hoach-4-tuan-luyen-de.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "TOEIC Listening",
+   "TOEIC Reading"
+  ]
+ },
+ {
+  "t": "30 lỗi ngữ pháp TOEIC hay sai nhất và cách sửa",
+  "u": "ngoai-ngu/toeic-30-loi-ngu-phap-hay-sai.html",
+  "e": "Bảng ôn tập 30 lỗi ngữ pháp người Việt hay sai trong Part 5–6, mỗi lỗi có câu sai, câu đúng, lý do ngắn và đường dẫn về bài học gốc.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-30-loi-ngu-phap-hay-sai.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "Ngữ pháp tiếng Anh",
+   "TOEIC Reading"
+  ]
+ },
+ {
+  "t": "Đăng ký thi TOEIC và chuẩn bị cho ngày thi",
+  "u": "ngoai-ngu/toeic-dang-ky-thi-va-ngay-thi.html",
+  "e": "Đăng ký thi qua IIG Việt Nam, giấy tờ cần mang, chọn ngày thi phù hợp lộ trình, lịch 24 giờ trước thi và những việc nên làm trong phòng thi.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/toeic-dang-ky-thi-va-ngay-thi.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC"
+  ]
+ },
+ {
+  "t": "Dự án cuối khóa 700 TOEIC: thi thử và kế hoạch duy trì",
+  "u": "ngoai-ngu/toeic-du-an-cuoi-khoa.html",
+  "e": "Bài thi thử cuối khóa trong điều kiện thật, bảng so sánh với đầu vào, quyết định ngày thi theo điểm và kế hoạch giữ tiếng Anh sau khi đạt 700+.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/toeic-du-an-cuoi-khoa.webp",
+  "tags": [
+   "Tiếng Anh",
+   "TOEIC",
+   "TOEIC Listening",
+   "TOEIC Reading",
+   "Giao tiếp tiếng Anh"
+  ]
+ },
+ {
   "t": "Học theo slide Deep Learning – Computer Vision: bản đồ bài học",
   "u": "tai-nguyen/slide-deep-learning-computer-vision-ban-do-bai-hoc.html",
   "e": "Học theo slide Deep Learning – Computer Vision – NLP? Bảng đối chiếu từng nhóm trang với bài học trên HọcFree, kèm các chỗ slide sai đã đính chính.",
@@ -3025,7 +3942,7 @@ window.HF_TOPICS = [
   "u": "ngoai-ngu/english.html",
   "s": "Ngoại ngữ",
   "g": "Ngôn ngữ",
-  "n": 3
+  "n": 63
  },
  {
   "t": "Chinese",
@@ -3033,6 +3950,41 @@ window.HF_TOPICS = [
   "s": "Ngoại ngữ",
   "g": "Ngôn ngữ",
   "n": 3
+ },
+ {
+  "t": "TOEIC Listening",
+  "u": "ngoai-ngu/toeic-listening.html",
+  "s": "Ngoại ngữ",
+  "g": "Tiếng Anh theo kỹ năng",
+  "n": 18
+ },
+ {
+  "t": "TOEIC Reading",
+  "u": "ngoai-ngu/toeic-reading.html",
+  "s": "Ngoại ngữ",
+  "g": "Tiếng Anh theo kỹ năng",
+  "n": 21
+ },
+ {
+  "t": "Ngữ pháp tiếng Anh",
+  "u": "ngoai-ngu/ngu-phap-tieng-anh.html",
+  "s": "Ngoại ngữ",
+  "g": "Tiếng Anh theo kỹ năng",
+  "n": 16
+ },
+ {
+  "t": "Từ vựng tiếng Anh",
+  "u": "ngoai-ngu/tu-vung-tieng-anh.html",
+  "s": "Ngoại ngữ",
+  "g": "Tiếng Anh theo kỹ năng",
+  "n": 8
+ },
+ {
+  "t": "Giao tiếp công sở",
+  "u": "ngoai-ngu/giao-tiep-tieng-anh.html",
+  "s": "Ngoại ngữ",
+  "g": "Tiếng Anh theo kỹ năng",
+  "n": 13
  },
  {
   "t": "Source Code",
@@ -3083,6 +4035,14 @@ window.HF_TOPICS = [
   "g": "Machine Vision + AI Vision + Industrial Automation",
   "n": -1,
   "f": 1
+ },
+ {
+  "t": "700+ TOEIC trong 5 tháng",
+  "u": "lo-trinh/toeic-700.html",
+  "s": "Learning Path",
+  "g": "TOEIC Listening & Reading + giao tiếp công sở cho người đi làm",
+  "n": -1,
+  "f": 0
  },
  {
   "t": "Python Developer",
@@ -3188,6 +4148,83 @@ window.HF_TOPICS = [
   "u": "lo-trinh/vision-engineer/real-world-projects.html",
   "s": "Vision Engineer",
   "g": "5 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 1: Khởi động: hiểu đề và lập kế hoạch",
+  "u": "lo-trinh/toeic-700/khoi-dong.html",
+  "s": "700 TOEIC",
+  "g": "5 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 2: Ngữ pháp lõi: câu, từ loại và thì",
+  "u": "lo-trinh/toeic-700/ngu-phap-loi.html",
+  "s": "700 TOEIC",
+  "g": "7 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 3: Từ vựng công sở và nghe chép chính tả",
+  "u": "lo-trinh/toeic-700/tu-vung-cong-so.html",
+  "s": "700 TOEIC",
+  "g": "6 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 4: Ngữ pháp TOEIC: bị động, mệnh đề, liên từ",
+  "u": "lo-trinh/toeic-700/ngu-phap-toeic.html",
+  "s": "700 TOEIC",
+  "g": "7 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 5: Part 5–6: điền từ và điền câu",
+  "u": "lo-trinh/toeic-700/part-5-6.html",
+  "s": "700 TOEIC",
+  "g": "4 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 6: Part 1–2: mô tả tranh và hỏi – đáp",
+  "u": "lo-trinh/toeic-700/part-1-2.html",
+  "s": "700 TOEIC",
+  "g": "4 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 7: Part 3–4: hội thoại và bài nói ngắn",
+  "u": "lo-trinh/toeic-700/part-3-4.html",
+  "s": "700 TOEIC",
+  "g": "6 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 8: Giao tiếp công sở",
+  "u": "lo-trinh/toeic-700/giao-tiep-cong-so.html",
+  "s": "700 TOEIC",
+  "g": "6 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 9: Part 7: đọc hiểu đoạn đơn và nhiều đoạn",
+  "u": "lo-trinh/toeic-700/part-7.html",
+  "s": "700 TOEIC",
+  "g": "6 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 10: Viết email công việc",
+  "u": "lo-trinh/toeic-700/email-cong-viec.html",
+  "s": "700 TOEIC",
+  "g": "3 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 11: Luyện đề và về đích 700+",
+  "u": "lo-trinh/toeic-700/luyen-de.html",
+  "s": "700 TOEIC",
+  "g": "6 bài học",
   "n": -1
  }
 ];
