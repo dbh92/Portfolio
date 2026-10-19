@@ -99,6 +99,13 @@ SEC = {s["key"]: s for s in SECTIONS}
 JOURNEY = sorted((s for s in SECTIONS if s.get("step")), key=lambda s: s["step"])
 PATH_BY = {p["slug"]: p for p in PATHS}
 
+
+def featured_paths(sec):
+    """Lộ trình nổi bật của một mục menu: 'featured' là một slug hoặc danh sách slug."""
+    f = sec.get("featured") or []
+    return [PATH_BY[x] for x in ([f] if isinstance(f, str) else f)]
+
+
 # Chuyên mục của bài viết = một mục menu có chủ đề (hoc, projects, kien-thuc, tin-tuc-ai, ngoai-ngu, tai-nguyen).
 # Bài nằm ở <mục>/<slug>.html, cùng thư mục với trang chủ đề của mục đó.
 CATS = {s["slug"]: {"slug": s["slug"], "name": s["label"], "section": s["key"]} for s in SECTIONS if s.get("groups")}
@@ -352,7 +359,7 @@ def nav_panel(root, sec):
         return f"""<div class="nav-panel mega" id="{pid}">
   <div class="container wide mega-inner">
     <div class="mega-groups">{groups}</div>
-    {feature_card(root, PATH_BY[sec['featured']])}
+    {feature_card(root, featured_paths(sec)[0])}
   </div>
   <div class="mega-foot"><div class="container wide mega-foot-inner">{journey(root, sec['key'], 'compact')}{all_link}</div></div>
 </div>"""
@@ -1213,9 +1220,7 @@ def build_hub(sec):
 
     body = topic_overview(root, sec)
 
-    feature = ""
-    if sec.get("featured"):
-        feature = f'<div class="hub-feature">{feature_card(root, PATH_BY[sec["featured"]], big=True)}</div>'
+    feature = "".join(f'<div class="hub-feature">{feature_card(root, fp, big=True)}</div>' for fp in featured_paths(sec))
     latest = ""
     if ps:
         latest = section_title("Bài viết mới") + f'<div class="post-list">{"".join(post_row(root, p) for p in ps[:6])}</div>'

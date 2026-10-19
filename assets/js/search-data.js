@@ -1,6 +1,937 @@
 /* Tự động sinh bởi tools/build.py – không sửa tay */
 window.HF_POSTS = [
  {
+  "t": "HSK 3.0 là gì? Cấp 3 cần bao nhiêu từ, thi những phần nào",
+  "u": "ngoai-ngu/hsk3-tong-quan-hsk-3-0.html",
+  "e": "HSK 3.0 thay HSK 2.0 tại Việt Nam từ 13/12/2026: cấp 3 khoảng 1.000 từ, đề 70 câu nghe, đọc, viết kèm phần nói, và cách đặt mục tiêu học.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/hsk3-tong-quan-hsk-3-0.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Luyện thi HSK"
+  ]
+ },
+ {
+  "t": "Kiểm tra đầu vào và lịch học tiếng Trung 24 tuần, 60 phút mỗi ngày",
+  "u": "ngoai-ngu/hsk3-kiem-tra-dau-vao-va-lich-hoc.html",
+  "e": "Bài tự kiểm tra 15 câu để biết bạn có thật sự bắt đầu từ số 0, lịch 24 tuần theo 5 giai đoạn và khung 60 phút mỗi ngày, 6 ngày mỗi tuần.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/hsk3-kiem-tra-dau-vao-va-lich-hoc.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK"
+  ]
+ },
+ {
+  "t": "21 thanh mẫu tiếng Trung: cách đọc và lỗi người Việt hay mắc",
+  "u": "ngoai-ngu/hsk3-thanh-mau.html",
+  "e": "Đọc đúng 21 phụ âm đầu của pinyin, phân biệt âm bật hơi b/p, d/t, g/k, nhóm j q x, zh ch sh r và z c s, kèm bảng so sánh với tiếng Việt.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/hsk3-thanh-mau.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Pinyin"
+  ]
+ },
+ {
+  "t": "Vận mẫu tiếng Trung và quy tắc viết pinyin: ü, y, w, iu, ui",
+  "u": "ngoai-ngu/hsk3-van-mau.html",
+  "e": "Vận mẫu đơn, kép, vận mẫu mũi -n/-ng, âm ü và các quy tắc viết pinyin hay gây nhầm: y, w, bỏ hai chấm trên ü, iu, ui, un.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/hsk3-van-mau.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Pinyin"
+  ]
+ },
+ {
+  "t": "4 thanh điệu và thanh nhẹ tiếng Trung: so sánh với dấu tiếng Việt",
+  "u": "ngoai-ngu/hsk3-thanh-dieu.html",
+  "e": "Độ cao của 4 thanh theo thang 5 bậc, so sánh và phân biệt với dấu tiếng Việt, thanh nhẹ, quy tắc đặt dấu thanh và bài luyện cặp thanh.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/hsk3-thanh-dieu.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Pinyin"
+  ]
+ },
+ {
+  "t": "Biến điệu tiếng Trung: hai thanh 3 liền nhau, 不 và 一",
+  "u": "ngoai-ngu/hsk3-bien-dieu.html",
+  "e": "Khi nào thanh 3 đọc thành thanh 2, nửa thanh 3, cách đọc 不 và 一 theo thanh phía sau, có bảng tóm tắt và bài luyện đọc câu.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-bien-dieu.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Pinyin"
+  ]
+ },
+ {
+  "t": "Luyện nghe pinyin và thanh điệu: cách tự luyện không cần giáo viên",
+  "u": "ngoai-ngu/hsk3-luyen-nghe-pinyin.html",
+  "e": "Quy trình nghe chép pinyin, luyện cặp âm dễ nhầm, ghi âm tự chấm và nguồn âm thanh chuẩn để tự kiểm tra phát âm khi học một mình.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-luyen-nghe-pinyin.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Pinyin"
+  ]
+ },
+ {
+  "t": "Nét cơ bản và quy tắc thứ tự nét khi viết chữ Hán",
+  "u": "ngoai-ngu/hsk3-net-va-thu-tu-net.html",
+  "e": "8 nét cơ bản, 7 quy tắc thứ tự nét áp dụng cho hầu hết chữ Hán, cách tập viết 5–10 chữ mỗi ngày mà không chán và nhớ được lâu.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/hsk3-net-va-thu-tu-net.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Chữ Hán"
+  ]
+ },
+ {
+  "t": "30 bộ thủ thông dụng và mẹo nhớ chữ Hán bằng âm Hán Việt",
+  "u": "ngoai-ngu/hsk3-bo-thu-thong-dung.html",
+  "e": "Bộ thủ là gì, 30 bộ hay gặp ở HSK 1–3 kèm ví dụ, chữ hình thanh và cách dùng âm Hán Việt để đoán nghĩa, nhớ chữ nhanh hơn.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/hsk3-bo-thu-thong-dung.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Chữ Hán"
+  ]
+ },
+ {
+  "t": "Gõ tiếng Trung bằng pinyin, dùng từ điển và Anki đúng cách",
+  "u": "ngoai-ngu/hsk3-go-tieng-trung-va-cong-cu.html",
+  "e": "Cài bộ gõ pinyin trên Windows và điện thoại, cách gõ ü, chọn từ điển có phát âm, tạo thẻ Anki chữ Hán – pinyin – nghĩa và nguồn audio đáng tin cậy.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/hsk3-go-tieng-trung-va-cong-cu.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Chữ Hán",
+   "Từ vựng tiếng Trung"
+  ]
+ },
+ {
+  "t": "Chào hỏi và giới thiệu tên bằng tiếng Trung: 你好, 是, 叫",
+  "u": "ngoai-ngu/hsk3-chao-hoi-va-dai-tu.html",
+  "e": "Chào hỏi, cảm ơn, xin lỗi, đại từ nhân xưng, câu khẳng định với 是, hỏi tên bằng 叫什么名字 và hội thoại làm quen đầu tiên có pinyin, nghĩa.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/hsk3-chao-hoi-va-dai-tu.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Giao tiếp tiếng Trung",
+   "Ngữ pháp tiếng Trung"
+  ]
+ },
+ {
+  "t": "Câu hỏi với 吗, phủ định với 不 và phó từ 也, 都",
+  "u": "ngoai-ngu/hsk3-cau-hoi-ma-va-phu-dinh-bu.html",
+  "e": "Biến câu khẳng định thành câu hỏi có/không bằng 吗, phủ định bằng 不, vị trí của 也 và 都, cách trả lời ngắn và lỗi trật tự từ hay gặp.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-cau-hoi-ma-va-phu-dinh-bu.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Ngữ pháp tiếng Trung"
+  ]
+ },
+ {
+  "t": "Số đếm tiếng Trung từ 0 đến 9999, hỏi tuổi và số điện thoại",
+  "u": "ngoai-ngu/hsk3-so-dem-tuoi-so-dien-thoai.html",
+  "e": "Đếm từ 0 đến 9.999, phân biệt 二 và 两, hỏi tuổi bằng 几岁 và 多大, đọc số điện thoại với yāo, cách dùng 几 và 多少 cho đúng từng trường hợp.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-so-dem-tuoi-so-dien-thoai.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Từ vựng tiếng Trung"
+  ]
+ },
+ {
+  "t": "Nói ngày tháng, thứ và giờ trong tiếng Trung",
+  "u": "ngoai-ngu/hsk3-ngay-thang-thu-gio.html",
+  "e": "Trật tự năm – tháng – ngày, thứ trong tuần với 星期, nói giờ với 点 và 分, 半 và 刻, hỏi 几点 và đặt từ chỉ thời gian đứng trước động từ trong câu.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-ngay-thang-thu-gio.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Từ vựng tiếng Trung",
+   "Ngữ pháp tiếng Trung"
+  ]
+ },
+ {
+  "t": "Giới thiệu gia đình bằng tiếng Trung: 有, 没有, 的 và lượng từ",
+  "u": "ngoai-ngu/hsk3-gia-dinh-co-khong.html",
+  "e": "Từ vựng thành viên gia đình, câu có với 有 và phủ định 没有, lượng từ 个 và 口, 的 chỉ sở hữu và đoạn giới thiệu gia đình mẫu.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-gia-dinh-co-khong.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Giao tiếp tiếng Trung",
+   "Ngữ pháp tiếng Trung"
+  ]
+ },
+ {
+  "t": "Bài kiểm tra tổng hợp tuần 5: pinyin, chào hỏi, số, thời gian",
+  "u": "ngoai-ngu/hsk3-kiem-tra-so-cap.html",
+  "e": "Bài tự kiểm tra 30 câu gồm pinyin, từ vựng, ngữ pháp, đọc hiểu và dịch câu, có đáp án, bảng phân loại lỗi và điều kiện để sang HSK 1.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 4,
+  "img": "assets/images/posts/hsk3-kiem-tra-so-cap.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Luyện thi HSK"
+  ]
+ },
+ {
+  "t": "Từ để hỏi trong tiếng Trung: 什么, 谁, 哪儿, 怎么, 为什么",
+  "u": "ngoai-ngu/hsk3-tu-de-hoi.html",
+  "e": "Quy tắc vàng: từ để hỏi đứng đúng chỗ của thông tin cần hỏi, không thêm 吗. Cách dùng 什么, 谁, 哪, 哪儿, 怎么, 为什么 kèm hội thoại mẫu.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-tu-de-hoi.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Ngữ pháp tiếng Trung"
+  ]
+ },
+ {
+  "t": "Câu có vị ngữ tính từ: vì sao phải có 很, cách dùng 太…了",
+  "u": "ngoai-ngu/hsk3-cau-vi-ngu-tinh-tu.html",
+  "e": "Tiếng Trung không dùng 是 trước tính từ: vai trò của 很, các phó từ mức độ 非常, 太…了, 不太, 有点儿 và cách miêu tả người, đồ vật.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-cau-vi-ngu-tinh-tu.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Ngữ pháp tiếng Trung"
+  ]
+ },
+ {
+  "t": "Nói nơi chốn trong tiếng Trung: 在, 这儿, 那儿 và phương vị từ",
+  "u": "ngoai-ngu/hsk3-dia-diem-voi-zai.html",
+  "e": "Ba cách dùng 在 (động từ, giới từ, phó từ), phương vị từ 上, 下, 里, 前, 后, 旁边, câu tồn tại với 有 và cách hỏi đồ vật, người đang ở đâu.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-dia-diem-voi-zai.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Ngữ pháp tiếng Trung"
+  ]
+ },
+ {
+  "t": "Trật tự câu tiếng Trung: thời gian, nơi chốn đứng trước động từ",
+  "u": "ngoai-ngu/hsk3-trat-tu-cau.html",
+  "e": "Khung câu chủ ngữ – thời gian – nơi chốn – động từ – tân ngữ, khác tiếng Việt ở đâu, và cách sắp xếp câu có nhiều thành phần.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/hsk3-trat-tu-cau.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Ngữ pháp tiếng Trung"
+  ]
+ },
+ {
+  "t": "想, 要, 会, 能, 可以: muốn, cần, biết, có thể khác nhau thế nào",
+  "u": "ngoai-ngu/hsk3-dong-tu-nang-nguyen.html",
+  "e": "Phân biệt 想 và 要 khi nói mong muốn, 会 – 能 – 可以 khi nói khả năng và sự cho phép, cách phủ định từng từ và bảng so sánh dễ nhớ.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-dong-tu-nang-nguyen.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Ngữ pháp tiếng Trung"
+  ]
+ },
+ {
+  "t": "Mua sắm bằng tiếng Trung: 多少钱, 块, 一点儿 và lượng từ",
+  "u": "ngoai-ngu/hsk3-mua-sam-va-tien.html",
+  "e": "Hỏi giá với 多少钱, đọc giá tiền 块 毛 元, lượng từ 个, 本, 件, 杯, 张, 斤, mặc cả nhẹ nhàng với 便宜一点儿 và hội thoại mua hàng ở cửa hàng, chợ.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-mua-sam-va-tien.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Giao tiếp tiếng Trung",
+   "Từ vựng tiếng Trung"
+  ]
+ },
+ {
+  "t": "Gọi món và nói về ăn uống bằng tiếng Trung",
+  "u": "ngoai-ngu/hsk3-an-uong-goi-mon.html",
+  "e": "Từ vựng món ăn, đồ uống, mẫu câu gọi món 我要, 来一个, hỏi món ngon, thanh toán, câu cầu khiến với 请 và 吧, hội thoại ở nhà hàng.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-an-uong-goi-mon.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Giao tiếp tiếng Trung",
+   "Từ vựng tiếng Trung"
+  ]
+ },
+ {
+  "t": "了 cơ bản, phủ định với 没 và trợ từ 呢",
+  "u": "ngoai-ngu/hsk3-le-co-ban-va-ne.html",
+  "e": "Dùng 了 để nói việc đã xảy ra, phủ định quá khứ bằng 没 chứ không phải 不, hỏi bằng 了吗 và 了没有, cách dùng 呢 để hỏi lại và hỏi ai đó ở đâu.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-le-co-ban-va-ne.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Ngữ pháp tiếng Trung"
+  ]
+ },
+ {
+  "t": "Bài kiểm tra HSK 1 tự biên soạn: nghe, đọc và nói, có đáp án",
+  "u": "ngoai-ngu/hsk3-kiem-tra-hsk-1.html",
+  "e": "Bài kiểm tra tổng hợp sau 9 tuần: nghe qua văn bản đọc to, đọc hiểu, ngữ pháp và nói theo câu hỏi, có thang chấm và điều kiện sang HSK 2.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/hsk3-kiem-tra-hsk-1.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Luyện thi HSK"
+  ]
+ },
+ {
+  "t": "Hai cách dùng 了: hành động hoàn thành và tình huống thay đổi",
+  "u": "ngoai-ngu/hsk3-le-hoan-thanh-va-thay-doi.html",
+  "e": "Phân biệt 了 sau động từ (hoàn thành) và 了 cuối câu (thay đổi, tình huống mới), khi nào có cả hai và khi nào tuyệt đối không dùng 了 trong câu.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-le-hoan-thanh-va-thay-doi.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Ngữ pháp tiếng Trung"
+  ]
+ },
+ {
+  "t": "Trợ từ 过: nói về điều đã từng trải qua",
+  "u": "ngoai-ngu/hsk3-guo-trai-nghiem.html",
+  "e": "Dùng V + 过 để nói đã từng, phủ định 没 + V + 过, câu hỏi 过吗 và 过没有, phân biệt 过 với 了 và cách đếm số lần đã từng làm một việc gì đó.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 4,
+  "img": "assets/images/posts/hsk3-guo-trai-nghiem.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Ngữ pháp tiếng Trung"
+  ]
+ },
+ {
+  "t": "Diễn đạt hành động đang diễn ra: 在, 正在, 呢 và 着",
+  "u": "ngoai-ngu/hsk3-dang-dien-ra-zhengzai-zhe.html",
+  "e": "Cách dùng 在, 正在, 正 và 呢 cho hành động đang diễn ra, phủ định 没在, trợ từ 着 chỉ trạng thái kéo dài và cách miêu tả người, cảnh trong tranh.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-dang-dien-ra-zhengzai-zhe.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Ngữ pháp tiếng Trung"
+  ]
+ },
+ {
+  "t": "Nói việc sắp xảy ra: 要…了, 快要…了, 就要…了",
+  "u": "ngoai-ngu/hsk3-sap-xay-ra.html",
+  "e": "Bốn mẫu câu nói việc sắp xảy ra, khác nhau thế nào về mức độ gần, mẫu nào đi được với thời gian cụ thể, và lỗi bỏ quên 了 cuối câu của người mới học.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-sap-xay-ra.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Ngữ pháp tiếng Trung"
+  ]
+ },
+ {
+  "t": "Câu so sánh tiếng Trung: 比, 没有, 一样, 更 và 最",
+  "u": "ngoai-ngu/hsk3-so-sanh-voi-bi.html",
+  "e": "Mẫu A 比 B + tính từ, nói chênh lệch với 一点儿, 多了 và số lượng, phủ định bằng 没有 chứ không phải 不比, cấu trúc 跟…一样, phó từ 更 và 最.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-so-sanh-voi-bi.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Ngữ pháp tiếng Trung"
+  ]
+ },
+ {
+  "t": "Bổ ngữ trình độ 得: nói làm gì đó tốt hay không tốt",
+  "u": "ngoai-ngu/hsk3-bo-ngu-trinh-do-de.html",
+  "e": "Mẫu V + 得 + tính từ để đánh giá hành động, cách lặp động từ khi có tân ngữ, phủ định, câu hỏi và cách phân biệt ba chữ de: 的, 得 và 地.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-bo-ngu-trinh-do-de.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Ngữ pháp tiếng Trung"
+  ]
+ },
+ {
+  "t": "Đi lại bằng tiếng Trung: câu liên động, 从…到 và 离",
+  "u": "ngoai-ngu/hsk3-lien-dong-va-di-lai.html",
+  "e": "Câu liên động 去 + nơi + làm gì, phương tiện với 坐, 开, 骑, khoảng cách với 离 và 远/近, hành trình với 从…到 và câu hỏi 怎么去 khi đi làm, đi chơi.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-lien-dong-va-di-lai.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Ngữ pháp tiếng Trung",
+   "Giao tiếp tiếng Trung"
+  ]
+ },
+ {
+  "t": "Nói làm gì bao lâu, mấy lần: bổ ngữ thời lượng, 次 và 已经",
+  "u": "ngoai-ngu/hsk3-thoi-luong-va-so-lan.html",
+  "e": "Bổ ngữ thời lượng (học hai năm, đợi mười phút), vị trí của tân ngữ, số lần với 次, 已经…了 và mẫu câu đã làm việc gì được bao lâu rồi.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-thoi-luong-va-so-lan.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Ngữ pháp tiếng Trung"
+  ]
+ },
+ {
+  "t": "Luyện tập 40 câu ngữ pháp HSK 2 có giải thích",
+  "u": "ngoai-ngu/hsk3-luyen-tap-ngu-phap-hsk-2.html",
+  "e": "40 câu tự biên soạn về 了, 过, 正在, 着, 要…了, 比, 得, 离 và thời lượng: chọn đáp án, sửa câu sai, dịch câu, kèm giải thích ngắn cho từng câu.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-luyen-tap-ngu-phap-hsk-2.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Ngữ pháp tiếng Trung",
+   "Luyện thi HSK"
+  ]
+ },
+ {
+  "t": "Hỏi đường, đi taxi, đi tàu xe bằng tiếng Trung",
+  "u": "ngoai-ngu/hsk3-hoi-duong-va-di-lai.html",
+  "e": "Từ vựng chỉ phương hướng, mẫu câu hỏi đường 怎么走, chỉ đường 往前走, 往左拐, đi taxi, mua vé tàu xe và hội thoại hỏi đường mẫu có pinyin.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-hoi-duong-va-di-lai.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Giao tiếp tiếng Trung"
+  ]
+ },
+ {
+  "t": "Nói về sức khỏe và đi khám bệnh bằng tiếng Trung",
+  "u": "ngoai-ngu/hsk3-suc-khoe-di-kham.html",
+  "e": "Từ vựng bộ phận cơ thể, triệu chứng, mẫu câu 我…疼, 不舒服, xin nghỉ ốm, hội thoại ở phòng khám và cách hiểu lời khuyên với 应该, 别, 多.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-suc-khoe-di-kham.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Giao tiếp tiếng Trung",
+   "Từ vựng tiếng Trung"
+  ]
+ },
+ {
+  "t": "Nói về thời tiết và các mùa trong tiếng Trung",
+  "u": "ngoai-ngu/hsk3-thoi-tiet-va-mua.html",
+  "e": "Từ vựng thời tiết, mùa, nhiệt độ, mẫu câu 天气怎么样, 下雨了, 越来越热, so sánh thời tiết hai nơi và nói chuyện làm quen bằng thời tiết.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-thoi-tiet-va-mua.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Giao tiếp tiếng Trung",
+   "Từ vựng tiếng Trung"
+  ]
+ },
+ {
+  "t": "Nói về sở thích và thời gian rảnh bằng tiếng Trung",
+  "u": "ngoai-ngu/hsk3-so-thich-thoi-gian-ranh.html",
+  "e": "Từ vựng thể thao, giải trí, mẫu câu 喜欢, 爱好, 有时候, 常常 để nói sở thích, rủ đi chơi với 一起…吧, cách nhận lời và từ chối khéo léo.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-so-thich-thoi-gian-ranh.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Giao tiếp tiếng Trung",
+   "Từ vựng tiếng Trung"
+  ]
+ },
+ {
+  "t": "Tiếng Trung công sở cơ bản: công việc, đồng nghiệp, cuộc họp",
+  "u": "ngoai-ngu/hsk3-cong-so-dong-nghiep.html",
+  "e": "Từ vựng chức vụ, bộ phận, công việc hằng ngày, mẫu câu giới thiệu công việc, hỏi tiến độ, báo bận, xin phép và hội thoại với đồng nghiệp.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-cong-so-dong-nghiep.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Giao tiếp tiếng Trung",
+   "Từ vựng tiếng Trung"
+  ]
+ },
+ {
+  "t": "Gọi điện thoại và hẹn gặp bằng tiếng Trung",
+  "u": "ngoai-ngu/hsk3-goi-dien-va-hen-gap.html",
+  "e": "Mở đầu cuộc gọi với 喂, hỏi người cần gặp, để lại lời nhắn, hẹn giờ với 有空吗, đổi lịch, nhắn tin xác nhận và hội thoại mẫu.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-goi-dien-va-hen-gap.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Giao tiếp tiếng Trung"
+  ]
+ },
+ {
+  "t": "15 cặp từ dễ nhầm trong tiếng Trung sơ cấp: 不/没, 二/两, 再/又",
+  "u": "ngoai-ngu/hsk3-tu-de-nham-hsk-2.html",
+  "e": "Bảng so sánh các cặp hay nhầm của người Việt: 不 và 没, 二 và 两, 会 – 能 – 可以, 再 và 又, 的 – 得 – 地, 有点儿 và 一点儿, kèm 20 câu luyện tập.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-tu-de-nham-hsk-2.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Ngữ pháp tiếng Trung",
+   "Từ vựng tiếng Trung"
+  ]
+ },
+ {
+  "t": "Bài kiểm tra HSK 2 tự biên soạn: nghe, đọc, viết, nói có đáp án",
+  "u": "ngoai-ngu/hsk3-kiem-tra-hsk-2.html",
+  "e": "Bài kiểm tra cuối tuần 16 gồm nghe qua văn bản đọc to, đọc hiểu, viết chữ Hán theo pinyin, nói theo tranh và câu hỏi, có thang chấm.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-kiem-tra-hsk-2.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Luyện thi HSK"
+  ]
+ },
+ {
+  "t": "Bổ ngữ kết quả trong tiếng Trung: làm xong, nghe hiểu, nhìn thấy",
+  "u": "ngoai-ngu/hsk3-bo-ngu-ket-qua.html",
+  "e": "Động từ + kết quả: 完, 好, 到, 懂, 见, 错, 对, 清楚, phủ định bằng 没, câu hỏi 了没有 và lý do người Việt hay bỏ quên bổ ngữ khi nói tiếng Trung.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/hsk3-bo-ngu-ket-qua.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Ngữ pháp tiếng Trung"
+  ]
+ },
+ {
+  "t": "Bổ ngữ xu hướng tiếng Trung: 进来, 出去, 回来, 拿起来",
+  "u": "ngoai-ngu/hsk3-bo-ngu-xu-huong.html",
+  "e": "Bổ ngữ xu hướng đơn 来/去 theo vị trí người nói, bổ ngữ xu hướng kép 进来, 出去, 回来, 上去, vị trí tân ngữ nơi chốn và nghĩa mở rộng của 起来.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-bo-ngu-xu-huong.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Ngữ pháp tiếng Trung"
+  ]
+ },
+ {
+  "t": "Bổ ngữ khả năng: 听得懂, 看不清楚, 买不到",
+  "u": "ngoai-ngu/hsk3-bo-ngu-kha-nang.html",
+  "e": "Chèn 得/不 giữa động từ và bổ ngữ để nói có thể hay không thể đạt kết quả, khác 能 ở đâu, câu hỏi chính phản và các cụm hay gặp.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/hsk3-bo-ngu-kha-nang.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Ngữ pháp tiếng Trung"
+  ]
+ },
+ {
+  "t": "Câu chữ 把: cấu trúc, điều kiện dùng và lỗi hay gặp",
+  "u": "ngoai-ngu/hsk3-cau-chu-ba.html",
+  "e": "Mẫu S + 把 + O + V + thành phần khác, vì sao động từ không đứng một mình, tân ngữ phải xác định, phủ định 没把 và các mẫu 把…放在, 把…给.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/hsk3-cau-chu-ba.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Ngữ pháp tiếng Trung"
+  ]
+ },
+ {
+  "t": "Câu bị động với 被 trong tiếng Trung",
+  "u": "ngoai-ngu/hsk3-cau-bi-dong-bei.html",
+  "e": "Mẫu S + 被 + (người làm) + V + thành phần khác, sắc thái không may, so sánh với câu 把, bị động không cần 被 và lỗi dịch từ chữ bị của tiếng Việt.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-cau-bi-dong-bei.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Ngữ pháp tiếng Trung"
+  ]
+ },
+ {
+  "t": "Cấu trúc 是…的: nhấn mạnh thời gian, nơi chốn, cách thức",
+  "u": "ngoai-ngu/hsk3-cau-truc-shi-de.html",
+  "e": "Dùng 是…的 để hỏi và nhấn mạnh khi nào, ở đâu, với ai, bằng cách nào cho việc đã xảy ra, phân biệt với 了 và vị trí tân ngữ.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-cau-truc-shi-de.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Ngữ pháp tiếng Trung"
+  ]
+ },
+ {
+  "t": "Liên từ HSK 3: 虽然…但是, 因为…所以, 如果…就, 不但…而且",
+  "u": "ngoai-ngu/hsk3-lien-tu-cau-phuc.html",
+  "e": "Năm cặp liên từ nối câu phức quan trọng ở HSK 3: nhượng bộ, nguyên nhân, điều kiện, tăng tiến, ngay khi, vị trí chủ ngữ và lỗi thừa liên từ.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-lien-tu-cau-phuc.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Ngữ pháp tiếng Trung"
+  ]
+ },
+ {
+  "t": "Cấu trúc hay gặp ở HSK 3: 越来越, 除了…以外, 又…又, 先…再",
+  "u": "ngoai-ngu/hsk3-cau-truc-hay-gap-hsk-3.html",
+  "e": "Các mẫu câu HSK 3 hay ra: 越来越, 越…越, 除了…以外 với 都 và 还, 又…又, 先…再…然后, 一边…一边, 只要…就, mỗi mẫu kèm ví dụ gần gũi đời sống, công việc và lỗi người Việt hay mắc.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-cau-truc-hay-gap-hsk-3.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Ngữ pháp tiếng Trung"
+  ]
+ },
+ {
+  "t": "Luyện tập 40 câu ngữ pháp HSK 3 có giải thích",
+  "u": "ngoai-ngu/hsk3-luyen-tap-ngu-phap-hsk-3.html",
+  "e": "40 câu tự biên soạn về bổ ngữ kết quả, xu hướng, khả năng, câu 把, 被, 是…的 và liên từ: chọn, sửa câu sai, dịch, kèm giải thích.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 4,
+  "img": "assets/images/posts/hsk3-luyen-tap-ngu-phap-hsk-3.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Ngữ pháp tiếng Trung",
+   "Luyện thi HSK"
+  ]
+ },
+ {
+  "t": "Luyện nghe HSK 3: đọc trước đáp án, bắt từ khóa, nghe chép",
+  "u": "ngoai-ngu/hsk3-nghe-hieu-chien-thuat.html",
+  "e": "Đọc trước đáp án, đoán chủ đề, bắt từ chỉ thời gian, nơi chốn, phủ định, bẫy đồng âm khác thanh và quy trình nghe chép 15 phút mỗi ngày.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/hsk3-nghe-hieu-chien-thuat.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Luyện thi HSK"
+  ]
+ },
+ {
+  "t": "Đọc hiểu HSK 3: ghép câu, điền từ và đọc đoạn văn",
+  "u": "ngoai-ngu/hsk3-doc-hieu-doan-van.html",
+  "e": "Cách làm từng dạng đọc: ghép câu hỏi – trả lời, điền từ theo ngữ cảnh, đọc đoạn văn trả lời nhiều câu hỏi, kèm 3 đoạn luyện có đáp án.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-doc-hieu-doan-van.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Luyện thi HSK"
+  ]
+ },
+ {
+  "t": "Phần viết HSK 3 mới: điền chữ Hán theo pinyin và viết câu theo tranh",
+  "u": "ngoai-ngu/hsk3-viet-chu-han-va-viet-cau.html",
+  "e": "Cách luyện dạng điền chữ Hán khi chỉ có pinyin, viết câu từ tranh và từ gợi ý, 5 khung câu an toàn và danh sách chữ hay viết sai.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/hsk3-viet-chu-han-va-viet-cau.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Luyện thi HSK",
+   "Chữ Hán"
+  ]
+ },
+ {
+  "t": "Luyện nói HSK 3: lặp lại câu, miêu tả tranh và trả lời câu hỏi",
+  "u": "ngoai-ngu/hsk3-noi-lap-lai-mo-ta-tranh.html",
+  "e": "Ba dạng nói theo đề mẫu HSK 3 mới, khung trả lời cho từng dạng, cách tự ghi âm và chấm theo tiêu chí phát âm, ngữ pháp, độ trôi chảy.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/hsk3-noi-lap-lai-mo-ta-tranh.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Luyện thi HSK",
+   "Giao tiếp tiếng Trung"
+  ]
+ },
+ {
+  "t": "Viết đoạn văn tiếng Trung 80–100 chữ: bố cục và câu nối",
+  "u": "ngoai-ngu/hsk3-viet-doan-van-ngan.html",
+  "e": "Bố cục 3 phần, câu mở, thân, kết, từ nối 首先, 然后, 最后, 因为, 所以, bài mẫu về công việc và cuối tuần, cách tự sửa đoạn văn theo danh sách.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-viet-doan-van-ngan.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Luyện thi HSK"
+  ]
+ },
+ {
+  "t": "Dự án tiếng Trung: nói 2 phút và viết đoạn văn về một ngày của bạn",
+  "u": "ngoai-ngu/hsk3-du-an-mot-ngay-cua-toi.html",
+  "e": "Dự án tổng hợp: viết đoạn 120–150 chữ, nói 2 phút về một ngày làm việc, trả lời 5 câu hỏi phụ, tự chấm theo thang và lưu làm bằng chứng tiến bộ.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 4,
+  "img": "assets/images/posts/hsk3-du-an-mot-ngay-cua-toi.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Luyện thi HSK",
+   "Giao tiếp tiếng Trung"
+  ]
+ },
+ {
+  "t": "Cấu trúc đề HSK 3 mới (HSK 3.0) và cách đăng ký thi",
+  "u": "ngoai-ngu/hsk3-cau-truc-de-va-dang-ky-thi.html",
+  "e": "Đề HSK 3 mới theo đề mẫu: 30 câu nghe, 30 câu đọc, 10 câu viết, phần nói thi cùng, thời gian, cách đăng ký và những gì cần kiểm tra lại.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/hsk3-cau-truc-de-va-dang-ky-thi.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Luyện thi HSK"
+  ]
+ },
+ {
+  "t": "Đề thi thử HSK 3 tự biên soạn theo dạng câu mới, có đáp án",
+  "u": "ngoai-ngu/hsk3-de-thi-thu-hsk-3.html",
+  "e": "Đề luyện đủ dạng câu nghe (qua văn bản đọc to), đọc, viết và nói theo đề mẫu HSK 3 mới, có đáp án, giải thích và bảng quy đổi tỉ lệ đúng.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-de-thi-thu-hsk-3.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Luyện thi HSK"
+  ]
+ },
+ {
+  "t": "Chữa đề HSK đúng cách, sổ lỗi sai và kế hoạch 2 tuần cuối",
+  "u": "ngoai-ngu/hsk3-chua-de-va-so-loi.html",
+  "e": "Chữa đề theo 4 lớp, phân loại lỗi từ vựng, ngữ pháp, nghe, đọc, viết, quy tắc điều chỉnh kế hoạch và lịch 14 ngày cuối trước ngày thi.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-chua-de-va-so-loi.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Luyện thi HSK"
+  ]
+ },
+ {
+  "t": "Dự án cuối khóa HSK 3: thi thử đầy đủ và kế hoạch học tiếp",
+  "u": "ngoai-ngu/hsk3-du-an-cuoi-khoa.html",
+  "e": "Thi thử đầy đủ với đề mẫu chính thức, so sánh với đầu vào, tự đánh giá 4 kỹ năng theo thang và lập kế hoạch duy trì hoặc học tiếp HSK 4.",
+  "c": "ngoai-ngu",
+  "cn": "Ngoại ngữ",
+  "d": "19/10/2026",
+  "m": 5,
+  "img": "assets/images/posts/hsk3-du-an-cuoi-khoa.webp",
+  "tags": [
+   "Tiếng Trung",
+   "HSK",
+   "Luyện thi HSK"
+  ]
+ },
+ {
   "t": "Cấu trúc đề TOEIC Listening & Reading và cách tính điểm",
   "u": "ngoai-ngu/toeic-cau-truc-de-va-cach-tinh-diem.html",
   "e": "200 câu trong 7 Part, điểm quy đổi 10–990, câu sai không bị trừ điểm và cách chia 700 điểm cho hai kỹ năng theo sức người đi làm.",
@@ -1996,7 +2927,7 @@ window.HF_POSTS = [
   "c": "ngoai-ngu",
   "cn": "Ngoại ngữ",
   "d": "09/10/2026",
-  "m": 4,
+  "m": 5,
   "img": "assets/images/posts/lo-trinh-hsk3.webp",
   "tags": [
    "Tiếng Trung",
@@ -3949,7 +4880,7 @@ window.HF_TOPICS = [
   "u": "ngoai-ngu/chinese.html",
   "s": "Ngoại ngữ",
   "g": "Ngôn ngữ",
-  "n": 3
+  "n": 64
  },
  {
   "t": "TOEIC Listening",
@@ -3985,6 +4916,48 @@ window.HF_TOPICS = [
   "s": "Ngoại ngữ",
   "g": "Tiếng Anh theo kỹ năng",
   "n": 13
+ },
+ {
+  "t": "Pinyin & phát âm",
+  "u": "ngoai-ngu/pinyin-phat-am.html",
+  "s": "Ngoại ngữ",
+  "g": "Tiếng Trung theo kỹ năng",
+  "n": 5
+ },
+ {
+  "t": "Chữ Hán",
+  "u": "ngoai-ngu/chu-han.html",
+  "s": "Ngoại ngữ",
+  "g": "Tiếng Trung theo kỹ năng",
+  "n": 4
+ },
+ {
+  "t": "Ngữ pháp tiếng Trung",
+  "u": "ngoai-ngu/ngu-phap-tieng-trung.html",
+  "s": "Ngoại ngữ",
+  "g": "Tiếng Trung theo kỹ năng",
+  "n": 29
+ },
+ {
+  "t": "Từ vựng tiếng Trung",
+  "u": "ngoai-ngu/tu-vung-tieng-trung.html",
+  "s": "Ngoại ngữ",
+  "g": "Tiếng Trung theo kỹ năng",
+  "n": 10
+ },
+ {
+  "t": "Giao tiếp tiếng Trung",
+  "u": "ngoai-ngu/giao-tiep-tieng-trung.html",
+  "s": "Ngoại ngữ",
+  "g": "Tiếng Trung theo kỹ năng",
+  "n": 13
+ },
+ {
+  "t": "Luyện thi HSK",
+  "u": "ngoai-ngu/luyen-thi-hsk.html",
+  "s": "Ngoại ngữ",
+  "g": "Tiếng Trung theo kỹ năng",
+  "n": 16
  },
  {
   "t": "Source Code",
@@ -4041,6 +5014,14 @@ window.HF_TOPICS = [
   "u": "lo-trinh/toeic-700.html",
   "s": "Learning Path",
   "g": "TOEIC Listening & Reading + giao tiếp công sở cho người đi làm",
+  "n": -1,
+  "f": 0
+ },
+ {
+  "t": "Tiếng Trung từ 0 đến HSK 3 trong 6 tháng",
+  "u": "lo-trinh/hsk3.html",
+  "s": "Learning Path",
+  "g": "Pinyin, chữ Hán, ngữ pháp, giao tiếp và luyện thi HSK 3.0 cho người Việt",
   "n": -1,
   "f": 0
  },
@@ -4225,6 +5206,76 @@ window.HF_TOPICS = [
   "u": "lo-trinh/toeic-700/luyen-de.html",
   "s": "700 TOEIC",
   "g": "6 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 1: Nền tảng phát âm: pinyin và thanh điệu",
+  "u": "lo-trinh/hsk3/pinyin.html",
+  "s": "HSK 3",
+  "g": "7 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 2: Làm quen chữ Hán và gõ tiếng Trung",
+  "u": "lo-trinh/hsk3/chu-han.html",
+  "s": "HSK 3",
+  "g": "3 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 3: Những câu đầu tiên: chào hỏi, số đếm, thời gian",
+  "u": "lo-trinh/hsk3/so-cap.html",
+  "s": "HSK 3",
+  "g": "6 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 4: Hoàn thành HSK 1: câu cơ bản theo chủ đề",
+  "u": "lo-trinh/hsk3/hsk1.html",
+  "s": "HSK 3",
+  "g": "9 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 5: HSK 2: thời gian, trải nghiệm và so sánh",
+  "u": "lo-trinh/hsk3/hsk2-ngu-phap.html",
+  "s": "HSK 3",
+  "g": "9 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 6: HSK 2: hội thoại theo tình huống",
+  "u": "lo-trinh/hsk3/hsk2-giao-tiep.html",
+  "s": "HSK 3",
+  "g": "6 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 7: Ôn tập và kiểm tra HSK 2",
+  "u": "lo-trinh/hsk3/on-tap-hsk2.html",
+  "s": "HSK 3",
+  "g": "2 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 8: HSK 3: bổ ngữ, câu chữ 把, câu bị động",
+  "u": "lo-trinh/hsk3/hsk3-ngu-phap.html",
+  "s": "HSK 3",
+  "g": "9 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 9: HSK 3: nghe, đọc, viết, nói",
+  "u": "lo-trinh/hsk3/hsk3-ky-nang.html",
+  "s": "HSK 3",
+  "g": "6 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 10: Luyện đề và về đích HSK 3",
+  "u": "lo-trinh/hsk3/luyen-de.html",
+  "s": "HSK 3",
+  "g": "4 bài học",
   "n": -1
  }
 ];
