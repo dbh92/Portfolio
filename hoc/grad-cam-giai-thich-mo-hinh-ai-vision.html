@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="vi" data-root="../">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grad-CAM: mô hình AI vision đang thật sự nhìn vào đâu? | HọcFree</title>
+<meta name="description" content="Mô hình học lối tắt: validation 100% nhưng bỏ sót gần hết lỗi thật. Dùng Grad-CAM và occlusion map tìm nguyên nhân, sửa dữ liệu rồi kiểm chứng lại.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://hocfree.vn/hoc/grad-cam-giai-thich-mo-hinh-ai-vision.html">
+<meta property="og:site_name" content="HọcFree">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Grad-CAM: mô hình AI vision đang thật sự nhìn vào đâu?">
+<meta property="og:description" content="Mô hình học lối tắt: validation 100% nhưng bỏ sót gần hết lỗi thật. Dùng Grad-CAM và occlusion map tìm nguyên nhân, sửa dữ liệu rồi kiểm chứng lại.">
+<meta property="og:url" content="https://hocfree.vn/hoc/grad-cam-giai-thich-mo-hinh-ai-vision.html">
+<meta property="og:image" content="https://hocfree.vn/assets/images/posts/grad-cam-giai-thich-mo-hinh-ai-vision.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="Grad-CAM: mô hình AI vision đang thật sự nhìn vào đâu?">
+<meta property="og:locale" content="vi_VN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Grad-CAM: mô hình AI vision đang thật sự nhìn vào đâu?">
+<meta name="twitter:description" content="Mô hình học lối tắt: validation 100% nhưng bỏ sót gần hết lỗi thật. Dùng Grad-CAM và occlusion map tìm nguyên nhân, sửa dữ liệu rồi kiểm chứng lại.">
+<meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/grad-cam-giai-thich-mo-hinh-ai-vision.jpg">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/fonts.css?v=20261021">
+<link rel="stylesheet" href="../assets/css/style.css?v=20261021">
+<script>try{var t=localStorage.getItem('hf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
+<meta property="article:published_time" content="2026-10-21">
+<meta property="article:section" content="Học AI &amp; Lập trình">
+<meta property="article:tag" content="AI Vision">
+<meta property="article:tag" content="Deep Learning">
+<meta property="article:tag" content="PyTorch">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "Grad-CAM: mô hình AI vision đang thật sự nhìn vào đâu?", "description": "Mô hình học lối tắt: validation 100% nhưng bỏ sót gần hết lỗi thật. Dùng Grad-CAM và occlusion map tìm nguyên nhân, sửa dữ liệu rồi kiểm chứng lại.", "image": ["https://hocfree.vn/assets/images/posts/grad-cam-giai-thich-mo-hinh-ai-vision.jpg"], "datePublished": "2026-10-21", "dateModified": "2026-10-21", "inLanguage": "vi", "articleSection": "Học AI & Lập trình", "keywords": "AI Vision, Deep Learning, PyTorch", "wordCount": 3122, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/hoc/grad-cam-giai-thich-mo-hinh-ai-vision.html"}, "isPartOf": {"@type": "Course", "name": "Trở thành Vision Engineer", "url": "https://hocfree.vn/lo-trinh/vision-engineer.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Learning Paths", "item": "https://hocfree.vn/lo-trinh/"}, {"@type": "ListItem", "position": 3, "name": "Trở thành Vision Engineer", "item": "https://hocfree.vn/lo-trinh/vision-engineer.html"}, {"@type": "ListItem", "position": 4, "name": "Chặng 12: AI Vision", "item": "https://hocfree.vn/lo-trinh/vision-engineer/ai-vision.html"}, {"@type": "ListItem", "position": 5, "name": "Grad-CAM: mô hình AI vision đang thật sự nhìn vào đâu?"}]}</script>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/contrib/auto-render.min.js" onload="renderMathInElement(document.querySelector('.prose'),{delimiters:[{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}],throwOnError:false})"></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div class="progress" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="container wide header-top">
+    <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="nav-scrim" hidden></div>
+    <a class="logo" href="../" aria-label="HọcFree – Trang chủ"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+    <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
+    <div class="header-actions">
+      <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="login-link" href="../dang-nhap.html">Đăng nhập</a>
+      <a class="btn start-btn" href="../lo-trinh/">Bắt đầu học</a>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="container wide">
+      <nav class="site-nav" id="site-nav" aria-label="Menu chính">
+        <div class="drawer-head">
+          <a class="logo" href="../" tabindex="-1"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+          <button class="icon-btn nav-close" aria-label="Đóng menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <button type="button" class="drawer-search search-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Tìm bài học, chủ đề…</span></button>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="../">Trang chủ</a></li><li class="nav-item has-panel is-mega"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-hoc">Học AI &amp; Lập trình<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel mega" id="nav-panel-hoc">
+  <div class="container wide mega-inner">
+    <div class="mega-groups"><div class="mega-group"><a class="mega-group-title" href="../hoc/#programming">Programming</a><ul><li><a href="../hoc/python.html">Python</a></li><li><a href="../hoc/csharp.html">C#</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#ai-machine-learning">AI &amp; Machine Learning</a><ul><li><a href="../hoc/machine-learning.html">Machine Learning</a></li><li><a href="../hoc/deep-learning.html">Deep Learning</a></li><li><a href="../hoc/pytorch.html">PyTorch</a></li><li><a href="../hoc/generative-ai.html">Generative AI</a></li><li><a href="../hoc/llm-ai-agents.html">LLM / AI Agents</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#computer-vision">Computer Vision</a><ul><li><a href="../hoc/opencv.html">OpenCV</a></li><li><a href="../hoc/image-processing.html">Image Processing</a></li><li><a href="../hoc/computer-vision.html">Computer Vision</a></li><li><a href="../hoc/ocr.html">OCR</a></li><li><a href="../hoc/object-detection.html">Object Detection</a></li><li><a href="../hoc/segmentation.html">Segmentation</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#vision-engineering">Vision Engineering</a><ul><li><a href="../hoc/machine-vision.html">Machine Vision</a></li><li><a href="../hoc/ai-vision.html">AI Vision</a></li><li><a href="../hoc/industrial-vision.html">Industrial Vision</a></li><li><a href="../hoc/camera-lens.html">Camera &amp; Lens</a></li><li><a href="../hoc/lighting.html">Lighting</a></li><li><a href="../hoc/calibration.html">Calibration</a></li><li><a href="../hoc/3d-vision.html">3D Vision</a></li><li><a href="../hoc/plc-robot-mes.html">PLC / Robot / MES</a></li><li><a href="../hoc/vision-deployment.html">Vision Deployment</a></li></ul></div></div>
+    <a class="feature-card" href="../lo-trinh/vision-engineer.html">
+  <span class="feature-eyebrow">⭐ Learning Path nổi bật</span>
+  <span class="feature-title">Trở thành Vision Engineer</span>
+  <span class="feature-sub">Machine Vision + AI Vision + Industrial Automation</span>
+  <span class="feature-desc">Lộ trình thực chiến từ Python, OpenCV và Machine Vision đến 3D Vision, Deep Learning, AI Vision, Camera, PLC, Robot và triển khai hệ thống Vision trong nhà máy.</span>
+  <span class="feature-chain" aria-label="Các chặng chính"><span>Python</span><i aria-hidden="true">→</i><span>OpenCV</span><i aria-hidden="true">→</i><span>Machine Vision</span><i aria-hidden="true">→</i><span>AI Vision</span><i aria-hidden="true">→</i><span class="chain-goal">🎯 Vision Engineer</span></span>
+  <span class="feature-meta">15 chặng · 5 giai đoạn · ~13 tháng</span>
+  <span class="feature-cta">Xem lộ trình →</span>
+</a>
+  </div>
+  <div class="mega-foot"><div class="container wide mega-foot-inner"><ol class="journey compact" aria-label="Học, thực hành, trở thành kỹ sư"><li><a href="../hoc/" aria-current="step"><span class="journey-n">1</span><span class="journey-t"><b>Học</b><small>Học AI &amp; Lập trình</small></span></a></li><li><a href="../projects/"><span class="journey-n">2</span><span class="journey-t"><b>Thực hành</b><small>Projects</small></span></a></li><li><a href="../lo-trinh/"><span class="journey-n">3</span><span class="journey-t"><b>Trở thành kỹ sư</b><small>Learning Paths</small></span></a></li></ol><a class="panel-all" href="../hoc/">Xem tất cả Học AI &amp; Lập trình →</a></div></div>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-projects">Projects<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-projects">
+  <p class="panel-kicker"><span>Bước 2 · Thực hành</span>Áp dụng vào dự án thật</p>
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../projects/ai-projects.html"><span class="drop-label">AI Projects</span><span class="drop-desc">Ứng dụng ML và LLM, từ ý tưởng đến bản demo</span></a></li><li><a class="drop-link" href="../projects/computer-vision-projects.html"><span class="drop-label">Computer Vision Projects</span><span class="drop-desc">Phát hiện, nhận dạng và theo dõi đối tượng</span></a></li><li><a class="drop-link" href="../projects/industrial-vision-projects.html"><span class="drop-label">Industrial Vision Projects</span><span class="drop-desc">Đo kích thước, kiểm tra lỗi, đọc mã trên dây chuyền</span></a></li></ul></div></div>
+  <a class="panel-all" href="../projects/">Xem tất cả Projects →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger is-active" aria-expanded="false" aria-controls="nav-panel-lo-trinh" aria-current="true">Learning Paths<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-lo-trinh">
+  <p class="panel-kicker"><span>Bước 3 · Trở thành kỹ sư</span>Định hướng nghề nghiệp</p>
+  <ul class="drop-list"><li><a class="drop-link is-flagship" href="../lo-trinh/vision-engineer.html"><span class="drop-label">⭐ Trở thành Vision Engineer</span><span class="drop-desc">Machine Vision + AI Vision + Industrial Automation · 15 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/toeic-700.html"><span class="drop-label">700+ TOEIC trong 5 tháng</span><span class="drop-desc">TOEIC Listening &amp; Reading + giao tiếp công sở cho người đi làm · 11 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/hsk3.html"><span class="drop-label">Tiếng Trung từ 0 đến HSK 3 trong 6 tháng</span><span class="drop-desc">Pinyin, chữ Hán, ngữ pháp, giao tiếp và luyện thi HSK 3.0 cho người Việt · 10 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/#python-developer"><span class="drop-label">Python Developer<span class="badge-soon">Sắp ra mắt</span></span><span class="drop-desc">Python, công cụ, tự động hóa</span></a></li></ul>
+  <a class="panel-all" href="../lo-trinh/">Xem tất cả lộ trình →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-kien-thuc">Kiến thức<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-kien-thuc">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Lĩnh vực</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/programming.html"><span class="drop-label">Programming</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-machine-learning.html"><span class="drop-label">AI / Machine Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/deep-learning.html"><span class="drop-label">Deep Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/machine-vision.html"><span class="drop-label">Machine Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-vision.html"><span class="drop-label">AI Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/industrial-automation.html"><span class="drop-label">Industrial Automation</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Công cụ &amp; mẹo</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/tools-frameworks.html"><span class="drop-label">Tools &amp; Frameworks</span></a></li><li><a class="drop-link" href="../kien-thuc/tips-tricks.html"><span class="drop-label">Tips &amp; Tricks</span></a></li></ul></div></div>
+  <a class="panel-all" href="../kien-thuc/">Xem tất cả Kiến thức →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tin-tuc-ai">Tin tức AI<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tin-tuc-ai">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tin-tuc-ai/ai-news.html"><span class="drop-label">AI News</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-models.html"><span class="drop-label">AI Models</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/technology.html"><span class="drop-label">Technology</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/robotics.html"><span class="drop-label">Robotics</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-industry.html"><span class="drop-label">AI Industry</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tin-tuc-ai/">Xem tất cả Tin tức AI →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-ngoai-ngu">Ngoại ngữ<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-ngoai-ngu">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Ngôn ngữ</p><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/english.html"><span class="drop-label">English</span><span class="drop-desc">Lộ trình 700 TOEIC, phương pháp học, giáo trình HF-700TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chinese.html"><span class="drop-label">Chinese</span><span class="drop-desc">Lộ trình 0 đến HSK 3 trong 6 tháng, phương pháp học, giáo trình HF-HSK3</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Tiếng Anh theo kỹ năng</p><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/toeic-listening.html"><span class="drop-label">TOEIC Listening</span><span class="drop-desc">Part 1–4: mô tả tranh, hỏi – đáp, hội thoại, bài nói</span></a></li><li><a class="drop-link" href="../ngoai-ngu/toeic-reading.html"><span class="drop-label">TOEIC Reading</span><span class="drop-desc">Part 5–7: điền từ, điền câu, đọc hiểu</span></a></li><li><a class="drop-link" href="../ngoai-ngu/ngu-phap-tieng-anh.html"><span class="drop-label">Ngữ pháp tiếng Anh</span><span class="drop-desc">Từ loại, thì, mệnh đề, liên từ cho TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/tu-vung-tieng-anh.html"><span class="drop-label">Từ vựng tiếng Anh</span><span class="drop-desc">Từ vựng công sở theo chủ đề, collocation</span></a></li><li><a class="drop-link" href="../ngoai-ngu/giao-tiep-tieng-anh.html"><span class="drop-label">Giao tiếp công sở</span><span class="drop-desc">Điện thoại, họp, thuyết trình, email</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Tiếng Trung theo kỹ năng</p><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/pinyin-phat-am.html"><span class="drop-label">Pinyin &amp; phát âm</span><span class="drop-desc">Thanh mẫu, vận mẫu, thanh điệu, biến điệu</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chu-han.html"><span class="drop-label">Chữ Hán</span><span class="drop-desc">Nét, thứ tự nét, bộ thủ, âm Hán Việt</span></a></li><li><a class="drop-link" href="../ngoai-ngu/ngu-phap-tieng-trung.html"><span class="drop-label">Ngữ pháp tiếng Trung</span><span class="drop-desc">Từ 是, 吗, 了 đến bổ ngữ, câu 把, câu 被</span></a></li><li><a class="drop-link" href="../ngoai-ngu/tu-vung-tieng-trung.html"><span class="drop-label">Từ vựng tiếng Trung</span><span class="drop-desc">Từ vựng HSK 1–3 theo chủ đề, Anki</span></a></li><li><a class="drop-link" href="../ngoai-ngu/giao-tiep-tieng-trung.html"><span class="drop-label">Giao tiếp tiếng Trung</span><span class="drop-desc">Chào hỏi, mua sắm, đi lại, công sở</span></a></li><li><a class="drop-link" href="../ngoai-ngu/luyen-thi-hsk.html"><span class="drop-label">Luyện thi HSK</span><span class="drop-desc">Đề HSK 3.0, nghe, đọc, viết, nói, đề thi thử</span></a></li></ul></div></div>
+  <a class="panel-all" href="../ngoai-ngu/">Xem tất cả Ngoại ngữ →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tai-nguyen">Tài nguyên<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tai-nguyen">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tai-nguyen/source-code.html"><span class="drop-label">Source Code</span><span class="drop-desc">Mã nguồn mẫu đi kèm bài học</span></a></li><li><a class="drop-link" href="../tai-nguyen/dataset.html"><span class="drop-label">Dataset</span><span class="drop-desc">Bộ dữ liệu ảnh để luyện tập</span></a></li><li><a class="drop-link" href="../tai-nguyen/cheat-sheets.html"><span class="drop-label">Cheat Sheets</span><span class="drop-desc">Tóm tắt nhanh trong một trang</span></a></li><li><a class="drop-link" href="../tai-nguyen/documentation.html"><span class="drop-label">Documentation</span><span class="drop-desc">Tài liệu tra cứu thư viện, API</span></a></li><li><a class="drop-link" href="../tai-nguyen/ebook.html"><span class="drop-label">Ebook / Tài liệu</span><span class="drop-desc">Sách và tài liệu tham khảo</span></a></li><li><a class="drop-link" href="../tai-nguyen/ai-tools.html"><span class="drop-label">AI Tools</span><span class="drop-desc">Công cụ AI hữu ích cho việc học</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tai-nguyen/">Xem tất cả Tài nguyên →</a>
+</div></li></ul>
+        <div class="drawer-foot">
+          <a class="btn ghost" href="../dang-nhap.html">Đăng nhập</a>
+          <a class="btn" href="../lo-trinh/">Bắt đầu học</a>
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+<div class="search-dialog" hidden>
+  <div class="search-scrim"></div>
+  <div class="search-box" role="dialog" aria-modal="true" aria-label="Tìm kiếm">
+    <form class="search-form" action="../search.html" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" placeholder="Tìm bài học, chủ đề, bài viết…" autocomplete="off" aria-label="Từ khóa tìm kiếm" aria-controls="search-suggest">
+      <button type="button" class="icon-btn search-close" aria-label="Đóng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </form>
+    <div class="search-suggest" id="search-suggest" aria-live="polite">
+      <div class="search-empty">
+        <p class="search-group-title">Chủ đề phổ biến</p>
+        <div class="chips"><a class="chip" href="../hoc/python.html">Python</a><a class="chip" href="../hoc/opencv.html">OpenCV</a><a class="chip" href="../hoc/machine-vision.html">Machine Vision</a><a class="chip" href="../hoc/deep-learning.html">Deep Learning</a><a class="chip" href="../hoc/ai-vision.html">AI Vision</a><a class="chip" href="../hoc/object-detection.html">Object Detection</a><a class="chip" href="../hoc/pytorch.html">PyTorch</a><a class="chip" href="../ngoai-ngu/english.html">English</a></div>
+        <p class="search-group-title">Lộ trình nổi bật</p>
+        <a class="search-item" href="../lo-trinh/vision-engineer.html"><span class="search-ico" aria-hidden="true">⭐</span><span>Trở thành Vision Engineer<small>Learning Path · Machine Vision + AI Vision + Industrial Automation</small></span></a>
+      </div>
+    </div>
+    <div class="search-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> chọn</span><span><kbd>Enter</kbd> mở</span><span><kbd>Esc</kbd> đóng</span></div>
+  </div>
+</div>
+<main id="main">
+  <div class="container layout article-layout">
+    <article class="article">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../lo-trinh/">Learning Paths</a><span>/</span><a href="../lo-trinh/vision-engineer.html">Vision Engineer</a><span>/</span><a href="../lo-trinh/vision-engineer/ai-vision.html">Chặng 12: AI Vision</a></nav>
+      <header class="article-head">
+        <div class="course-bar" data-course="vision-engineer"><a class="course-chip" href="../lo-trinh/vision-engineer/ai-vision.html">⭐ Vision Engineer · Chặng 12</a><span class="lesson-no">Bài 5/8</span><span class="kind kind-lesson">Bài học</span><span class="lesson-min"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></svg>~75 phút</span></div>
+        <h1>Grad-CAM: mô hình AI vision đang thật sự nhìn vào đâu?</h1>
+        <p class="lead">Mô hình học lối tắt: validation 100% nhưng bỏ sót gần hết lỗi thật. Dùng Grad-CAM và occlusion map tìm nguyên nhân, sửa dữ liệu rồi kiểm chứng lại.</p>
+        <div class="article-meta">
+          <span class="avatar" aria-hidden="true">HF</span>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-21">21/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>18 phút đọc</span></div>
+        </div>
+      </header>
+      <figure class="article-cover">
+        <img src="../assets/images/posts/grad-cam-giai-thich-mo-hinh-ai-vision.webp" alt="Grad-CAM: mô hình AI vision đang thật sự nhìn vào đâu?" width="1200" height="675" fetchpriority="high" decoding="async">
+      </figure>
+      <section class="lesson-goals" aria-label="Mục tiêu bài học"><h2>Học xong bài này, bạn sẽ</h2><ul><li>Nhận ra mô hình học lối tắt dù validation cao</li><li>Tính Grad-CAM bằng autograd và bằng thư viện</li><li>Kiểm chứng bằng occlusion map</li><li>Sửa dữ liệu và đo lại trên ảnh sản xuất</li></ul><p class="goals-before">Nên học trước: <a href="../hoc/du-lieu-tong-hop-synthetic-data-ai-vision.html">Khi thiếu ảnh lỗi: augmentation và dữ liệu tổng hợp</a></p></section>
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol class="toc-plain"><li><a href="#1-thi-nghiem-mot-dataset-co-duong-tat">1. Thí nghiệm: một dataset có đường tắt</a></li><li><a href="#2-grad-cam-mo-hinh-chu-y-vao-dau">2. Grad-CAM: mô hình chú ý vào đâu?</a></li><li><a href="#3-phep-che-kiem-chung-nhan-qua">3. Phép che: kiểm chứng nhân quả</a></li><li><a href="#4-sua-du-lieu-khong-sua-mo-hinh">4. Sửa dữ liệu, không sửa mô hình</a></li><li><a href="#5-grad-cam-trong-thuc-te">5. Grad-CAM trong thực tế</a></li><li><a href="#tom-tat">Tóm tắt</a></li><li><a href="#bai-tap">Bài tập</a></li></ol></details>
+      <div class="prose">
+<p>Mô hình phân loại OK/NG đạt 100% trên tập validation. Trưởng phòng QC hỏi: "Nó nhìn vào đâu để nói NG?" Câu hỏi đó không phải tò mò: một mô hình có thể đạt điểm tuyệt đối bằng cách học một <strong>đường tắt</strong> (shortcut), một dấu hiệu tình cờ đi kèm nhãn trong dữ liệu huấn luyện nhưng không liên quan gì tới lỗi: ảnh NG chụp ở trạm sửa chữa có đèn khác, có in dấu ngày giờ, có thước đo đặt cạnh. Ra sản xuất, dấu hiệu đó biến mất và mô hình sụp đổ. Bài này tạo đúng tình huống đó, dùng <strong>Grad-CAM</strong> để xem mô hình chú ý vào đâu, kiểm chứng bằng <strong>phép che</strong> (occlusion), sửa dữ liệu, và chứng minh bằng số rằng mô hình sau khi sửa nhìn đúng chỗ.</p>
+<p>Cần PyTorch, NumPy; mục 6 dùng thêm thư viện <code>grad-cam</code>. Các khối code nối tiếp nhau trong cùng một file. Nên học trước: <a href="deep-learning-3-mang-no-ron-va-cnn.html">mạng nơ-ron và CNN</a>, <a href="phan-loai-anh-ok-ng-transfer-learning-pytorch.html">dự án phân loại OK/NG</a> (ở đó Grad-CAM được nhắc tới như một bước kiểm tra), <a href="../tai-nguyen/tu-xay-dataset-anh-cong-nghiep.html">tự xây dataset ảnh công nghiệp</a>.</p>
+
+<h2 id="1-thi-nghiem-mot-dataset-co-duong-tat">1. Thí nghiệm: một dataset có đường tắt</h2>
+<p>Ảnh 64 × 64 bề mặt nắp nhựa; ảnh NG có một vết xước mờ ở vị trí ngẫu nhiên. Trong dữ liệu huấn luyện và validation, mọi ảnh NG được chụp ở trạm sửa chữa, nơi camera in một <strong>dấu ngày giờ</strong> sáng ở góc dưới phải; ảnh OK lấy từ dây chuyền không có dấu. Dữ liệu "sản xuất" lấy từ trạm mới: không ảnh nào có dấu. Tình huống này hoàn toàn có thật: ảnh NG thường hiếm, nên người ta gom từ nơi khác (trạm sửa chữa, phòng thí nghiệm, một camera khác), và đường tắt đi theo.</p>
+<pre><code class="language-python">import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+torch.manual_seed(0)
+torch.set_num_threads(4)
+S = 64
+
+
+def tao_anh(n, hat, ty_le_ng=0.5, dau_goc_ng=1.0, dau_goc_ok=0.0):
+    """Ảnh 64×64 bề mặt nắp nhựa. NG có một vết xước tối ngắn ở vị trí ngẫu nhiên.
+    'Dấu góc' là con dấu ngày giờ sáng ở góc dưới phải, do trạm chụp in lên: dau_goc_ng / dau_goc_ok là
+    xác suất ảnh NG / OK có dấu này."""
+    g = np.random.default_rng(hat)
+    yy, xx = np.mgrid[0:S, 0:S]
+    anh = 0.55 + 0.05 * g.standard_normal((n, S, S))
+    anh += 0.04 * np.sin((xx + yy)[None] / g.uniform(2, 4, (n, 1, 1)))              # vân bề mặt
+    nhan = (g.random(n) &lt; ty_le_ng).astype(np.int64)
+    vi_tri = np.zeros((n, 2))
+    for i in range(n):
+        if nhan[i]:
+            cx, cy, goc = g.uniform(12, 44), g.uniform(12, 44), g.uniform(0, np.pi)
+            t = np.linspace(-6, 6, 40)
+            for k in t:                                                               # vết xước dài 12 px
+                x, y = int(round(cx + k * np.cos(goc))), int(round(cy + k * np.sin(goc)))
+                anh[i, y - 1:y + 1, x - 1:x + 1] -= 0.08
+            vi_tri[i] = cx, cy
+        if g.random() &lt; (dau_goc_ng if nhan[i] else dau_goc_ok):
+            anh[i, 54:61, 48:61] = 0.95                                               # dấu ngày giờ
+    return torch.tensor(anh[:, None], dtype=torch.float32), torch.tensor(nhan), vi_tri
+
+
+# dữ liệu huấn luyện và validation lấy từ cùng một nguồn: mọi ảnh NG đều chụp ở trạm sửa chữa có in dấu góc
+X_tr, y_tr, _ = tao_anh(1200, 1)
+X_va, y_va, _ = tao_anh(400, 2)
+# dữ liệu sản xuất thật: trạm mới không in dấu nào
+X_sx, y_sx, vt_sx = tao_anh(400, 3, dau_goc_ng=0.0)
+print("train:", tuple(X_tr.shape), "NG:", int(y_tr.sum()), "| val NG:", int(y_va.sum()), "| sản xuất NG:", int(y_sx.sum()))
+
+
+class MangOkNg(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.dac_trung = nn.Sequential(                                              # ảnh → bản đồ đặc trưng 8×8
+            nn.Conv2d(1, 16, 3, padding=1), nn.BatchNorm2d(16), nn.ReLU(), nn.MaxPool2d(2),
+            nn.Conv2d(16, 32, 3, padding=1), nn.BatchNorm2d(32), nn.ReLU(), nn.MaxPool2d(2),
+            nn.Conv2d(32, 64, 3, padding=1), nn.BatchNorm2d(64), nn.ReLU(), nn.MaxPool2d(2))
+        self.phan_loai = nn.Sequential(nn.AdaptiveAvgPool2d(1), nn.Flatten(), nn.Linear(64, 2))
+
+    def forward(self, x):
+        return self.phan_loai(self.dac_trung(x))
+
+
+def huan_luyen(X, y, epoch=8):
+    torch.manual_seed(0)
+    mh = MangOkNg()
+    opt = torch.optim.Adam(mh.parameters(), lr=3e-3)
+    for _ in range(epoch):
+        for i in torch.randperm(len(X)).split(64):
+            loss = F.cross_entropy(mh(X[i]), y[i])
+            opt.zero_grad()
+            loss.backward()
+            opt.step()
+    return mh.eval()
+
+
+def danh_gia(mh, X, y):
+    with torch.no_grad():
+        du = mh(X).argmax(1)
+    return (du == y).float().mean().item(), (du[y == 1] == 1).float().mean().item()
+
+
+mo_hinh = huan_luyen(X_tr, y_tr)
+for ten, X, y in (("validation", X_va, y_va), ("sản xuất", X_sx, y_sx)):
+    acc, recall = danh_gia(mo_hinh, X, y)
+    print(f"{ten:10s}: accuracy {100 * acc:5.1f}%, recall NG {100 * recall:5.1f}%")</code></pre>
+<pre><code class="language-text">train: (1200, 1, 64, 64) NG: 608 | val NG: 223 | sản xuất NG: 180
+validation: accuracy 100.0%, recall NG 100.0%
+sản xuất  : accuracy  55.3%, recall NG   0.6%</code></pre>
+<p>Validation hoàn hảo, sản xuất gần như không bắt được ảnh NG nào. Vì validation được chia từ cùng nguồn với train, nó mang cùng đường tắt và không cảnh báo được gì; chỉ dữ liệu từ đúng nơi mô hình sẽ chạy mới lộ ra vấn đề (bài <a href="../kien-thuc/overfitting-chia-train-val-test.html">chia train/val/test không rò rỉ</a>). Nhưng trước khi có dữ liệu sản xuất, làm sao nghi ngờ được?</p>
+
+<h2 id="2-grad-cam-mo-hinh-chu-y-vao-dau">2. Grad-CAM: mô hình chú ý vào đâu?</h2>
+<p><strong>Grad-CAM</strong> (Gradient-weighted Class Activation Mapping) dựa trên bản đồ đặc trưng của lớp tích chập cuối, nơi mỗi kênh A<sup>k</sup> còn giữ thông tin vị trí (ở đây lưới 8 × 8). Mức quan trọng của kênh k đối với lớp c là trung bình gradient của điểm lớp đó theo kênh:</p>
+\[ \alpha_k^c = \frac{1}{Z}\sum_{i,j}\frac{\partial y^c}{\partial A^k_{ij}}, \qquad L^c_{\text{Grad-CAM}} = \mathrm{ReLU}\Big(\sum_k \alpha_k^c A^k\Big) \]
+<p>ReLU giữ lại những vùng làm <em>tăng</em> điểm của lớp c. Bản đồ 8 × 8 rồi được phóng to lên kích thước ảnh để xem. Cài đặt bằng <code>torch.autograd.grad</code> chỉ vài dòng; ta chuẩn hóa bản đồ để tổng bằng 1, rồi đo tỉ lệ "năng lượng" rơi vào góc có dấu và vào vùng quanh vết xước:</p>
+<pre><code class="language-python">def grad_cam(mh, x, lop=1):
+    """Grad-CAM: trọng số mỗi kênh = trung bình gradient của điểm lớp theo kênh đó; CAM = ReLU(Σ trọng số · kênh)."""
+    A = mh.dac_trung(x)                                   # (N, 64, 8, 8): bản đồ đặc trưng lớp tích chập cuối
+    diem = mh.phan_loai(A)[:, lop]                        # điểm (logit) của lớp NG
+    grad, = torch.autograd.grad(diem.sum(), A)
+    w = grad.mean(dim=(2, 3), keepdim=True)               # (N, 64, 1, 1)
+    cam = F.relu((w * A).sum(dim=1))                      # (N, 8, 8)
+    cam = cam / cam.flatten(1).sum(1).clamp_min(1e-12)[:, None, None]    # chuẩn hóa: tổng = 1
+    return cam.detach()
+
+
+def phan_tram_vung(cam, vi_tri):
+    """Tỉ lệ 'năng lượng' CAM ở ô góc dưới phải (nơi có dấu) và ở các ô quanh vết xước."""
+    goc = cam[:, 6:8, 6:8].flatten(1).sum(1)
+    quanh_loi = torch.zeros(len(cam))
+    for i, (cx, cy) in enumerate(vi_tri):
+        c, r = int(cx // 8), int(cy // 8)
+        quanh_loi[i] = cam[i, max(r - 1, 0):r + 2, max(c - 1, 0):c + 2].sum()
+    return 100 * goc.mean().item(), 100 * quanh_loi.mean().item()
+
+
+X_va2, y_va2, vt_va2 = tao_anh(400, 2)                    # lấy lại vị trí vết xước của tập validation
+ng = y_va2 == 1
+cam_va = grad_cam(mo_hinh, X_va2[ng])
+g, q = phan_tram_vung(cam_va, vt_va2[ng.numpy()])
+print(f"ảnh NG của validation: CAM ở góc có dấu {g:.0f}%, quanh vết xước {q:.0f}% (diện tích: góc 6%, quanh lỗi ~14%)")
+
+i0 = int(torch.nonzero(ng)[0])
+print(f"bản đồ Grad-CAM ảnh NG số {i0} (vết xước ở ô hàng {int(vt_va2[i0][1] // 8)}, cột {int(vt_va2[i0][0] // 8)}), thang 0–9:")
+c = cam_va[0]
+for hang in (9 * c / c.max()).round().int().tolist():
+    print("   " + " ".join(str(v) for v in hang))</code></pre>
+<pre><code class="language-text">ảnh NG của validation: CAM ở góc có dấu 38%, quanh vết xước 36% (diện tích: góc 6%, quanh lỗi ~14%)
+bản đồ Grad-CAM ảnh NG số 0 (vết xước ở ô hàng 2, cột 3), thang 0–9:
+   0 0 0 0 0 0 0 0
+   0 3 9 9 2 0 0 0
+   0 2 6 5 1 0 0 0
+   0 1 2 2 0 0 0 0
+   0 0 0 0 0 0 0 0
+   0 0 0 0 0 3 6 4
+   0 0 0 0 0 6 9 8
+   0 0 0 0 0 5 8 8</code></pre>
+<p>Góc có dấu chỉ chiếm 6% diện tích ảnh nhưng nhận khoảng 38% năng lượng CAM: mô hình đang dùng dấu ngày giờ. Bản đồ của ảnh mẫu (in theo thang 0–9) có hai điểm nóng: quanh vết xước ở hàng 1–2, cột 2–3, và ở góc dưới phải. Đây là tín hiệu đủ để dừng lại và điều tra trước khi đưa mô hình ra dây chuyền. Nhưng hãy chú ý: Grad-CAM <em>cũng</em> sáng quanh vết xước. Nhìn bản đồ, bạn có thể kết luận "mô hình nhìn cả lỗi lẫn dấu, chắc vẫn ổn". Mục sau cho thấy kết luận đó sai.</p>
+
+<h2 id="3-phep-che-kiem-chung-nhan-qua">3. Phép che: kiểm chứng nhân quả</h2>
+<p>Grad-CAM cho biết vùng nào <em>góp phần</em> vào điểm số, không cho biết phần góp đó có <em>đủ để quyết định</em> hay không. Cách kiểm chứng trực tiếp: xóa thứ nghi ngờ khỏi ảnh và xem quyết định có đổi không.</p>
+<pre><code class="language-python">def xac_suat_ng(mh, X):
+    with torch.no_grad():
+        return torch.softmax(mh(X), 1)[:, 1]
+
+
+che = X_va2[ng].clone()
+che[:, :, 54:61, 48:61] = 0.55                            # che góc bằng màu nền: xóa dấu ngày giờ
+p_truoc, p_sau = xac_suat_ng(mo_hinh, X_va2[ng]), xac_suat_ng(mo_hinh, che)
+print(f"ảnh NG validation: P(NG) trung vị {p_truoc.median():.3f} → sau khi che góc {p_sau.median():.3f}; "
+      f"vẫn được báo NG {100 * (p_sau &gt; 0.5).float().mean():.0f}%")</code></pre>
+<pre><code class="language-text">ảnh NG validation: P(NG) trung vị 0.999 → sau khi che góc 0.216; vẫn được báo NG 1%</code></pre>
+<p>Che dấu góc, xác suất NG trung vị giảm từ gần 1 xuống khoảng 0,2, và gần như không ảnh NG nào còn được báo NG, dù vết xước vẫn còn nguyên. Vết xước có góp phần (Grad-CAM thấy nó), nhưng một mình nó không đủ đẩy mô hình qua ngưỡng: quyết định thực sự do dấu góc. Grad-CAM giúp <em>đặt giả thuyết</em>; phép che (hoặc tạo ảnh đối chứng) <em>kiểm chứng</em> giả thuyết.</p>
+
+<h2 id="4-sua-du-lieu-khong-sua-mo-hinh">4. Sửa dữ liệu, không sửa mô hình</h2>
+<p>Đường tắt là lỗi của dữ liệu, nên cách sửa nằm ở dữ liệu: làm cho dấu hiệu tình cờ <strong>không còn đi kèm nhãn</strong>. Có nhiều cách: thu ảnh OK từ chính trạm sửa chữa, cắt bỏ vùng dấu khi tiền xử lý, hoặc khi augment thì chèn dấu ngẫu nhiên vào cả ảnh OK lẫn NG. Ở đây ta mô phỏng cách thứ ba: dấu xuất hiện ở 50% ảnh của cả hai lớp.</p>
+<pre><code class="language-python"># sửa dữ liệu: dấu ngày giờ xuất hiện ngẫu nhiên ở cả hai lớp (thu ảnh OK từ cùng trạm, hoặc tự chèn dấu khi augment)
+X_tr2, y_tr2, _ = tao_anh(1200, 1, dau_goc_ng=0.5, dau_goc_ok=0.5)
+mo_hinh2 = huan_luyen(X_tr2, y_tr2)
+X_va3, y_va3, vt_va3 = tao_anh(400, 2, dau_goc_ng=0.5, dau_goc_ok=0.5)
+for ten, X, y in (("validation mới", X_va3, y_va3), ("sản xuất", X_sx, y_sx)):
+    acc, recall = danh_gia(mo_hinh2, X, y)
+    print(f"mô hình sau khi sửa dữ liệu, {ten:14s}: accuracy {100 * acc:5.1f}%, recall NG {100 * recall:5.1f}%")
+ng3 = y_va3 == 1
+g, q = phan_tram_vung(grad_cam(mo_hinh2, X_va3[ng3]), vt_va3[ng3.numpy()])
+print(f"Grad-CAM sau khi sửa: CAM ở góc {g:.0f}%, quanh vết xước {q:.0f}%")</code></pre>
+<pre><code class="language-text">mô hình sau khi sửa dữ liệu, validation mới: accuracy 100.0%, recall NG 100.0%
+mô hình sau khi sửa dữ liệu, sản xuất      : accuracy 100.0%, recall NG 100.0%
+Grad-CAM sau khi sửa: CAM ở góc 0%, quanh vết xước 94%</code></pre>
+<p>Mô hình huấn luyện lại đạt 100% cả trên validation mới lẫn dữ liệu sản xuất, và Grad-CAM giờ gần như chỉ sáng quanh vết xước (khoảng 94% năng lượng), góc không còn đáng kể. Đây là bằng chứng có thể đưa cho QC: số liệu trên dữ liệu đúng nguồn, cộng với bản đồ cho thấy mô hình nhìn đúng chỗ.</p>
+<div class="tip"><strong>Mẹo nhỏ để huấn luyện ổn định</strong>Mô hình trong bài có BatchNorm sau mỗi lớp tích chập. Khi thử bản không có BatchNorm, mô hình sau khi sửa dữ liệu (không còn đường tắt dễ học) bị kẹt ở lời giải "báo NG mọi ảnh" và không thoát ra được dù huấn luyện lâu hơn: đúng hiện tượng ở bài <a href="ham-mat-mat-cross-entropy-focal-loss.html">dữ liệu mất cân bằng</a> và cách BatchNorm giúp ở bài <a href="batchnorm-dropout-receptive-field.html">BatchNorm, Dropout</a>. Đường tắt nguy hiểm một phần vì nó <em>dễ học</em>: nó che mất khó khăn thật của bài toán.</div>
+
+<h2 id="5-grad-cam-trong-thuc-te">5. Grad-CAM trong thực tế</h2>
+<pre><code class="language-python">from pytorch_grad_cam import GradCAM
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
+
+x = X_va2[ng][:20]
+with GradCAM(model=mo_hinh, target_layers=[mo_hinh.dac_trung[-2]]) as gc:           # ReLU cuối (trước MaxPool)
+    cam_tv = gc(input_tensor=x, targets=[ClassifierOutputTarget(1)] * len(x))       # (20, 64, 64), đã phóng to
+cam_ta = F.interpolate(grad_cam(mo_hinh, x)[:, None], size=(S, S), mode="bilinear")[:, 0].numpy()
+r = [np.corrcoef(a.ravel(), b.ravel())[0, 1] for a, b in zip(cam_tv, cam_ta)]
+print(f"tương quan giữa CAM của thư viện (ReLU cuối, 16×16) và CAM tự viết (sau pooling, 8×8): trung vị {np.median(r):.2f}")</code></pre>
+<pre><code class="language-text">tương quan giữa CAM của thư viện (ReLU cuối, 16×16) và CAM tự viết (sau pooling, 8×8): trung vị 0.82</code></pre>
+<p>Thư viện <code>pytorch-grad-cam</code> (<code>pip install grad-cam</code>) cho kết quả tương tự bản tự viết (tương quan cao; chênh lệch do bản thư viện lấy lớp ReLU cuối trước MaxPool, độ phân giải 16 × 16). Nó có sẵn nhiều biến thể (Grad-CAM++, Score-CAM, Eigen-CAM…) và hàm chồng bản đồ lên ảnh. Chọn <code>target_layers</code> là lớp tích chập cuối còn đủ thông tin vị trí: với ResNet của torchvision thường là <code>model.layer4[-1]</code>.</p>
+<ul>
+  <li><strong>Khi nào chạy</strong>: trên một mẫu ảnh của golden set (bài <a href="ai-vision-5-chon-nguong-va-danh-gia-theo-nha-may.html">chọn ngưỡng và golden set</a>) trước mỗi lần đưa mô hình mới vào sản xuất; trên mọi ảnh bị phân loại sai; khi dữ liệu đến từ nhiều nguồn (trạm, ca, camera khác nhau).</li>
+  <li><strong>Cách đọc</strong>: không chỉ nhìn ảnh NG; xem cả ảnh OK có điểm NG cao, và tính tỉ lệ năng lượng theo vùng như mục 2 để có con số thay vì cảm nhận.</li>
+  <li><strong>Giới hạn</strong>: độ phân giải thô (bằng lưới của lớp cuối), có thể bỏ qua chi tiết nhỏ; bị ảnh hưởng khi điểm số đã bão hòa; cho biết tương quan chứ không chứng minh nhân quả. Luôn đi kèm phép che hoặc ảnh đối chứng khi kết luận quan trọng.</li>
+  <li><strong>Anomaly detection</strong> (PatchCore, PaDiM) đã có sẵn bản đồ bất thường theo vùng (bài <a href="anomaly-6-anomaly-detection-padim-patchcore.html">anomaly detection</a>), không cần Grad-CAM; detector như YOLO trả về hộp, bản thân hộp đã là "giải thích" vị trí.</li>
+</ul>
+
+<h2 id="tom-tat">Tóm tắt</h2>
+<ul>
+  <li>Đường tắt: dấu hiệu tình cờ đi kèm nhãn trong dữ liệu huấn luyện (dấu thời gian, đèn khác, nguồn ảnh khác). Validation chia từ cùng nguồn không phát hiện được.</li>
+  <li>Grad-CAM: trọng số kênh = trung bình gradient; bản đồ = ReLU(tổng có trọng số của kênh). Đo tỉ lệ năng lượng theo vùng để có con số.</li>
+  <li>Grad-CAM cho giả thuyết; phép che hoặc ảnh đối chứng cho kiểm chứng. Dùng logit thay vì xác suất khi mô hình đã bão hòa.</li>
+  <li>Sửa đường tắt bằng dữ liệu (thu đúng nguồn, cắt vùng, augment phá liên hệ), rồi kiểm tra lại trên dữ liệu đúng nơi triển khai.</li>
+</ul>
+
+<h2 id="bai-tap">Bài tập</h2>
+<div class="ex">
+<h3 id="bai-1-ban-do-che-toan-anh">Bài 1. Bản đồ che toàn ảnh</h3>
+<p>Viết hàm che lần lượt từng ô 8 × 8 của ảnh NG mẫu ở mục 2 bằng màu nền và ghi lượng giảm của điểm NG. Dùng <strong>hiệu logit</strong> NG − OK thay vì xác suất. So bản đồ thu được với Grad-CAM.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">def le(mh, X):
+    """Hiệu logit NG − OK: không bão hòa như xác suất khi mô hình đã rất chắc."""
+    with torch.no_grad():
+        z = mh(X)
+    return z[:, 1] - z[:, 0]
+
+
+def ban_do_che(mh, x, o=8):
+    """Che lần lượt từng ô o×o bằng màu nền, ghi hiệu logit NG − OK giảm bao nhiêu (không cần gradient)."""
+    goc = le(mh, x[None])[0]
+    ket_qua = torch.zeros(S // o, S // o)
+    for r in range(S // o):
+        for c in range(S // o):
+            xc = x.clone()
+            xc[:, r * o:(r + 1) * o, c * o:(c + 1) * o] = 0.55
+            ket_qua[r, c] = goc - le(mh, xc[None])[0]
+    return ket_qua, goc
+
+
+bd, goc = ban_do_che(mo_hinh, X_va2[i0])
+print(f"hiệu logit ban đầu {goc:.1f}; che ô chứa vết xước (hàng 2, cột 3) giảm {bd[2, 3]:.1f}, "
+      f"che ô góc (hàng 7, cột 6) giảm {bd[7, 6]:.1f}")
+for hang in (9 * bd.clamp(min=0) / bd.max()).round().int().tolist():
+    print("   " + " ".join(str(v) for v in hang))</code></pre>
+<pre><code class="language-text">hiệu logit ban đầu 8.9; che ô chứa vết xước (hàng 2, cột 3) giảm 2.3, che ô góc (hàng 7, cột 6) giảm 1.8
+   0 0 0 0 0 0 0 0
+   0 0 0 0 0 0 0 0
+   0 0 8 9 0 0 0 0
+   0 0 0 0 0 0 0 0
+   0 0 0 0 0 0 0 0
+   0 0 0 0 0 0 0 0
+   0 0 0 0 0 0 9 4
+   0 0 0 0 0 0 7 4</code></pre>
+<p>Bản đồ che có cùng hai điểm nóng như Grad-CAM: ô chứa vết xước và các ô góc. Vì sao dùng logit: xác suất NG của ảnh này là 0,999, che một ô làm logit giảm vài đơn vị nhưng xác suất gần như không nhúc nhích (thử thay bằng xác suất để thấy). Phép che không cần gradient nên dùng được cho mọi mô hình, kể cả mô hình chỉ có file ONNX, nhưng chậm hơn: 64 lần suy luận cho một ảnh với lưới 8 × 8.</p>
+</details>
+</div>
+<div class="ex">
+<h3 id="bai-2-duong-tat-o-day-chuyen-cua-ban">Bài 2. Đường tắt ở dây chuyền của bạn</h3>
+<p>Liệt kê ít nhất năm dấu hiệu tình cờ có thể đi kèm nhãn NG trong dữ liệu của một trạm kiểm tra thật, và với mỗi dấu hiệu, cách kiểm tra nhanh xem mô hình có dùng nó không.</p>
+<details><summary>Xem đáp án</summary>
+<p>(1) Ảnh NG chụp ở trạm khác (đèn, camera, nền khác): so phân phối độ sáng, độ nét giữa hai lớp; Grad-CAM tập trung ở nền. (2) Dấu, chữ, thước, bút đánh dấu lỗi do người QC vẽ lên sản phẩm: che vùng đánh dấu. (3) NG được chụp ở thời điểm khác (ca đêm, nhiệt độ khác): kiểm tra theo thời gian chụp. (4) Ảnh NG được cắt (crop) hoặc nén khác (JPEG chất lượng khác): so kích thước file, mức nén. (5) Vị trí đặt sản phẩm khác (NG đặt tay, OK do robot đặt): so phân phối vị trí, góc xoay. (6) Lô vật liệu: NG chủ yếu từ một lô có màu khác. Cách kiểm tra chung: huấn luyện một mô hình nhỏ chỉ trên đặc trưng "nghi ngờ" (độ sáng trung bình, vị trí, kích thước file); nếu nó phân biệt được OK/NG tốt hơn hẳn mức ngẫu nhiên, dữ liệu có đường tắt.</p>
+</details>
+</div>
+<p>Bài tiếp theo: <a href="foundation-model-dinov2-sam-ai-vision.html">Foundation model cho vision: DINOv2, SAM và khi nào nên dùng</a>, khi chỉ có vài chục ảnh để bắt đầu.</p>
+
+<p class="note">Nguồn tham khảo: Selvaraju và cộng sự (2017), <a href="https://arxiv.org/abs/1610.02391" rel="noopener" target="_blank"><em>Grad-CAM: Visual Explanations from Deep Networks via Gradient-based Localization</em> (arXiv:1610.02391)</a>; Zeiler, Fergus (2014), <em>Visualizing and Understanding Convolutional Networks</em> (phép che); Lapuschkin và cộng sự (2019), <em>Unmasking Clever Hans predictors and assessing what machines really learn</em>, Nature Communications; Geirhos và cộng sự (2020), <em>Shortcut learning in deep neural networks</em>, Nature Machine Intelligence; <a href="https://github.com/jacobgil/pytorch-grad-cam" rel="noopener" target="_blank">pytorch-grad-cam trên GitHub</a>.</p>
+
+      </div>
+      <section class="practice"><h2><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <circle cx="12" cy="12" r="6" /> <circle cx="12" cy="12" r="2" /></svg>Bài tập thực hành</h2><ol><li>C</li><li>h</li><li>ạ</li><li>y</li><li> </li><li>t</li><li>h</li><li>í</li><li> </li><li>n</li><li>g</li><li>h</li><li>i</li><li>ệ</li><li>m</li><li> </li><li>l</li><li>ố</li><li>i</li><li> </li><li>t</li><li>ắ</li><li>t</li><li>,</li><li> </li><li>v</li><li>ẽ</li><li> </li><li>G</li><li>r</li><li>a</li><li>d</li><li>-</li><li>C</li><li>A</li><li>M</li><li> </li><li>t</li><li>r</li><li>ư</li><li>ớ</li><li>c</li><li> </li><li>v</li><li>à</li><li> </li><li>s</li><li>a</li><li>u</li><li> </li><li>k</li><li>h</li><li>i</li><li> </li><li>s</li><li>ử</li><li>a</li><li> </li><li>d</li><li>ữ</li><li> </li><li>l</li><li>i</li><li>ệ</li><li>u</li><li>,</li><li> </li><li>r</li><li>ồ</li><li>i</li><li> </li><li>l</li><li>à</li><li>m</li><li> </li><li>o</li><li>c</li><li>c</li><li>l</li><li>u</li><li>s</li><li>i</li><li>o</li><li>n</li><li> </li><li>m</li><li>a</li><li>p</li><li> </li><li>d</li><li>ù</li><li>n</li><li>g</li><li> </li><li>l</li><li>o</li><li>g</li><li>i</li><li>t</li></ol><p>Làm xong bài tập mới chuyển sang bài tiếp theo: tự viết code là cách duy nhất để nhớ lâu.</p></section><div class="lesson-done" data-course="vision-engineer"><button type="button" class="lesson-done-btn" data-lesson-done="grad-cam-giai-thich-mo-hinh-ai-vision" aria-pressed="false"><span class="box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></span><span class="off">Đánh dấu đã học xong</span><span class="on">Đã học xong bài này</span></button><a class="btn lg" href="../hoc/foundation-model-dinov2-sam-ai-vision.html">Bài tiếp theo<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a></div>
+      <footer class="article-foot">
+        <div class="tags"><a class="tag" href="../search.html?q=AI Vision">#AI Vision</a><a class="tag" href="../search.html?q=Deep Learning">#Deep Learning</a><a class="tag" href="../search.html?q=PyTorch">#PyTorch</a></div>
+        <div class="share">
+      <span>Chia sẻ:</span>
+      <a class="share-btn fb" href="https://www.facebook.com/sharer/sharer.php?u=https://hocfree.vn/hoc/grad-cam-giai-thich-mo-hinh-ai-vision.html" target="_blank" rel="noopener" aria-label="Chia sẻ Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8z"/></svg></a>
+      <a class="share-btn x" href="https://twitter.com/intent/tweet?url=https://hocfree.vn/hoc/grad-cam-giai-thich-mo-hinh-ai-vision.html" target="_blank" rel="noopener" aria-label="Chia sẻ X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+      <button class="share-btn copy-link" data-url="https://hocfree.vn/hoc/grad-cam-giai-thich-mo-hinh-ai-vision.html" aria-label="Sao chép liên kết"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+    </div>
+      </footer>
+      <div class="author-box">
+        <span class="avatar lg" aria-hidden="true">HF</span>
+        <div>
+          <strong>Ban biên tập HọcFree</strong>
+          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và ngoại ngữ, hoàn toàn miễn phí.</p>
+        </div>
+      </div>
+      <nav class="pager lesson-pager" aria-label="Bài học trước/sau"><a class="prev" href="../hoc/du-lieu-tong-hop-synthetic-data-ai-vision.html"><span>← Bài trước · Bài 4</span>Khi thiếu ảnh lỗi: augmentation và dữ liệu tổng hợp</a><a class="next" href="../hoc/foundation-model-dinov2-sam-ai-vision.html"><span>Bài tiếp → · Bài 6</span>Foundation model: DINOv2, SAM, YOLOE</a></nav>
+    </article>
+    <aside class="sidebar course-side" data-course="vision-engineer">
+      <section class="widget course-toc">
+        <p class="widget-title">Chặng 12/15 · Vision Engineer</p>
+        <a class="course-toc-title" href="../lo-trinh/vision-engineer/ai-vision.html">AI Vision</a>
+        <div class="lc" data-lesson-count="rule-based-hay-deep-learning-kiem-tra-loi tu-xay-dataset-anh-cong-nghiep cong-cu-gan-nhan-du-lieu-anh-mien-phi du-lieu-tong-hop-synthetic-data-ai-vision grad-cam-giai-thich-mo-hinh-ai-vision foundation-model-dinov2-sam-ai-vision ai-vision-5-chon-nguong-va-danh-gia-theo-nha-may ai-vision-6-bai-tap-thiet-ke-chien-luoc-ai"><div class="lc-bar"><span data-lc-bar></span></div><span data-lc-text>0/8 bài</span></div>
+        <ol class="toc-lessons"><li data-lesson="rule-based-hay-deep-learning-kiem-tra-loi"><a href="../kien-thuc/rule-based-hay-deep-learning-kiem-tra-loi.html"><span class="tn">1</span><span class="tt">Rule-based hay Deep Learning?</span></a></li><li data-lesson="tu-xay-dataset-anh-cong-nghiep"><a href="../tai-nguyen/tu-xay-dataset-anh-cong-nghiep.html"><span class="tn">2</span><span class="tt">Tự xây dataset ảnh công nghiệp</span></a></li><li data-lesson="cong-cu-gan-nhan-du-lieu-anh-mien-phi"><a href="../tai-nguyen/cong-cu-gan-nhan-du-lieu-anh-mien-phi.html"><span class="tn">3</span><span class="tt">Công cụ gán nhãn miễn phí</span></a></li><li data-lesson="du-lieu-tong-hop-synthetic-data-ai-vision"><a href="../hoc/du-lieu-tong-hop-synthetic-data-ai-vision.html"><span class="tn">4</span><span class="tt">Khi thiếu ảnh lỗi: augmentation và dữ liệu tổng hợp</span></a></li><li data-lesson="grad-cam-giai-thich-mo-hinh-ai-vision" class="is-current"><a href="../hoc/grad-cam-giai-thich-mo-hinh-ai-vision.html" aria-current="page"><span class="tn">5</span><span class="tt">Grad-CAM: mô hình đang nhìn vào đâu?</span></a></li><li data-lesson="foundation-model-dinov2-sam-ai-vision"><a href="../hoc/foundation-model-dinov2-sam-ai-vision.html"><span class="tn">6</span><span class="tt">Foundation model: DINOv2, SAM, YOLOE</span></a></li><li data-lesson="ai-vision-5-chon-nguong-va-danh-gia-theo-nha-may"><a href="../hoc/ai-vision-5-chon-nguong-va-danh-gia-theo-nha-may.html"><span class="tn">7</span><span class="tt">Chọn ngưỡng và đánh giá theo escape, overkill, cycle time</span></a></li><li data-lesson="ai-vision-6-bai-tap-thiet-ke-chien-luoc-ai"><a href="../hoc/ai-vision-6-bai-tap-thiet-ke-chien-luoc-ai.html"><span class="tn">8</span><span class="tt">Bài tập chặng 12: thiết kế chiến lược AI cho một bài toán lỗi</span></a></li></ol>
+        <a class="more" href="../lo-trinh/vision-engineer.html">Xem toàn bộ lộ trình<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a>
+      </section>
+    </aside>
+  </div>
+  <section class="band">
+    <div class="container">
+      <div class="section-title"><h2>Có thể bạn quan tâm</h2></div>
+      <div class="card-grid"><article class="card">
+  <a class="thumb" href="../hoc/python-7-class-dataclass-to-chuc-code.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-7-class-dataclass-to-chuc-code.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-7-class-dataclass-to-chuc-code.html">Class và dataclass: tổ chức code cho trạm kiểm tra</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-21">21/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>17 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/luong-hang-doi-tach-chup-anh-xu-ly.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/luong-hang-doi-tach-chup-anh-xu-ly.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/luong-hang-doi-tach-chup-anh-xu-ly.html">Luồng và hàng đợi: tách chụp ảnh khỏi xử lý, không mất khung</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-21">21/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>24 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/lay-anh-camera-cong-nghiep-genicam-pypylon.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html">Lấy ảnh từ camera công nghiệp: GenICam, pypylon, camera giả lập</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-21">21/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>28 phút đọc</span></div>
+</article></div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <a class="logo" href="../"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+      <p>HọcFree.vn – nền tảng học miễn phí về AI, lập trình, Computer Vision, Machine Vision, tin tức AI và ngoại ngữ dành cho người Việt.</p>
+    </div>
+    <div><h3>Học &amp; thực hành</h3><ul><li><a href="../hoc/">Học AI &amp; Lập trình</a></li><li><a href="../projects/">Projects</a></li><li><a href="../lo-trinh/">Learning Paths</a></li></ul></div>
+    <div><h3>Khám phá</h3><ul><li><a href="../kien-thuc/">Kiến thức</a></li><li><a href="../tin-tuc-ai/">Tin tức AI</a></li><li><a href="../ngoai-ngu/">Ngoại ngữ</a></li><li><a href="../tai-nguyen/">Tài nguyên</a></li></ul></div>
+    <div><h3>Bài mới</h3><ul><li><a href="../hoc/python-7-class-dataclass-to-chuc-code.html">Class và dataclass: tổ chức code cho trạm kiểm tra</a></li><li><a href="../hoc/luong-hang-doi-tach-chup-anh-xu-ly.html">Luồng và hàng đợi: tách chụp ảnh khỏi xử lý, không mất khung</a></li><li><a href="../hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html">Lấy ảnh từ camera công nghiệp: GenICam, pypylon, camera giả lập</a></li><li><a href="../hoc/msa-gage-rr-anova-he-do-camera.html">MSA và Gage R&amp;R cho trạm đo camera: ANOVA, ndc, dải bảo vệ</a></li></ul></div>
+    <div>
+      <h3>HọcFree</h3>
+      <ul>
+        <li><a href="../gioi-thieu.html">Giới thiệu</a></li>
+        <li><a href="../search.html">Tìm kiếm</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">© 2026 HọcFree.vn · Kiến thức là để chia sẻ.</div>
+  </div>
+</footer>
+<button class="to-top" aria-label="Lên đầu trang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<script src="../assets/js/search-data.js?v=20261021" defer></script>
+<script src="../assets/js/main.js?v=20261021" defer></script>
+</body>
+</html>

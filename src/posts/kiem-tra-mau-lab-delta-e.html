@@ -1,0 +1,247 @@
+<p>"Màu nắp này có đúng màu mẫu không?" là câu hỏi nghe đơn giản nhưng hay làm trạm vision thất bại. Khoảng cách giữa hai giá trị RGB không phản ánh mắt người thấy khác bao nhiêu; OpenCV trả Lab theo một thang riêng dễ dùng nhầm; và chỉ cần đèn yếu đi hay ngả vàng là hàng tốt bị loại, hoặc tệ hơn, hàng lệch màu lọt qua. Bài thực hành này đi từng bước: đổi sang không gian <strong>CIELAB</strong> đúng cách, đo độ khác màu bằng <strong>ΔE</strong> (cài đặt CIEDE2000 và kiểm chứng với bộ dữ liệu chuẩn), giữ phép đo ổn định bằng <strong>cân bằng trắng theo thẻ xám</strong>, và hiệu chỉnh màu tuyệt đối bằng <strong>ma trận CCM</strong>.</p>
+<p>Chỉ cần <code>numpy</code> và <code>opencv-python</code>. Nên học trước: <a href="../hoc/opencv-2-khong-gian-mau-va-tach-mau.html">không gian màu và tách màu</a> và <a href="nhieu-snr-flat-field-chat-luong-anh.html">nhiễu, SNR và flat-field</a> (ảnh tuyến tính, tắt gamma).</p>
+
+<h2>1. CIELAB và cái bẫy thang đo của OpenCV</h2>
+<p>CIELAB (L*a*b*) được thiết kế để khoảng cách giữa hai màu gần với cảm nhận của mắt: L* là độ sáng từ 0 (đen) đến 100 (trắng), a* đi từ xanh lá (âm) sang đỏ (dương), b* từ xanh dương (âm) sang vàng (dương). Đổi ảnh sang Lab bằng OpenCV có hai bẫy:</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+mau_bgr = np.uint8([[[40, 30, 200]]])                                   # một màu đỏ; OpenCV lưu theo thứ tự B, G, R
+print("uint8               :", cv2.cvtColor(mau_bgr, cv2.COLOR_BGR2Lab)[0, 0])
+print("float32 trong [0, 1]:", cv2.cvtColor(mau_bgr.astype(np.float32) / 255, cv2.COLOR_BGR2Lab)[0, 0].round(2))
+print("nhầm RGB2Lab        :", cv2.cvtColor(mau_bgr.astype(np.float32) / 255, cv2.COLOR_RGB2Lab)[0, 0].round(2))
+
+
+def sang_lab(anh_bgr, tuyen_tinh=False):
+    """Ảnh BGR (uint8, hoặc float trong [0, 1]) → L*a*b* thật: L trong [0, 100], a, b có dấu."""
+    a = anh_bgr.astype(np.float32) / 255 if anh_bgr.dtype == np.uint8 else anh_bgr.astype(np.float32)
+    return cv2.cvtColor(a, cv2.COLOR_LBGR2Lab if tuyen_tinh else cv2.COLOR_BGR2Lab)</code></pre>
+<pre><code class="language-text">uint8               : [110 191 168]
+float32 trong [0, 1]: [43.26 63.2  39.98]
+nhầm RGB2Lab        : [ 28.2   58.36 -82.97]</code></pre>
+<ul>
+  <li>Với ảnh <code>uint8</code>, OpenCV nén Lab vào 0 đến 255: L được nhân 255/100, a và b được cộng 128. Con số <code>[110 191 168]</code> không phải L*a*b*; đem nó tính ΔE là sai ngay từ đầu. Đổi ảnh sang <code>float32</code> trong [0, 1] thì nhận được giá trị thật (L ≈ 43, a ≈ 63, b ≈ 40).</li>
+  <li>Ảnh OpenCV là BGR; gọi nhầm <code>COLOR_RGB2Lab</code> biến màu đỏ thành màu xanh dương (b* = −83) mà không báo lỗi gì.</li>
+  <li><code>COLOR_BGR2Lab</code> giả định ảnh đã mã hóa gamma sRGB (ảnh JPEG thông thường). Ảnh từ camera công nghiệp đã tắt gamma là ảnh tuyến tính; khi đó dùng <code>COLOR_LBGR2Lab</code> (chữ L là linear). Hàm <code>sang_lab</code> gói cả ba điều này.</li>
+</ul>
+
+<h2>2. ΔE: đo độ khác màu</h2>
+<p>Công thức đầu tiên, <strong>ΔE*ab</strong> (CIE 1976, thường viết ΔE76), chỉ là khoảng cách Euclid trong Lab:</p>
+\[ \Delta E_{76} = \sqrt{(\Delta L^*)^2 + (\Delta a^*)^2 + (\Delta b^*)^2} \]
+<p>Về sau người ta thấy Lab chưa đều như mong muốn: mắt nhạy với khác biệt sắc độ ở vùng xám hơn ở vùng màu đậm, và vùng xanh dương bị méo. <strong>CIEDE2000</strong> (ΔE00) sửa bằng cách tách độ khác thành độ sáng, độ bão hòa (chroma) và sắc độ (hue), chia mỗi phần cho một hệ số phụ thuộc vị trí màu, và thêm một số hạng xoay cho vùng xanh dương:</p>
+\[ \Delta E_{00} = \sqrt{\left(\frac{\Delta L'}{S_L}\right)^2 + \left(\frac{\Delta C'}{S_C}\right)^2 + \left(\frac{\Delta H'}{S_H}\right)^2 + R_T\,\frac{\Delta C'}{S_C}\,\frac{\Delta H'}{S_H}} \]
+<p>Công thức có nhiều bước dễ cài sai (đặc biệt là trung bình góc hue khi hai góc cách nhau qua 0°). Vì thế Sharma, Wu và Dalal (2005) công bố một bộ cặp màu kiểm thử kèm kết quả đúng; mọi bản cài đặt nên chạy qua bộ này:</p>
+<pre><code class="language-python">def de76(lab1, lab2):
+    return np.linalg.norm(np.asarray(lab1, float) - np.asarray(lab2, float), axis=-1)
+
+
+def de2000(lab1, lab2):
+    """CIEDE2000 (CIE 142-2001), theo các bước trong Sharma, Wu, Dalal (2005). Nhận mảng (..., 3)."""
+    L1, a1, b1 = np.moveaxis(np.asarray(lab1, float), -1, 0)
+    L2, a2, b2 = np.moveaxis(np.asarray(lab2, float), -1, 0)
+    C_tb = (np.hypot(a1, b1) + np.hypot(a2, b2)) / 2
+    G = 0.5 * (1 - np.sqrt(C_tb ** 7 / (C_tb ** 7 + 25.0 ** 7)))        # giãn trục a* gần vùng xám
+    a1p, a2p = (1 + G) * a1, (1 + G) * a2
+    C1p, C2p = np.hypot(a1p, b1), np.hypot(a2p, b2)
+    h1p, h2p = np.degrees(np.arctan2(b1, a1p)) % 360, np.degrees(np.arctan2(b2, a2p)) % 360
+    dh = h2p - h1p
+    dh = np.where(dh &gt; 180, dh - 360, np.where(dh &lt; -180, dh + 360, dh))
+    dh = np.where(C1p * C2p == 0, 0, dh)
+    dL, dC = L2 - L1, C2p - C1p
+    dH = 2 * np.sqrt(C1p * C2p) * np.sin(np.radians(dh / 2))
+    L_tb, Cp_tb, tong_h = (L1 + L2) / 2, (C1p + C2p) / 2, h1p + h2p
+    h_tb = np.where(C1p * C2p == 0, tong_h, np.where(np.abs(h1p - h2p) &lt;= 180, tong_h / 2,
+                    np.where(tong_h &lt; 360, (tong_h + 360) / 2, (tong_h - 360) / 2)))
+    T = (1 - 0.17 * np.cos(np.radians(h_tb - 30)) + 0.24 * np.cos(np.radians(2 * h_tb))
+         + 0.32 * np.cos(np.radians(3 * h_tb + 6)) - 0.20 * np.cos(np.radians(4 * h_tb - 63)))
+    SL = 1 + 0.015 * (L_tb - 50) ** 2 / np.sqrt(20 + (L_tb - 50) ** 2)
+    SC, SH = 1 + 0.045 * Cp_tb, 1 + 0.015 * Cp_tb * T
+    RT = -np.sin(np.radians(60 * np.exp(-((h_tb - 275) / 25) ** 2))) * 2 * np.sqrt(Cp_tb ** 7 / (Cp_tb ** 7 + 25.0 ** 7))
+    return np.sqrt((dL / SL) ** 2 + (dC / SC) ** 2 + (dH / SH) ** 2 + RT * (dC / SC) * (dH / SH))
+
+
+# vài cặp trong bộ dữ liệu kiểm thử của Sharma và cộng sự (2005), kèm ΔE00 công bố
+SHARMA = [((50, 2.6772, -79.7751), (50, 0, -82.7485), 2.0425),
+          ((50, 0, 0), (50, -1, 2), 2.3669),
+          ((50, 2.49, -0.001), (50, -2.49, 0.0009), 7.1792),
+          ((50, 2.5, 0), (58, 24, 15), 19.4535),
+          ((50, 2.5, 0), (50, 3.1736, 0.5854), 1.0000),
+          ((60.2574, -34.0099, 36.2677), (60.4626, -34.1751, 39.4387), 1.2644)]
+for lab1, lab2, chuan in SHARMA:
+    print(f"{str(lab1):28s} {str(lab2):28s} ΔE00 = {de2000(lab1, lab2):7.4f} (công bố {chuan:7.4f}), ΔE76 = {de76(lab1, lab2):6.3f}")</code></pre>
+<pre><code class="language-text">(50, 2.6772, -79.7751)       (50, 0, -82.7485)            ΔE00 =  2.0425 (công bố  2.0425), ΔE76 =  4.001
+(50, 0, 0)                   (50, -1, 2)                  ΔE00 =  2.3669 (công bố  2.3669), ΔE76 =  2.236
+(50, 2.49, -0.001)           (50, -2.49, 0.0009)          ΔE00 =  7.1792 (công bố  7.1792), ΔE76 =  4.980
+(50, 2.5, 0)                 (58, 24, 15)                 ΔE00 = 19.4535 (công bố 19.4535), ΔE76 = 27.409
+(50, 2.5, 0)                 (50, 3.1736, 0.5854)         ΔE00 =  1.0000 (công bố  1.0000), ΔE76 =  0.892
+(60.2574, -34.0099, 36.2677) (60.4626, -34.1751, 39.4387) ΔE00 =  1.2644 (công bố  1.2644), ΔE76 =  3.182</code></pre>
+<p>Bản cài đặt khớp kết quả công bố đến bốn chữ số. Để ý các cặp mà hai công thức bất đồng: cặp vùng xanh dương đầu tiên có ΔE76 = 4,0 nhưng ΔE00 chỉ 2,0, còn cặp gần xám thứ ba thì ngược lại. Trong dự án thật, có thể dùng hàm có sẵn như <code>skimage.color.deltaE_ciede2000</code> hoặc thư viện <code>colour-science</code>; điều quan trọng là biết hàm mình dùng đã được kiểm chứng.</p>
+<p>Giờ so với khoảng cách RGB: bốn cặp màu dưới đây đều lệch đúng 20 mức trên một kênh.</p>
+<pre><code class="language-python"># Cùng khoảng cách RGB 20 mức, mắt thấy khác nhau rất khác
+CAP = {"xanh dương đậm": ((120, 20, 20), (140, 20, 20)), "xanh lá đậm": ((20, 120, 20), (20, 140, 20)),
+       "vàng tươi": ((20, 220, 230), (20, 240, 230)), "đỏ thẫm": ((20, 20, 120), (20, 20, 140))}
+for ten, (m1, m2) in CAP.items():
+    l1, l2 = sang_lab(np.uint8([[m1]]))[0, 0], sang_lab(np.uint8([[m2]]))[0, 0]
+    print(f"{ten:15s}: ΔRGB = {np.linalg.norm(np.subtract(m1, m2)):4.1f}  ΔE76 = {de76(l1, l2):5.2f}  ΔE00 = {de2000(l1, l2):5.2f}")</code></pre>
+<pre><code class="language-text">xanh dương đậm : ΔRGB = 20.0  ΔE76 = 11.21  ΔE00 =  3.05
+xanh lá đậm    : ΔRGB = 20.0  ΔE76 = 11.63  ΔE00 =  7.28
+vàng tươi      : ΔRGB = 20.0  ΔE76 = 11.72  ΔE00 =  5.54
+đỏ thẫm        : ΔRGB = 20.0  ΔE76 =  9.61  ΔE00 =  4.20</code></pre>
+<p>Cùng ΔRGB = 20, nhưng cặp xanh lá đậm khác nhau về cảm nhận gấp hơn hai lần cặp xanh dương đậm. Một ngưỡng trên khoảng cách RGB vì vậy quá chặt với màu này và quá lỏng với màu khác. ΔE76 cũng gần như không phân biệt được bốn cặp (9,6 đến 11,7), trong khi ΔE00 thì có. Khi viết đặc tả, luôn ghi rõ dùng công thức nào: "ΔE ≤ 2" theo ΔE76 và theo ΔE00 là hai tiêu chí khác nhau.</p>
+<div class="tip"><strong>Dung sai bao nhiêu là đủ?</strong>Không có con số chung; dung sai là thỏa thuận với khách hàng, thường dựa trên mẫu màu chuẩn và mẫu giới hạn (bài <a href="../hoc/industrial-vision-5-dac-ta-va-nghiem-thu-fat-sat.html">đặc tả và nghiệm thu</a>). Như một mốc tham khảo, ΔE00 khoảng 1 là mức khác biệt mà người quan sát có kinh nghiệm bắt đầu nhận ra khi đặt hai mẫu cạnh nhau. Trước khi hứa một dung sai, hãy đo độ lặp lại của chính hệ đo (bài <a href="../hoc/msa-gage-rr-anova-he-do-camera.html">Gage R&amp;R</a>): hệ đo dao động 0,8 ΔE thì không thể kiểm dung sai 1 ΔE.</div>
+
+<h2>3. Ánh sáng thay đổi: cân bằng trắng theo thẻ xám</h2>
+<p>Camera không đo màu của vật mà đo ánh sáng phản xạ từ vật, nên màu đo được thay đổi theo độ sáng và màu của đèn. Đèn LED yếu dần và ngả màu theo thời gian sử dụng, nhiệt độ cũng làm phổ đèn dịch đi. Cách xử lý phổ biến: đặt một <strong>thẻ xám trung tính</strong> cố định trong trường nhìn, và mỗi ảnh tính hệ số từng kênh để thẻ xám trở về đúng như lúc cài đặt. Thí nghiệm dưới đây kiểm tra màu một nắp sơn cam với dung sai ΔE00 ≤ 2.</p>
+<pre><code class="language-python">rng = np.random.default_rng(0)
+XAM = np.array([0.18, 0.18, 0.18])                       # thẻ xám trung tính (tuyến tính, B G R) đặt cố định trong FOV
+SON_CHUAN = np.array([0.08, 0.20, 0.55])                 # màu sơn chuẩn của nắp (tuyến tính, B G R): cam
+
+
+def chup(son, den=(1.0, 1.0, 1.0), do_sang=1.0):
+    """Camera tuyến tính, gamma = 1: nửa trái là thẻ xám, nửa phải là nắp sơn. den: hệ số B, G, R của đèn."""
+    anh = np.zeros((100, 200, 3), np.float32)
+    anh[:, :100], anh[:, 100:] = XAM, son
+    anh *= np.float32(den) * do_sang
+    return np.clip(anh + rng.normal(0, 0.004, anh.shape), 0, 1).astype(np.float32)
+
+
+def can_bang_trang(anh, xam_luc_cai_dat):
+    """Hệ số từng kênh để thẻ xám trở về đúng như lúc cài đặt; áp cho cả ảnh (chỉ đúng với ảnh tuyến tính)."""
+    he_so = xam_luc_cai_dat / anh[20:80, 20:80].reshape(-1, 3).mean(0)
+    return np.clip(anh * he_so, 0, 1)
+
+
+def do_mau(anh):
+    return sang_lab(anh[20:80, 120:180], tuyen_tinh=True).reshape(-1, 3).mean(0)   # trung bình Lab trong ROI
+
+
+goc = chup(SON_CHUAN)
+xam_goc, lab_chuan = goc[20:80, 20:80].reshape(-1, 3).mean(0), do_mau(goc)
+print(f"màu chuẩn L*a*b* = {lab_chuan.round(1)}, dung sai ΔE00 ≤ 2,0")
+TINH_HUONG = {
+    "bình thường": dict(son=SON_CHUAN),
+    "đèn yếu đi 15%": dict(son=SON_CHUAN, do_sang=0.85),
+    "đèn ngả vàng (LED lão hóa)": dict(son=SON_CHUAN, den=(0.85, 1.0, 1.10)),
+    "sơn lệch màu thật": dict(son=SON_CHUAN * np.array([1.22, 1.0, 0.90])),
+    "sơn lệch + đèn ngả vàng": dict(son=SON_CHUAN * np.array([1.22, 1.0, 0.90]), den=(0.85, 1.0, 1.10)),
+}
+print("tình huống                 | ΔE00 thô | ΔE00 sau cân bằng trắng")
+for ten, ts in TINH_HUONG.items():
+    anh = chup(**ts)
+    tho, sua = de2000(do_mau(anh), lab_chuan), de2000(do_mau(can_bang_trang(anh, xam_goc)), lab_chuan)
+    print(f"{ten:26s} | {tho:5.2f} {'NG' if tho &gt; 2 else 'OK'} | {sua:5.2f} {'NG' if sua &gt; 2 else 'OK'}")</code></pre>
+<pre><code class="language-text">màu chuẩn L*a*b* = [58.6 23.7 35.3], dung sai ΔE00 ≤ 2,0
+tình huống                 | ΔE00 thô | ΔE00 sau cân bằng trắng
+bình thường                |  0.02 OK |  0.03 OK
+đèn yếu đi 15%             |  3.72 NG |  0.03 OK
+đèn ngả vàng (LED lão hóa) |  2.06 NG |  0.01 OK
+sơn lệch màu thật          |  2.63 NG |  2.61 NG
+sơn lệch + đèn ngả vàng    |  0.37 OK |  2.62 NG</code></pre>
+<p>Ba kết luận từ bảng:</p>
+<ul>
+  <li>Không cân bằng trắng, chỉ cần đèn yếu 15% là hàng tốt bị loại: L* giảm kéo theo ΔE vượt dung sai. Đèn ngả vàng cũng đủ làm hàng tốt thành NG.</li>
+  <li>Dòng cuối đáng sợ nhất: sơn lệch màu thật nhưng đèn ngả vàng lại "bù" đúng hướng lệch, ảnh thô cho ΔE00 = 0,4 và hàng lỗi lọt qua. Cân bằng trắng đưa nó về 2,6, đúng như khi đèn bình thường.</li>
+  <li>Cân bằng trắng không che lỗi thật: dòng "sơn lệch màu thật" vẫn NG như trước. Nó chỉ loại phần thay đổi do đèn gây ra, với điều kiện thẻ xám và vật nhận cùng một ánh sáng.</li>
+</ul>
+<p>Cân bằng trắng nhân từng kênh với một hệ số, nên chỉ đúng trên ảnh <strong>tuyến tính</strong> (tắt gamma, bài <a href="nhieu-snr-flat-field-chat-luong-anh.html">nhiễu và flat-field</a>). Tắt luôn auto white balance và auto exposure của camera: chúng thay đổi theo nội dung ảnh, nên cùng một vật đặt cạnh hai vật khác nhau sẽ cho hai màu khác nhau. Khi đèn hay ống kính không đều, hiệu chỉnh flat-field trước rồi mới đo màu.</p>
+
+<h2>4. Màu tuyệt đối: ma trận hiệu chỉnh màu (CCM)</h2>
+<p>Mục 3 so màu với chính mẫu chuẩn chụp bằng cùng camera (so sánh tương đối), đủ cho đa số trạm. Khi phải so với số tuyệt đối, ví dụ khách hàng ghi trong bản vẽ L*a*b* đo bằng máy đo màu (spectrophotometer), thì phải hiệu chỉnh màu camera. Bộ lọc màu trên cảm biến không có phổ giống mắt người: các kênh chồng lấn lên nhau, nên cân bằng trắng đúng được màu xám nhưng sai các màu khác. Cách chuẩn là chụp một <strong>bảng màu chuẩn</strong> có giá trị đã biết (bảng 24 ô kiểu ColorChecker) và khớp một ma trận 3×3 bằng bình phương tối thiểu.</p>
+<pre><code class="language-python"># Ma trận hiệu chỉnh màu (CCM): đưa màu camera về màu "thật" (đo bằng máy đo màu) khi cần so với số tuyệt đối
+TRON = np.array([[0.78, 0.17, 0.05],                    # bộ lọc màu của cảm biến chồng lấn: kênh B nhận cả chút G...
+                 [0.12, 0.72, 0.16],
+                 [0.04, 0.22, 0.74]])
+
+
+def camera_mau(that_bgr):                                # that_bgr: (N, 3) màu tuyến tính thật
+    return np.clip(that_bgr @ TRON.T + rng.normal(0, 0.003, that_bgr.shape), 0, 1)
+
+
+bang_mau = rng.uniform(0.03, 0.85, (24, 3))             # 24 ô màu của bảng màu chuẩn (đã biết giá trị thật)
+bang_mau[-1] = 0.18                                      # ô cuối là xám trung tính
+mau_thu = rng.uniform(0.03, 0.85, (300, 3))              # 300 màu khác để đánh giá, không dùng khi khớp
+
+do_bang = camera_mau(bang_mau)
+he_so_wb = bang_mau[-1] / do_bang[-1]                    # chỉ cân bằng trắng theo ô xám
+ccm, *_ = np.linalg.lstsq(do_bang, bang_mau, rcond=None) # 3×3: bình phương tối thiểu trên 24 ô
+
+
+def lab_n(mau):                                          # (N, 3) tuyến tính → (N, 3) Lab
+    return sang_lab(np.clip(mau, 0, 1).astype(np.float32)[None], tuyen_tinh=True)[0]
+
+
+do_thu = camera_mau(mau_thu)
+for ten, uoc in (("chỉ cân bằng trắng", do_thu * he_so_wb), ("cân bằng trắng + CCM 3×3", do_thu @ ccm)):
+    d = de2000(lab_n(uoc), lab_n(mau_thu))
+    print(f"{ten:25s}: ΔE00 trung bình {d.mean():5.2f}, 95% ≤ {np.percentile(d, 95):5.2f}, lớn nhất {d.max():5.2f}")</code></pre>
+<pre><code class="language-text">chỉ cân bằng trắng       : ΔE00 trung bình  6.99, 95% ≤ 11.11, lớn nhất 14.34
+cân bằng trắng + CCM 3×3 : ΔE00 trung bình  0.56, 95% ≤  1.33, lớn nhất  3.02</code></pre>
+<p>Chỉ cân bằng trắng thì ô xám đúng nhưng màu bão hòa sai trung bình gần 7 ΔE00. Ma trận 3×3 khớp trên 24 ô đưa sai số trên 300 màu chưa từng dùng xuống dưới 1. Ở camera thật sai số còn lại thường lớn hơn mô phỏng này, vì quan hệ giữa phổ cảm biến và mắt người không hoàn toàn tuyến tính; khi đó dùng bảng nhiều ô hơn, ma trận đa thức, hoặc giới hạn hiệu chỉnh vào vùng màu của sản phẩm. Ma trận chỉ đúng với đúng đèn lúc chụp bảng màu.</p>
+
+<h2>5. Đưa vào trạm kiểm tra</h2>
+<table>
+  <tr><th>Hạng mục</th><th>Cách làm</th></tr>
+  <tr><td>Chiếu sáng</td><td>Đèn trắng phổ rộng (chỉ số hoàn màu cao), dome hoặc khuếch tán để tránh chói (bài <a href="7-kieu-chieu-sang-machine-vision.html">7 kiểu chiếu sáng</a>), che ánh sáng môi trường</td></tr>
+  <tr><td>Camera</td><td>Tắt auto exposure, auto white balance, gamma; cố định gain; ảnh 10 đến 12 bit nếu màu tối</td></tr>
+  <tr><td>Tham chiếu</td><td>Thẻ xám cố định trong FOV, kiểm tra mỗi ảnh; cảnh báo khi hệ số cân bằng trắng lệch quá mức cho phép (đèn cần thay)</td></tr>
+  <tr><td>Vùng đo</td><td>ROI tránh cạnh, vết chói, chữ in; dùng trung vị hoặc loại pixel bão hòa (bài tập 2)</td></tr>
+  <tr><td>Tiêu chí</td><td>Ghi rõ công thức (ΔE00), dung sai, có tách ΔL, ΔC, ΔH hay không; xác nhận bằng mẫu giới hạn và Gage R&amp;R</td></tr>
+</table>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Đo màu trong CIELAB; với OpenCV dùng ảnh <code>float32</code> trong [0, 1], đúng thứ tự BGR, và <code>COLOR_LBGR2Lab</code> cho ảnh tuyến tính.</li>
+  <li>Khoảng cách RGB không phản ánh cảm nhận; ΔE00 tốt hơn ΔE76, nhất là vùng xanh dương và gần xám. Kiểm chứng bản cài đặt bằng bộ dữ liệu Sharma.</li>
+  <li>Đèn yếu đi hay ngả màu làm hàng tốt bị loại, hoặc che lỗi thật; cân bằng trắng theo thẻ xám trong FOV loại được phần thay đổi do đèn.</li>
+  <li>So với màu tuyệt đối thì cần CCM khớp từ bảng màu chuẩn; ma trận gắn với đúng đèn và camera đó.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Lỗi màu nằm ở thành phần nào?</h3>
+<p>Khách hàng hỏi: nắp bị lệch màu là do tối hơn, nhạt hơn hay ngả màu khác? Tách độ lệch của mẫu "sơn lệch màu thật" thành ΔL, ΔC (độ bão hòa) và Δh (góc sắc độ).</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">def lch(lab):
+    L, a, b = lab
+    return L, np.hypot(a, b), np.degrees(np.arctan2(b, a)) % 360
+
+
+lab_loi = do_mau(can_bang_trang(chup(**TINH_HUONG["sơn lệch màu thật"]), xam_goc))
+(L0, C0, h0), (L1, C1, h1) = lch(lab_chuan), lch(lab_loi)
+print(f"chuẩn: L {L0:.1f}  C {C0:.1f}  h {h0:.1f}°")
+print(f"lỗi  : L {L1:.1f}  C {C1:.1f}  h {h1:.1f}°")
+print(f"ΔL = {L1 - L0:+.2f}, ΔC = {C1 - C0:+.2f}, Δh = {h1 - h0:+.1f}° → ΔE00 = {de2000(lab_loi, lab_chuan):.2f}")</code></pre>
+<pre><code class="language-text">chuẩn: L 58.6  C 42.5  h 56.1°
+lỗi  : L 57.6  C 35.9  h 54.8°
+ΔL = -1.02, ΔC = -6.62, Δh = -1.3° → ΔE00 = 2.65</code></pre>
+<p>Độ sáng và sắc độ gần như giữ nguyên; lỗi chủ yếu là <strong>nhạt màu</strong> (độ bão hòa giảm khoảng 6,6), đúng với thực tế khi lớp sơn mỏng hoặc pha thiếu bột màu. Báo cáo dạng này giúp bộ phận sơn biết sửa gì, và nhiều đặc tả đặt dung sai riêng cho từng thành phần thay vì một con số ΔE.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Vệt chói trong vùng đo</h3>
+<p>Một vệt chói bão hòa chiếm khoảng 11% vùng đo của một nắp đúng màu. So ΔE00 khi lấy trung bình cả vùng, trung vị, và trung bình sau khi bỏ pixel gần bão hòa.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">anh = chup(SON_CHUAN)
+anh[30:45, 130:175] = 1.0                                # vệt chói (bão hòa) chiếm khoảng 11% ROI
+roi = anh[20:80, 120:180].reshape(-1, 3)
+lab_px = sang_lab(roi[None], tuyen_tinh=True)[0]
+khong_choi = roi.max(1) &lt; 0.98                           # bỏ pixel có kênh gần bão hòa
+for ten, lab in (("trung bình cả ROI", lab_px.mean(0)), ("trung vị", np.median(lab_px, 0)),
+                 ("trung bình, bỏ pixel bão hòa", lab_px[khong_choi].mean(0))):
+    print(f"{ten:28s}: ΔE00 = {de2000(lab, lab_chuan):5.2f}")</code></pre>
+<pre><code class="language-text">trung bình cả ROI           : ΔE00 =  7.22
+trung vị                    : ΔE00 =  0.16
+trung bình, bỏ pixel bão hòa: ΔE00 =  0.04</code></pre>
+<p>Chỉ 11% pixel chói đã kéo trung bình lệch hơn 7 ΔE00 và làm hàng tốt bị loại. Trung vị chịu được ngoại lai, còn loại pixel bão hòa thì cho kết quả gần đúng nhất. Tốt hơn cả là trị tận gốc bằng chiếu sáng khuếch tán hoặc phân cực chéo (bài <a href="mau-den-kinh-loc-phan-cuc.html">màu đèn, kính lọc và phân cực</a>), và đếm số pixel bị loại: nếu quá nhiều thì báo lỗi đo thay vì kết luận OK/NG.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 3. Đặc tả mơ hồ</h3>
+<p>Đặc tả ghi "sai lệch màu ΔE ≤ 3". Trạm của bạn tính ΔE00, phòng thí nghiệm khách hàng tính ΔE76. Dựa vào bảng ở mục 2, với sản phẩm màu xanh dương, bên nào sẽ khắt khe hơn và hệ quả là gì?</p>
+<details><summary>Xem đáp án</summary>
+<p>Ở vùng xanh dương, ΔE76 cho số lớn hơn ΔE00 khoảng gấp đôi (cặp đầu tiên của bộ Sharma: 4,0 so với 2,0; cặp xanh dương đậm ở mục 2: 11,2 so với 3,1). Phòng thí nghiệm khách hàng vì vậy khắt khe hơn: những mẫu trạm của bạn cho OK với ΔE00 = 2,5 có thể là ΔE76 = 5 và bị khách trả về. Cách xử lý là thống nhất công thức trong đặc tả trước khi nghiệm thu, và đối chiếu trạm với máy đo màu của khách trên cùng một bộ mẫu.</p>
+</details>
+</div>
+<p>Bài tiếp theo: <a href="../hoc/camera-8-bai-tap-chon-cau-hinh.html">Bài tập chặng 6: chọn camera, ống kính, đèn cho bài toán thật</a>.</p>
+
+<p class="note">Nguồn tham khảo: G. Sharma, W. Wu, E. N. Dalal, "The CIEDE2000 color-difference formula: Implementation notes, supplementary test data, and mathematical observations", <em>Color Research &amp; Application</em> 30(1), 2005, <a href="https://hajim.rochester.edu/ece/sites/gsharma/ciede2000/" rel="noopener" target="_blank">trang dữ liệu kiểm thử CIEDE2000</a>; <a href="https://docs.opencv.org/4.x/de/d25/imgproc_color_conversions.html" rel="noopener" target="_blank">OpenCV: Color conversions</a>; <a href="https://scikit-image.org/docs/stable/api/skimage.color.html" rel="noopener" target="_blank">scikit-image: skimage.color</a>.</p>

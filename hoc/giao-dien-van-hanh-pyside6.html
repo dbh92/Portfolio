@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="vi" data-root="../">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Giao diện vận hành trạm vision bằng PySide6: QThread, signal</title>
+<meta name="description" content="Màn hình vận hành: ảnh trực tiếp, OK/NG, bộ đếm, chọn mã sản phẩm. Kiểm tra chạy trong QThread, giao diện nhận kết quả qua signal, dừng sạch, test offscreen.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://hocfree.vn/hoc/giao-dien-van-hanh-pyside6.html">
+<meta property="og:site_name" content="HọcFree">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Giao diện vận hành trạm vision bằng PySide6: QThread, signal">
+<meta property="og:description" content="Màn hình vận hành: ảnh trực tiếp, OK/NG, bộ đếm, chọn mã sản phẩm. Kiểm tra chạy trong QThread, giao diện nhận kết quả qua signal, dừng sạch, test offscreen.">
+<meta property="og:url" content="https://hocfree.vn/hoc/giao-dien-van-hanh-pyside6.html">
+<meta property="og:image" content="https://hocfree.vn/assets/images/posts/giao-dien-van-hanh-pyside6.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="Giao diện vận hành trạm vision bằng PySide6: QThread, signal">
+<meta property="og:locale" content="vi_VN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Giao diện vận hành trạm vision bằng PySide6: QThread, signal">
+<meta name="twitter:description" content="Màn hình vận hành: ảnh trực tiếp, OK/NG, bộ đếm, chọn mã sản phẩm. Kiểm tra chạy trong QThread, giao diện nhận kết quả qua signal, dừng sạch, test offscreen.">
+<meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/giao-dien-van-hanh-pyside6.jpg">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/fonts.css?v=20261021">
+<link rel="stylesheet" href="../assets/css/style.css?v=20261021">
+<script>try{var t=localStorage.getItem('hf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
+<meta property="article:published_time" content="2026-10-21">
+<meta property="article:section" content="Học AI &amp; Lập trình">
+<meta property="article:tag" content="Python">
+<meta property="article:tag" content="Industrial Vision">
+<meta property="article:tag" content="Machine Vision">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "Giao diện vận hành trạm vision bằng PySide6: QThread, signal", "description": "Màn hình vận hành: ảnh trực tiếp, OK/NG, bộ đếm, chọn mã sản phẩm. Kiểm tra chạy trong QThread, giao diện nhận kết quả qua signal, dừng sạch, test offscreen.", "image": ["https://hocfree.vn/assets/images/posts/giao-dien-van-hanh-pyside6.jpg"], "datePublished": "2026-10-21", "dateModified": "2026-10-21", "inLanguage": "vi", "articleSection": "Học AI & Lập trình", "keywords": "Python, Industrial Vision, Machine Vision", "wordCount": 2230, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/hoc/giao-dien-van-hanh-pyside6.html"}, "isPartOf": {"@type": "Course", "name": "Trở thành Vision Engineer", "url": "https://hocfree.vn/lo-trinh/vision-engineer.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Learning Paths", "item": "https://hocfree.vn/lo-trinh/"}, {"@type": "ListItem", "position": 3, "name": "Trở thành Vision Engineer", "item": "https://hocfree.vn/lo-trinh/vision-engineer.html"}, {"@type": "ListItem", "position": 4, "name": "Chặng 10: PLC / Robot / MES", "item": "https://hocfree.vn/lo-trinh/vision-engineer/plc-robot-mes.html"}, {"@type": "ListItem", "position": 5, "name": "Giao diện vận hành trạm vision bằng PySide6: QThread, signal"}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div class="progress" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="container wide header-top">
+    <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="nav-scrim" hidden></div>
+    <a class="logo" href="../" aria-label="HọcFree – Trang chủ"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+    <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
+    <div class="header-actions">
+      <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="login-link" href="../dang-nhap.html">Đăng nhập</a>
+      <a class="btn start-btn" href="../lo-trinh/">Bắt đầu học</a>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="container wide">
+      <nav class="site-nav" id="site-nav" aria-label="Menu chính">
+        <div class="drawer-head">
+          <a class="logo" href="../" tabindex="-1"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+          <button class="icon-btn nav-close" aria-label="Đóng menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <button type="button" class="drawer-search search-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Tìm bài học, chủ đề…</span></button>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="../">Trang chủ</a></li><li class="nav-item has-panel is-mega"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-hoc">Học AI &amp; Lập trình<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel mega" id="nav-panel-hoc">
+  <div class="container wide mega-inner">
+    <div class="mega-groups"><div class="mega-group"><a class="mega-group-title" href="../hoc/#programming">Programming</a><ul><li><a href="../hoc/python.html">Python</a></li><li><a href="../hoc/csharp.html">C#</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#ai-machine-learning">AI &amp; Machine Learning</a><ul><li><a href="../hoc/machine-learning.html">Machine Learning</a></li><li><a href="../hoc/deep-learning.html">Deep Learning</a></li><li><a href="../hoc/pytorch.html">PyTorch</a></li><li><a href="../hoc/generative-ai.html">Generative AI</a></li><li><a href="../hoc/llm-ai-agents.html">LLM / AI Agents</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#computer-vision">Computer Vision</a><ul><li><a href="../hoc/opencv.html">OpenCV</a></li><li><a href="../hoc/image-processing.html">Image Processing</a></li><li><a href="../hoc/computer-vision.html">Computer Vision</a></li><li><a href="../hoc/ocr.html">OCR</a></li><li><a href="../hoc/object-detection.html">Object Detection</a></li><li><a href="../hoc/segmentation.html">Segmentation</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#vision-engineering">Vision Engineering</a><ul><li><a href="../hoc/machine-vision.html">Machine Vision</a></li><li><a href="../hoc/ai-vision.html">AI Vision</a></li><li><a href="../hoc/industrial-vision.html">Industrial Vision</a></li><li><a href="../hoc/camera-lens.html">Camera &amp; Lens</a></li><li><a href="../hoc/lighting.html">Lighting</a></li><li><a href="../hoc/calibration.html">Calibration</a></li><li><a href="../hoc/3d-vision.html">3D Vision</a></li><li><a href="../hoc/plc-robot-mes.html">PLC / Robot / MES</a></li><li><a href="../hoc/vision-deployment.html">Vision Deployment</a></li></ul></div></div>
+    <a class="feature-card" href="../lo-trinh/vision-engineer.html">
+  <span class="feature-eyebrow">⭐ Learning Path nổi bật</span>
+  <span class="feature-title">Trở thành Vision Engineer</span>
+  <span class="feature-sub">Machine Vision + AI Vision + Industrial Automation</span>
+  <span class="feature-desc">Lộ trình thực chiến từ Python, OpenCV và Machine Vision đến 3D Vision, Deep Learning, AI Vision, Camera, PLC, Robot và triển khai hệ thống Vision trong nhà máy.</span>
+  <span class="feature-chain" aria-label="Các chặng chính"><span>Python</span><i aria-hidden="true">→</i><span>OpenCV</span><i aria-hidden="true">→</i><span>Machine Vision</span><i aria-hidden="true">→</i><span>AI Vision</span><i aria-hidden="true">→</i><span class="chain-goal">🎯 Vision Engineer</span></span>
+  <span class="feature-meta">15 chặng · 5 giai đoạn · ~13 tháng</span>
+  <span class="feature-cta">Xem lộ trình →</span>
+</a>
+  </div>
+  <div class="mega-foot"><div class="container wide mega-foot-inner"><ol class="journey compact" aria-label="Học, thực hành, trở thành kỹ sư"><li><a href="../hoc/" aria-current="step"><span class="journey-n">1</span><span class="journey-t"><b>Học</b><small>Học AI &amp; Lập trình</small></span></a></li><li><a href="../projects/"><span class="journey-n">2</span><span class="journey-t"><b>Thực hành</b><small>Projects</small></span></a></li><li><a href="../lo-trinh/"><span class="journey-n">3</span><span class="journey-t"><b>Trở thành kỹ sư</b><small>Learning Paths</small></span></a></li></ol><a class="panel-all" href="../hoc/">Xem tất cả Học AI &amp; Lập trình →</a></div></div>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-projects">Projects<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-projects">
+  <p class="panel-kicker"><span>Bước 2 · Thực hành</span>Áp dụng vào dự án thật</p>
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../projects/ai-projects.html"><span class="drop-label">AI Projects</span><span class="drop-desc">Ứng dụng ML và LLM, từ ý tưởng đến bản demo</span></a></li><li><a class="drop-link" href="../projects/computer-vision-projects.html"><span class="drop-label">Computer Vision Projects</span><span class="drop-desc">Phát hiện, nhận dạng và theo dõi đối tượng</span></a></li><li><a class="drop-link" href="../projects/industrial-vision-projects.html"><span class="drop-label">Industrial Vision Projects</span><span class="drop-desc">Đo kích thước, kiểm tra lỗi, đọc mã trên dây chuyền</span></a></li></ul></div></div>
+  <a class="panel-all" href="../projects/">Xem tất cả Projects →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger is-active" aria-expanded="false" aria-controls="nav-panel-lo-trinh" aria-current="true">Learning Paths<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-lo-trinh">
+  <p class="panel-kicker"><span>Bước 3 · Trở thành kỹ sư</span>Định hướng nghề nghiệp</p>
+  <ul class="drop-list"><li><a class="drop-link is-flagship" href="../lo-trinh/vision-engineer.html"><span class="drop-label">⭐ Trở thành Vision Engineer</span><span class="drop-desc">Machine Vision + AI Vision + Industrial Automation · 15 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/toeic-700.html"><span class="drop-label">700+ TOEIC trong 5 tháng</span><span class="drop-desc">TOEIC Listening &amp; Reading + giao tiếp công sở cho người đi làm · 11 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/hsk3.html"><span class="drop-label">Tiếng Trung từ 0 đến HSK 3 trong 6 tháng</span><span class="drop-desc">Pinyin, chữ Hán, ngữ pháp, giao tiếp và luyện thi HSK 3.0 cho người Việt · 10 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/#python-developer"><span class="drop-label">Python Developer<span class="badge-soon">Sắp ra mắt</span></span><span class="drop-desc">Python, công cụ, tự động hóa</span></a></li></ul>
+  <a class="panel-all" href="../lo-trinh/">Xem tất cả lộ trình →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-kien-thuc">Kiến thức<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-kien-thuc">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Lĩnh vực</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/programming.html"><span class="drop-label">Programming</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-machine-learning.html"><span class="drop-label">AI / Machine Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/deep-learning.html"><span class="drop-label">Deep Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/machine-vision.html"><span class="drop-label">Machine Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-vision.html"><span class="drop-label">AI Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/industrial-automation.html"><span class="drop-label">Industrial Automation</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Công cụ &amp; mẹo</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/tools-frameworks.html"><span class="drop-label">Tools &amp; Frameworks</span></a></li><li><a class="drop-link" href="../kien-thuc/tips-tricks.html"><span class="drop-label">Tips &amp; Tricks</span></a></li></ul></div></div>
+  <a class="panel-all" href="../kien-thuc/">Xem tất cả Kiến thức →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tin-tuc-ai">Tin tức AI<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tin-tuc-ai">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tin-tuc-ai/ai-news.html"><span class="drop-label">AI News</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-models.html"><span class="drop-label">AI Models</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/technology.html"><span class="drop-label">Technology</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/robotics.html"><span class="drop-label">Robotics</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-industry.html"><span class="drop-label">AI Industry</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tin-tuc-ai/">Xem tất cả Tin tức AI →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-ngoai-ngu">Ngoại ngữ<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-ngoai-ngu">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Ngôn ngữ</p><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/english.html"><span class="drop-label">English</span><span class="drop-desc">Lộ trình 700 TOEIC, phương pháp học, giáo trình HF-700TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chinese.html"><span class="drop-label">Chinese</span><span class="drop-desc">Lộ trình 0 đến HSK 3 trong 6 tháng, phương pháp học, giáo trình HF-HSK3</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Tiếng Anh theo kỹ năng</p><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/toeic-listening.html"><span class="drop-label">TOEIC Listening</span><span class="drop-desc">Part 1–4: mô tả tranh, hỏi – đáp, hội thoại, bài nói</span></a></li><li><a class="drop-link" href="../ngoai-ngu/toeic-reading.html"><span class="drop-label">TOEIC Reading</span><span class="drop-desc">Part 5–7: điền từ, điền câu, đọc hiểu</span></a></li><li><a class="drop-link" href="../ngoai-ngu/ngu-phap-tieng-anh.html"><span class="drop-label">Ngữ pháp tiếng Anh</span><span class="drop-desc">Từ loại, thì, mệnh đề, liên từ cho TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/tu-vung-tieng-anh.html"><span class="drop-label">Từ vựng tiếng Anh</span><span class="drop-desc">Từ vựng công sở theo chủ đề, collocation</span></a></li><li><a class="drop-link" href="../ngoai-ngu/giao-tiep-tieng-anh.html"><span class="drop-label">Giao tiếp công sở</span><span class="drop-desc">Điện thoại, họp, thuyết trình, email</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Tiếng Trung theo kỹ năng</p><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/pinyin-phat-am.html"><span class="drop-label">Pinyin &amp; phát âm</span><span class="drop-desc">Thanh mẫu, vận mẫu, thanh điệu, biến điệu</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chu-han.html"><span class="drop-label">Chữ Hán</span><span class="drop-desc">Nét, thứ tự nét, bộ thủ, âm Hán Việt</span></a></li><li><a class="drop-link" href="../ngoai-ngu/ngu-phap-tieng-trung.html"><span class="drop-label">Ngữ pháp tiếng Trung</span><span class="drop-desc">Từ 是, 吗, 了 đến bổ ngữ, câu 把, câu 被</span></a></li><li><a class="drop-link" href="../ngoai-ngu/tu-vung-tieng-trung.html"><span class="drop-label">Từ vựng tiếng Trung</span><span class="drop-desc">Từ vựng HSK 1–3 theo chủ đề, Anki</span></a></li><li><a class="drop-link" href="../ngoai-ngu/giao-tiep-tieng-trung.html"><span class="drop-label">Giao tiếp tiếng Trung</span><span class="drop-desc">Chào hỏi, mua sắm, đi lại, công sở</span></a></li><li><a class="drop-link" href="../ngoai-ngu/luyen-thi-hsk.html"><span class="drop-label">Luyện thi HSK</span><span class="drop-desc">Đề HSK 3.0, nghe, đọc, viết, nói, đề thi thử</span></a></li></ul></div></div>
+  <a class="panel-all" href="../ngoai-ngu/">Xem tất cả Ngoại ngữ →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tai-nguyen">Tài nguyên<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tai-nguyen">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tai-nguyen/source-code.html"><span class="drop-label">Source Code</span><span class="drop-desc">Mã nguồn mẫu đi kèm bài học</span></a></li><li><a class="drop-link" href="../tai-nguyen/dataset.html"><span class="drop-label">Dataset</span><span class="drop-desc">Bộ dữ liệu ảnh để luyện tập</span></a></li><li><a class="drop-link" href="../tai-nguyen/cheat-sheets.html"><span class="drop-label">Cheat Sheets</span><span class="drop-desc">Tóm tắt nhanh trong một trang</span></a></li><li><a class="drop-link" href="../tai-nguyen/documentation.html"><span class="drop-label">Documentation</span><span class="drop-desc">Tài liệu tra cứu thư viện, API</span></a></li><li><a class="drop-link" href="../tai-nguyen/ebook.html"><span class="drop-label">Ebook / Tài liệu</span><span class="drop-desc">Sách và tài liệu tham khảo</span></a></li><li><a class="drop-link" href="../tai-nguyen/ai-tools.html"><span class="drop-label">AI Tools</span><span class="drop-desc">Công cụ AI hữu ích cho việc học</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tai-nguyen/">Xem tất cả Tài nguyên →</a>
+</div></li></ul>
+        <div class="drawer-foot">
+          <a class="btn ghost" href="../dang-nhap.html">Đăng nhập</a>
+          <a class="btn" href="../lo-trinh/">Bắt đầu học</a>
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+<div class="search-dialog" hidden>
+  <div class="search-scrim"></div>
+  <div class="search-box" role="dialog" aria-modal="true" aria-label="Tìm kiếm">
+    <form class="search-form" action="../search.html" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" placeholder="Tìm bài học, chủ đề, bài viết…" autocomplete="off" aria-label="Từ khóa tìm kiếm" aria-controls="search-suggest">
+      <button type="button" class="icon-btn search-close" aria-label="Đóng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </form>
+    <div class="search-suggest" id="search-suggest" aria-live="polite">
+      <div class="search-empty">
+        <p class="search-group-title">Chủ đề phổ biến</p>
+        <div class="chips"><a class="chip" href="../hoc/python.html">Python</a><a class="chip" href="../hoc/opencv.html">OpenCV</a><a class="chip" href="../hoc/machine-vision.html">Machine Vision</a><a class="chip" href="../hoc/deep-learning.html">Deep Learning</a><a class="chip" href="../hoc/ai-vision.html">AI Vision</a><a class="chip" href="../hoc/object-detection.html">Object Detection</a><a class="chip" href="../hoc/pytorch.html">PyTorch</a><a class="chip" href="../ngoai-ngu/english.html">English</a></div>
+        <p class="search-group-title">Lộ trình nổi bật</p>
+        <a class="search-item" href="../lo-trinh/vision-engineer.html"><span class="search-ico" aria-hidden="true">⭐</span><span>Trở thành Vision Engineer<small>Learning Path · Machine Vision + AI Vision + Industrial Automation</small></span></a>
+      </div>
+    </div>
+    <div class="search-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> chọn</span><span><kbd>Enter</kbd> mở</span><span><kbd>Esc</kbd> đóng</span></div>
+  </div>
+</div>
+<main id="main">
+  <div class="container layout article-layout">
+    <article class="article">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../lo-trinh/">Learning Paths</a><span>/</span><a href="../lo-trinh/vision-engineer.html">Vision Engineer</a><span>/</span><a href="../lo-trinh/vision-engineer/plc-robot-mes.html">Chặng 10: PLC / Robot / MES</a></nav>
+      <header class="article-head">
+        <div class="course-bar" data-course="vision-engineer"><a class="course-chip" href="../lo-trinh/vision-engineer/plc-robot-mes.html">⭐ Vision Engineer · Chặng 10</a><span class="lesson-no">Bài 9/10</span><span class="kind kind-lab">Thực hành</span><span class="lesson-min"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></svg>~75 phút</span></div>
+        <h1>Giao diện vận hành trạm vision bằng PySide6: QThread, signal</h1>
+        <p class="lead">Màn hình vận hành: ảnh trực tiếp, OK/NG, bộ đếm, chọn mã sản phẩm. Kiểm tra chạy trong QThread, giao diện nhận kết quả qua signal, dừng sạch, test offscreen.</p>
+        <div class="article-meta">
+          <span class="avatar" aria-hidden="true">HF</span>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-21">21/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>13 phút đọc</span></div>
+        </div>
+      </header>
+      <figure class="article-cover">
+        <img src="../assets/images/posts/giao-dien-van-hanh-pyside6.webp" alt="Giao diện vận hành trạm vision bằng PySide6: QThread, signal" width="1200" height="675" fetchpriority="high" decoding="async">
+      </figure>
+      <section class="lesson-goals" aria-label="Mục tiêu bài học"><h2>Học xong bài này, bạn sẽ</h2><ul><li>Chạy lõi kiểm tra trong QThread, giao diện nhận qua signal</li><li>Đổi ảnh NumPy sang QImage đúng cách</li><li>Khóa đổi mã sản phẩm khi chạy, ghi nhật ký</li><li>Dừng luồng sạch và test offscreen</li></ul><p class="goals-before">Nên học trước: <a href="../hoc/tich-hop-8-luu-ket-qua-sqlite-anh-ng.html">Lưu kết quả và ảnh NG: SQLite, thư mục, dọn ổ đĩa</a></p></section>
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol class="toc-plain"><li><a href="#1-ba-nguyen-tac">1. Ba nguyên tắc</a></li><li><a href="#2-toan-bo-chuong-trinh">2. Toàn bộ chương trình</a></li><li><a href="#3-chay-thu-tu-dong-khong-can-man-hinh">3. Chạy thử tự động, không cần màn hình</a></li><li><a href="#4-loi-thuong-gap">4. Lỗi thường gặp</a></li><li><a href="#tom-tat">Tóm tắt</a></li><li><a href="#bai-tap">Bài tập</a></li></ol></details>
+      <div class="prose">
+<p>Trạm kiểm tra nào cũng cần một màn hình cho người vận hành: thấy ảnh đang chụp, kết quả OK/NG to và rõ, bộ đếm ca, chọn mã sản phẩm khi đổi hàng, bắt đầu và dừng, nhật ký sự kiện. Giao diện cũng là chỗ dễ làm hỏng trạm theo một cách rất cụ thể: vẽ ảnh, cập nhật bảng, phản hồi chuột đều tốn thời gian, và nếu chúng chạy chung luồng với phần kiểm tra thì một cú kéo cửa sổ hay một phiên remote desktop chậm cũng làm trạm trễ kết quả gửi PLC. Bài này xây một giao diện vận hành tối giản bằng <strong>PySide6</strong> (Qt for Python) theo đúng nguyên tắc: kiểm tra chạy trong luồng riêng, giao diện chỉ nhận kết quả qua <strong>signal</strong>.</p>
+<p>Cài: <code>pip install PySide6 opencv-python numpy</code>. Nên học trước: <a href="python-7-class-dataclass-to-chuc-code.html">class và dataclass</a>, <a href="luong-hang-doi-tach-chup-anh-xu-ly.html">luồng và hàng đợi</a>.</p>
+
+<h2 id="1-ba-nguyen-tac">1. Ba nguyên tắc</h2>
+<ol>
+  <li><strong>Chỉ luồng giao diện được chạm vào widget.</strong> Qt không cho cập nhật <code>QLabel</code>, <code>QListWidget</code>… từ luồng khác. Vi phạm thì chương trình có thể chạy được vài giờ rồi treo hoặc văng ngẫu nhiên, loại lỗi khó tìm nhất.</li>
+  <li><strong>Luồng kiểm tra không phụ thuộc giao diện.</strong> Nó lấy ảnh, xử lý, gửi kết quả, ghi dữ liệu, rồi <em>phát</em> một signal mang ảnh và kết quả. Giao diện có kịp vẽ hay không không ảnh hưởng gì tới nó.</li>
+  <li><strong>Giao diện không chứa logic kiểm tra.</strong> Ngưỡng, số vật, công thức theo mã sản phẩm nằm trong cấu hình; giao diện chỉ chọn và hiển thị. Nhờ vậy cùng một lõi kiểm tra chạy được có giao diện, không giao diện (dịch vụ chạy nền), hoặc trong test.</li>
+</ol>
+<p>Qt hiện thực nguyên tắc 1 và 2 rất gọn: đối tượng kiểm tra là một <code>QObject</code> được chuyển sang <code>QThread</code> bằng <code>moveToThread</code>. Khi nó phát signal, Qt thấy bên nhận (cửa sổ) sống ở luồng khác nên tự động <em>xếp hàng</em> lời gọi vào vòng sự kiện của luồng giao diện (queued connection). Không cần khóa, không cần tự viết hàng đợi.</p>
+
+<h2 id="2-toan-bo-chuong-trinh">2. Toàn bộ chương trình</h2>
+<p>File <code>tram_gui.py</code> dưới đây chạy được ngay bằng <code>python tram_gui.py</code>: camera giả 25 khung/giây tạo 6 vật tối trên nền sáng, khoảng 15% số khung thiếu một vật; lõi kiểm tra đếm vật theo công thức của mã sản phẩm đang chọn.</p>
+<pre><code class="language-python">"""Giao diện vận hành tối giản cho một trạm kiểm tra: ảnh trực tiếp, kết quả, bộ đếm, chọn mã sản phẩm."""
+import json
+import sys
+import time
+from pathlib import Path
+
+import cv2
+import numpy as np
+from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal, Slot
+from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtWidgets import (QApplication, QComboBox, QGridLayout, QLabel, QListWidget, QMainWindow, QPushButton,
+                               QWidget)
+
+CONG_THUC = {                                    # "recipe": tham số theo mã sản phẩm (thực tế đọc từ file JSON)
+    "SP-A (6 vật)": {"so_vat": 6, "nguong": 90},
+    "SP-B (4 vật)": {"so_vat": 4, "nguong": 90},
+}
+
+
+def anh_sang_qimage(anh):
+    """numpy (H, W) uint8 hoặc (H, W, 3) BGR → QImage. .copy(): QImage không giữ mảng numpy, phải sao chép."""
+    if anh.ndim == 2:
+        h, w = anh.shape
+        return QImage(anh.data, w, h, w, QImage.Format.Format_Grayscale8).copy()
+    h, w, _ = anh.shape
+    return QImage(anh.data, w, h, 3 * w, QImage.Format.Format_BGR888).copy()
+
+
+class LuongKiemTra(QObject):
+    """Chạy trong QThread riêng: lấy ảnh, xử lý, phát kết quả qua signal. Không chạm vào widget nào."""
+    co_ket_qua = Signal(object, str, int, float)          # ảnh BGR đã vẽ, "OK"/"NG", số vật, ms xử lý
+    bao_loi = Signal(str)
+
+    def __init__(self):
+        super().__init__()
+        self.cong_thuc = CONG_THUC["SP-A (6 vật)"]
+        self.dang_chay = False
+        self.rng = np.random.default_rng(0)
+
+    def chup(self):
+        """Camera giả: 6 vật tối trên nền sáng, thỉnh thoảng thiếu một vật."""
+        anh = np.full((360, 640), 170, np.uint8)
+        so = 6 if self.rng.random() &gt; 0.15 else 5
+        for k in range(so):
+            cv2.circle(anh, (70 + 100 * k, 180), 35, 40, -1)
+        return cv2.add(anh, self.rng.integers(0, 15, anh.shape, dtype=np.uint8))
+
+    @Slot()
+    def chay(self):
+        self.dang_chay = True
+        while self.dang_chay:
+            t = time.perf_counter()
+            try:
+                anh = self.chup()
+                _, bw = cv2.threshold(anh, self.cong_thuc["nguong"], 255, cv2.THRESH_BINARY_INV)
+                n, _, st, _ = cv2.connectedComponentsWithStats(bw)
+                so_vat = int((st[1:, cv2.CC_STAT_AREA] &gt;= 500).sum())
+                kq = "OK" if so_vat == self.cong_thuc["so_vat"] else "NG"
+                ve = cv2.cvtColor(anh, cv2.COLOR_GRAY2BGR)
+                cv2.putText(ve, f"{kq}  {so_vat} vat", (12, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.2,
+                            (0, 170, 0) if kq == "OK" else (0, 0, 220), 3)
+                self.co_ket_qua.emit(ve, kq, so_vat, 1000 * (time.perf_counter() - t))
+            except Exception as loi:                       # luồng không được chết (bài luồng và hàng đợi)
+                self.bao_loi.emit(f"{type(loi).__name__}: {loi}")
+            QThread.msleep(40)                             # camera giả 25 khung/giây
+
+    def dung(self):
+        self.dang_chay = False
+
+
+class CuaSoTram(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Trạm ST3 – kiểm tra số vật")
+        self.anh = QLabel(alignment=Qt.AlignmentFlag.AlignCenter)
+        self.anh.setMinimumSize(640, 360)
+        self.ket_qua = QLabel("—", alignment=Qt.AlignmentFlag.AlignCenter)
+        self.ket_qua.setStyleSheet("font-size: 48px; font-weight: bold;")
+        self.dem = QLabel()
+        self.chon_sp = QComboBox()
+        self.chon_sp.addItems(CONG_THUC)
+        self.nut_chay, self.nut_dung = QPushButton("Bắt đầu"), QPushButton("Dừng")
+        self.nhat_ky = QListWidget()
+        luoi = QGridLayout()
+        luoi.addWidget(self.anh, 0, 0, 4, 1)
+        luoi.addWidget(self.ket_qua, 0, 1)
+        luoi.addWidget(self.dem, 1, 1)
+        luoi.addWidget(self.chon_sp, 2, 1)
+        luoi.addWidget(self.nut_chay, 3, 1)
+        luoi.addWidget(self.nut_dung, 4, 1)
+        luoi.addWidget(self.nhat_ky, 4, 0)
+        khung = QWidget()
+        khung.setLayout(luoi)
+        self.setCentralWidget(khung)
+
+        self.so = {"OK": 0, "NG": 0}
+        self.so_khung_hien = 0
+        self.luong = QThread()
+        self.kiem_tra = LuongKiemTra()
+        self.kiem_tra.moveToThread(self.luong)             # đối tượng sống trong luồng phụ
+        self.luong.started.connect(self.kiem_tra.chay)
+        self.kiem_tra.co_ket_qua.connect(self.nhan_ket_qua)  # signal qua luồng: Qt tự xếp hàng về luồng giao diện
+        self.kiem_tra.bao_loi.connect(lambda s: self.ghi(f"LỖI {s}"))
+        self.nut_chay.clicked.connect(self.bat_dau)
+        self.nut_dung.clicked.connect(self.dung)
+        self.chon_sp.currentTextChanged.connect(self.doi_san_pham)
+        self.cap_nhat_dem()
+
+    def ghi(self, dong):
+        self.nhat_ky.insertItem(0, time.strftime("%H:%M:%S ") + dong)
+
+    def cap_nhat_dem(self):
+        tong = self.so["OK"] + self.so["NG"]
+        self.dem.setText(f"Tổng {tong} | OK {self.so['OK']} | NG {self.so['NG']}")
+
+    @Slot(object, str, int, float)
+    def nhan_ket_qua(self, ve, kq, so_vat, ms):            # chạy trong luồng giao diện: được phép chạm widget
+        self.so[kq] += 1
+        self.so_khung_hien += 1
+        self.anh.setPixmap(QPixmap.fromImage(anh_sang_qimage(ve)))
+        self.ket_qua.setText(kq)
+        self.ket_qua.setStyleSheet(f"font-size: 48px; font-weight: bold; color: {'green' if kq == 'OK' else 'red'};")
+        self.cap_nhat_dem()
+        if kq == "NG":
+            self.ghi(f"NG: {so_vat} vật ({ms:.1f} ms)")
+
+    def bat_dau(self):
+        if not self.luong.isRunning():
+            self.chon_sp.setEnabled(False)                 # không đổi mã sản phẩm khi đang chạy
+            self.luong.start()
+            self.ghi(f"Bắt đầu, mã {self.chon_sp.currentText()}")
+
+    def dung(self):
+        if self.luong.isRunning():
+            self.kiem_tra.dung()
+            self.luong.quit()
+            self.luong.wait(2000)
+            self.chon_sp.setEnabled(True)
+            self.ghi("Dừng")
+
+    def doi_san_pham(self, ten):
+        self.kiem_tra.cong_thuc = CONG_THUC[ten]
+        self.ghi(f"Đổi mã sản phẩm: {ten} {json.dumps(CONG_THUC[ten])}")
+
+    def closeEvent(self, su_kien):
+        self.dung()                                        # đóng cửa sổ thì dừng luồng sạch sẽ
+        su_kien.accept()
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    cua_so = CuaSoTram()
+    cua_so.show()
+    if "--thu" in sys.argv:                                # chạy thử tự động: bấm Bắt đầu, 3 giây sau chụp màn hình rồi thoát
+        QTimer.singleShot(100, cua_so.nut_chay.click)
+
+        def ket_thuc():
+            cua_so.grab().save("man_hinh.png")
+            print(f"đã hiển thị {cua_so.so_khung_hien} khung; {cua_so.dem.text()}; "
+                  f"luồng kiểm tra đang chạy: {cua_so.luong.isRunning()}")
+            cua_so.close()
+            print(f"sau khi đóng: luồng kiểm tra đang chạy: {cua_so.luong.isRunning()}")
+            app.quit()
+        QTimer.singleShot(3100, ket_thuc)
+    sys.exit(app.exec())</code></pre>
+<p>Những chỗ đáng đọc kỹ:</p>
+<ul>
+  <li><code>anh_sang_qimage</code> gọi <code>.copy()</code>: <code>QImage</code> tạo từ <code>anh.data</code> chỉ trỏ vào bộ nhớ của mảng NumPy; khi mảng bị giải phóng, ảnh hiển thị thành rác hoặc chương trình văng. Tham số thứ tư là số byte mỗi dòng (<code>3 * w</code> với ảnh BGR); sai số này thì ảnh bị xiên.</li>
+  <li>Signal <code>co_ket_qua</code> khai báo kiểu <code>object</code> cho ảnh nên mảng NumPy được truyền nguyên vẹn qua luồng. Luồng kiểm tra tạo mảng mới mỗi khung, vì vậy không có chuyện hai luồng cùng sửa một mảng.</li>
+  <li>Vòng lặp kiểm tra bọc từng khung trong <code>try/except</code> và phát signal <code>bao_loi</code>: luồng không được chết lặng lẽ (bài <a href="luong-hang-doi-tach-chup-anh-xu-ly.html">luồng và hàng đợi</a>).</li>
+  <li>Không cho đổi mã sản phẩm khi đang chạy (<code>setEnabled(False)</code>); khi đổi thì ghi nhật ký kèm công thức. Chọn sai mã là một nguyên nhân NG hàng loạt rất hay gặp, và nhật ký là thứ đầu tiên cần xem khi điều tra.</li>
+  <li><code>closeEvent</code> dừng luồng rồi mới đóng: đóng cửa sổ khi luồng vẫn chạy thì tiến trình không thoát, hoặc thoát khi luồng đang ghi dở dữ liệu.</li>
+</ul>
+
+<h2 id="3-chay-thu-tu-dong-khong-can-man-hinh">3. Chạy thử tự động, không cần màn hình</h2>
+<p>Tham số <code>--thu</code> bấm "Bắt đầu" bằng code, đợi 3 giây, chụp cửa sổ ra <code>man_hinh.png</code>, in bộ đếm, rồi đóng cửa sổ. Biến môi trường <code>QT_QPA_PLATFORM=offscreen</code> cho Qt vẽ vào bộ nhớ thay vì màn hình, nên chạy được trên máy chủ build, trong CI, hoặc qua SSH.</p>
+<pre><code class="language-text">$ QT_QPA_PLATFORM=offscreen python tram_gui.py --thu
+đã hiển thị 61 khung; Tổng 61 | OK 43 | NG 18; luồng kiểm tra đang chạy: True
+sau khi đóng: luồng kiểm tra đang chạy: False</code></pre>
+<p>Trên Windows PowerShell: <code>$env:QT_QPA_PLATFORM="offscreen"; python tram_gui.py --thu</code>. Trong 3 giây giao diện nhận và vẽ khoảng 60 khung, khớp tốc độ 25 khung/giây của camera giả, và luồng kiểm tra dừng sạch khi đóng cửa sổ. Tỉ lệ NG 18/61 cao hơn 15% chỉ vì mẫu ngắn; chạy riêng bộ tạo ảnh 200 khung với cùng hạt giống cho 31 khung thiếu vật và đúng 31 khung NG, tức lõi kiểm tra không báo nhầm. Ảnh chụp ở chế độ offscreen có thể hiện chữ thành ô vuông vì không nạp font hệ thống; bố cục và ảnh vẫn đúng. Cách chạy này cũng là khung cho test giao diện: dùng <code>QTimer</code> bấm nút, đổi mã sản phẩm, rồi kiểm tra trạng thái widget (thư viện <code>pytest-qt</code> làm việc này gọn hơn; xem bài <a href="pytest-kiem-thu-ham-xu-ly-anh.html">pytest</a>).</p>
+
+<h2 id="4-loi-thuong-gap">4. Lỗi thường gặp</h2>
+<table>
+  <tr><th>Triệu chứng</th><th>Nguyên nhân</th><th>Cách sửa</th></tr>
+  <tr><td>Văng hoặc treo ngẫu nhiên sau vài giờ</td><td>Cập nhật widget từ luồng kiểm tra</td><td>Mọi cập nhật hiển thị đi qua signal</td></tr>
+  <tr><td>Ảnh bị xiên, sọc, sai màu</td><td>Sai số byte mỗi dòng, nhầm RGB/BGR, hoặc thiếu <code>.copy()</code></td><td>Dùng hàm <code>anh_sang_qimage</code> ở trên; ảnh màu OpenCV là BGR</td></tr>
+  <tr><td>Giao diện đơ khi bấm nút</td><td>Làm việc nặng (lưu ảnh, gọi PLC, chờ mạng) trong slot của luồng giao diện</td><td>Đẩy việc nặng sang luồng khác; slot chỉ cập nhật hiển thị</td></tr>
+  <tr><td>Chậm dần, RAM tăng theo ca</td><td>Nhật ký thêm dòng mãi mãi; giữ tham chiếu tới mọi ảnh</td><td>Giới hạn số dòng nhật ký, chỉ giữ ảnh đang hiển thị</td></tr>
+  <tr><td>Remote desktop làm trạm chậm</td><td>Vẽ 25 khung/giây ảnh lớn qua mạng</td><td>Thu nhỏ ảnh hiển thị, giới hạn tốc độ vẽ (bài tập 2)</td></tr>
+  <tr><td>Không thoát được chương trình</td><td>Luồng còn chạy khi đóng cửa sổ</td><td><code>closeEvent</code> dừng luồng, <code>wait</code> có thời hạn</td></tr>
+</table>
+<div class="tip"><strong>Chọn công nghệ giao diện</strong>PySide6 (giấy phép LGPL) và PyQt6 (GPL hoặc thương mại) có API gần như giống hệt; khi bán phần mềm kèm máy, giấy phép là khác biệt quan trọng (bài <a href="machine-vision-3-thu-vien-va-phan-mem.html">thư viện và phần mềm Machine Vision</a>). Nhiều trạm dùng C# WinForms/WPF (xem <a href="winforms-hien-thi-camera-opencvsharp.html">WinForms hiển thị camera</a>); giao diện web hợp khi cần xem từ nhiều máy. Nguyên tắc tách luồng trong bài này áp dụng cho mọi lựa chọn.</div>
+
+<h2 id="tom-tat">Tóm tắt</h2>
+<ul>
+  <li>Lõi kiểm tra chạy trong <code>QThread</code> (<code>moveToThread</code>) và phát signal mang ảnh, kết quả; chỉ luồng giao diện chạm vào widget.</li>
+  <li>Đổi ảnh NumPy sang <code>QImage</code> với đúng số byte mỗi dòng, đúng định dạng, và <code>.copy()</code>.</li>
+  <li>Logic và công thức theo mã sản phẩm nằm ngoài giao diện; khóa đổi mã khi đang chạy; ghi nhật ký mọi thao tác.</li>
+  <li>Dừng luồng sạch khi đóng; chạy thử tự động bằng <code>QTimer</code> và <code>QT_QPA_PLATFORM=offscreen</code>.</li>
+</ul>
+
+<h2 id="bai-tap">Bài tập</h2>
+<div class="ex">
+<h3 id="bai-1-hien-thi-thoi-gian-xu-ly">Bài 1. Hiển thị thời gian xử lý</h3>
+<p>Thêm một nhãn hiển thị thời gian xử lý trung bình của 50 khung gần nhất và tô đỏ khi vượt 20 ms.</p>
+<details><summary>Xem đáp án</summary>
+<p>Trong <code>CuaSoTram.__init__</code> tạo <code>self.thoi_gian = collections.deque(maxlen=50)</code> (thêm <code>import collections</code>), một <code>self.nhan_ms = QLabel()</code> và đặt vào lưới, ví dụ <code>luoi.addWidget(self.nhan_ms, 5, 1)</code>. Trong <code>nhan_ket_qua</code>, vốn đã nhận sẵn <code>ms</code>:</p>
+<pre><code class="language-python"># (minh họa) thêm vào cuối CuaSoTram.nhan_ket_qua
+self.thoi_gian.append(ms)
+tb = sum(self.thoi_gian) / len(self.thoi_gian)
+self.nhan_ms.setText(f"Xử lý trung bình: {tb:.1f} ms")
+self.nhan_ms.setStyleSheet("color: red;" if tb &gt; 20 else "")</code></pre>
+<p>Thời gian phải được đo trong luồng kiểm tra (đã làm trong <code>chay</code>) rồi gửi sang, không đo trong luồng giao diện: thời điểm signal tới giao diện còn cộng thêm độ trễ xếp hàng.</p>
+</details>
+</div>
+<div class="ex">
+<h3 id="bai-2-gioi-han-toc-do-ve">Bài 2. Giới hạn tốc độ vẽ</h3>
+<p>Camera chạy 25 khung/giây nhưng người vận hành chỉ cần thấy khoảng 10 khung/giây. Sửa sao cho bộ đếm vẫn đủ mọi khung, ảnh chỉ được vẽ lại tối đa 10 lần mỗi giây, nhưng khung NG thì luôn được vẽ.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python"># (minh họa) trong CuaSoTram.nhan_ket_qua, thay dòng self.anh.setPixmap(...)
+bay_gio = time.perf_counter()
+if kq == "NG" or bay_gio - getattr(self, "lan_ve_cuoi", 0.0) &gt;= 0.1:
+    self.anh.setPixmap(QPixmap.fromImage(anh_sang_qimage(ve)))
+    self.lan_ve_cuoi = bay_gio</code></pre>
+<p>Bộ đếm và nhật ký vẫn cập nhật mỗi khung; chỉ phần tốn kém nhất (đổi ảnh và vẽ) bị giới hạn. Tốt hơn nữa là luồng kiểm tra gửi ảnh đã thu nhỏ, giảm cả chi phí truyền ảnh lớn qua signal.</p>
+</details>
+</div>
+<div class="ex">
+<h3 id="bai-3-doc-cong-thuc-tu-file">Bài 3. Đọc công thức từ file</h3>
+<p>Chuyển <code>CONG_THUC</code> ra file <code>cong_thuc.json</code>, nạp khi khởi động, và từ chối khởi động (hiện hộp thoại lỗi) nếu một công thức thiếu khóa <code>so_vat</code> hoặc <code>nguong</code>.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python"># (minh họa)
+from PySide6.QtWidgets import QMessageBox
+
+def nap_cong_thuc(duong_dan="cong_thuc.json"):
+    ct = json.loads(Path(duong_dan).read_text(encoding="utf-8"))
+    for ten, gia_tri in ct.items():
+        thieu = {"so_vat", "nguong"} - set(gia_tri)
+        if thieu:
+            raise ValueError(f"công thức {ten} thiếu {sorted(thieu)}")
+    return ct
+
+# trong khối __main__, trước khi tạo CuaSoTram:
+try:
+    CONG_THUC = nap_cong_thuc()
+except (OSError, ValueError) as loi:
+    QMessageBox.critical(None, "Lỗi công thức", str(loi))
+    sys.exit(1)</code></pre>
+<p>Kiểm tra cấu hình ngay khi khởi động tốt hơn nhiều so với phát hiện lỗi giữa ca. Hàm <code>nap_cong_thuc</code> không đụng tới Qt nên test được bằng pytest với <code>tmp_path</code>.</p>
+</details>
+</div>
+<p>Bài tiếp theo: <a href="tich-hop-9-du-an-tram-vision-mo-phong.html">Dự án chặng 10: trạm vision hoàn chỉnh với PLC mô phỏng</a>. Hãy gắn giao diện này vào trạm của dự án.</p>
+
+<p class="note">Nguồn tham khảo: <a href="https://doc.qt.io/qtforpython-6/" rel="noopener" target="_blank">Qt for Python (PySide6) documentation</a>, <a href="https://doc.qt.io/qt-6/threads-qobject.html" rel="noopener" target="_blank">Qt: Threads and QObjects</a>, <a href="https://doc.qt.io/qt-6/qimage.html" rel="noopener" target="_blank">Qt: QImage</a>, <a href="https://doc.qt.io/qtforpython-6/licenses.html" rel="noopener" target="_blank">Qt for Python: Licenses</a>.</p>
+
+      </div>
+      <section class="practice"><h2><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <circle cx="12" cy="12" r="6" /> <circle cx="12" cy="12" r="2" /></svg>Bài tập thực hành</h2><ol><li>C</li><li>h</li><li>ạ</li><li>y</li><li> </li><li>t</li><li>r</li><li>a</li><li>m</li><li>_</li><li>g</li><li>u</li><li>i</li><li>.</li><li>p</li><li>y</li><li>,</li><li> </li><li>t</li><li>h</li><li>ê</li><li>m</li><li> </li><li>n</li><li>h</li><li>ã</li><li>n</li><li> </li><li>t</li><li>h</li><li>ờ</li><li>i</li><li> </li><li>g</li><li>i</li><li>a</li><li>n</li><li> </li><li>x</li><li>ử</li><li> </li><li>l</li><li>ý</li><li>,</li><li> </li><li>g</li><li>i</li><li>ớ</li><li>i</li><li> </li><li>h</li><li>ạ</li><li>n</li><li> </li><li>t</li><li>ố</li><li>c</li><li> </li><li>đ</li><li>ộ</li><li> </li><li>v</li><li>ẽ</li><li> </li><li>v</li><li>à</li><li> </li><li>n</li><li>ạ</li><li>p</li><li> </li><li>c</li><li>ô</li><li>n</li><li>g</li><li> </li><li>t</li><li>h</li><li>ứ</li><li>c</li><li> </li><li>t</li><li>ừ</li><li> </li><li>f</li><li>i</li><li>l</li><li>e</li><li> </li><li>J</li><li>S</li><li>O</li><li>N</li></ol><p>Làm xong bài tập mới chuyển sang bài tiếp theo: tự viết code là cách duy nhất để nhớ lâu.</p></section><div class="lesson-done" data-course="vision-engineer"><button type="button" class="lesson-done-btn" data-lesson-done="giao-dien-van-hanh-pyside6" aria-pressed="false"><span class="box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></span><span class="off">Đánh dấu đã học xong</span><span class="on">Đã học xong bài này</span></button><a class="btn lg" href="../hoc/tich-hop-9-du-an-tram-vision-mo-phong.html">Bài tiếp theo<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a></div>
+      <footer class="article-foot">
+        <div class="tags"><a class="tag" href="../search.html?q=Python">#Python</a><a class="tag" href="../search.html?q=Industrial Vision">#Industrial Vision</a><a class="tag" href="../search.html?q=Machine Vision">#Machine Vision</a></div>
+        <div class="share">
+      <span>Chia sẻ:</span>
+      <a class="share-btn fb" href="https://www.facebook.com/sharer/sharer.php?u=https://hocfree.vn/hoc/giao-dien-van-hanh-pyside6.html" target="_blank" rel="noopener" aria-label="Chia sẻ Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8z"/></svg></a>
+      <a class="share-btn x" href="https://twitter.com/intent/tweet?url=https://hocfree.vn/hoc/giao-dien-van-hanh-pyside6.html" target="_blank" rel="noopener" aria-label="Chia sẻ X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+      <button class="share-btn copy-link" data-url="https://hocfree.vn/hoc/giao-dien-van-hanh-pyside6.html" aria-label="Sao chép liên kết"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+    </div>
+      </footer>
+      <div class="author-box">
+        <span class="avatar lg" aria-hidden="true">HF</span>
+        <div>
+          <strong>Ban biên tập HọcFree</strong>
+          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và ngoại ngữ, hoàn toàn miễn phí.</p>
+        </div>
+      </div>
+      <nav class="pager lesson-pager" aria-label="Bài học trước/sau"><a class="prev" href="../hoc/tich-hop-8-luu-ket-qua-sqlite-anh-ng.html"><span>← Bài trước · Bài 8</span>Lưu kết quả và ảnh NG: SQLite, thư mục, dọn ổ đĩa</a><a class="next" href="../hoc/tich-hop-9-du-an-tram-vision-mo-phong.html"><span>Bài tiếp → · Bài 10</span>Dự án chặng 10: trạm vision hoàn chỉnh với PLC mô phỏng</a></nav>
+    </article>
+    <aside class="sidebar course-side" data-course="vision-engineer">
+      <section class="widget course-toc">
+        <p class="widget-title">Chặng 10/15 · Vision Engineer</p>
+        <a class="course-toc-title" href="../lo-trinh/vision-engineer/plc-robot-mes.html">PLC / Robot / MES</a>
+        <div class="lc" data-lesson-count="tich-hop-1-io-so-va-handshake-plc giao-tiep-camera-vision-voi-plc tich-hop-3-modbus-tcp-python opc-ua-cho-ky-su-vision tich-hop-5-tcp-socket-gui-toa-do-robot vision-dan-huong-robot-gap-vat mes-truy-xuat-nguon-goc-vision tich-hop-8-luu-ket-qua-sqlite-anh-ng giao-dien-van-hanh-pyside6 tich-hop-9-du-an-tram-vision-mo-phong"><div class="lc-bar"><span data-lc-bar></span></div><span data-lc-text>0/10 bài</span></div>
+        <ol class="toc-lessons"><li data-lesson="tich-hop-1-io-so-va-handshake-plc"><a href="../hoc/tich-hop-1-io-so-va-handshake-plc.html"><span class="tn">1</span><span class="tt">I/O số và handshake với PLC</span></a></li><li data-lesson="giao-tiep-camera-vision-voi-plc"><a href="../kien-thuc/giao-tiep-camera-vision-voi-plc.html"><span class="tn">2</span><span class="tt">Các chuẩn giao tiếp: Modbus TCP, EtherNet/IP, PROFINET</span></a></li><li data-lesson="tich-hop-3-modbus-tcp-python"><a href="../hoc/tich-hop-3-modbus-tcp-python.html"><span class="tn">3</span><span class="tt">Modbus TCP bằng Python với pymodbus</span></a></li><li data-lesson="opc-ua-cho-ky-su-vision"><a href="../kien-thuc/opc-ua-cho-ky-su-vision.html"><span class="tn">4</span><span class="tt">OPC UA cho kỹ sư Vision</span></a></li><li data-lesson="tich-hop-5-tcp-socket-gui-toa-do-robot"><a href="../hoc/tich-hop-5-tcp-socket-gui-toa-do-robot.html"><span class="tn">5</span><span class="tt">TCP socket: gửi kết quả và tọa độ cho robot</span></a></li><li data-lesson="vision-dan-huong-robot-gap-vat"><a href="../hoc/vision-dan-huong-robot-gap-vat.html"><span class="tn">6</span><span class="tt">Vision dẫn hướng robot gắp vật</span></a></li><li data-lesson="mes-truy-xuat-nguon-goc-vision"><a href="../kien-thuc/mes-truy-xuat-nguon-goc-vision.html"><span class="tn">7</span><span class="tt">MES và truy xuất nguồn gốc</span></a></li><li data-lesson="tich-hop-8-luu-ket-qua-sqlite-anh-ng"><a href="../hoc/tich-hop-8-luu-ket-qua-sqlite-anh-ng.html"><span class="tn">8</span><span class="tt">Lưu kết quả và ảnh NG: SQLite, thư mục, dọn ổ đĩa</span></a></li><li data-lesson="giao-dien-van-hanh-pyside6" class="is-current"><a href="../hoc/giao-dien-van-hanh-pyside6.html" aria-current="page"><span class="tn">9</span><span class="tt">Giao diện vận hành bằng PySide6</span></a></li><li data-lesson="tich-hop-9-du-an-tram-vision-mo-phong"><a href="../hoc/tich-hop-9-du-an-tram-vision-mo-phong.html"><span class="tn">10</span><span class="tt">Dự án chặng 10: trạm vision hoàn chỉnh với PLC mô phỏng</span></a></li></ol>
+        <a class="more" href="../lo-trinh/vision-engineer.html">Xem toàn bộ lộ trình<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a>
+      </section>
+    </aside>
+  </div>
+  <section class="band">
+    <div class="container">
+      <div class="section-title"><h2>Có thể bạn quan tâm</h2></div>
+      <div class="card-grid"><article class="card">
+  <a class="thumb" href="../hoc/python-7-class-dataclass-to-chuc-code.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-7-class-dataclass-to-chuc-code.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-7-class-dataclass-to-chuc-code.html">Class và dataclass: tổ chức code cho trạm kiểm tra</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-21">21/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>17 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/luong-hang-doi-tach-chup-anh-xu-ly.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/luong-hang-doi-tach-chup-anh-xu-ly.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/luong-hang-doi-tach-chup-anh-xu-ly.html">Luồng và hàng đợi: tách chụp ảnh khỏi xử lý, không mất khung</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-21">21/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>24 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/lay-anh-camera-cong-nghiep-genicam-pypylon.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html">Lấy ảnh từ camera công nghiệp: GenICam, pypylon, camera giả lập</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-21">21/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>28 phút đọc</span></div>
+</article></div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <a class="logo" href="../"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+      <p>HọcFree.vn – nền tảng học miễn phí về AI, lập trình, Computer Vision, Machine Vision, tin tức AI và ngoại ngữ dành cho người Việt.</p>
+    </div>
+    <div><h3>Học &amp; thực hành</h3><ul><li><a href="../hoc/">Học AI &amp; Lập trình</a></li><li><a href="../projects/">Projects</a></li><li><a href="../lo-trinh/">Learning Paths</a></li></ul></div>
+    <div><h3>Khám phá</h3><ul><li><a href="../kien-thuc/">Kiến thức</a></li><li><a href="../tin-tuc-ai/">Tin tức AI</a></li><li><a href="../ngoai-ngu/">Ngoại ngữ</a></li><li><a href="../tai-nguyen/">Tài nguyên</a></li></ul></div>
+    <div><h3>Bài mới</h3><ul><li><a href="../hoc/python-7-class-dataclass-to-chuc-code.html">Class và dataclass: tổ chức code cho trạm kiểm tra</a></li><li><a href="../hoc/luong-hang-doi-tach-chup-anh-xu-ly.html">Luồng và hàng đợi: tách chụp ảnh khỏi xử lý, không mất khung</a></li><li><a href="../hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html">Lấy ảnh từ camera công nghiệp: GenICam, pypylon, camera giả lập</a></li><li><a href="../hoc/msa-gage-rr-anova-he-do-camera.html">MSA và Gage R&amp;R cho trạm đo camera: ANOVA, ndc, dải bảo vệ</a></li></ul></div>
+    <div>
+      <h3>HọcFree</h3>
+      <ul>
+        <li><a href="../gioi-thieu.html">Giới thiệu</a></li>
+        <li><a href="../search.html">Tìm kiếm</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">© 2026 HọcFree.vn · Kiến thức là để chia sẻ.</div>
+  </div>
+</footer>
+<button class="to-top" aria-label="Lên đầu trang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<script src="../assets/js/search-data.js?v=20261021" defer></script>
+<script src="../assets/js/main.js?v=20261021" defer></script>
+</body>
+</html>

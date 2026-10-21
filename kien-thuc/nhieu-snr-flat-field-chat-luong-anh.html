@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="vi" data-root="../">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nhiễu, SNR và flat-field: đo chất lượng ảnh camera bằng số | HọcFree</title>
+<meta name="description" content="Nguồn nhiễu, công thức SNR, đường cong truyền photon theo EMVA 1288, vì sao gain không thêm thông tin, tỉ lệ bắt lỗi mờ theo ánh sáng và flat-field.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://hocfree.vn/kien-thuc/nhieu-snr-flat-field-chat-luong-anh.html">
+<meta property="og:site_name" content="HọcFree">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Nhiễu, SNR và flat-field: đo chất lượng ảnh camera bằng số">
+<meta property="og:description" content="Nguồn nhiễu, công thức SNR, đường cong truyền photon theo EMVA 1288, vì sao gain không thêm thông tin, tỉ lệ bắt lỗi mờ theo ánh sáng và flat-field.">
+<meta property="og:url" content="https://hocfree.vn/kien-thuc/nhieu-snr-flat-field-chat-luong-anh.html">
+<meta property="og:image" content="https://hocfree.vn/assets/images/posts/nhieu-snr-flat-field-chat-luong-anh.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="Nhiễu, SNR và flat-field: đo chất lượng ảnh camera bằng số">
+<meta property="og:locale" content="vi_VN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Nhiễu, SNR và flat-field: đo chất lượng ảnh camera bằng số">
+<meta name="twitter:description" content="Nguồn nhiễu, công thức SNR, đường cong truyền photon theo EMVA 1288, vì sao gain không thêm thông tin, tỉ lệ bắt lỗi mờ theo ánh sáng và flat-field.">
+<meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/nhieu-snr-flat-field-chat-luong-anh.jpg">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/fonts.css?v=20261021">
+<link rel="stylesheet" href="../assets/css/style.css?v=20261021">
+<script>try{var t=localStorage.getItem('hf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
+<meta property="article:published_time" content="2026-10-21">
+<meta property="article:section" content="Kiến thức">
+<meta property="article:tag" content="Camera">
+<meta property="article:tag" content="Machine Vision">
+<meta property="article:tag" content="Image Processing">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "Nhiễu, SNR và flat-field: đo chất lượng ảnh camera bằng số", "description": "Nguồn nhiễu, công thức SNR, đường cong truyền photon theo EMVA 1288, vì sao gain không thêm thông tin, tỉ lệ bắt lỗi mờ theo ánh sáng và flat-field.", "image": ["https://hocfree.vn/assets/images/posts/nhieu-snr-flat-field-chat-luong-anh.jpg"], "datePublished": "2026-10-21", "dateModified": "2026-10-21", "inLanguage": "vi", "articleSection": "Kiến thức", "keywords": "Camera, Machine Vision, Image Processing", "wordCount": 3878, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/kien-thuc/nhieu-snr-flat-field-chat-luong-anh.html"}, "isPartOf": {"@type": "Course", "name": "Trở thành Vision Engineer", "url": "https://hocfree.vn/lo-trinh/vision-engineer.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Learning Paths", "item": "https://hocfree.vn/lo-trinh/"}, {"@type": "ListItem", "position": 3, "name": "Trở thành Vision Engineer", "item": "https://hocfree.vn/lo-trinh/vision-engineer.html"}, {"@type": "ListItem", "position": 4, "name": "Chặng 6: Camera / Lens / Lighting", "item": "https://hocfree.vn/lo-trinh/vision-engineer/camera-lens-lighting.html"}, {"@type": "ListItem", "position": 5, "name": "Nhiễu, SNR và flat-field: đo chất lượng ảnh camera bằng số"}]}</script>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/contrib/auto-render.min.js" onload="renderMathInElement(document.querySelector('.prose'),{delimiters:[{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}],throwOnError:false})"></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div class="progress" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="container wide header-top">
+    <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="nav-scrim" hidden></div>
+    <a class="logo" href="../" aria-label="HọcFree – Trang chủ"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+    <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
+    <div class="header-actions">
+      <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="login-link" href="../dang-nhap.html">Đăng nhập</a>
+      <a class="btn start-btn" href="../lo-trinh/">Bắt đầu học</a>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="container wide">
+      <nav class="site-nav" id="site-nav" aria-label="Menu chính">
+        <div class="drawer-head">
+          <a class="logo" href="../" tabindex="-1"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+          <button class="icon-btn nav-close" aria-label="Đóng menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <button type="button" class="drawer-search search-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Tìm bài học, chủ đề…</span></button>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="../">Trang chủ</a></li><li class="nav-item has-panel is-mega"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-hoc">Học AI &amp; Lập trình<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel mega" id="nav-panel-hoc">
+  <div class="container wide mega-inner">
+    <div class="mega-groups"><div class="mega-group"><a class="mega-group-title" href="../hoc/#programming">Programming</a><ul><li><a href="../hoc/python.html">Python</a></li><li><a href="../hoc/csharp.html">C#</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#ai-machine-learning">AI &amp; Machine Learning</a><ul><li><a href="../hoc/machine-learning.html">Machine Learning</a></li><li><a href="../hoc/deep-learning.html">Deep Learning</a></li><li><a href="../hoc/pytorch.html">PyTorch</a></li><li><a href="../hoc/generative-ai.html">Generative AI</a></li><li><a href="../hoc/llm-ai-agents.html">LLM / AI Agents</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#computer-vision">Computer Vision</a><ul><li><a href="../hoc/opencv.html">OpenCV</a></li><li><a href="../hoc/image-processing.html">Image Processing</a></li><li><a href="../hoc/computer-vision.html">Computer Vision</a></li><li><a href="../hoc/ocr.html">OCR</a></li><li><a href="../hoc/object-detection.html">Object Detection</a></li><li><a href="../hoc/segmentation.html">Segmentation</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#vision-engineering">Vision Engineering</a><ul><li><a href="../hoc/machine-vision.html">Machine Vision</a></li><li><a href="../hoc/ai-vision.html">AI Vision</a></li><li><a href="../hoc/industrial-vision.html">Industrial Vision</a></li><li><a href="../hoc/camera-lens.html">Camera &amp; Lens</a></li><li><a href="../hoc/lighting.html">Lighting</a></li><li><a href="../hoc/calibration.html">Calibration</a></li><li><a href="../hoc/3d-vision.html">3D Vision</a></li><li><a href="../hoc/plc-robot-mes.html">PLC / Robot / MES</a></li><li><a href="../hoc/vision-deployment.html">Vision Deployment</a></li></ul></div></div>
+    <a class="feature-card" href="../lo-trinh/vision-engineer.html">
+  <span class="feature-eyebrow">⭐ Learning Path nổi bật</span>
+  <span class="feature-title">Trở thành Vision Engineer</span>
+  <span class="feature-sub">Machine Vision + AI Vision + Industrial Automation</span>
+  <span class="feature-desc">Lộ trình thực chiến từ Python, OpenCV và Machine Vision đến 3D Vision, Deep Learning, AI Vision, Camera, PLC, Robot và triển khai hệ thống Vision trong nhà máy.</span>
+  <span class="feature-chain" aria-label="Các chặng chính"><span>Python</span><i aria-hidden="true">→</i><span>OpenCV</span><i aria-hidden="true">→</i><span>Machine Vision</span><i aria-hidden="true">→</i><span>AI Vision</span><i aria-hidden="true">→</i><span class="chain-goal">🎯 Vision Engineer</span></span>
+  <span class="feature-meta">15 chặng · 5 giai đoạn · ~13 tháng</span>
+  <span class="feature-cta">Xem lộ trình →</span>
+</a>
+  </div>
+  <div class="mega-foot"><div class="container wide mega-foot-inner"><ol class="journey compact" aria-label="Học, thực hành, trở thành kỹ sư"><li><a href="../hoc/" aria-current="step"><span class="journey-n">1</span><span class="journey-t"><b>Học</b><small>Học AI &amp; Lập trình</small></span></a></li><li><a href="../projects/"><span class="journey-n">2</span><span class="journey-t"><b>Thực hành</b><small>Projects</small></span></a></li><li><a href="../lo-trinh/"><span class="journey-n">3</span><span class="journey-t"><b>Trở thành kỹ sư</b><small>Learning Paths</small></span></a></li></ol><a class="panel-all" href="../hoc/">Xem tất cả Học AI &amp; Lập trình →</a></div></div>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-projects">Projects<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-projects">
+  <p class="panel-kicker"><span>Bước 2 · Thực hành</span>Áp dụng vào dự án thật</p>
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../projects/ai-projects.html"><span class="drop-label">AI Projects</span><span class="drop-desc">Ứng dụng ML và LLM, từ ý tưởng đến bản demo</span></a></li><li><a class="drop-link" href="../projects/computer-vision-projects.html"><span class="drop-label">Computer Vision Projects</span><span class="drop-desc">Phát hiện, nhận dạng và theo dõi đối tượng</span></a></li><li><a class="drop-link" href="../projects/industrial-vision-projects.html"><span class="drop-label">Industrial Vision Projects</span><span class="drop-desc">Đo kích thước, kiểm tra lỗi, đọc mã trên dây chuyền</span></a></li></ul></div></div>
+  <a class="panel-all" href="../projects/">Xem tất cả Projects →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger is-active" aria-expanded="false" aria-controls="nav-panel-lo-trinh" aria-current="true">Learning Paths<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-lo-trinh">
+  <p class="panel-kicker"><span>Bước 3 · Trở thành kỹ sư</span>Định hướng nghề nghiệp</p>
+  <ul class="drop-list"><li><a class="drop-link is-flagship" href="../lo-trinh/vision-engineer.html"><span class="drop-label">⭐ Trở thành Vision Engineer</span><span class="drop-desc">Machine Vision + AI Vision + Industrial Automation · 15 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/toeic-700.html"><span class="drop-label">700+ TOEIC trong 5 tháng</span><span class="drop-desc">TOEIC Listening &amp; Reading + giao tiếp công sở cho người đi làm · 11 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/hsk3.html"><span class="drop-label">Tiếng Trung từ 0 đến HSK 3 trong 6 tháng</span><span class="drop-desc">Pinyin, chữ Hán, ngữ pháp, giao tiếp và luyện thi HSK 3.0 cho người Việt · 10 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/#python-developer"><span class="drop-label">Python Developer<span class="badge-soon">Sắp ra mắt</span></span><span class="drop-desc">Python, công cụ, tự động hóa</span></a></li></ul>
+  <a class="panel-all" href="../lo-trinh/">Xem tất cả lộ trình →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-kien-thuc">Kiến thức<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-kien-thuc">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Lĩnh vực</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/programming.html"><span class="drop-label">Programming</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-machine-learning.html"><span class="drop-label">AI / Machine Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/deep-learning.html"><span class="drop-label">Deep Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/machine-vision.html"><span class="drop-label">Machine Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-vision.html"><span class="drop-label">AI Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/industrial-automation.html"><span class="drop-label">Industrial Automation</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Công cụ &amp; mẹo</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/tools-frameworks.html"><span class="drop-label">Tools &amp; Frameworks</span></a></li><li><a class="drop-link" href="../kien-thuc/tips-tricks.html"><span class="drop-label">Tips &amp; Tricks</span></a></li></ul></div></div>
+  <a class="panel-all" href="../kien-thuc/">Xem tất cả Kiến thức →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tin-tuc-ai">Tin tức AI<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tin-tuc-ai">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tin-tuc-ai/ai-news.html"><span class="drop-label">AI News</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-models.html"><span class="drop-label">AI Models</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/technology.html"><span class="drop-label">Technology</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/robotics.html"><span class="drop-label">Robotics</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-industry.html"><span class="drop-label">AI Industry</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tin-tuc-ai/">Xem tất cả Tin tức AI →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-ngoai-ngu">Ngoại ngữ<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-ngoai-ngu">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Ngôn ngữ</p><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/english.html"><span class="drop-label">English</span><span class="drop-desc">Lộ trình 700 TOEIC, phương pháp học, giáo trình HF-700TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chinese.html"><span class="drop-label">Chinese</span><span class="drop-desc">Lộ trình 0 đến HSK 3 trong 6 tháng, phương pháp học, giáo trình HF-HSK3</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Tiếng Anh theo kỹ năng</p><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/toeic-listening.html"><span class="drop-label">TOEIC Listening</span><span class="drop-desc">Part 1–4: mô tả tranh, hỏi – đáp, hội thoại, bài nói</span></a></li><li><a class="drop-link" href="../ngoai-ngu/toeic-reading.html"><span class="drop-label">TOEIC Reading</span><span class="drop-desc">Part 5–7: điền từ, điền câu, đọc hiểu</span></a></li><li><a class="drop-link" href="../ngoai-ngu/ngu-phap-tieng-anh.html"><span class="drop-label">Ngữ pháp tiếng Anh</span><span class="drop-desc">Từ loại, thì, mệnh đề, liên từ cho TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/tu-vung-tieng-anh.html"><span class="drop-label">Từ vựng tiếng Anh</span><span class="drop-desc">Từ vựng công sở theo chủ đề, collocation</span></a></li><li><a class="drop-link" href="../ngoai-ngu/giao-tiep-tieng-anh.html"><span class="drop-label">Giao tiếp công sở</span><span class="drop-desc">Điện thoại, họp, thuyết trình, email</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Tiếng Trung theo kỹ năng</p><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/pinyin-phat-am.html"><span class="drop-label">Pinyin &amp; phát âm</span><span class="drop-desc">Thanh mẫu, vận mẫu, thanh điệu, biến điệu</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chu-han.html"><span class="drop-label">Chữ Hán</span><span class="drop-desc">Nét, thứ tự nét, bộ thủ, âm Hán Việt</span></a></li><li><a class="drop-link" href="../ngoai-ngu/ngu-phap-tieng-trung.html"><span class="drop-label">Ngữ pháp tiếng Trung</span><span class="drop-desc">Từ 是, 吗, 了 đến bổ ngữ, câu 把, câu 被</span></a></li><li><a class="drop-link" href="../ngoai-ngu/tu-vung-tieng-trung.html"><span class="drop-label">Từ vựng tiếng Trung</span><span class="drop-desc">Từ vựng HSK 1–3 theo chủ đề, Anki</span></a></li><li><a class="drop-link" href="../ngoai-ngu/giao-tiep-tieng-trung.html"><span class="drop-label">Giao tiếp tiếng Trung</span><span class="drop-desc">Chào hỏi, mua sắm, đi lại, công sở</span></a></li><li><a class="drop-link" href="../ngoai-ngu/luyen-thi-hsk.html"><span class="drop-label">Luyện thi HSK</span><span class="drop-desc">Đề HSK 3.0, nghe, đọc, viết, nói, đề thi thử</span></a></li></ul></div></div>
+  <a class="panel-all" href="../ngoai-ngu/">Xem tất cả Ngoại ngữ →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tai-nguyen">Tài nguyên<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tai-nguyen">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tai-nguyen/source-code.html"><span class="drop-label">Source Code</span><span class="drop-desc">Mã nguồn mẫu đi kèm bài học</span></a></li><li><a class="drop-link" href="../tai-nguyen/dataset.html"><span class="drop-label">Dataset</span><span class="drop-desc">Bộ dữ liệu ảnh để luyện tập</span></a></li><li><a class="drop-link" href="../tai-nguyen/cheat-sheets.html"><span class="drop-label">Cheat Sheets</span><span class="drop-desc">Tóm tắt nhanh trong một trang</span></a></li><li><a class="drop-link" href="../tai-nguyen/documentation.html"><span class="drop-label">Documentation</span><span class="drop-desc">Tài liệu tra cứu thư viện, API</span></a></li><li><a class="drop-link" href="../tai-nguyen/ebook.html"><span class="drop-label">Ebook / Tài liệu</span><span class="drop-desc">Sách và tài liệu tham khảo</span></a></li><li><a class="drop-link" href="../tai-nguyen/ai-tools.html"><span class="drop-label">AI Tools</span><span class="drop-desc">Công cụ AI hữu ích cho việc học</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tai-nguyen/">Xem tất cả Tài nguyên →</a>
+</div></li></ul>
+        <div class="drawer-foot">
+          <a class="btn ghost" href="../dang-nhap.html">Đăng nhập</a>
+          <a class="btn" href="../lo-trinh/">Bắt đầu học</a>
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+<div class="search-dialog" hidden>
+  <div class="search-scrim"></div>
+  <div class="search-box" role="dialog" aria-modal="true" aria-label="Tìm kiếm">
+    <form class="search-form" action="../search.html" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" placeholder="Tìm bài học, chủ đề, bài viết…" autocomplete="off" aria-label="Từ khóa tìm kiếm" aria-controls="search-suggest">
+      <button type="button" class="icon-btn search-close" aria-label="Đóng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </form>
+    <div class="search-suggest" id="search-suggest" aria-live="polite">
+      <div class="search-empty">
+        <p class="search-group-title">Chủ đề phổ biến</p>
+        <div class="chips"><a class="chip" href="../hoc/python.html">Python</a><a class="chip" href="../hoc/opencv.html">OpenCV</a><a class="chip" href="../hoc/machine-vision.html">Machine Vision</a><a class="chip" href="../hoc/deep-learning.html">Deep Learning</a><a class="chip" href="../hoc/ai-vision.html">AI Vision</a><a class="chip" href="../hoc/object-detection.html">Object Detection</a><a class="chip" href="../hoc/pytorch.html">PyTorch</a><a class="chip" href="../ngoai-ngu/english.html">English</a></div>
+        <p class="search-group-title">Lộ trình nổi bật</p>
+        <a class="search-item" href="../lo-trinh/vision-engineer.html"><span class="search-ico" aria-hidden="true">⭐</span><span>Trở thành Vision Engineer<small>Learning Path · Machine Vision + AI Vision + Industrial Automation</small></span></a>
+      </div>
+    </div>
+    <div class="search-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> chọn</span><span><kbd>Enter</kbd> mở</span><span><kbd>Esc</kbd> đóng</span></div>
+  </div>
+</div>
+<main id="main">
+  <div class="container layout article-layout">
+    <article class="article">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../lo-trinh/">Learning Paths</a><span>/</span><a href="../lo-trinh/vision-engineer.html">Vision Engineer</a><span>/</span><a href="../lo-trinh/vision-engineer/camera-lens-lighting.html">Chặng 6: Camera / Lens / Lighting</a></nav>
+      <header class="article-head">
+        <div class="course-bar" data-course="vision-engineer"><a class="course-chip" href="../lo-trinh/vision-engineer/camera-lens-lighting.html">⭐ Vision Engineer · Chặng 6</a><span class="lesson-no">Bài 9/11</span><span class="kind kind-lesson">Bài học</span><span class="lesson-min"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></svg>~75 phút</span></div>
+        <h1>Nhiễu, SNR và flat-field: đo chất lượng ảnh camera bằng số</h1>
+        <p class="lead">Nguồn nhiễu, công thức SNR, đường cong truyền photon theo EMVA 1288, vì sao gain không thêm thông tin, tỉ lệ bắt lỗi mờ theo ánh sáng và flat-field.</p>
+        <div class="article-meta">
+          <span class="avatar" aria-hidden="true">HF</span>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-21">21/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>22 phút đọc</span></div>
+        </div>
+      </header>
+      <figure class="article-cover">
+        <img src="../assets/images/posts/nhieu-snr-flat-field-chat-luong-anh.webp" alt="Nhiễu, SNR và flat-field: đo chất lượng ảnh camera bằng số" width="1200" height="675" fetchpriority="high" decoding="async">
+      </figure>
+      <section class="lesson-goals" aria-label="Mục tiêu bài học"><h2>Học xong bài này, bạn sẽ</h2><ul><li>Biết các nguồn nhiễu và công thức SNR</li><li>Đo K, nhiễu đọc, full well bằng đường cong truyền photon</li><li>Hiểu vì sao gain không tăng SNR</li><li>Hiệu chỉnh flat-field bằng ảnh tối và ảnh phẳng</li></ul><p class="goals-before">Nên học trước: <a href="../kien-thuc/kiem-soat-anh-sang-moi-truong-nha-may.html">Kiểm soát ánh sáng môi trường</a></p></section>
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol class="toc-plain"><li><a href="#1-nhieu-den-tu-dau">1. Nhiễu đến từ đâu</a></li><li><a href="#2-do-dac-tinh-camera-bang-duong-cong-truyen-photon">2. Đo đặc tính camera bằng đường cong truyền photon</a></li><li><a href="#3-gain-khong-them-thong-tin">3. Gain không thêm thông tin</a></li><li><a href="#4-snr-quyet-dinh-bat-duoc-loi-mo-hay-khong">4. SNR quyết định bắt được lỗi mờ hay không</a></li><li><a href="#5-hieu-chinh-flat-field">5. Hiệu chỉnh flat-field</a></li><li><a href="#6-gamma-va-do-sau-bit">6. Gamma và độ sâu bit</a></li><li><a href="#tom-tat">Tóm tắt</a></li><li><a href="#bai-tap">Bài tập</a></li></ol></details>
+      <div class="prose">
+<p>Hai trạm dùng cùng thuật toán, cùng ngưỡng: một trạm bắt được vết mờ, trạm kia bỏ sót một nửa. Thường thì thủ phạm không nằm trong code mà nằm ở chất lượng ảnh: ảnh quá tối nên nhiễu lấn tín hiệu, người cài đặt tăng gain cho "sáng lên" mà không hiểu gain không thêm thông tin, hoặc nền sáng không đều đến mức một ngưỡng toàn cục không thể dùng được. Bài này đo chất lượng ảnh bằng số: nhiễu đến từ đâu, <strong>SNR</strong> (tỉ số tín hiệu trên nhiễu) phụ thuộc vào gì, cách đo đặc tính camera bằng <strong>đường cong truyền photon</strong> theo tinh thần chuẩn EMVA 1288, và cách <strong>hiệu chỉnh flat-field</strong> để xóa độ không đều của đèn và ống kính.</p>
+<p>Mọi thí nghiệm dùng một camera mô phỏng tuyến tính, nên bạn chạy được ngay với <code>numpy</code> và <code>opencv-python</code>; ở mục 3 có cách làm lại với camera thật. Nên đọc trước: <a href="global-rolling-shutter-area-line-scan.html">cảm biến area/line scan</a> (bảng thông số QE, full well, dải động) và <a href="../hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html">lấy ảnh từ camera công nghiệp</a>.</p>
+
+<h2 id="1-nhieu-den-tu-dau">1. Nhiễu đến từ đâu</h2>
+<p>Một pixel đếm photon. Trong thời gian phơi sáng, trung bình \(\mu_p\) photon tới pixel, một phần (hiệu suất lượng tử QE) thành \(\mu_e = \mathrm{QE}\cdot\mu_p\) electron. Các nguồn nhiễu chính:</p>
+<ul>
+  <li><strong>Nhiễu photon (shot noise)</strong>: số photon tới mỗi lần là ngẫu nhiên theo phân phối Poisson, độ lệch chuẩn \(\sqrt{\mu_e}\) electron. Đây là giới hạn vật lý, camera tốt đến đâu cũng không tránh được.</li>
+  <li><strong>Nhiễu đọc</strong> \(\sigma_d\): mạch đọc và bộ khuếch đại, vài electron với cảm biến CMOS công nghiệp hiện nay.</li>
+  <li><strong>Nhiễu lượng tử hóa</strong>: bộ ADC làm tròn về số nguyên, độ lệch chuẩn \(1/\sqrt{12}\) DN (đơn vị số ADC).</li>
+  <li><strong>Nhiễu cố định theo vị trí</strong>: mỗi pixel có độ lệch tối (DSNU) và độ nhạy (PRNU) hơi khác nhau. Loại này không đổi giữa các ảnh nên hiệu chỉnh được (mục 5).</li>
+</ul>
+<p>Gộp lại, với \(K\) là hệ số chuyển đổi (DN trên mỗi electron):</p>
+\[ \mathrm{SNR} = \frac{\mu_e}{\sqrt{\mu_e + \sigma_d^2 + \sigma_q^2/K^2}}, \qquad \sigma_q^2 = \tfrac{1}{12}\ \mathrm{DN}^2 \]
+<p>Khi ảnh đủ sáng, \(\mu_e\) lấn át mọi số hạng khác và \(\mathrm{SNR} \approx \sqrt{\mu_e}\): muốn SNR gấp đôi phải có gấp bốn lần ánh sáng. Mô phỏng dưới đây dùng thông số điển hình của một camera CMOS: QE 0,6, full well 10 500 electron, nhiễu đọc 6 electron, ADC 12 bit.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+
+class CameraGia:
+    """Mô hình camera tuyến tính kiểu EMVA 1288: photon → electron → (nhiễu đọc) → nhân gain → số ADC 12 bit."""
+
+    def __init__(self, qe=0.6, full_well=10500, nhieu_doc_e=6.0, offset_dn=20, bit=12, gain_db=0.0):
+        self.qe, self.full_well, self.nhieu_doc_e = qe, full_well, nhieu_doc_e
+        self.offset_dn, self.dn_max = offset_dn, 2 ** bit - 1
+        self.k = (self.dn_max - offset_dn) / full_well * 10 ** (gain_db / 20)   # DN trên mỗi electron
+
+    def chup(self, photon, shape=(200, 200)):
+        """photon: số photon trung bình tới mỗi pixel trong thời gian phơi sáng (số hoặc mảng)."""
+        e = rng.poisson(self.qe * np.broadcast_to(photon, shape)).astype(float)   # nhiễu photon (shot noise)
+        e = np.minimum(e, self.full_well)                                          # pixel đầy thì bão hòa
+        e += rng.normal(0, self.nhieu_doc_e, shape)                                # nhiễu đọc
+        return np.clip(np.round(self.offset_dn + self.k * e), 0, self.dn_max)      # lượng tử hóa ADC
+
+
+cam = CameraGia()
+print(f"K = {cam.k:.3f} DN/e-, 1 DN ≈ {1 / cam.k:.1f} electron")
+print(" photon | trung bình DN | độ lệch DN | SNR đo | SNR lý thuyết | giới hạn photon √μe")
+for photon in (100, 1000, 5000, 15000):
+    anh = cam.chup(photon)
+    tin_hieu = anh.mean() - cam.offset_dn
+    mu_e = cam.qe * photon
+    ly_thuyet = mu_e / np.sqrt(mu_e + cam.nhieu_doc_e ** 2 + 1 / 12 / cam.k ** 2)   # photon + đọc + lượng tử hóa
+    print(f"{photon:7d} | {anh.mean():12.1f} | {anh.std():10.2f} | {tin_hieu / anh.std():6.1f} | "
+          f"{ly_thuyet:13.1f} | {np.sqrt(mu_e):8.1f}")</code></pre>
+<pre><code class="language-text">K = 0.388 DN/e-, 1 DN ≈ 2.6 electron
+ photon | trung bình DN | độ lệch DN | SNR đo | SNR lý thuyết | giới hạn photon √μe
+    100 |         43.3 |       3.84 |    6.1 |           6.1 |      7.7
+   1000 |        252.9 |       9.77 |   23.8 |          23.8 |     24.5
+   5000 |       1184.4 |      21.54 |   54.1 |          54.4 |     54.8
+  15000 |       3512.8 |      36.82 |   94.9 |          94.7 |     94.9</code></pre>
+<p>SNR đo trên ảnh khớp công thức. Ở 100 photon (60 electron), nhiễu đọc đã kéo SNR xuống thấp hơn hẳn giới hạn photon; ở 15 000 photon thì chỉ còn nhiễu photon. Ở đây SNR đo theo từng pixel trên một vùng phẳng: độ lệch chuẩn của vùng ảnh đồng đều chính là nhiễu.</p>
+
+<h2 id="2-do-dac-tinh-camera-bang-duong-cong-truyen-photon">2. Đo đặc tính camera bằng đường cong truyền photon</h2>
+<p>Bảng thông số hãng ghi theo điều kiện chuẩn; thông số thật của con camera đang lắp, ở gain đang dùng, đo được chỉ từ ảnh. Vì nhiễu photon có phương sai bằng trung bình (tính bằng electron), khi đổi sang DN ta có \(\sigma^2_{DN} = K\,\mu_{DN} + K^2\sigma_d^2\): vẽ phương sai theo độ sáng trung bình sẽ được một đường thẳng, <strong>hệ số góc là \(K\)</strong> và chặn dưới cho nhiễu đọc. Đây là phương pháp cốt lõi của chuẩn EMVA 1288.</p>
+<pre><code class="language-python"># Đường cong truyền photon (photon transfer curve): đo K và nhiễu đọc chỉ từ ảnh, không cần biết thông số hãng
+toi = np.mean([cam.chup(0) for _ in range(8)], axis=0)          # ảnh tối: đậy nắp ống kính
+x, y = [], []
+for photon in np.geomspace(20, 20000, 14):
+    a, b = cam.chup(photon), cam.chup(photon)                     # HAI ảnh cùng điều kiện
+    tb = (a.mean() + b.mean()) / 2 - toi.mean()
+    phuong_sai = np.var(a - b) / 2                                # hiệu hai ảnh loại bỏ được độ không đều cố định
+    if (a.max() &lt; cam.dn_max) and (b.max() &lt; cam.dn_max):         # bỏ điểm đã bão hòa
+        x.append(tb); y.append(phuong_sai)
+K_uoc, chan = np.polyfit(x, y, 1)                                 # σ²_DN = K·μ_DN + K²·σ²_đọc
+print(f"K ước lượng {K_uoc:.3f} DN/e- (thật {cam.k:.3f}); nhiễu đọc ước lượng {np.sqrt(max(chan, 0)) / K_uoc:.1f} e- (thật {cam.nhieu_doc_e})")
+print(f"full well ước lượng ≈ {(cam.dn_max - cam.offset_dn) / K_uoc:.0f} e-, SNR tối đa ≈ {np.sqrt((cam.dn_max - cam.offset_dn) / K_uoc):.0f} "
+      f"({20 * np.log10(np.sqrt((cam.dn_max - cam.offset_dn) / K_uoc)):.1f} dB)")</code></pre>
+<pre><code class="language-text">K ước lượng 0.390 DN/e- (thật 0.388); nhiễu đọc ước lượng 5.6 e- (thật 6.0)
+full well ước lượng ≈ 10456 e-, SNR tối đa ≈ 102 (40.2 dB)</code></pre>
+<p>Hai mẹo quan trọng: lấy <strong>hiệu hai ảnh</strong> chụp cùng điều kiện, vì phần không đều cố định (đèn, PRNU) bị triệt tiêu, chỉ còn nhiễu ngẫu nhiên (chia 2 vì hiệu hai biến độc lập có phương sai gấp đôi); và <strong>bỏ các điểm đã bão hòa</strong>, vì pixel đầy thì phương sai sụt và kéo lệch đường thẳng. Từ \(K\) suy ra full well và SNR tối đa \(\sqrt{\text{full well}}\), khoảng 40 dB với camera này: dù ảnh sáng tới đâu, nhiễu cũng không nhỏ hơn khoảng 1% độ sáng mỗi pixel.</p>
+<div class="tip"><strong>Làm với camera thật</strong>Đặt camera nhìn một tấm khuếch tán được chiếu đều (hoặc tháo ống kính, đặt trước nguồn sáng đều), tắt gamma, tắt mọi chế độ tự động. Với mỗi thời gian phơi sáng tăng dần, chụp hai ảnh; thêm vài ảnh tối khi đậy nắp. Đoạn code trên dùng nguyên được, chỉ thay <code>cam.chup(...)</code> bằng hàm lấy ảnh thật của bạn (bài <a href="../hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html">GenICam, pypylon</a>). Lặp lại ở vài mức gain để biết gain thật sự làm gì với camera của bạn.</div>
+
+<h2 id="3-gain-khong-them-thong-tin">3. Gain không thêm thông tin</h2>
+<p>Ảnh tối, cách nhanh nhất cho "sáng lên" là tăng gain. Thí nghiệm sau so sánh bốn cách làm ảnh tốt hơn từ một cảnh chỉ có 400 photon mỗi pixel.</p>
+<pre><code class="language-python">def snr(cam_, photon, so_anh=1):
+    anh = np.mean([cam_.chup(photon) for _ in range(so_anh)], axis=0)
+    return (anh.mean() - cam_.offset_dn) / anh.std(), anh.mean()
+
+
+phuong_an = {
+    "gốc: 400 photon, gain 0 dB": (CameraGia(), 400, 1),
+    "tăng gain 12 dB": (CameraGia(gain_db=12), 400, 1),
+    "phơi sáng hoặc đèn ×4": (CameraGia(), 1600, 1),
+    "cộng trung bình 4 ảnh": (CameraGia(), 400, 4),
+}
+for ten, (c, p, n) in phuong_an.items():
+    s, tb = snr(c, p, n)
+    print(f"{ten:28s}: độ sáng {tb:6.0f} DN, SNR {s:5.1f}")</code></pre>
+<pre><code class="language-text">gốc: 400 photon, gain 0 dB  : độ sáng    113 DN, SNR  14.4
+tăng gain 12 dB             : độ sáng    391 DN, SNR  14.4
+phơi sáng hoặc đèn ×4       : độ sáng    393 DN, SNR  30.6
+cộng trung bình 4 ảnh       : độ sáng    113 DN, SNR  28.8</code></pre>
+<p>Gain nhân cả tín hiệu lẫn nhiễu nên ảnh sáng hơn mà SNR không đổi; ngoài ra gain cao còn thu hẹp dải động, vì ADC bão hòa ở số electron ít hơn (gain 12 dB thì chỉ còn khoảng 1/4 full well). Chỉ có <strong>thêm photon</strong> mới tăng SNR: đèn mạnh hơn, phơi sáng lâu hơn (bị giới hạn bởi nhòe chuyển động), khẩu độ lớn hơn (đổi lại độ sâu trường ảnh, bài <a href="do-sau-truong-anh-khau-do-lay-net.html">độ sâu trường ảnh</a>), hoặc cộng trung bình nhiều ảnh (tốn thời gian chu kỳ, chỉ dùng được khi vật đứng yên). Ở cảm biến thật, gain analog có thể giảm nhẹ nhiễu đọc quy về electron, nên gain hơi có ích khi cảnh rất tối; đường cong ở mục 2 đo ở nhiều mức gain sẽ cho bạn biết chính xác.</p>
+
+<h2 id="4-snr-quyet-dinh-bat-duoc-loi-mo-hay-khong">4. SNR quyết định bắt được lỗi mờ hay không</h2>
+<p>Đại lượng cần cho kiểm tra không phải SNR của nền mà là <strong>tương phản trên nhiễu</strong> (CNR): độ chênh của vết lỗi so với nền, chia cho nhiễu. Thí nghiệm: 100 ảnh tốt và 100 ảnh có một vết tối chỉ 4%, ngưỡng chọn trên ảnh tốt để báo nhầm không quá 1%, đo tỉ lệ bắt được vết ở bốn mức sáng.</p>
+<pre><code class="language-python">yy, xx = np.mgrid[:200, :200]
+VET = ((yy - 100) ** 2 + (xx - 100) ** 2 &lt;= 4 ** 2)              # vết tối bán kính 4 px ở giữa
+
+
+def thu_phat_hien(photon, do_tuong_phan=0.04, so_anh=200):
+    """Nửa số ảnh có vết tối 4%. Ngưỡng chọn trên ảnh tốt để báo nhầm ≤ 1%; đo tỉ lệ bắt được vết."""
+    c = CameraGia()
+    def diem(co_vet):
+        p = photon * (1 - do_tuong_phan * VET) if co_vet else photon
+        anh = cv2.GaussianBlur(c.chup(p).astype(np.float32), (9, 9), 2)   # làm mượt trước khi so ngưỡng
+        return np.median(anh) - anh.min()                                  # vết sâu nhất so với nền
+    tot = np.array([diem(False) for _ in range(so_anh // 2)])
+    loi = np.array([diem(True) for _ in range(so_anh // 2)])
+    nguong = np.percentile(tot, 99)
+    tin_hieu_e = c.qe * photon
+    cnr = do_tuong_phan * tin_hieu_e / np.sqrt(tin_hieu_e + c.nhieu_doc_e ** 2)   # tương phản / nhiễu, theo pixel
+    return cnr, np.mean(loi &gt; nguong)
+
+
+for photon in (400, 700, 1000, 1600):
+    cnr, bat = thu_phat_hien(photon)
+    print(f"{photon:5d} photon: CNR mỗi pixel {cnr:4.2f} → bắt được {bat:5.1%} vết tối 4% (báo nhầm ≤ 1%)")</code></pre>
+<pre><code class="language-text">  400 photon: CNR mỗi pixel 0.58 → bắt được 10.0% vết tối 4% (báo nhầm ≤ 1%)
+  700 photon: CNR mỗi pixel 0.79 → bắt được 39.0% vết tối 4% (báo nhầm ≤ 1%)
+ 1000 photon: CNR mỗi pixel 0.95 → bắt được 51.0% vết tối 4% (báo nhầm ≤ 1%)
+ 1600 photon: CNR mỗi pixel 1.22 → bắt được 99.0% vết tối 4% (báo nhầm ≤ 1%)</code></pre>
+<p>Cùng thuật toán, cùng tiêu chí báo nhầm, chỉ đổi lượng ánh sáng mà tỉ lệ bắt lỗi đi từ gần như không bắt được tới bắt hết. Vì thuật toán đã làm mượt (lấy trung bình vùng 9×9), CNR mỗi pixel khoảng 1 là đủ; với lỗi chỉ rộng 1 đến 2 pixel thì không làm mượt được và cần CNR mỗi pixel cao hơn nhiều. Đây là lý do khi nghiệm thu, phải đo độ tương phản lỗi nhỏ nhất trên ảnh thật chứ không chỉ nhìn "ảnh rõ".</p>
+
+<h2 id="5-hieu-chinh-flat-field">5. Hiệu chỉnh flat-field</h2>
+<p>Ống kính làm tối góc ảnh (vignetting), đèn chiếu không đều, và mỗi pixel nhạy hơi khác nhau. Kết quả là nền một vật đồng màu có thể chênh hàng chục phần trăm giữa tâm và góc, trong khi lỗi cần bắt chỉ tối hơn vài phần trăm. Hiệu chỉnh flat-field dùng hai ảnh tham chiếu, chụp một lần khi lắp đặt: ảnh <strong>tối</strong> \(D\) (đậy nắp ống kính) và ảnh <strong>phẳng</strong> \(F\) (tấm trắng khuếch tán, đúng đèn và ống kính của trạm):</p>
+\[ I_{\text{sửa}} = \frac{I - D}{F - D}\cdot \overline{(F - D)} \]
+<pre><code class="language-python">H, W = 480, 640
+yy, xx = np.mgrid[:H, :W]
+r2 = ((xx - W / 2) ** 2 + (yy - H / 2) ** 2) / (W / 2) ** 2
+vignet = 1 / (1 + 0.35 * r2) ** 2                                   # tối dần ra góc (ống kính)
+den = 1.0 - 0.3 * xx / W                                            # đèn chiếu lệch: bên phải tối hơn 30%
+prnu = 1 + 0.01 * np.random.default_rng(1).standard_normal((H, W))  # độ nhạy từng pixel lệch nhau 1% (cố định)
+chieu_sang = 8000 * vignet * den * prnu                             # số photon tới từng pixel khi nhìn mặt phẳng trắng
+
+VI_TRI = [(60, 80), (60, 560), (240, 320), (420, 80), (420, 560), (240, 40), (100, 330), (380, 600)]
+vat = np.ones((H, W))
+for y, x in VI_TRI:                                                 # 8 vết bẩn tối 10%, có vết nằm sát góc
+    vat[(yy - y) ** 2 + (xx - x) ** 2 &lt;= 5 ** 2] = 0.90
+
+cam_ff = CameraGia()
+anh = cam_ff.chup(chieu_sang * vat, (H, W))
+
+
+def dem_vet(a, ten):
+    nguong = 0.95 * np.median(a)                                    # ngưỡng toàn cục: tối hơn 5% so với trung vị
+    bw = (cv2.GaussianBlur(a.astype(np.float32), (5, 5), 1) &lt; nguong).astype(np.uint8)
+    n, _, st, tam = cv2.connectedComponentsWithStats(bw)
+    vung = [tam[i] for i in range(1, n) if st[i, cv2.CC_STAT_AREA] &gt;= 15]
+    dung = sum(any(abs(cx - x) &lt; 6 and abs(cy - y) &lt; 6 for cx, cy in vung) for y, x in VI_TRI)
+    print(f"{ten:24s}: {len(vung):3d} vùng tối, bắt đúng {dung}/8 vết, "
+          f"vùng tối chiếm {bw.mean():5.1%} ảnh")
+
+
+dem_vet(anh, "ảnh gốc")
+
+# hiệu chỉnh flat-field: một lần khi lắp đặt (và sau mỗi lần thay đèn, chỉnh ống kính)
+toi = np.mean([cam_ff.chup(0, (H, W)) for _ in range(16)], axis=0)                 # đậy nắp ống kính
+phang = np.mean([cam_ff.chup(chieu_sang, (H, W)) for _ in range(16)], axis=0)     # tấm trắng khuếch tán, cùng đèn
+ff = phang - toi
+sua = (anh - toi) / ff * ff.mean()
+dem_vet(sua, "sau hiệu chỉnh flat-field")
+print(f"độ không đều nền: gốc {np.ptp(cv2.blur(anh, (31, 31))[40:-40, 40:-40]) / anh.mean():.0%}, "
+      f"sau hiệu chỉnh {np.ptp(cv2.blur(sua, (31, 31))[40:-40, 40:-40]) / sua.mean():.1%}")</code></pre>
+<pre><code class="language-text">ảnh gốc                 :   5 vùng tối, bắt đúng 0/8 vết, vùng tối chiếm 40.8% ảnh
+sau hiệu chỉnh flat-field:   8 vùng tối, bắt đúng 8/8 vết, vùng tối chiếm  0.2% ảnh
+độ không đều nền: gốc 78%, sau hiệu chỉnh 1.2%</code></pre>
+<p>Trên ảnh gốc, 41% diện tích bị coi là "tối" vì góc và cạnh phải tối hơn hẳn tâm, nên không bắt đúng được vết nào: tám vết nằm lẫn trong những vùng tối khổng lồ. Sau hiệu chỉnh, độ chênh nền (đo sau khi lọc trung bình 31×31, kể cả các vết) giảm từ 78% xuống khoảng 1%, và cùng một ngưỡng toàn cục bắt đủ 8/8 vết mà không có vùng tối thừa. Ảnh tối và ảnh phẳng được <strong>cộng trung bình 16 ảnh</strong> để nhiễu của chúng không cộng thêm vào mọi ảnh sau này (bài tập 3).</p>
+<p>Có thể hỏi: sao không dùng ngưỡng thích nghi cục bộ (bài <a href="../hoc/phan-nguong-contour-dem-do-vat.html">phân ngưỡng và contour</a>)? Ngưỡng cục bộ xử lý được nền đổi chậm, nhưng nó cũng "ăn" vết lỗi lớn và không cho bạn đo cường độ thật. Flat-field sửa nguyên nhân, nên kết quả dùng được cho cả đo độ sáng, đo màu (bài <a href="kiem-tra-mau-lab-delta-e.html">kiểm tra màu</a>) và so sánh với ảnh mẫu.</p>
+<div class="warn"><strong>Flat-field gắn với cấu hình</strong>Ảnh phẳng chỉ đúng với đúng ống kính, khẩu độ, tiêu cự, đèn và vị trí đèn lúc chụp. Thay đèn, chỉnh khẩu độ, đổi khoảng làm việc thì phải chụp lại (bài tập 2). Lưu ảnh tham chiếu kèm ngày chụp và cấu hình, đưa vào quy trình <a href="kiem-tra-hieu-chuan-dinh-ky-san-xuat.html">kiểm tra định kỳ</a>. Nhiều camera công nghiệp có sẵn hiệu chỉnh trong camera (thường gọi là shading correction hoặc flat field correction): nguyên lý giống hệt, chỉ là chạy trong phần cứng.</div>
+
+<h2 id="6-gamma-va-do-sau-bit">6. Gamma và độ sâu bit</h2>
+<p>Hai cài đặt camera ảnh hưởng trực tiếp tới phép đo cường độ:</p>
+<pre><code class="language-python"># Gamma và độ sâu bit: hai cài đặt camera làm sai phép đo cường độ
+tuyen_tinh = np.array([0.30, 0.60, 1.00])                 # độ sáng thật (tỉ lệ) ở góc, giữa cạnh, tâm
+gamma = tuyen_tinh ** 0.45                                # camera bật gamma 0.45 (kiểu hiển thị sRGB)
+print("tỉ lệ sáng góc/tâm: thật", tuyen_tinh[0], "| sau gamma", gamma[0].round(2))
+print("trung bình 2 pixel 0.3 và 1.0: thật", tuyen_tinh[[0, 2]].mean().round(3),
+      "| tính trên ảnh gamma rồi đổi ngược", (gamma[[0, 2]].mean() ** (1 / 0.45)).round(3))
+for bit in (8, 10, 12):
+    muc = 2 ** bit - 1
+    print(f"{bit:2d} bit: {muc + 1:5d} mức, bước lượng tử = {cam.full_well / muc:5.1f} e-, "
+          f"nhiễu lượng tử {cam.full_well / muc / np.sqrt(12):4.1f} e- (so với nhiễu đọc {cam.nhieu_doc_e} e-)")</code></pre>
+<pre><code class="language-text">tỉ lệ sáng góc/tâm: thật 0.3 | sau gamma 0.58
+trung bình 2 pixel 0.3 và 1.0: thật 0.65 | tính trên ảnh gamma rồi đổi ngược 0.594
+ 8 bit:   256 mức, bước lượng tử =  41.2 e-, nhiễu lượng tử 11.9 e- (so với nhiễu đọc 6.0 e-)
+10 bit:  1024 mức, bước lượng tử =  10.3 e-, nhiễu lượng tử  3.0 e- (so với nhiễu đọc 6.0 e-)
+12 bit:  4096 mức, bước lượng tử =   2.6 e-, nhiễu lượng tử  0.7 e- (so với nhiễu đọc 6.0 e-)</code></pre>
+<ul>
+  <li><strong>Gamma</strong> nén vùng sáng để ảnh trông dễ chịu trên màn hình, nhưng phá tính tuyến tính: góc thật chỉ sáng bằng 30% tâm mà ảnh gamma cho 58%; trung bình (làm mượt, cộng ảnh) tính trên ảnh gamma rồi đổi ngược cũng lệch khỏi giá trị thật. Mọi phép ở bài này (SNR, đường cong truyền photon, flat-field) và đo màu đều cần gamma = 1. Nhiều webcam và camera USB phổ thông bật gamma mặc định.</li>
+  <li><strong>Độ sâu bit</strong>: ở 8 bit, mỗi bước ADC là khoảng 41 electron nên nhiễu lượng tử lớn hơn cả nhiễu đọc. Với cảnh đủ sáng, nhiễu photon (khoảng 100 electron ở gần bão hòa) vẫn lấn át nên 8 bit thường đủ cho kiểm tra; khi cảnh tối, khi cần dải động rộng, hoặc khi đo cường độ chính xác thì dùng 10 đến 12 bit (đổi lại băng thông gấp đôi, bài <a href="../hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html">GenICam</a>).</li>
+</ul>
+
+<h2 id="tom-tat">Tóm tắt</h2>
+<ul>
+  <li>Nhiễu gồm nhiễu photon (\(\sqrt{\mu_e}\), không tránh được), nhiễu đọc, nhiễu lượng tử, và nhiễu cố định theo vị trí (hiệu chỉnh được).</li>
+  <li>Khi ảnh đủ sáng, \(\mathrm{SNR}\approx\sqrt{\mu_e}\); SNR tối đa bằng căn của full well. Muốn SNR gấp đôi cần gấp bốn lần ánh sáng.</li>
+  <li>Đường cong truyền photon (phương sai của hiệu hai ảnh theo độ sáng) cho hệ số \(K\), nhiễu đọc và full well của chính camera bạn đang dùng.</li>
+  <li>Gain không tăng SNR và còn thu hẹp dải động; chỉ có thêm photon hoặc cộng nhiều ảnh mới tăng SNR.</li>
+  <li>Khả năng bắt lỗi mờ phụ thuộc tương phản trên nhiễu; đo nó trên ảnh thật khi nghiệm thu.</li>
+  <li>Flat-field: \((I-D)/(F-D)\) với ảnh tối và ảnh phẳng cộng trung bình nhiều ảnh; chụp lại khi đổi đèn, ống kính, khẩu độ. Tắt gamma khi cần đo cường độ.</li>
+</ul>
+
+<h2 id="bai-tap">Bài tập</h2>
+<div class="ex">
+<h3 id="bai-1-cong-bao-nhieu-anh">Bài 1. Cộng bao nhiêu ảnh?</h3>
+<p>Cảnh 400 photon mỗi pixel, không thể tăng đèn hay phơi sáng. Cần SNR ít nhất 40. Tính số ảnh phải cộng trung bình rồi kiểm chứng bằng mô phỏng.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">s0, _ = snr(CameraGia(), 400)
+can = int(np.ceil((40 / s0) ** 2))                      # SNR tăng theo √n nên n = (SNR cần / SNR hiện có)²
+s, _ = snr(CameraGia(), 400, can)
+print(f"SNR một ảnh {s0:.1f} → cần {can} ảnh; đo được SNR {s:.1f}; thời gian chụp tăng {can} lần")</code></pre>
+<pre><code class="language-text">SNR một ảnh 14.4 → cần 8 ảnh; đo được SNR 40.9; thời gian chụp tăng 8 lần</code></pre>
+<p>SNR tăng theo \(\sqrt{n}\), nên \(n = (40/\mathrm{SNR}_1)^2\). Đổi lại thời gian chụp tăng tương ứng và vật phải đứng yên trong suốt thời gian đó. Thường đáng xem trước phương án đèn chớp mạnh hơn: một xung đèn ngắn vừa nhiều photon vừa không nhòe.</p>
+</details>
+</div>
+<div class="ex">
+<h3 id="bai-2-thay-den-ma-quen-chup-lai-flat-field">Bài 2. Thay đèn mà quên chụp lại flat-field</h3>
+<p>Bảo trì thay đèn mới, nay bên trái tối hơn bên phải 30% (ngược với lúc chụp ảnh phẳng). Chạy hiệu chỉnh bằng ảnh phẳng cũ, rồi bằng ảnh phẳng chụp lại.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">den_moi = 1.0 - 0.3 * (W - xx) / W                      # thay đèn: giờ bên TRÁI tối hơn
+anh_moi = cam_ff.chup(8000 * vignet * den_moi * prnu * vat, (H, W))
+dem_vet((anh_moi - toi) / ff * ff.mean(), "flat-field cũ, đèn mới")
+phang_moi = np.mean([cam_ff.chup(8000 * vignet * den_moi * prnu, (H, W)) for _ in range(16)], axis=0)
+dem_vet((anh_moi - toi) / (phang_moi - toi) * (phang_moi - toi).mean(), "chụp lại flat-field")</code></pre>
+<pre><code class="language-text">flat-field cũ, đèn mới  :   5 vùng tối, bắt đúng 2/8 vết, vùng tối chiếm 42.8% ảnh
+chụp lại flat-field     :   8 vùng tối, bắt đúng 8/8 vết, vùng tối chiếm  0.2% ảnh</code></pre>
+<p>Ảnh phẳng cũ sửa được vignetting nhưng lại "sửa" gradient đèn theo hướng cũ, nên nền vẫn chênh mạnh: 43% diện tích bị coi là tối và chỉ bắt đúng 2/8 vết, trạm hỏng như chưa hiệu chỉnh. Vì vậy thay đèn phải nằm trong danh sách việc kéo theo chụp lại ảnh tham chiếu, và hàm giám sát vùng chuẩn (bài <a href="kiem-soat-anh-sang-moi-truong-nha-may.html">ánh sáng môi trường</a>) nên cảnh báo khi độ sáng các vùng lệch khỏi lúc hiệu chỉnh.</p>
+</details>
+</div>
+<div class="ex">
+<h3 id="bai-3-anh-phang-can-bao-nhieu-khung">Bài 3. Ảnh phẳng cần bao nhiêu khung?</h3>
+<p>Hiệu chỉnh một ảnh mặt trắng mới bằng ảnh phẳng cộng từ 1, 4 và 16 khung; so nhiễu còn lại với giới hạn khi biết chính xác độ sáng thật.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">trang = cam_ff.chup(chieu_sang, (H, W))                 # một ảnh mặt trắng mới (không có vết)
+for n in (1, 4, 16):
+    ph = np.mean([cam_ff.chup(chieu_sang, (H, W)) for _ in range(n)], axis=0) - toi
+    s = (trang - toi) / ph * ph.mean()
+    print(f"flat từ {n:2d} ảnh: nhiễu ảnh sau hiệu chỉnh {s[100:380, 140:500].std() / s.mean():.2%}")
+ly_tuong = ((trang - toi) / chieu_sang)[100:380, 140:500]          # flat "hoàn hảo": biết chính xác độ sáng thật
+print(f"flat hoàn hảo (giới hạn do nhiễu của chính ảnh): {ly_tuong.std() / ly_tuong.mean():.2%}")</code></pre>
+<pre><code class="language-text">flat từ  1 ảnh: nhiễu ảnh sau hiệu chỉnh 2.37%
+flat từ  4 ảnh: nhiễu ảnh sau hiệu chỉnh 1.87%
+flat từ 16 ảnh: nhiễu ảnh sau hiệu chỉnh 1.72%
+flat hoàn hảo (giới hạn do nhiễu của chính ảnh): 1.67%</code></pre>
+<p>Ảnh phẳng chỉ một khung mang theo nhiễu của chính nó vào mọi ảnh sau này, làm nhiễu tăng khoảng \(\sqrt{2}\) lần. Cộng 16 khung đã gần sát giới hạn. Chụp ảnh tham chiếu chỉ làm một lần nên cứ cộng thật nhiều khung.</p>
+</details>
+</div>
+<p>Bài tiếp theo: <a href="kiem-tra-mau-lab-delta-e.html">Kiểm tra màu: Lab, ΔE và cân bằng trắng</a>, nơi ảnh tuyến tính đã hiệu chỉnh được dùng để đo màu theo cách mắt người cảm nhận.</p>
+
+<p class="note">Nguồn tham khảo: <a href="https://www.emva.org/standards-technology/emva-1288/" rel="noopener" target="_blank">EMVA 1288: Standard for Characterization of Image Sensors and Cameras</a>, James R. Janesick, <em>Photon Transfer: DN → λ</em> (SPIE Press, 2007), <a href="https://docs.opencv.org/4.x/d4/d13/tutorial_py_filtering.html" rel="noopener" target="_blank">OpenCV: Smoothing Images</a>.</p>
+
+      </div>
+      <section class="practice"><h2><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <circle cx="12" cy="12" r="6" /> <circle cx="12" cy="12" r="2" /></svg>Bài tập thực hành</h2><ol><li>C</li><li>h</li><li>ạ</li><li>y</li><li> </li><li>m</li><li>ô</li><li> </li><li>p</li><li>h</li><li>ỏ</li><li>n</li><li>g</li><li> </li><li>c</li><li>a</li><li>m</li><li>e</li><li>r</li><li>a</li><li>,</li><li> </li><li>đ</li><li>o</li><li> </li><li>đ</li><li>ư</li><li>ờ</li><li>n</li><li>g</li><li> </li><li>c</li><li>o</li><li>n</li><li>g</li><li> </li><li>t</li><li>r</li><li>u</li><li>y</li><li>ề</li><li>n</li><li> </li><li>p</li><li>h</li><li>o</li><li>t</li><li>o</li><li>n</li><li>,</li><li> </li><li>s</li><li>o</li><li> </li><li>t</li><li>ỉ</li><li> </li><li>l</li><li>ệ</li><li> </li><li>b</li><li>ắ</li><li>t</li><li> </li><li>v</li><li>ế</li><li>t</li><li> </li><li>m</li><li>ờ</li><li> </li><li>t</li><li>h</li><li>e</li><li>o</li><li> </li><li>á</li><li>n</li><li>h</li><li> </li><li>s</li><li>á</li><li>n</li><li>g</li><li> </li><li>v</li><li>à</li><li> </li><li>h</li><li>i</li><li>ệ</li><li>u</li><li> </li><li>c</li><li>h</li><li>ỉ</li><li>n</li><li>h</li><li> </li><li>f</li><li>l</li><li>a</li><li>t</li><li>-</li><li>f</li><li>i</li><li>e</li><li>l</li><li>d</li></ol><p>Làm xong bài tập mới chuyển sang bài tiếp theo: tự viết code là cách duy nhất để nhớ lâu.</p></section><div class="lesson-done" data-course="vision-engineer"><button type="button" class="lesson-done-btn" data-lesson-done="nhieu-snr-flat-field-chat-luong-anh" aria-pressed="false"><span class="box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></span><span class="off">Đánh dấu đã học xong</span><span class="on">Đã học xong bài này</span></button><a class="btn lg" href="../kien-thuc/kiem-tra-mau-lab-delta-e.html">Bài tiếp theo<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a></div>
+      <footer class="article-foot">
+        <div class="tags"><a class="tag" href="../search.html?q=Camera">#Camera</a><a class="tag" href="../search.html?q=Machine Vision">#Machine Vision</a><a class="tag" href="../search.html?q=Image Processing">#Image Processing</a></div>
+        <div class="share">
+      <span>Chia sẻ:</span>
+      <a class="share-btn fb" href="https://www.facebook.com/sharer/sharer.php?u=https://hocfree.vn/kien-thuc/nhieu-snr-flat-field-chat-luong-anh.html" target="_blank" rel="noopener" aria-label="Chia sẻ Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8z"/></svg></a>
+      <a class="share-btn x" href="https://twitter.com/intent/tweet?url=https://hocfree.vn/kien-thuc/nhieu-snr-flat-field-chat-luong-anh.html" target="_blank" rel="noopener" aria-label="Chia sẻ X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+      <button class="share-btn copy-link" data-url="https://hocfree.vn/kien-thuc/nhieu-snr-flat-field-chat-luong-anh.html" aria-label="Sao chép liên kết"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+    </div>
+      </footer>
+      <div class="author-box">
+        <span class="avatar lg" aria-hidden="true">HF</span>
+        <div>
+          <strong>Ban biên tập HọcFree</strong>
+          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và ngoại ngữ, hoàn toàn miễn phí.</p>
+        </div>
+      </div>
+      <nav class="pager lesson-pager" aria-label="Bài học trước/sau"><a class="prev" href="../kien-thuc/kiem-soat-anh-sang-moi-truong-nha-may.html"><span>← Bài trước · Bài 8</span>Kiểm soát ánh sáng môi trường</a><a class="next" href="../kien-thuc/kiem-tra-mau-lab-delta-e.html"><span>Bài tiếp → · Bài 10</span>Kiểm tra màu: Lab, ΔE2000, cân bằng trắng</a></nav>
+    </article>
+    <aside class="sidebar course-side" data-course="vision-engineer">
+      <section class="widget course-toc">
+        <p class="widget-title">Chặng 6/15 · Vision Engineer</p>
+        <a class="course-toc-title" href="../lo-trinh/vision-engineer/camera-lens-lighting.html">Camera / Lens / Lighting</a>
+        <div class="lc" data-lesson-count="global-rolling-shutter-area-line-scan chon-camera-ong-kinh-machine-vision lay-anh-camera-cong-nghiep-genicam-pypylon do-sau-truong-anh-khau-do-lay-net camera-4-ong-kinh-telecentric 7-kieu-chieu-sang-machine-vision mau-den-kinh-loc-phan-cuc kiem-soat-anh-sang-moi-truong-nha-may nhieu-snr-flat-field-chat-luong-anh kiem-tra-mau-lab-delta-e camera-8-bai-tap-chon-cau-hinh"><div class="lc-bar"><span data-lc-bar></span></div><span data-lc-text>0/11 bài</span></div>
+        <ol class="toc-lessons"><li data-lesson="global-rolling-shutter-area-line-scan"><a href="../kien-thuc/global-rolling-shutter-area-line-scan.html"><span class="tn">1</span><span class="tt">Global/rolling shutter, area/line scan</span></a></li><li data-lesson="chon-camera-ong-kinh-machine-vision"><a href="../kien-thuc/chon-camera-ong-kinh-machine-vision.html"><span class="tn">2</span><span class="tt">Chọn camera và ống kính: độ phân giải, FOV, tiêu cự</span></a></li><li data-lesson="lay-anh-camera-cong-nghiep-genicam-pypylon"><a href="../hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html"><span class="tn">3</span><span class="tt">Lấy ảnh từ camera công nghiệp: GenICam, pypylon</span></a></li><li data-lesson="do-sau-truong-anh-khau-do-lay-net"><a href="../kien-thuc/do-sau-truong-anh-khau-do-lay-net.html"><span class="tn">4</span><span class="tt">Độ sâu trường ảnh, khẩu độ, lấy nét</span></a></li><li data-lesson="camera-4-ong-kinh-telecentric"><a href="../hoc/camera-4-ong-kinh-telecentric.html"><span class="tn">5</span><span class="tt">Ống kính telecentric: khi nào cần?</span></a></li><li data-lesson="7-kieu-chieu-sang-machine-vision"><a href="../kien-thuc/7-kieu-chieu-sang-machine-vision.html"><span class="tn">6</span><span class="tt">7 kiểu chiếu sáng và khi nào dùng</span></a></li><li data-lesson="mau-den-kinh-loc-phan-cuc"><a href="../kien-thuc/mau-den-kinh-loc-phan-cuc.html"><span class="tn">7</span><span class="tt">Màu đèn, kính lọc và phân cực</span></a></li><li data-lesson="kiem-soat-anh-sang-moi-truong-nha-may"><a href="../kien-thuc/kiem-soat-anh-sang-moi-truong-nha-may.html"><span class="tn">8</span><span class="tt">Kiểm soát ánh sáng môi trường</span></a></li><li data-lesson="nhieu-snr-flat-field-chat-luong-anh" class="is-current"><a href="../kien-thuc/nhieu-snr-flat-field-chat-luong-anh.html" aria-current="page"><span class="tn">9</span><span class="tt">Nhiễu, SNR và flat-field</span></a></li><li data-lesson="kiem-tra-mau-lab-delta-e"><a href="../kien-thuc/kiem-tra-mau-lab-delta-e.html"><span class="tn">10</span><span class="tt">Kiểm tra màu: Lab, ΔE2000, cân bằng trắng</span></a></li><li data-lesson="camera-8-bai-tap-chon-cau-hinh"><a href="../hoc/camera-8-bai-tap-chon-cau-hinh.html"><span class="tn">11</span><span class="tt">Bài tập chặng 6: chọn camera, ống kính, đèn cho bài toán thật</span></a></li></ol>
+        <a class="more" href="../lo-trinh/vision-engineer.html">Xem toàn bộ lộ trình<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a>
+      </section>
+    </aside>
+  </div>
+  <section class="band">
+    <div class="container">
+      <div class="section-title"><h2>Có thể bạn quan tâm</h2></div>
+      <div class="card-grid"><article class="card">
+  <a class="thumb" href="../kien-thuc/3d-vision-1-cam-bien-3d-chon-cong-nghe.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/3d-vision-1-cam-bien-3d-chon-cong-nghe.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-kien-thuc" href="../kien-thuc/">Kiến thức</a>
+  <h3><a href="../kien-thuc/3d-vision-1-cam-bien-3d-chon-cong-nghe.html">Cảm biến 3D: laser, ánh sáng cấu trúc, stereo, ToF và cách chọn</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-21">21/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>20 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../kien-thuc/chay-thu-xu-ly-su-co-tram-vision.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/chay-thu-xu-ly-su-co-tram-vision.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-kien-thuc" href="../kien-thuc/">Kiến thức</a>
+  <h3><a href="../kien-thuc/chay-thu-xu-ly-su-co-tram-vision.html">Chạy thử và xử lý sự cố trạm vision tại hiện trường</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-21">21/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>20 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../kien-thuc/kiem-tra-mau-lab-delta-e.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/kiem-tra-mau-lab-delta-e.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-kien-thuc" href="../kien-thuc/">Kiến thức</a>
+  <h3><a href="../kien-thuc/kiem-tra-mau-lab-delta-e.html">Kiểm tra màu bằng camera: Lab, ΔE2000, cân bằng trắng, CCM</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-21">21/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>20 phút đọc</span></div>
+</article></div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <a class="logo" href="../"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+      <p>HọcFree.vn – nền tảng học miễn phí về AI, lập trình, Computer Vision, Machine Vision, tin tức AI và ngoại ngữ dành cho người Việt.</p>
+    </div>
+    <div><h3>Học &amp; thực hành</h3><ul><li><a href="../hoc/">Học AI &amp; Lập trình</a></li><li><a href="../projects/">Projects</a></li><li><a href="../lo-trinh/">Learning Paths</a></li></ul></div>
+    <div><h3>Khám phá</h3><ul><li><a href="../kien-thuc/">Kiến thức</a></li><li><a href="../tin-tuc-ai/">Tin tức AI</a></li><li><a href="../ngoai-ngu/">Ngoại ngữ</a></li><li><a href="../tai-nguyen/">Tài nguyên</a></li></ul></div>
+    <div><h3>Bài mới</h3><ul><li><a href="../hoc/python-7-class-dataclass-to-chuc-code.html">Class và dataclass: tổ chức code cho trạm kiểm tra</a></li><li><a href="../hoc/luong-hang-doi-tach-chup-anh-xu-ly.html">Luồng và hàng đợi: tách chụp ảnh khỏi xử lý, không mất khung</a></li><li><a href="../hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html">Lấy ảnh từ camera công nghiệp: GenICam, pypylon, camera giả lập</a></li><li><a href="../hoc/msa-gage-rr-anova-he-do-camera.html">MSA và Gage R&amp;R cho trạm đo camera: ANOVA, ndc, dải bảo vệ</a></li></ul></div>
+    <div>
+      <h3>HọcFree</h3>
+      <ul>
+        <li><a href="../gioi-thieu.html">Giới thiệu</a></li>
+        <li><a href="../search.html">Tìm kiếm</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">© 2026 HọcFree.vn · Kiến thức là để chia sẻ.</div>
+  </div>
+</footer>
+<button class="to-top" aria-label="Lên đầu trang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<script src="../assets/js/search-data.js?v=20261021" defer></script>
+<script src="../assets/js/main.js?v=20261021" defer></script>
+</body>
+</html>

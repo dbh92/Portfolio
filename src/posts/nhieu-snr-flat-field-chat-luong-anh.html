@@ -1,0 +1,253 @@
+<p>Hai trạm dùng cùng thuật toán, cùng ngưỡng: một trạm bắt được vết mờ, trạm kia bỏ sót một nửa. Thường thì thủ phạm không nằm trong code mà nằm ở chất lượng ảnh: ảnh quá tối nên nhiễu lấn tín hiệu, người cài đặt tăng gain cho "sáng lên" mà không hiểu gain không thêm thông tin, hoặc nền sáng không đều đến mức một ngưỡng toàn cục không thể dùng được. Bài này đo chất lượng ảnh bằng số: nhiễu đến từ đâu, <strong>SNR</strong> (tỉ số tín hiệu trên nhiễu) phụ thuộc vào gì, cách đo đặc tính camera bằng <strong>đường cong truyền photon</strong> theo tinh thần chuẩn EMVA 1288, và cách <strong>hiệu chỉnh flat-field</strong> để xóa độ không đều của đèn và ống kính.</p>
+<p>Mọi thí nghiệm dùng một camera mô phỏng tuyến tính, nên bạn chạy được ngay với <code>numpy</code> và <code>opencv-python</code>; ở mục 3 có cách làm lại với camera thật. Nên đọc trước: <a href="global-rolling-shutter-area-line-scan.html">cảm biến area/line scan</a> (bảng thông số QE, full well, dải động) và <a href="../hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html">lấy ảnh từ camera công nghiệp</a>.</p>
+
+<h2>1. Nhiễu đến từ đâu</h2>
+<p>Một pixel đếm photon. Trong thời gian phơi sáng, trung bình \(\mu_p\) photon tới pixel, một phần (hiệu suất lượng tử QE) thành \(\mu_e = \mathrm{QE}\cdot\mu_p\) electron. Các nguồn nhiễu chính:</p>
+<ul>
+  <li><strong>Nhiễu photon (shot noise)</strong>: số photon tới mỗi lần là ngẫu nhiên theo phân phối Poisson, độ lệch chuẩn \(\sqrt{\mu_e}\) electron. Đây là giới hạn vật lý, camera tốt đến đâu cũng không tránh được.</li>
+  <li><strong>Nhiễu đọc</strong> \(\sigma_d\): mạch đọc và bộ khuếch đại, vài electron với cảm biến CMOS công nghiệp hiện nay.</li>
+  <li><strong>Nhiễu lượng tử hóa</strong>: bộ ADC làm tròn về số nguyên, độ lệch chuẩn \(1/\sqrt{12}\) DN (đơn vị số ADC).</li>
+  <li><strong>Nhiễu cố định theo vị trí</strong>: mỗi pixel có độ lệch tối (DSNU) và độ nhạy (PRNU) hơi khác nhau. Loại này không đổi giữa các ảnh nên hiệu chỉnh được (mục 5).</li>
+</ul>
+<p>Gộp lại, với \(K\) là hệ số chuyển đổi (DN trên mỗi electron):</p>
+\[ \mathrm{SNR} = \frac{\mu_e}{\sqrt{\mu_e + \sigma_d^2 + \sigma_q^2/K^2}}, \qquad \sigma_q^2 = \tfrac{1}{12}\ \mathrm{DN}^2 \]
+<p>Khi ảnh đủ sáng, \(\mu_e\) lấn át mọi số hạng khác và \(\mathrm{SNR} \approx \sqrt{\mu_e}\): muốn SNR gấp đôi phải có gấp bốn lần ánh sáng. Mô phỏng dưới đây dùng thông số điển hình của một camera CMOS: QE 0,6, full well 10 500 electron, nhiễu đọc 6 electron, ADC 12 bit.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+rng = np.random.default_rng(0)
+
+
+class CameraGia:
+    """Mô hình camera tuyến tính kiểu EMVA 1288: photon → electron → (nhiễu đọc) → nhân gain → số ADC 12 bit."""
+
+    def __init__(self, qe=0.6, full_well=10500, nhieu_doc_e=6.0, offset_dn=20, bit=12, gain_db=0.0):
+        self.qe, self.full_well, self.nhieu_doc_e = qe, full_well, nhieu_doc_e
+        self.offset_dn, self.dn_max = offset_dn, 2 ** bit - 1
+        self.k = (self.dn_max - offset_dn) / full_well * 10 ** (gain_db / 20)   # DN trên mỗi electron
+
+    def chup(self, photon, shape=(200, 200)):
+        """photon: số photon trung bình tới mỗi pixel trong thời gian phơi sáng (số hoặc mảng)."""
+        e = rng.poisson(self.qe * np.broadcast_to(photon, shape)).astype(float)   # nhiễu photon (shot noise)
+        e = np.minimum(e, self.full_well)                                          # pixel đầy thì bão hòa
+        e += rng.normal(0, self.nhieu_doc_e, shape)                                # nhiễu đọc
+        return np.clip(np.round(self.offset_dn + self.k * e), 0, self.dn_max)      # lượng tử hóa ADC
+
+
+cam = CameraGia()
+print(f"K = {cam.k:.3f} DN/e-, 1 DN ≈ {1 / cam.k:.1f} electron")
+print(" photon | trung bình DN | độ lệch DN | SNR đo | SNR lý thuyết | giới hạn photon √μe")
+for photon in (100, 1000, 5000, 15000):
+    anh = cam.chup(photon)
+    tin_hieu = anh.mean() - cam.offset_dn
+    mu_e = cam.qe * photon
+    ly_thuyet = mu_e / np.sqrt(mu_e + cam.nhieu_doc_e ** 2 + 1 / 12 / cam.k ** 2)   # photon + đọc + lượng tử hóa
+    print(f"{photon:7d} | {anh.mean():12.1f} | {anh.std():10.2f} | {tin_hieu / anh.std():6.1f} | "
+          f"{ly_thuyet:13.1f} | {np.sqrt(mu_e):8.1f}")</code></pre>
+<pre><code class="language-text">K = 0.388 DN/e-, 1 DN ≈ 2.6 electron
+ photon | trung bình DN | độ lệch DN | SNR đo | SNR lý thuyết | giới hạn photon √μe
+    100 |         43.3 |       3.84 |    6.1 |           6.1 |      7.7
+   1000 |        252.9 |       9.77 |   23.8 |          23.8 |     24.5
+   5000 |       1184.4 |      21.54 |   54.1 |          54.4 |     54.8
+  15000 |       3512.8 |      36.82 |   94.9 |          94.7 |     94.9</code></pre>
+<p>SNR đo trên ảnh khớp công thức. Ở 100 photon (60 electron), nhiễu đọc đã kéo SNR xuống thấp hơn hẳn giới hạn photon; ở 15 000 photon thì chỉ còn nhiễu photon. Ở đây SNR đo theo từng pixel trên một vùng phẳng: độ lệch chuẩn của vùng ảnh đồng đều chính là nhiễu.</p>
+
+<h2>2. Đo đặc tính camera bằng đường cong truyền photon</h2>
+<p>Bảng thông số hãng ghi theo điều kiện chuẩn; thông số thật của con camera đang lắp, ở gain đang dùng, đo được chỉ từ ảnh. Vì nhiễu photon có phương sai bằng trung bình (tính bằng electron), khi đổi sang DN ta có \(\sigma^2_{DN} = K\,\mu_{DN} + K^2\sigma_d^2\): vẽ phương sai theo độ sáng trung bình sẽ được một đường thẳng, <strong>hệ số góc là \(K\)</strong> và chặn dưới cho nhiễu đọc. Đây là phương pháp cốt lõi của chuẩn EMVA 1288.</p>
+<pre><code class="language-python"># Đường cong truyền photon (photon transfer curve): đo K và nhiễu đọc chỉ từ ảnh, không cần biết thông số hãng
+toi = np.mean([cam.chup(0) for _ in range(8)], axis=0)          # ảnh tối: đậy nắp ống kính
+x, y = [], []
+for photon in np.geomspace(20, 20000, 14):
+    a, b = cam.chup(photon), cam.chup(photon)                     # HAI ảnh cùng điều kiện
+    tb = (a.mean() + b.mean()) / 2 - toi.mean()
+    phuong_sai = np.var(a - b) / 2                                # hiệu hai ảnh loại bỏ được độ không đều cố định
+    if (a.max() &lt; cam.dn_max) and (b.max() &lt; cam.dn_max):         # bỏ điểm đã bão hòa
+        x.append(tb); y.append(phuong_sai)
+K_uoc, chan = np.polyfit(x, y, 1)                                 # σ²_DN = K·μ_DN + K²·σ²_đọc
+print(f"K ước lượng {K_uoc:.3f} DN/e- (thật {cam.k:.3f}); nhiễu đọc ước lượng {np.sqrt(max(chan, 0)) / K_uoc:.1f} e- (thật {cam.nhieu_doc_e})")
+print(f"full well ước lượng ≈ {(cam.dn_max - cam.offset_dn) / K_uoc:.0f} e-, SNR tối đa ≈ {np.sqrt((cam.dn_max - cam.offset_dn) / K_uoc):.0f} "
+      f"({20 * np.log10(np.sqrt((cam.dn_max - cam.offset_dn) / K_uoc)):.1f} dB)")</code></pre>
+<pre><code class="language-text">K ước lượng 0.390 DN/e- (thật 0.388); nhiễu đọc ước lượng 5.6 e- (thật 6.0)
+full well ước lượng ≈ 10456 e-, SNR tối đa ≈ 102 (40.2 dB)</code></pre>
+<p>Hai mẹo quan trọng: lấy <strong>hiệu hai ảnh</strong> chụp cùng điều kiện, vì phần không đều cố định (đèn, PRNU) bị triệt tiêu, chỉ còn nhiễu ngẫu nhiên (chia 2 vì hiệu hai biến độc lập có phương sai gấp đôi); và <strong>bỏ các điểm đã bão hòa</strong>, vì pixel đầy thì phương sai sụt và kéo lệch đường thẳng. Từ \(K\) suy ra full well và SNR tối đa \(\sqrt{\text{full well}}\), khoảng 40 dB với camera này: dù ảnh sáng tới đâu, nhiễu cũng không nhỏ hơn khoảng 1% độ sáng mỗi pixel.</p>
+<div class="tip"><strong>Làm với camera thật</strong>Đặt camera nhìn một tấm khuếch tán được chiếu đều (hoặc tháo ống kính, đặt trước nguồn sáng đều), tắt gamma, tắt mọi chế độ tự động. Với mỗi thời gian phơi sáng tăng dần, chụp hai ảnh; thêm vài ảnh tối khi đậy nắp. Đoạn code trên dùng nguyên được, chỉ thay <code>cam.chup(...)</code> bằng hàm lấy ảnh thật của bạn (bài <a href="../hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html">GenICam, pypylon</a>). Lặp lại ở vài mức gain để biết gain thật sự làm gì với camera của bạn.</div>
+
+<h2>3. Gain không thêm thông tin</h2>
+<p>Ảnh tối, cách nhanh nhất cho "sáng lên" là tăng gain. Thí nghiệm sau so sánh bốn cách làm ảnh tốt hơn từ một cảnh chỉ có 400 photon mỗi pixel.</p>
+<pre><code class="language-python">def snr(cam_, photon, so_anh=1):
+    anh = np.mean([cam_.chup(photon) for _ in range(so_anh)], axis=0)
+    return (anh.mean() - cam_.offset_dn) / anh.std(), anh.mean()
+
+
+phuong_an = {
+    "gốc: 400 photon, gain 0 dB": (CameraGia(), 400, 1),
+    "tăng gain 12 dB": (CameraGia(gain_db=12), 400, 1),
+    "phơi sáng hoặc đèn ×4": (CameraGia(), 1600, 1),
+    "cộng trung bình 4 ảnh": (CameraGia(), 400, 4),
+}
+for ten, (c, p, n) in phuong_an.items():
+    s, tb = snr(c, p, n)
+    print(f"{ten:28s}: độ sáng {tb:6.0f} DN, SNR {s:5.1f}")</code></pre>
+<pre><code class="language-text">gốc: 400 photon, gain 0 dB  : độ sáng    113 DN, SNR  14.4
+tăng gain 12 dB             : độ sáng    391 DN, SNR  14.4
+phơi sáng hoặc đèn ×4       : độ sáng    393 DN, SNR  30.6
+cộng trung bình 4 ảnh       : độ sáng    113 DN, SNR  28.8</code></pre>
+<p>Gain nhân cả tín hiệu lẫn nhiễu nên ảnh sáng hơn mà SNR không đổi; ngoài ra gain cao còn thu hẹp dải động, vì ADC bão hòa ở số electron ít hơn (gain 12 dB thì chỉ còn khoảng 1/4 full well). Chỉ có <strong>thêm photon</strong> mới tăng SNR: đèn mạnh hơn, phơi sáng lâu hơn (bị giới hạn bởi nhòe chuyển động), khẩu độ lớn hơn (đổi lại độ sâu trường ảnh, bài <a href="do-sau-truong-anh-khau-do-lay-net.html">độ sâu trường ảnh</a>), hoặc cộng trung bình nhiều ảnh (tốn thời gian chu kỳ, chỉ dùng được khi vật đứng yên). Ở cảm biến thật, gain analog có thể giảm nhẹ nhiễu đọc quy về electron, nên gain hơi có ích khi cảnh rất tối; đường cong ở mục 2 đo ở nhiều mức gain sẽ cho bạn biết chính xác.</p>
+
+<h2>4. SNR quyết định bắt được lỗi mờ hay không</h2>
+<p>Đại lượng cần cho kiểm tra không phải SNR của nền mà là <strong>tương phản trên nhiễu</strong> (CNR): độ chênh của vết lỗi so với nền, chia cho nhiễu. Thí nghiệm: 100 ảnh tốt và 100 ảnh có một vết tối chỉ 4%, ngưỡng chọn trên ảnh tốt để báo nhầm không quá 1%, đo tỉ lệ bắt được vết ở bốn mức sáng.</p>
+<pre><code class="language-python">yy, xx = np.mgrid[:200, :200]
+VET = ((yy - 100) ** 2 + (xx - 100) ** 2 &lt;= 4 ** 2)              # vết tối bán kính 4 px ở giữa
+
+
+def thu_phat_hien(photon, do_tuong_phan=0.04, so_anh=200):
+    """Nửa số ảnh có vết tối 4%. Ngưỡng chọn trên ảnh tốt để báo nhầm ≤ 1%; đo tỉ lệ bắt được vết."""
+    c = CameraGia()
+    def diem(co_vet):
+        p = photon * (1 - do_tuong_phan * VET) if co_vet else photon
+        anh = cv2.GaussianBlur(c.chup(p).astype(np.float32), (9, 9), 2)   # làm mượt trước khi so ngưỡng
+        return np.median(anh) - anh.min()                                  # vết sâu nhất so với nền
+    tot = np.array([diem(False) for _ in range(so_anh // 2)])
+    loi = np.array([diem(True) for _ in range(so_anh // 2)])
+    nguong = np.percentile(tot, 99)
+    tin_hieu_e = c.qe * photon
+    cnr = do_tuong_phan * tin_hieu_e / np.sqrt(tin_hieu_e + c.nhieu_doc_e ** 2)   # tương phản / nhiễu, theo pixel
+    return cnr, np.mean(loi &gt; nguong)
+
+
+for photon in (400, 700, 1000, 1600):
+    cnr, bat = thu_phat_hien(photon)
+    print(f"{photon:5d} photon: CNR mỗi pixel {cnr:4.2f} → bắt được {bat:5.1%} vết tối 4% (báo nhầm ≤ 1%)")</code></pre>
+<pre><code class="language-text">  400 photon: CNR mỗi pixel 0.58 → bắt được 10.0% vết tối 4% (báo nhầm ≤ 1%)
+  700 photon: CNR mỗi pixel 0.79 → bắt được 39.0% vết tối 4% (báo nhầm ≤ 1%)
+ 1000 photon: CNR mỗi pixel 0.95 → bắt được 51.0% vết tối 4% (báo nhầm ≤ 1%)
+ 1600 photon: CNR mỗi pixel 1.22 → bắt được 99.0% vết tối 4% (báo nhầm ≤ 1%)</code></pre>
+<p>Cùng thuật toán, cùng tiêu chí báo nhầm, chỉ đổi lượng ánh sáng mà tỉ lệ bắt lỗi đi từ gần như không bắt được tới bắt hết. Vì thuật toán đã làm mượt (lấy trung bình vùng 9×9), CNR mỗi pixel khoảng 1 là đủ; với lỗi chỉ rộng 1 đến 2 pixel thì không làm mượt được và cần CNR mỗi pixel cao hơn nhiều. Đây là lý do khi nghiệm thu, phải đo độ tương phản lỗi nhỏ nhất trên ảnh thật chứ không chỉ nhìn "ảnh rõ".</p>
+
+<h2>5. Hiệu chỉnh flat-field</h2>
+<p>Ống kính làm tối góc ảnh (vignetting), đèn chiếu không đều, và mỗi pixel nhạy hơi khác nhau. Kết quả là nền một vật đồng màu có thể chênh hàng chục phần trăm giữa tâm và góc, trong khi lỗi cần bắt chỉ tối hơn vài phần trăm. Hiệu chỉnh flat-field dùng hai ảnh tham chiếu, chụp một lần khi lắp đặt: ảnh <strong>tối</strong> \(D\) (đậy nắp ống kính) và ảnh <strong>phẳng</strong> \(F\) (tấm trắng khuếch tán, đúng đèn và ống kính của trạm):</p>
+\[ I_{\text{sửa}} = \frac{I - D}{F - D}\cdot \overline{(F - D)} \]
+<pre><code class="language-python">H, W = 480, 640
+yy, xx = np.mgrid[:H, :W]
+r2 = ((xx - W / 2) ** 2 + (yy - H / 2) ** 2) / (W / 2) ** 2
+vignet = 1 / (1 + 0.35 * r2) ** 2                                   # tối dần ra góc (ống kính)
+den = 1.0 - 0.3 * xx / W                                            # đèn chiếu lệch: bên phải tối hơn 30%
+prnu = 1 + 0.01 * np.random.default_rng(1).standard_normal((H, W))  # độ nhạy từng pixel lệch nhau 1% (cố định)
+chieu_sang = 8000 * vignet * den * prnu                             # số photon tới từng pixel khi nhìn mặt phẳng trắng
+
+VI_TRI = [(60, 80), (60, 560), (240, 320), (420, 80), (420, 560), (240, 40), (100, 330), (380, 600)]
+vat = np.ones((H, W))
+for y, x in VI_TRI:                                                 # 8 vết bẩn tối 10%, có vết nằm sát góc
+    vat[(yy - y) ** 2 + (xx - x) ** 2 &lt;= 5 ** 2] = 0.90
+
+cam_ff = CameraGia()
+anh = cam_ff.chup(chieu_sang * vat, (H, W))
+
+
+def dem_vet(a, ten):
+    nguong = 0.95 * np.median(a)                                    # ngưỡng toàn cục: tối hơn 5% so với trung vị
+    bw = (cv2.GaussianBlur(a.astype(np.float32), (5, 5), 1) &lt; nguong).astype(np.uint8)
+    n, _, st, tam = cv2.connectedComponentsWithStats(bw)
+    vung = [tam[i] for i in range(1, n) if st[i, cv2.CC_STAT_AREA] &gt;= 15]
+    dung = sum(any(abs(cx - x) &lt; 6 and abs(cy - y) &lt; 6 for cx, cy in vung) for y, x in VI_TRI)
+    print(f"{ten:24s}: {len(vung):3d} vùng tối, bắt đúng {dung}/8 vết, "
+          f"vùng tối chiếm {bw.mean():5.1%} ảnh")
+
+
+dem_vet(anh, "ảnh gốc")
+
+# hiệu chỉnh flat-field: một lần khi lắp đặt (và sau mỗi lần thay đèn, chỉnh ống kính)
+toi = np.mean([cam_ff.chup(0, (H, W)) for _ in range(16)], axis=0)                 # đậy nắp ống kính
+phang = np.mean([cam_ff.chup(chieu_sang, (H, W)) for _ in range(16)], axis=0)     # tấm trắng khuếch tán, cùng đèn
+ff = phang - toi
+sua = (anh - toi) / ff * ff.mean()
+dem_vet(sua, "sau hiệu chỉnh flat-field")
+print(f"độ không đều nền: gốc {np.ptp(cv2.blur(anh, (31, 31))[40:-40, 40:-40]) / anh.mean():.0%}, "
+      f"sau hiệu chỉnh {np.ptp(cv2.blur(sua, (31, 31))[40:-40, 40:-40]) / sua.mean():.1%}")</code></pre>
+<pre><code class="language-text">ảnh gốc                 :   5 vùng tối, bắt đúng 0/8 vết, vùng tối chiếm 40.8% ảnh
+sau hiệu chỉnh flat-field:   8 vùng tối, bắt đúng 8/8 vết, vùng tối chiếm  0.2% ảnh
+độ không đều nền: gốc 78%, sau hiệu chỉnh 1.2%</code></pre>
+<p>Trên ảnh gốc, 41% diện tích bị coi là "tối" vì góc và cạnh phải tối hơn hẳn tâm, nên không bắt đúng được vết nào: tám vết nằm lẫn trong những vùng tối khổng lồ. Sau hiệu chỉnh, độ chênh nền (đo sau khi lọc trung bình 31×31, kể cả các vết) giảm từ 78% xuống khoảng 1%, và cùng một ngưỡng toàn cục bắt đủ 8/8 vết mà không có vùng tối thừa. Ảnh tối và ảnh phẳng được <strong>cộng trung bình 16 ảnh</strong> để nhiễu của chúng không cộng thêm vào mọi ảnh sau này (bài tập 3).</p>
+<p>Có thể hỏi: sao không dùng ngưỡng thích nghi cục bộ (bài <a href="../hoc/phan-nguong-contour-dem-do-vat.html">phân ngưỡng và contour</a>)? Ngưỡng cục bộ xử lý được nền đổi chậm, nhưng nó cũng "ăn" vết lỗi lớn và không cho bạn đo cường độ thật. Flat-field sửa nguyên nhân, nên kết quả dùng được cho cả đo độ sáng, đo màu (bài <a href="kiem-tra-mau-lab-delta-e.html">kiểm tra màu</a>) và so sánh với ảnh mẫu.</p>
+<div class="warn"><strong>Flat-field gắn với cấu hình</strong>Ảnh phẳng chỉ đúng với đúng ống kính, khẩu độ, tiêu cự, đèn và vị trí đèn lúc chụp. Thay đèn, chỉnh khẩu độ, đổi khoảng làm việc thì phải chụp lại (bài tập 2). Lưu ảnh tham chiếu kèm ngày chụp và cấu hình, đưa vào quy trình <a href="kiem-tra-hieu-chuan-dinh-ky-san-xuat.html">kiểm tra định kỳ</a>. Nhiều camera công nghiệp có sẵn hiệu chỉnh trong camera (thường gọi là shading correction hoặc flat field correction): nguyên lý giống hệt, chỉ là chạy trong phần cứng.</div>
+
+<h2>6. Gamma và độ sâu bit</h2>
+<p>Hai cài đặt camera ảnh hưởng trực tiếp tới phép đo cường độ:</p>
+<pre><code class="language-python"># Gamma và độ sâu bit: hai cài đặt camera làm sai phép đo cường độ
+tuyen_tinh = np.array([0.30, 0.60, 1.00])                 # độ sáng thật (tỉ lệ) ở góc, giữa cạnh, tâm
+gamma = tuyen_tinh ** 0.45                                # camera bật gamma 0.45 (kiểu hiển thị sRGB)
+print("tỉ lệ sáng góc/tâm: thật", tuyen_tinh[0], "| sau gamma", gamma[0].round(2))
+print("trung bình 2 pixel 0.3 và 1.0: thật", tuyen_tinh[[0, 2]].mean().round(3),
+      "| tính trên ảnh gamma rồi đổi ngược", (gamma[[0, 2]].mean() ** (1 / 0.45)).round(3))
+for bit in (8, 10, 12):
+    muc = 2 ** bit - 1
+    print(f"{bit:2d} bit: {muc + 1:5d} mức, bước lượng tử = {cam.full_well / muc:5.1f} e-, "
+          f"nhiễu lượng tử {cam.full_well / muc / np.sqrt(12):4.1f} e- (so với nhiễu đọc {cam.nhieu_doc_e} e-)")</code></pre>
+<pre><code class="language-text">tỉ lệ sáng góc/tâm: thật 0.3 | sau gamma 0.58
+trung bình 2 pixel 0.3 và 1.0: thật 0.65 | tính trên ảnh gamma rồi đổi ngược 0.594
+ 8 bit:   256 mức, bước lượng tử =  41.2 e-, nhiễu lượng tử 11.9 e- (so với nhiễu đọc 6.0 e-)
+10 bit:  1024 mức, bước lượng tử =  10.3 e-, nhiễu lượng tử  3.0 e- (so với nhiễu đọc 6.0 e-)
+12 bit:  4096 mức, bước lượng tử =   2.6 e-, nhiễu lượng tử  0.7 e- (so với nhiễu đọc 6.0 e-)</code></pre>
+<ul>
+  <li><strong>Gamma</strong> nén vùng sáng để ảnh trông dễ chịu trên màn hình, nhưng phá tính tuyến tính: góc thật chỉ sáng bằng 30% tâm mà ảnh gamma cho 58%; trung bình (làm mượt, cộng ảnh) tính trên ảnh gamma rồi đổi ngược cũng lệch khỏi giá trị thật. Mọi phép ở bài này (SNR, đường cong truyền photon, flat-field) và đo màu đều cần gamma = 1. Nhiều webcam và camera USB phổ thông bật gamma mặc định.</li>
+  <li><strong>Độ sâu bit</strong>: ở 8 bit, mỗi bước ADC là khoảng 41 electron nên nhiễu lượng tử lớn hơn cả nhiễu đọc. Với cảnh đủ sáng, nhiễu photon (khoảng 100 electron ở gần bão hòa) vẫn lấn át nên 8 bit thường đủ cho kiểm tra; khi cảnh tối, khi cần dải động rộng, hoặc khi đo cường độ chính xác thì dùng 10 đến 12 bit (đổi lại băng thông gấp đôi, bài <a href="../hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html">GenICam</a>).</li>
+</ul>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Nhiễu gồm nhiễu photon (\(\sqrt{\mu_e}\), không tránh được), nhiễu đọc, nhiễu lượng tử, và nhiễu cố định theo vị trí (hiệu chỉnh được).</li>
+  <li>Khi ảnh đủ sáng, \(\mathrm{SNR}\approx\sqrt{\mu_e}\); SNR tối đa bằng căn của full well. Muốn SNR gấp đôi cần gấp bốn lần ánh sáng.</li>
+  <li>Đường cong truyền photon (phương sai của hiệu hai ảnh theo độ sáng) cho hệ số \(K\), nhiễu đọc và full well của chính camera bạn đang dùng.</li>
+  <li>Gain không tăng SNR và còn thu hẹp dải động; chỉ có thêm photon hoặc cộng nhiều ảnh mới tăng SNR.</li>
+  <li>Khả năng bắt lỗi mờ phụ thuộc tương phản trên nhiễu; đo nó trên ảnh thật khi nghiệm thu.</li>
+  <li>Flat-field: \((I-D)/(F-D)\) với ảnh tối và ảnh phẳng cộng trung bình nhiều ảnh; chụp lại khi đổi đèn, ống kính, khẩu độ. Tắt gamma khi cần đo cường độ.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Cộng bao nhiêu ảnh?</h3>
+<p>Cảnh 400 photon mỗi pixel, không thể tăng đèn hay phơi sáng. Cần SNR ít nhất 40. Tính số ảnh phải cộng trung bình rồi kiểm chứng bằng mô phỏng.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">s0, _ = snr(CameraGia(), 400)
+can = int(np.ceil((40 / s0) ** 2))                      # SNR tăng theo √n nên n = (SNR cần / SNR hiện có)²
+s, _ = snr(CameraGia(), 400, can)
+print(f"SNR một ảnh {s0:.1f} → cần {can} ảnh; đo được SNR {s:.1f}; thời gian chụp tăng {can} lần")</code></pre>
+<pre><code class="language-text">SNR một ảnh 14.4 → cần 8 ảnh; đo được SNR 40.9; thời gian chụp tăng 8 lần</code></pre>
+<p>SNR tăng theo \(\sqrt{n}\), nên \(n = (40/\mathrm{SNR}_1)^2\). Đổi lại thời gian chụp tăng tương ứng và vật phải đứng yên trong suốt thời gian đó. Thường đáng xem trước phương án đèn chớp mạnh hơn: một xung đèn ngắn vừa nhiều photon vừa không nhòe.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Thay đèn mà quên chụp lại flat-field</h3>
+<p>Bảo trì thay đèn mới, nay bên trái tối hơn bên phải 30% (ngược với lúc chụp ảnh phẳng). Chạy hiệu chỉnh bằng ảnh phẳng cũ, rồi bằng ảnh phẳng chụp lại.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">den_moi = 1.0 - 0.3 * (W - xx) / W                      # thay đèn: giờ bên TRÁI tối hơn
+anh_moi = cam_ff.chup(8000 * vignet * den_moi * prnu * vat, (H, W))
+dem_vet((anh_moi - toi) / ff * ff.mean(), "flat-field cũ, đèn mới")
+phang_moi = np.mean([cam_ff.chup(8000 * vignet * den_moi * prnu, (H, W)) for _ in range(16)], axis=0)
+dem_vet((anh_moi - toi) / (phang_moi - toi) * (phang_moi - toi).mean(), "chụp lại flat-field")</code></pre>
+<pre><code class="language-text">flat-field cũ, đèn mới  :   5 vùng tối, bắt đúng 2/8 vết, vùng tối chiếm 42.8% ảnh
+chụp lại flat-field     :   8 vùng tối, bắt đúng 8/8 vết, vùng tối chiếm  0.2% ảnh</code></pre>
+<p>Ảnh phẳng cũ sửa được vignetting nhưng lại "sửa" gradient đèn theo hướng cũ, nên nền vẫn chênh mạnh: 43% diện tích bị coi là tối và chỉ bắt đúng 2/8 vết, trạm hỏng như chưa hiệu chỉnh. Vì vậy thay đèn phải nằm trong danh sách việc kéo theo chụp lại ảnh tham chiếu, và hàm giám sát vùng chuẩn (bài <a href="kiem-soat-anh-sang-moi-truong-nha-may.html">ánh sáng môi trường</a>) nên cảnh báo khi độ sáng các vùng lệch khỏi lúc hiệu chỉnh.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 3. Ảnh phẳng cần bao nhiêu khung?</h3>
+<p>Hiệu chỉnh một ảnh mặt trắng mới bằng ảnh phẳng cộng từ 1, 4 và 16 khung; so nhiễu còn lại với giới hạn khi biết chính xác độ sáng thật.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">trang = cam_ff.chup(chieu_sang, (H, W))                 # một ảnh mặt trắng mới (không có vết)
+for n in (1, 4, 16):
+    ph = np.mean([cam_ff.chup(chieu_sang, (H, W)) for _ in range(n)], axis=0) - toi
+    s = (trang - toi) / ph * ph.mean()
+    print(f"flat từ {n:2d} ảnh: nhiễu ảnh sau hiệu chỉnh {s[100:380, 140:500].std() / s.mean():.2%}")
+ly_tuong = ((trang - toi) / chieu_sang)[100:380, 140:500]          # flat "hoàn hảo": biết chính xác độ sáng thật
+print(f"flat hoàn hảo (giới hạn do nhiễu của chính ảnh): {ly_tuong.std() / ly_tuong.mean():.2%}")</code></pre>
+<pre><code class="language-text">flat từ  1 ảnh: nhiễu ảnh sau hiệu chỉnh 2.37%
+flat từ  4 ảnh: nhiễu ảnh sau hiệu chỉnh 1.87%
+flat từ 16 ảnh: nhiễu ảnh sau hiệu chỉnh 1.72%
+flat hoàn hảo (giới hạn do nhiễu của chính ảnh): 1.67%</code></pre>
+<p>Ảnh phẳng chỉ một khung mang theo nhiễu của chính nó vào mọi ảnh sau này, làm nhiễu tăng khoảng \(\sqrt{2}\) lần. Cộng 16 khung đã gần sát giới hạn. Chụp ảnh tham chiếu chỉ làm một lần nên cứ cộng thật nhiều khung.</p>
+</details>
+</div>
+<p>Bài tiếp theo: <a href="kiem-tra-mau-lab-delta-e.html">Kiểm tra màu: Lab, ΔE và cân bằng trắng</a>, nơi ảnh tuyến tính đã hiệu chỉnh được dùng để đo màu theo cách mắt người cảm nhận.</p>
+
+<p class="note">Nguồn tham khảo: <a href="https://www.emva.org/standards-technology/emva-1288/" rel="noopener" target="_blank">EMVA 1288: Standard for Characterization of Image Sensors and Cameras</a>, James R. Janesick, <em>Photon Transfer: DN → λ</em> (SPIE Press, 2007), <a href="https://docs.opencv.org/4.x/d4/d13/tutorial_py_filtering.html" rel="noopener" target="_blank">OpenCV: Smoothing Images</a>.</p>

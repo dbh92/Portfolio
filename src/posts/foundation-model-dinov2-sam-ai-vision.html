@@ -1,0 +1,265 @@
+<p>Các bài trước của chặng huấn luyện mô hình cho <em>một</em> bài toán, trên dữ liệu của chính bài toán đó. <strong>Foundation model</strong> (mô hình nền tảng) đi theo hướng ngược lại: một mô hình rất lớn được huấn luyện một lần trên hàng trăm triệu ảnh (thường không cần nhãn, hoặc kèm văn bản), rồi được dùng lại cho rất nhiều bài toán mà không cần, hoặc chỉ cần rất ít, huấn luyện thêm. Với kỹ sư Vision, có ba cách dùng đáng quan tâm: <strong>trích đặc trưng</strong> (DINOv2, DINOv3, CLIP), <strong>phân đoạn theo nhắc</strong> (họ SAM, đến SAM 3 nhận cả câu chữ), và <strong>phát hiện theo câu chữ</strong> (open-vocabulary: YOLOE, Grounding DINO). Bài này đo bằng thí nghiệm chạy thật xem đặc trưng DINOv2 mang lại gì khi có rất ít ảnh có nhãn và khi chỉ có ảnh OK, nó thất bại ở đâu, và khi nào nên hoặc không nên đưa foundation model lên dây chuyền.</p>
+<p>Cần PyTorch, scikit-learn; DINOv2 được tải qua <code>torch.hub</code> lần đầu (khoảng 85 MB). Các khối code nối tiếp nhau trong cùng một file. Nên học trước: <a href="phan-loai-anh-ok-ng-transfer-learning-pytorch.html">transfer learning</a>, <a href="anomaly-6-anomaly-detection-padim-patchcore.html">anomaly detection với PaDiM, PatchCore</a>.</p>
+
+<h2>1. Ba cách dùng foundation model</h2>
+<table>
+  <tr><th>Cách dùng</th><th>Mô hình tiêu biểu</th><th>Đầu vào → đầu ra</th><th>Dùng trong nhà máy để</th></tr>
+  <tr><td>Trích đặc trưng (backbone)</td><td>DINOv2, DINOv3 (Meta, tự giám sát trên ảnh); CLIP (ảnh + văn bản)</td><td>Ảnh → vector đặc trưng cho cả ảnh và cho từng ô nhỏ (patch)</td><td>Phân loại với rất ít nhãn, anomaly detection, tìm ảnh giống nhau, làm backbone cho mô hình riêng</td></tr>
+  <tr><td>Phân đoạn theo nhắc</td><td>SAM, SAM 2 (điểm, khung); SAM 3 (thêm câu chữ, ra cuối 2025)</td><td>Ảnh + nhắc → mặt nạ</td><td>Gán nhãn phân đoạn nhanh; đếm, đo vật mới mà chưa có dữ liệu</td></tr>
+  <tr><td>Phát hiện theo câu chữ (open-vocabulary)</td><td>YOLOE, YOLO-World, Grounding DINO</td><td>Ảnh + danh sách tên lớp bằng chữ → hộp</td><td>Thử ý tưởng nhanh, tạo nhãn khởi đầu, phát hiện vật thông dụng (người, xe nâng, thùng)</td></tr>
+</table>
+<p>DINOv3 (Meta, 2025) là thế hệ sau của DINOv2 với các mô hình lớn hơn nhiều; nó dùng giấy phép riêng của Meta (cho phép dùng thương mại kèm điều kiện), khác với DINOv2 dùng Apache 2.0. Bài dùng DINOv2 ViT-S/14 (21 triệu tham số) vì nhỏ, chạy được trên CPU và tải về không cần đăng ký. Mọi ý trong bài áp dụng được cho DINOv3.</p>
+
+<h2>2. Thí nghiệm 1: phân loại OK/NG với vài ảnh có nhãn</h2>
+<p>Ảnh 224 × 224 bề mặt gỗ ép: vân gỗ và màu thay đổi theo từng tấm; ảnh NG có một trong ba lỗi (vết nứt mảnh, đốm cháy, mảng sứt lộ lõi). Một "kho" 400 ảnh để rút vài ảnh có nhãn, và 300 ảnh thử.</p>
+<pre><code class="language-python">import time
+
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import roc_auc_score
+
+torch.manual_seed(0)
+torch.set_num_threads(8)
+S = 224
+
+
+def tao_anh(n, hat, ty_le_ng=0.5, lech_mau=(0.0, 0.0, 0.0), tan_van=(15, 30)):
+    """Ảnh 224×224 màu: bề mặt gỗ ép có vân; NG có một trong ba lỗi (vết nứt, đốm cháy, mảng sứt) ở vị trí ngẫu nhiên."""
+    g = np.random.default_rng(hat)
+    yy, xx = np.mgrid[0:S, 0:S] / S
+    anh = np.zeros((n, S, S, 3), np.float32)
+    nhan = (g.random(n) &lt; ty_le_ng).astype(np.int64)
+    vi_tri = np.zeros((n, 2))
+    for i in range(n):
+        tan = g.uniform(*tan_van)                                  # mật độ vân gỗ
+        van = 0.5 + 0.5 * np.sin(2 * np.pi * (tan * yy + 2 * np.sin(4 * xx + g.uniform(0, 6))))      # vân gỗ
+        nen = 0.55 + 0.1 * van + 0.03 * g.standard_normal((S, S))
+        anh[i] = nen[..., None] * np.array([0.85, 0.65, 0.45]) + g.uniform(-0.04, 0.04, 3) + lech_mau   # màu gỗ
+        if nhan[i]:
+            cx, cy = g.uniform(30, 194, 2)
+            loai = g.integers(3)
+            d2 = (np.arange(S)[None, :] - cx) ** 2 + (np.arange(S)[:, None] - cy) ** 2
+            if loai == 0:                                          # vết nứt mảnh
+                goc = g.uniform(0, np.pi)
+                kc = np.abs(-(np.arange(S)[None, :] - cx) * np.sin(goc) + (np.arange(S)[:, None] - cy) * np.cos(goc))
+                mat_na = (kc &lt; 1.2) &amp; (d2 &lt; 22 ** 2)
+                anh[i][mat_na] *= 0.55
+            elif loai == 1:                                        # đốm cháy tối
+                anh[i] *= (1 - 0.45 * np.exp(-d2 / (2 * 6 ** 2)))[..., None]
+            else:                                                  # mảng sứt, lộ lớp lõi sáng
+                anh[i][d2 &lt; 9 ** 2] = np.array([0.82, 0.78, 0.7])
+            vi_tri[i] = cx, cy
+    return torch.tensor(np.clip(anh, 0, 1)).permute(0, 3, 1, 2), torch.tensor(nhan), vi_tri
+
+
+X_tap, y_tap, _ = tao_anh(400, 1)                                  # nguồn để rút vài ảnh có nhãn
+X_thu, y_thu, vt_thu = tao_anh(300, 2)                             # tập thử
+print("tập thử:", tuple(X_thu.shape), "| NG:", int(y_thu.sum()))</code></pre>
+<pre><code class="language-text">tập thử: (300, 3, 224, 224) | NG: 162</code></pre>
+<p>So ba cách khi chỉ có 4, 8, 16, 32 ảnh có nhãn mỗi lớp: một CNN nhỏ huấn luyện từ đầu; đặc trưng ResNet-18 huấn luyện trên ImageNet (đóng băng) cộng hồi quy logistic; đặc trưng DINOv2 (token CLS, đóng băng) cộng hồi quy logistic. "Đóng băng" nghĩa là không huấn luyện lại backbone, chỉ học một bộ phân loại tuyến tính rất nhỏ trên vector đặc trưng: nhanh, và khó quá khớp khi dữ liệu ít.</p>
+<pre><code class="language-python">dino = torch.hub.load("facebookresearch/dinov2", "dinov2_vits14").eval()       # ViT-S/14, 21 triệu tham số
+CHUAN = (torch.tensor([0.485, 0.456, 0.406])[:, None, None], torch.tensor([0.229, 0.224, 0.225])[:, None, None])
+
+
+@torch.no_grad()
+def dac_trung(X, lo=32):
+    """Đặc trưng ảnh (token CLS, 384 chiều) và đặc trưng từng patch 14×14 px (16 × 16 patch, 384 chiều)."""
+    cls, patch = [], []
+    for i in range(0, len(X), lo):
+        ra = dino.forward_features((X[i:i + lo] - CHUAN[0]) / CHUAN[1])
+        cls.append(ra["x_norm_clstoken"])
+        patch.append(ra["x_norm_patchtokens"])
+    return torch.cat(cls), torch.cat(patch)
+
+
+t = time.perf_counter()
+cls_tap, patch_tap = dac_trung(X_tap)
+cls_thu, patch_thu = dac_trung(X_thu)
+print(f"trích đặc trưng {len(X_tap) + len(X_thu)} ảnh trên CPU: {time.perf_counter() - t:.0f} s; "
+      f"CLS {tuple(cls_thu.shape)}, patch {tuple(patch_thu.shape)}")
+
+
+class CnnNho(nn.Module):
+    def __init__(self):
+        super().__init__()
+        khoi = lambda a, b: [nn.Conv2d(a, b, 3, padding=1), nn.BatchNorm2d(b), nn.ReLU(), nn.MaxPool2d(2)]
+        self.net = nn.Sequential(*khoi(3, 16), *khoi(16, 32), *khoi(32, 64), *khoi(64, 64),
+                                 nn.AdaptiveAvgPool2d(1), nn.Flatten(), nn.Linear(64, 2))
+
+    def forward(self, x):
+        return self.net(x)
+
+
+def cnn_tu_dau(X, y, epoch=60):
+    torch.manual_seed(0)
+    mh, Xn = CnnNho(), F.interpolate(X, size=112)
+    opt = torch.optim.Adam(mh.parameters(), lr=1e-3)
+    for _ in range(epoch):
+        xb = torch.where(torch.rand(len(Xn), 1, 1, 1) &lt; 0.5, Xn.flip(3), Xn)          # lật ngang ngẫu nhiên
+        loss = F.cross_entropy(mh(xb), y)
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+    mh.eval()
+    with torch.no_grad():
+        return (mh(F.interpolate(X_thu, size=112)).argmax(1) == y_thu).float().mean().item()
+
+
+def dino_logistic(i_chon):
+    clf = LogisticRegression(max_iter=2000).fit(F.normalize(cls_tap[i_chon]).numpy(), y_tap[i_chon].numpy())
+    return clf.score(F.normalize(cls_thu).numpy(), y_thu.numpy())
+
+
+import torchvision
+
+resnet = torchvision.models.resnet18(weights=torchvision.models.ResNet18_Weights.DEFAULT).eval()
+resnet.fc = nn.Identity()                                         # bỏ lớp phân loại 1000 lớp: lấy vector 512 chiều
+
+
+@torch.no_grad()
+def dac_trung_resnet(X, lo=32):
+    return torch.cat([resnet((X[i:i + lo] - CHUAN[0]) / CHUAN[1]) for i in range(0, len(X), lo)])
+
+
+rn_tap, rn_thu = dac_trung_resnet(X_tap), dac_trung_resnet(X_thu)
+
+
+def resnet_logistic(i_chon):
+    clf = LogisticRegression(max_iter=2000).fit(F.normalize(rn_tap[i_chon]).numpy(), y_tap[i_chon].numpy())
+    return clf.score(F.normalize(rn_thu).numpy(), y_thu.numpy())
+
+
+rng = np.random.default_rng(0)
+ok_idx, ng_idx = np.nonzero(y_tap.numpy() == 0)[0], np.nonzero(y_tap.numpy() == 1)[0]
+print("ảnh có nhãn/lớp | CNN từ đầu | ResNet-18 ImageNet + logistic | DINOv2 + logistic  (accuracy TB 5 lần rút)")
+for n in (4, 8, 16, 32):
+    kq = {"cnn": [], "rn": [], "dino": []}
+    for _ in range(5):
+        i_chon = np.r_[rng.choice(ok_idx, n, replace=False), rng.choice(ng_idx, n, replace=False)]
+        kq["cnn"].append(cnn_tu_dau(X_tap[i_chon], y_tap[i_chon]))
+        kq["rn"].append(resnet_logistic(i_chon))
+        kq["dino"].append(dino_logistic(i_chon))
+    print(f"      {n:3d}      |   {100 * np.mean(kq['cnn']):5.1f}%   |            {100 * np.mean(kq['rn']):5.1f}%            |"
+          f"      {100 * np.mean(kq['dino']):5.1f}%")</code></pre>
+<pre><code class="language-text">trích đặc trưng 700 ảnh trên CPU: 31 s; CLS (300, 384), patch (300, 256, 384)
+ảnh có nhãn/lớp | CNN từ đầu | ResNet-18 ImageNet + logistic | DINOv2 + logistic  (accuracy TB 5 lần rút)
+        4      |    48.8%   |             70.1%            |       96.1%
+        8      |    51.7%   |             78.3%            |       98.9%
+       16      |    48.4%   |             83.1%            |       99.0%
+       32      |    51.1%   |             83.7%            |       99.2%</code></pre>
+<p>Với 4 ảnh mỗi lớp, CNN từ đầu chỉ ngang đoán mò, đặc trưng ImageNet đạt khoảng 70%, đặc trưng DINOv2 đã trên 95%. Đặc trưng ImageNet được học để phân biệt chó, mèo, xe; đặc trưng DINOv2 được học tự giám sát để mô tả <em>mọi</em> thứ trong ảnh, kể cả kết cấu và chi tiết nhỏ, nên tách lỗi bề mặt tốt hơn nhiều khi dữ liệu ít. Thời gian trích đặc trưng trên CPU vào khoảng vài chục ms mỗi ảnh 224 × 224 (dòng in đầu tiên), chấp nhận được với nhiều trạm; trên GPU nhanh hơn nhiều.</p>
+
+<h2>3. Thí nghiệm 2: chỉ có ảnh OK</h2>
+<p>Đặc trưng từng patch (ô 14 × 14 px, lưới 16 × 16) của DINOv2 dùng được thay cho backbone ResNet trong PatchCore: lưu đặc trưng patch của vài chục ảnh OK làm "bộ nhớ"; với ảnh mới, mỗi patch được chấm bằng khoảng cách tới patch OK gần nhất; điểm của ảnh là patch xa nhất, và vị trí patch đó là vị trí nghi lỗi.</p>
+<pre><code class="language-python">kho = patch_tap[ok_idx[:30]].reshape(-1, 384)                     # "bộ nhớ" patch của 30 ảnh OK: 7680 vector
+print("bộ nhớ patch OK:", tuple(kho.shape))
+
+
+@torch.no_grad()
+def diem_bat_thuong(patch):
+    """Mỗi patch: khoảng cách tới patch OK gần nhất (ý tưởng PatchCore). Điểm ảnh = patch xa nhất."""
+    d = torch.stack([torch.cdist(p, kho).min(dim=1).values for p in patch])        # (N, 256)
+    return d.max(dim=1).values, d.argmax(dim=1)
+
+
+diem, vi_tri_max = diem_bat_thuong(patch_thu)
+print(f"AUROC phân biệt OK/NG (không dùng ảnh NG nào để học): {roc_auc_score(y_thu.numpy(), diem.numpy()):.3f}")
+ng = np.nonzero(y_thu.numpy() == 1)[0]
+r, c = vi_tri_max[ng] // 16, vi_tri_max[ng] % 16                  # patch xa nhất → tọa độ tâm patch (px)
+lech = np.hypot(c.numpy() * 14 + 7 - vt_thu[ng, 0], r.numpy() * 14 + 7 - vt_thu[ng, 1])
+print(f"định vị: patch bất thường nhất cách tâm lỗi trung vị {np.median(lech):.0f} px, "
+      f"{100 * np.mean(lech &lt; 21):.0f}% ảnh NG trong vòng 1,5 patch")
+nguong_95 = np.quantile(diem[y_thu == 0].numpy(), 0.95)
+print(f"ngưỡng giữ 95% ảnh OK: {nguong_95:.2f}; tỉ lệ ảnh NG vượt ngưỡng: {100 * (diem[y_thu == 1] &gt; nguong_95).float().mean():.0f}%")</code></pre>
+<pre><code class="language-text">bộ nhớ patch OK: (7680, 384)
+AUROC phân biệt OK/NG (không dùng ảnh NG nào để học): 1.000
+định vị: patch bất thường nhất cách tâm lỗi trung vị 9 px, 99% ảnh NG trong vòng 1,5 patch
+ngưỡng giữ 95% ảnh OK: 24.89; tỉ lệ ảnh NG vượt ngưỡng: 100%</code></pre>
+<p>Không dùng một ảnh NG nào, phương pháp tách OK/NG hoàn toàn trên bộ thử và chỉ đúng vị trí lỗi trong gần như mọi ảnh. Hãy đọc con số này cẩn thận: <strong>dữ liệu tổng hợp ở đây dễ</strong> (lỗi tương phản rõ trên nền vân đều). Trên lỗi thật, mờ, nằm trong vân phức tạp, kết quả sẽ thấp hơn; điều đáng học là quy trình, không phải con số 1,000.</p>
+
+<h2>4. Thay đổi lô vật liệu: đặc trưng nhạy với gì?</h2>
+<p>Đặc trưng tổng quát mô tả mọi thứ, nên phương pháp ở mục 3 báo bất thường với <em>mọi</em> thay đổi so với bộ nhớ OK, kể cả thay đổi vô hại. Thử với 100 ảnh OK của các lô gỗ khác nhau, dùng ngưỡng giữ 95% ảnh OK của lô cũ:</p>
+<pre><code class="language-python">for ten, lech, van in (("lô cũ", (0.0, 0.0, 0.0), (15, 30)), ("lô mới đậm màu hơn", (-0.06, -0.06, -0.04), (15, 30)),
+                       ("lô mới vân thưa hơn", (0.0, 0.0, 0.0), (8, 14)), ("lô mới vân dày hơn", (0.0, 0.0, 0.0), (32, 45))):
+    X_lo, _, _ = tao_anh(100, 7, ty_le_ng=0.0, lech_mau=lech, tan_van=van)     # 100 ảnh OK của một lô gỗ
+    d_lo, _ = diem_bat_thuong(dac_trung(X_lo)[1])
+    print(f"{ten:20s}: {100 * (d_lo &gt; nguong_95).float().mean():3.0f}% ảnh OK bị báo bất thường")</code></pre>
+<pre><code class="language-text">lô cũ               :   4% ảnh OK bị báo bất thường
+lô mới đậm màu hơn  :   4% ảnh OK bị báo bất thường
+lô mới vân thưa hơn :   4% ảnh OK bị báo bất thường
+lô mới vân dày hơn  :  26% ảnh OK bị báo bất thường</code></pre>
+<p>Lệch màu toàn tấm và vân thưa hơn không làm tăng báo nhầm (đặc trưng chuẩn hóa nên ít nhạy với màu chung), nhưng lô vân dày hơn khiến khoảng một phần tư ảnh OK bị báo bất thường. Không đoán trước được đặc trưng nhạy với loại thay đổi nào: phải thử trên chính các biến thiên OK thật của nhà máy (lô vật liệu, ca, đèn), giống như với variation model ở bài <a href="so-sanh-anh-mau-golden-template-opencv.html">golden template</a>. Bài tập 1 thử cách cập nhật bộ nhớ khi lô mới về.</p>
+
+<h2>5. SAM 3 và phát hiện theo câu chữ</h2>
+<p>SAM 3 (Meta, ra ngày 20/11/2025) nhận một cụm danh từ (ví dụ "nắp chai", "vết xước") hoặc vài khung mẫu, rồi tìm và phân đoạn <em>mọi</em> đối tượng thuộc khái niệm đó trong ảnh và video (xem thêm bài tin <a href="../tin-tuc-ai/computer-vision-2026-yolo26-sam-3-1.html">YOLO26 và SAM 3.1</a>). Thư viện Ultralytics có giao diện cho SAM 3 và cho YOLOE (open-vocabulary). Hai đoạn dưới là minh họa: trọng số SAM 3 (<code>sam3.pt</code>) phải xin quyền truy cập trên Hugging Face rồi tải thủ công; YOLOE tự tải trọng số lần đầu.</p>
+<pre><code class="language-python"># (minh họa) cần ultralytics và file sam3.pt đã được cấp quyền tải từ Hugging Face
+from ultralytics.models.sam import SAM3SemanticPredictor
+
+du_doan = SAM3SemanticPredictor(overrides=dict(conf=0.25, task="segment", mode="predict", model="sam3.pt"))
+du_doan.set_image("khay_linh_kien.jpg")                 # đặt ảnh một lần, hỏi nhiều khái niệm
+ket_qua = du_doan(text=["screw", "washer"])             # mặt nạ mọi con vít, vòng đệm trong ảnh</code></pre>
+<pre><code class="language-python"># (minh họa) phát hiện theo tên lớp bằng chữ, không cần huấn luyện
+from ultralytics import YOLOE
+
+mo_hinh = YOLOE("yoloe-26s-seg.pt")
+mo_hinh.set_classes(["forklift", "person", "pallet"])  # tên lớp tùy ý, bằng tiếng Anh
+ket_qua = mo_hinh.predict("kho_hang.jpg", conf=0.25)</code></pre>
+<p>Với vật thông dụng (người, xe nâng, thùng, pallet, chai), các mô hình này dùng được ngay. Với <strong>lỗi công nghiệp</strong> ("vết xước 0,2 mm trên nhôm anod", "bavia"), khái niệm hiếm khi có trong dữ liệu huấn luyện của chúng và kết quả thường không đủ tin cậy để phán OK/NG. Cách dùng hiệu quả nhất trong nhà máy hiện nay là làm <strong>công cụ gán nhãn</strong>: SAM 3 hoặc YOLOE đề xuất mặt nạ, hộp; người kiểm tra và sửa; rồi huấn luyện một mô hình nhỏ chuyên biệt (YOLO26, U-Net, PatchCore) để chạy trên dây chuyền. Xem bài <a href="../tai-nguyen/cong-cu-gan-nhan-du-lieu-anh-mien-phi.html">công cụ gán nhãn</a> và <a href="../tai-nguyen/sam-gan-nhan-phan-doan-nhanh.html">SAM để gán nhãn phân đoạn nhanh</a>.</p>
+
+<h2>6. Đưa lên dây chuyền: được gì, mất gì</h2>
+<table>
+  <tr><th>Tiêu chí</th><th>Foundation model</th><th>Mô hình nhỏ chuyên biệt</th></tr>
+  <tr><td>Dữ liệu cần</td><td>Rất ít (vài ảnh mỗi lớp, hoặc chỉ ảnh OK)</td><td>Hàng trăm đến hàng nghìn ảnh có nhãn</td></tr>
+  <tr><td>Thời gian ra phiên bản đầu</td><td>Vài giờ</td><td>Vài tuần (thu dữ liệu, gán nhãn, huấn luyện)</td></tr>
+  <tr><td>Tốc độ, phần cứng</td><td>Chậm hơn, nặng hơn (DINOv2 ViT-S 21 triệu tham số; bản lớn hàng trăm triệu đến hàng tỉ); SAM 3 cần GPU</td><td>Nhanh, chạy CPU/edge (YOLO26n khoảng 2,4 triệu tham số)</td></tr>
+  <tr><td>Kiểm soát</td><td>Nhạy với thay đổi không lường trước (mục 4); khó giải thích vì sao</td><td>Biết rõ dữ liệu đã học; kiểm định bằng golden set như mọi mô hình</td></tr>
+  <tr><td>Giấy phép</td><td>Khác nhau theo mô hình (DINOv2: Apache 2.0; DINOv3, SAM: giấy phép riêng của Meta; thư viện Ultralytics: AGPL-3.0 hoặc thương mại)</td><td>Tùy kiến trúc và thư viện; thường dễ kiểm soát hơn</td></tr>
+</table>
+<p>Lộ trình thực tế hay gặp: dùng foundation model để <em>khởi động</em> (chứng minh khả thi với vài ảnh, gán nhãn nhanh, chạy bóng song song với QC), rồi chuyển sang mô hình nhỏ chuyên biệt khi đã có dữ liệu, hoặc giữ foundation model làm backbone nếu tốc độ và giấy phép cho phép. Dù cách nào, nghiệm thu vẫn theo đúng quy trình golden set, ngưỡng, escape và overkill ở bài <a href="ai-vision-5-chon-nguong-va-danh-gia-theo-nha-may.html">chọn ngưỡng</a>.</p>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Foundation model: trích đặc trưng (DINOv2/v3, CLIP), phân đoạn theo nhắc (SAM, SAM 3 với câu chữ), phát hiện theo câu chữ (YOLOE, Grounding DINO).</li>
+  <li>Đặc trưng DINOv2 đóng băng + hồi quy logistic phân loại tốt với vài ảnh mỗi lớp, vượt xa CNN từ đầu và đặc trưng ImageNet trong thí nghiệm.</li>
+  <li>Đặc trưng patch + khoảng cách tới bộ nhớ OK (kiểu PatchCore) phát hiện và định vị lỗi khi không có ảnh NG.</li>
+  <li>Đặc trưng tổng quát nhạy với cả thay đổi vô hại; phải thử trên biến thiên OK thật của nhà máy, cập nhật bộ nhớ khi đổi lô.</li>
+  <li>Với lỗi công nghiệp, SAM 3, YOLOE hiệu quả nhất trong vai trò công cụ gán nhãn; mô hình nhỏ chuyên biệt chạy trên dây chuyền. Kiểm tra giấy phép từng mô hình.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Cập nhật bộ nhớ khi lô mới về</h3>
+<p>Lô gỗ vân dày làm khoảng một phần tư ảnh OK bị báo bất thường. Thêm 5 và 20 ảnh OK của lô mới vào bộ nhớ (giữ ngưỡng chọn trên lô cũ), đo lại tỉ lệ báo nhầm trên 100 ảnh OK lô mới và tỉ lệ bắt được 100 ảnh NG lô mới.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">X_moi, _, _ = tao_anh(120, 8, ty_le_ng=0.0, tan_van=(32, 45))                # ảnh OK lô vân dày: 20 để học, 100 để thử
+p_moi = dac_trung(X_moi)[1]
+X_ng_moi, y_ng_moi, _ = tao_anh(100, 9, ty_le_ng=1.0, tan_van=(32, 45))      # ảnh NG trên lô vân dày
+p_ng_moi = dac_trung(X_ng_moi)[1]
+kho_goc = patch_tap[ok_idx[:30]].reshape(-1, 384)
+for them in (0, 5, 20):
+    kho = torch.cat([kho_goc, p_moi[:them].reshape(-1, 384)])            # diem_bat_thuong dùng biến toàn cục kho
+    d_ok, _ = diem_bat_thuong(p_moi[20:])
+    d_ng, _ = diem_bat_thuong(p_ng_moi)
+    nguong = np.quantile(diem_bat_thuong(patch_thu[y_thu == 0])[0].numpy(), 0.95)   # ngưỡng chọn lại trên OK lô cũ
+    print(f"thêm {them:2d} ảnh OK lô mới: báo nhầm OK lô mới {100 * (d_ok &gt; nguong).float().mean():3.0f}%, "
+          f"bắt được NG lô mới {100 * (d_ng &gt; nguong).float().mean():3.0f}%")
+kho = kho_goc                                                         # trả lại như mục 3</code></pre>
+<pre><code class="language-text">thêm  0 ảnh OK lô mới: báo nhầm OK lô mới  22%, bắt được NG lô mới 100%
+thêm  5 ảnh OK lô mới: báo nhầm OK lô mới  16%, bắt được NG lô mới 100%
+thêm 20 ảnh OK lô mới: báo nhầm OK lô mới  13%, bắt được NG lô mới 100%</code></pre>
+<p>Thêm ảnh lô mới làm báo nhầm giảm, nhưng chậm: 20 ảnh vẫn chưa đưa về mức của lô cũ, vì lô mới có dải mật độ vân rộng và cần nhiều mẫu hơn để phủ. Ảnh NG vẫn bị bắt đủ. Trên trạm thật: quy trình đổi lô gồm thu một lượng ảnh OK đủ đa dạng của lô mới (theo dõi tỉ lệ báo nhầm khi thêm dần), chọn lại ngưỡng trên OK của cả hai lô, chạy lại bộ ảnh NG đã lưu để chắc escape không tăng, và ghi phiên bản bộ nhớ như ghi phiên bản mô hình.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Kế hoạch dùng SAM 3 để gán nhãn</h3>
+<p>Dự án mới: phát hiện linh kiện thiếu trên bo mạch, 15 loại linh kiện, chưa có ảnh nào được gán nhãn, 3 000 ảnh thô. Lập kế hoạch dùng SAM 3 (hoặc YOLOE) để có dataset nhanh nhất mà vẫn tin được.</p>
+<details><summary>Xem đáp án</summary>
+<p>(1) Gán nhãn tay cẩn thận 50–100 ảnh làm tập "chuẩn" để đo chất lượng nhãn tự động. (2) Thử các cụm từ nhắc cho từng loại linh kiện (tên tiếng Anh, mô tả hình dạng) và khung mẫu; đo IoU so với tập chuẩn, giữ cách nhắc tốt nhất cho từng loại; loại nào nhắc bằng chữ kém thì dùng khung mẫu hoặc gán tay. (3) Chạy tự động trên 3 000 ảnh, người kiểm tra chỉ sửa và xác nhận (nhanh hơn vẽ mới nhiều lần), ưu tiên xem ảnh có điểm tin cậy thấp. (4) Huấn luyện YOLO26 nhỏ trên nhãn đã xác nhận; dùng mô hình đó tìm ảnh nó còn sai để gán nhãn thêm. (5) Chia train/val/test theo bo mạch, theo lô; tập test được kiểm tra kỹ nhất. Ghi rõ trong tài liệu dataset nhãn nào do máy đề xuất, nhãn nào người xác nhận.</p>
+</details>
+</div>
+<p>Bài tiếp theo: <a href="ai-vision-5-chon-nguong-va-danh-gia-theo-nha-may.html">Chọn ngưỡng và đánh giá theo escape, overkill, cycle time</a>.</p>
+
+<p class="note">Nguồn tham khảo: Oquab và cộng sự (2023), <a href="https://arxiv.org/abs/2304.07193" rel="noopener" target="_blank"><em>DINOv2: Learning Robust Visual Features without Supervision</em> (arXiv:2304.07193)</a>, <a href="https://github.com/facebookresearch/dinov2" rel="noopener" target="_blank">DINOv2 trên GitHub</a>, <a href="https://ai.meta.com/resources/models-and-libraries/dinov3-license" rel="noopener" target="_blank">Meta: DINOv3 License</a>, <a href="https://docs.ultralytics.com/models/sam-3" rel="noopener" target="_blank">Ultralytics: SAM 3 (Segment Anything with Concepts)</a>, <a href="https://docs.ultralytics.com/models/yoloe/" rel="noopener" target="_blank">Ultralytics: YOLOE</a>; Roth và cộng sự (2022), <em>Towards Total Recall in Industrial Anomaly Detection</em> (PatchCore).</p>
