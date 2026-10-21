@@ -87,6 +87,11 @@ print("tanh, N(0, 1)    :", run(tanh, lambda n: 1.0))
 print("tanh, Xavier     :", run(tanh, lambda n: (2 / (n + n)) ** 0.5))
 print("ReLU, Xavier     :", run(relu, lambda n: (2 / (n + n)) ** 0.5))
 print("ReLU, He         :", run(relu, lambda n: (2 / n) ** 0.5))</code></pre>
+<pre><code class="language-text">tanh, N(0, 0.01) : 0.213 0.0476 0.0106 0.00237 0.000529 0.000118 2.64e-05 5.91e-06 1.32e-06 2.98e-07
+tanh, N(0, 1)    : 0.982 0.982 0.982 0.982 0.982 0.982 0.982 0.982 0.982 0.982
+tanh, Xavier     : 0.628 0.487 0.409 0.358 0.322 0.295 0.273 0.254 0.242 0.228
+ReLU, Xavier     : 0.585 0.414 0.294 0.214 0.158 0.115 0.0784 0.0516 0.0366 0.0259
+ReLU, He         : 0.827 0.814 0.809 0.829 0.838 0.844 0.876 0.901 0.881 0.892</code></pre>
 <div class="table-wrap"><table>
 <tr><th>Cấu hình</th><th>Lớp 1</th><th>Lớp 5</th><th>Lớp 10</th><th>Nhận xét</th></tr>
 <tr><td>tanh, \(\mathcal N(0, 0.01^2)\)</td><td>0,213</td><td>5,3·10⁻⁴</td><td>3·10⁻⁷</td><td>Activation teo về 0 → gradient theo trọng số cũng teo: <strong>vanishing</strong></td></tr>
@@ -134,8 +139,15 @@ def init_weights(m):
         nn.init.zeros_(m.bias)
 
 
-model.apply(init_weights)            # áp dụng đệ quy cho mọi lớp con</code></pre>
-<p>(<code>mode="fan_out"</code> giữ ổn định phương sai ở chiều backward; cả hai mode đều phổ biến.)</p>
+torch.manual_seed(0)
+model = nn.Sequential(nn.Conv2d(64, 128, 3, padding=1, bias=False), nn.BatchNorm2d(128), nn.ReLU(),
+                      nn.AdaptiveAvgPool2d(1), nn.Flatten(), nn.Linear(128, 10))
+model.apply(init_weights)            # áp dụng đệ quy cho mọi lớp con
+print(f"conv  : std {model[0].weight.std():.4f}, lý thuyết √(2/fan_out) = {(2 / (128 * 3 * 3)) ** 0.5:.4f}")
+print(f"linear: |w| lớn nhất {model[5].weight.abs().max():.4f}, giới hạn Xavier uniform √(6/(128+10)) = {(6 / 138) ** 0.5:.4f}")</code></pre>
+<pre><code class="language-text">conv  : std 0.0418, lý thuyết √(2/fan_out) = 0.0417
+linear: |w| lớn nhất 0.2083, giới hạn Xavier uniform √(6/(128+10)) = 0.2085</code></pre>
+<p>Độ lệch chuẩn đo được khớp lý thuyết. <code>mode="fan_out"</code> dùng \(n_{out} = C_{out}\cdot k_h\cdot k_w\) và giữ ổn định phương sai ở chiều backward; <code>fan_in</code> giữ ổn định ở chiều forward; cả hai đều phổ biến.</p>
 
 <h2>Gradient clipping</h2>
 <p>Ngay cả khi mọi thứ đúng, đôi khi một batch "lạ" sinh ra gradient cực lớn và đẩy trọng số văng xa khỏi vùng tốt (trang 131: một bước nhảy vọt ra khỏi vách đá của mặt loss). Gradient clipping chặn độ lớn gradient trước khi cập nhật:</p>
@@ -143,7 +155,8 @@ model.apply(init_weights)            # áp dụng đệ quy cho mọi lớp con<
 <li><strong>Theo giá trị</strong> (by value): kẹp từng phần tử vào \([-c, c]\). Đơn giản nhưng làm <strong>đổi hướng</strong> vector gradient.</li>
 <li><strong>Theo chuẩn</strong> (by norm): nếu \(\|g\| &gt; \tau\) thì co cả vector \(g \leftarrow g\cdot\dfrac{\tau}{\|g\|}\). Giữ nguyên hướng, chỉ giảm độ dài. Đây là cách được khuyên dùng.</li>
 </ul>
-<pre><code class="language-python">for images, labels in train_loader:
+<pre><code class="language-python"># (minh họa) vị trí của clipping trong vòng huấn luyện
+for images, labels in train_loader:
     loss = criterion(model(images), labels)
     optimizer.zero_grad()
     loss.backward()
@@ -151,7 +164,122 @@ model.apply(init_weights)            # áp dụng đệ quy cho mọi lớp con<
     grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
     # hoặc: torch.nn.utils.clip_grad_value_(model.parameters(), clip_value=0.5)
     optimizer.step()</code></pre>
-<p>Ví dụ: gradient \([30, 40]\) có norm 50; clip với <code>max_norm=5</code> cho \([3, 4]\), cùng hướng, độ dài 5. Clip theo value 1.0 với \([30, -0.5]\) cho \([1, -0.5]\), hướng đã thay đổi. Khi dùng mixed precision (<code>torch.amp</code>), phải gọi <code>scaler.unscale_(optimizer)</code> trước khi clip.</p>
+<p>Ví dụ: gradient \([30, 40]\) có norm 50; clip với <code>max_norm=5</code> cho \([3, 4]\), cùng hướng, độ dài 5. Clip theo value 1.0 với \([30, -0.5]\) cho \([1, -0.5]\), hướng đã thay đổi:</p>
+<pre><code class="language-python">w = torch.nn.Parameter(torch.zeros(2))
+w.grad = torch.tensor([30.0, 40.0])
+norm_truoc = torch.nn.utils.clip_grad_norm_([w], max_norm=5.0)    # trả về norm TRƯỚC khi clip
+print(f"theo norm : norm trước {norm_truoc:.0f} → gradient {w.grad.tolist()}")
+w.grad = torch.tensor([30.0, -0.5])
+torch.nn.utils.clip_grad_value_([w], clip_value=1.0)
+print(f"theo value: gradient {w.grad.tolist()}")</code></pre>
+<pre><code class="language-text">theo norm : norm trước 50 → gradient [2.999999761581421, 3.999999761581421]
+theo value: gradient [1.0, -0.5]</code></pre>
+<p> Khi dùng mixed precision (<code>torch.amp</code>), phải gọi <code>scaler.unscale_(optimizer)</code> trước khi clip.</p>
+
+<h2>Thí nghiệm: huấn luyện một mạng 20 lớp</h2>
+<p>Các liều thuốc trên giúp được bao nhiêu? Thí nghiệm sau dựng một mạng 20 lớp conv 3×3 (16 kênh) cho bài toán ảnh OK/NG 32×32 có vết xước mờ (cùng bộ dữ liệu với bài <a href="loss-function-gradient-descent-optimizer.html">loss và optimizer</a>), đo norm gradient của lớp conv đầu và cuối ngay khi khởi tạo, rồi huấn luyện 8 epoch bằng SGD momentum. Chạy khoảng 1 đến 2 phút trên CPU.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+import torch.nn.functional as F
+
+
+def tao_anh_ok_ng(n, seed):
+    """Ảnh xám 32×32 đã chuẩn hóa: nền kim loại có vân và nhiễu; một nửa có vết xước mờ (nhãn 1 = NG)."""
+    rng = np.random.default_rng(seed)
+    X = np.empty((n, 1, 32, 32), np.float32)
+    y = (rng.random(n) &lt; 0.5).astype(np.int64)
+    for i in range(n):
+        anh = 0.55 + 0.05 * np.sin(np.arange(32) / rng.uniform(1.5, 4))[None, :] + rng.normal(0, 0.05, (32, 32))
+        if y[i]:
+            x0, y0 = rng.integers(4, 28, 2)
+            goc, dai = rng.uniform(0, np.pi), rng.uniform(6, 14)
+            p1 = (int(x0 - dai * np.cos(goc) / 2), int(y0 - dai * np.sin(goc) / 2))
+            p2 = (int(x0 + dai * np.cos(goc) / 2), int(y0 + dai * np.sin(goc) / 2))
+            cv2.line(anh, p1, p2, float(anh.mean() - 0.15), 1)
+        X[i, 0] = anh
+    return torch.from_numpy((X - 0.55) / 0.1), torch.from_numpy(y)
+
+
+X_train, y_train = tao_anh_ok_ng(2000, seed=1)
+X_val, y_val = tao_anh_ok_ng(1000, seed=2)
+
+
+class MangSau(nn.Module):
+    """20 lớp conv 3×3, 16 kênh, ở độ phân giải 16×16; tùy chọn activation, khởi tạo He, BN, đường tắt."""
+
+    def __init__(self, act="relu", he=False, bn=False, tat=False, so_lop=20):
+        super().__init__()
+        self.vao = nn.Conv2d(1, 16, 3, stride=2, padding=1)
+        self.conv = nn.ModuleList(nn.Conv2d(16, 16, 3, padding=1, bias=not bn) for _ in range(so_lop))
+        self.bn = nn.ModuleList((nn.BatchNorm2d(16) if bn else nn.Identity()) for _ in range(so_lop))
+        self.act = torch.sigmoid if act == "sigmoid" else F.relu
+        self.tat = tat
+        self.ra = nn.Linear(16, 2)
+        if he:
+            for c in self.conv:
+                nn.init.kaiming_normal_(c.weight, nonlinearity="relu")
+
+    def forward(self, x):
+        x = self.act(self.vao(x))
+        for c, b in zip(self.conv, self.bn):
+            h = b(c(x))
+            x = self.act(x + h if self.tat else h)             # đường tắt kiểu ResNet: cộng đầu vào trước activation
+        return self.ra(x.amax(dim=(2, 3)))
+
+
+def do_gradient(mo_hinh):
+    """Norm gradient của lớp conv đầu và cuối trên một batch, lúc vừa khởi tạo."""
+    mo_hinh.zero_grad()
+    F.cross_entropy(mo_hinh(X_train[:128]), y_train[:128]).backward()
+    return mo_hinh.conv[0].weight.grad.norm().item(), mo_hinh.conv[-1].weight.grad.norm().item()
+
+
+def huan_luyen(mo_hinh, so_epoch=8, lr=0.01):
+    opt = torch.optim.SGD(mo_hinh.parameters(), lr=lr, momentum=0.9)
+    for _ in range(so_epoch):
+        mo_hinh.train()
+        thu_tu = torch.randperm(len(X_train))
+        for k in range(0, len(X_train), 64):
+            i = thu_tu[k:k + 64]
+            opt.zero_grad()
+            loss = F.cross_entropy(mo_hinh(X_train[i]), y_train[i])
+            loss.backward()
+            opt.step()
+    mo_hinh.eval()
+    with torch.no_grad():
+        return (mo_hinh(X_val).argmax(1) == y_val).float().mean().item()
+
+
+CAU_HINH = {"sigmoid, khởi tạo mặc định": dict(act="sigmoid"), "ReLU, khởi tạo mặc định": dict(),
+            "ReLU, khởi tạo He": dict(he=True), "ReLU + BatchNorm": dict(bn=True), "ReLU + đường tắt": dict(tat=True),
+            "ReLU + BN + đường tắt (ResNet)": dict(bn=True, tat=True)}
+print(f"{'mạng 20 lớp':30s} | grad lớp đầu | grad lớp cuối | val sau 8 epoch")
+for ten, ts in CAU_HINH.items():
+    torch.manual_seed(0)
+    m = MangSau(**ts)
+    dau, cuoi = do_gradient(m)
+    print(f"{ten:30s} | {dau:12.1e} | {cuoi:13.1e} | {huan_luyen(m):.1%}")</code></pre>
+<pre><code class="language-text">mạng 20 lớp                    | grad lớp đầu | grad lớp cuối | val sau 8 epoch
+sigmoid, khởi tạo mặc định     |      1.9e-18 |       9.9e-02 | 50.3%
+ReLU, khởi tạo mặc định        |      2.3e-09 |       1.3e-03 | 50.3%
+ReLU, khởi tạo He              |      5.7e-02 |       1.5e-02 | 49.7%
+ReLU + BatchNorm               |      2.7e+01 |       1.2e+00 | 85.1%
+ReLU + đường tắt               |      7.5e-01 |       1.4e+01 | 57.0%
+ReLU + BN + đường tắt (ResNet) |      8.9e+00 |       3.9e+00 | 78.6%</code></pre>
+<ul>
+  <li><strong>Sigmoid</strong>: gradient lớp đầu \(10^{-18}\), nhỏ hơn lớp cuối 17 bậc độ lớn. Lớp đầu không học gì; độ chính xác 50% là đoán bừa.</li>
+  <li><strong>ReLU, khởi tạo mặc định của PyTorch</strong>: đỡ hơn nhưng gradient lớp đầu vẫn \(10^{-9}\). Khởi tạo mặc định (\(U(\pm 1/\sqrt{n_{in}})\)) có phương sai chỉ bằng 1/6 của He, nên tín hiệu co lại qua 20 lớp.</li>
+  <li><strong>ReLU, khởi tạo He</strong>: gradient lớp đầu và cuối đã cùng cỡ, đúng như lý thuyết. Vậy mà trong 8 epoch mạng vẫn không học được. Gradient đúng cỡ lúc khởi tạo là điều kiện cần, chưa phải điều kiện đủ: mạng "phẳng" rất sâu vẫn khó tối ưu. He và cộng sự (2016) gọi đây là <em>degradation problem</em> và đó chính là lý do ResNet ra đời.</li>
+  <li><strong>BatchNorm</strong> giữ activation mọi lớp ở thang đo ổn định và cho mạng 20 lớp học được (85%).</li>
+  <li><strong>Đường tắt</strong> không có BN thì gradient lớp cuối lớn hơn lớp đầu gần 20 lần và chỉ đạt 57%; kết hợp BN và đường tắt (kiểu ResNet) cũng học được.</li>
+</ul>
+<p>Ở 20 lớp, BN đơn thuần đã đủ, và giữa nhiều seed mình chạy thử thì BN (84 đến 90%) và BN + đường tắt (75 đến 93%) chưa phân thắng bại. Khác biệt lộ ra khi mạng sâu hơn:</p>
+<pre><code class="language-python">for ten, ts in (("ReLU + BatchNorm", dict(bn=True)), ("ReLU + BN + đường tắt (ResNet)", dict(bn=True, tat=True))):
+    torch.manual_seed(0)
+    print(f"50 lớp, {ten:30s}: val sau 8 epoch {huan_luyen(MangSau(so_lop=50, **ts)):.1%}")</code></pre>
+<pre><code class="language-text">50 lớp, ReLU + BatchNorm              : val sau 8 epoch 50.6%
+50 lớp, ReLU + BN + đường tắt (ResNet): val sau 8 epoch 67.1%</code></pre>
+<p>Ở 50 lớp, mạng chỉ có BN sụp về mức đoán bừa, còn đường tắt vẫn giữ được việc học. Chạy 3 seed, mình được BN 49 đến 57% và BN + đường tắt 58 đến 67%; 8 epoch là quá ít cho mạng 50 lớp, nhưng xu hướng đã rõ. Đường tắt cho gradient một lối đi thẳng (đạo hàm của \(x + h(x)\) theo \(x\) luôn có thành phần 1), nên lớp đầu không phụ thuộc vào tích của 50 thừa số. Chi tiết ở bài <a href="kien-truc-cnn-kinh-dien.html">kiến trúc CNN kinh điển</a>.</p>
 
 <h2>Checklist khi huấn luyện "có vấn đề"</h2>
 <ul>
@@ -159,10 +287,22 @@ model.apply(init_weights)            # áp dụng đệ quy cho mọi lớp con<
 <li><strong>Loss thành NaN</strong>: giảm learning rate 3–10 lần; thêm gradient clipping; kiểm tra dữ liệu có NaN/Inf; kiểm tra phép <code>log(0)</code> hay chia 0 trong loss tự viết.</li>
 <li><strong>Loss dao động mạnh</strong>: learning rate quá lớn hoặc batch quá nhỏ; thêm warmup.</li>
 </ul>
-<pre><code class="language-python"># In norm gradient của từng lớp sau loss.backward()
+<pre><code class="language-python"># In norm gradient của từng lớp sau loss.backward(): ở đây là mạng sigmoid 6 lớp
+torch.manual_seed(0)
+model = MangSau(act="sigmoid", so_lop=6)
+F.cross_entropy(model(X_train[:128]), y_train[:128]).backward()
 for name, p in model.named_parameters():
-    if p.grad is not None:
-        print(f"{name:40s} {p.grad.norm().item():.2e}")</code></pre>
+    if p.grad is not None and name.endswith("weight"):
+        print(f"{name:16s} {p.grad.norm().item():.2e}")</code></pre>
+<pre><code class="language-text">vao.weight       7.64e-08
+conv.0.weight    3.16e-06
+conv.1.weight    1.91e-05
+conv.2.weight    1.35e-04
+conv.3.weight    1.19e-03
+conv.4.weight    9.62e-03
+conv.5.weight    8.10e-02
+ra.weight        2.08e-01</code></pre>
+<p>Đọc từ dưới lên: mỗi lớp sigmoid làm gradient nhỏ đi khoảng 6 đến 9 lần, đến lớp vào chỉ còn cỡ \(10^{-7}\). Bảng kiểu này là cách nhanh nhất để chẩn đoán vanishing gradient trên mô hình thật.</p>
 
 <h2>Tóm tắt</h2>
 <ul>
@@ -170,8 +310,82 @@ for name, p in model.named_parameters():
 <li>Sigmoid có đạo hàm tối đa 0,25: tránh dùng ở lớp ẩn; dùng ReLU, LeakyReLU, SiLU, GELU.</li>
 <li>Không khởi tạo trọng số bằng hằng số; Xavier cho tanh/sigmoid (\(2/(n_{in}+n_{out})\)), He cho ReLU (\(2/n_{in}\)).</li>
 <li>Gradient clipping theo norm, đặt giữa <code>backward()</code> và <code>step()</code>.</li>
-<li>BatchNorm và skip connection là hai "vũ khí" quan trọng nhất giúp mạng sâu huấn luyện được.</li>
+<li>BatchNorm và skip connection là hai "vũ khí" quan trọng nhất giúp mạng sâu huấn luyện được: thí nghiệm cho thấy khởi tạo đúng là cần nhưng chưa đủ.</li>
 </ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Tính độ lệch chuẩn He cho một lớp conv</h3>
+<p>Lớp <code>Conv2d(64, 64, 3)</code> khởi tạo He normal theo <code>fan_in</code>. Tính độ lệch chuẩn lý thuyết rồi đo lại.</p>
+<details><summary>Xem đáp án</summary>
+<p>\(n_{in} = 64\cdot3\cdot3 = 576\), \(\sigma = \sqrt{2/576} \approx 0{,}0589\).</p>
+<pre><code class="language-python">conv = nn.Conv2d(64, 64, 3)
+nn.init.kaiming_normal_(conv.weight, mode="fan_in", nonlinearity="relu")
+print(f"lý thuyết {(2 / (64 * 3 * 3)) ** 0.5:.4f}, đo được {conv.weight.std():.4f}")</code></pre>
+<pre><code class="language-text">lý thuyết 0.0589, đo được 0.0591</code></pre>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Khởi tạo hằng số không phá được đối xứng</h3>
+<p>Khởi tạo mọi trọng số một mạng nhỏ bằng 0,5, huấn luyện 200 bước, rồi in trọng số lớp đầu. Ba neuron ẩn có học được ba đặc trưng khác nhau không?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">torch.manual_seed(0)
+lop = nn.Sequential(nn.Linear(4, 3), nn.ReLU(), nn.Linear(3, 2))
+for m in lop:
+    if isinstance(m, nn.Linear):
+        nn.init.constant_(m.weight, 0.5)                  # khởi tạo hằng số: SAI
+        nn.init.zeros_(m.bias)
+opt = torch.optim.SGD(lop.parameters(), lr=0.1)
+X4, y4 = torch.randn(256, 4), torch.randint(0, 2, (256,))
+for _ in range(200):
+    opt.zero_grad()
+    F.cross_entropy(lop(X4), y4).backward()
+    opt.step()
+print(lop[0].weight.data.round(decimals=4))</code></pre>
+<pre><code class="language-text">tensor([[0.5009, 0.4990, 0.4999, 0.5002],
+        [0.5009, 0.4990, 0.4999, 0.5002],
+        [0.5009, 0.4990, 0.4999, 0.5002]])</code></pre>
+<p>Ba hàng giống hệt nhau đến bốn chữ số: trọng số có thay đổi (không còn đúng 0,5) nhưng ba neuron luôn nhận cùng gradient nên mãi là bản sao của nhau. Lớp 3 neuron hoạt động như 1 neuron.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 3. Loss thành vô cùng: clip hay sửa gốc?</h3>
+<p>Hồi quy khối lượng (khoảng 1 000 mg) từ diện tích (khoảng 50 mm²) bằng một lớp Linear, chưa chuẩn hóa dữ liệu. So ba cách: không làm gì, clip norm gradient, và chuẩn hóa cả đặc trưng lẫn mục tiêu.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">torch.manual_seed(0)
+dien_tich = 50 + 10 * torch.randn(64, 1)                  # đặc trưng chưa chuẩn hóa (mm²)
+khoi_luong = 20 * dien_tich + 5 * torch.randn(64, 1)      # mục tiêu ~1000 (mg)
+
+
+def hoi_quy(X, y, lr, clip=None, so_buoc=50):
+    torch.manual_seed(1)
+    m = nn.Linear(1, 1)
+    opt = torch.optim.SGD(m.parameters(), lr=lr)
+    lich_su = []
+    for _ in range(so_buoc):
+        opt.zero_grad()
+        loss = F.mse_loss(m(X), y)
+        loss.backward()
+        if clip:
+            torch.nn.utils.clip_grad_norm_(m.parameters(), max_norm=clip)
+        opt.step()
+        lich_su.append(loss.item())
+    return ", ".join(f"{lich_su[i]:.3g}" for i in (0, 9, 49))
+
+
+print("loss ở bước 1, 10, 50")
+print("không làm gì, lr=1e-3     :", hoi_quy(dien_tich, khoi_luong, 1e-3))
+print("clip norm 100, lr=1e-3    :", hoi_quy(dien_tich, khoi_luong, 1e-3, clip=100))
+Xc = (dien_tich - dien_tich.mean()) / dien_tich.std()
+yc = (khoi_luong - khoi_luong.mean()) / khoi_luong.std()
+print("chuẩn hóa X và y, lr=0.1  :", hoi_quy(Xc, yc, 0.1))</code></pre>
+<pre><code class="language-text">loss ở bước 1, 10, 50
+không làm gì, lr=1e-3     : 1.03e+06, 4.02e+17, inf
+clip norm 100, lr=1e-3    : 1.03e+06, 9.34e+05, 5.75e+05
+chuẩn hóa X và y, lr=0.1  : 0.426, 0.00857, 0.000593</code></pre>
+<p>Không làm gì: loss bùng nổ lên vô cùng sau vài chục bước, vì đặc trưng cỡ 50 làm mặt loss rất dốc nên lr = 1e-3 đã là quá lớn. Clip chặn được bùng nổ nhưng mô hình học rất chậm, loss vẫn còn cỡ \(10^5\) sau 50 bước. Chuẩn hóa \(X\) và \(y\) sửa đúng nguyên nhân: dùng được lr = 0,1 và loss giảm về gần 0. Clipping là dây an toàn cho những batch bất thường, không phải thuốc chữa dữ liệu chưa chuẩn hóa.</p>
+</details>
+</div>
 <p>Bài tiếp theo trong chặng: <a href="kien-truc-cnn-kinh-dien.html">Các kiến trúc CNN kinh điển: LeNet đến ResNet</a>, nơi skip connection của ResNet giải đúng bài toán gradient biến mất của bài này. Đọc thêm: <a href="transfer-learning-data-augmentation.html">Transfer Learning và Data Augmentation</a>, hai kỹ thuật giúp bạn đạt kết quả tốt với ít dữ liệu.</p>
 
 <h2>Tài liệu tham khảo</h2>

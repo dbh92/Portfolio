@@ -157,7 +157,41 @@ print(bao_cao([]))</code></pre>
 <div class="ex">
 <h3>Bài 3. Tách module</h3>
 <p>Tạo thư mục <code>bai_tap_5</code> gồm <code>do_luong.py</code> (chứa hàm <code>kiem_tra_dung_sai</code> và <code>thong_ke</code>) và <code>main.py</code> import hai hàm đó, đọc list giá trị đo, in thống kê và số NG. Thêm khối <code>if __name__ == "__main__":</code> trong <code>do_luong.py</code> để tự kiểm tra bằng <code>assert</code>.</p>
-<details><summary>Gợi ý</summary>
-<p>Dùng lại code ở mục 3 và mục 6. Chạy <code>python do_luong.py</code> phải in thông báo tự kiểm tra; chạy <code>python main.py</code> chỉ in kết quả thống kê, không in thông báo tự kiểm tra.</p>
+<details><summary>Xem đáp án</summary>
+<p>File <code>bai_tap_5/do_luong.py</code>:</p>
+<pre><code class="language-python">"""Hàm đo lường dùng chung cho trạm kiểm tra."""
+
+
+def kiem_tra_dung_sai(gia_tri: float, danh_nghia: float, dung_sai: float) -&gt; bool:
+    """True nếu gia_tri nằm trong danh_nghia ± dung_sai."""
+    return danh_nghia - dung_sai &lt;= gia_tri &lt;= danh_nghia + dung_sai
+
+
+def thong_ke(ds: list[float]) -&gt; tuple[float, float, float]:
+    """Trả về (nhỏ nhất, lớn nhất, trung bình) của một list số."""
+    return min(ds), max(ds), sum(ds) / len(ds)
+
+
+if __name__ == "__main__":
+    assert kiem_tra_dung_sai(12.5, 12.5, 0.1)
+    assert not kiem_tra_dung_sai(12.63, 12.5, 0.1)
+    assert thong_ke([1.0, 2.0, 3.0]) == (1.0, 3.0, 2.0)
+    print("do_luong.py: các kiểm tra đều đạt")</code></pre>
+<pre><code class="language-text">do_luong.py: các kiểm tra đều đạt</code></pre>
+<p>File <code>bai_tap_5/main.py</code>:</p>
+<pre><code class="language-python"># (minh họa) chạy bằng: python main.py, cùng thư mục với do_luong.py
+from do_luong import kiem_tra_dung_sai, thong_ke
+
+gia_tri_do = [12.48, 12.51, 12.63, 12.47, 12.52, 12.38]
+nho, lon, tb = thong_ke(gia_tri_do)
+so_ng = sum(not kiem_tra_dung_sai(v, 12.50, 0.10) for v in gia_tri_do)
+print(f"{len(gia_tri_do)} giá trị: min={nho} max={lon} tb={tb:.3f}")
+print(f"NG: {so_ng}")</code></pre>
+<pre><code class="language-text">$ python main.py
+6 giá trị: min=12.38 max=12.63 tb=12.498
+NG: 2</code></pre>
+<p>Chạy <code>python main.py</code> không in dòng "các kiểm tra đều đạt": khi <code>do_luong.py</code> được import, <code>__name__</code> của nó là <code>"do_luong"</code> chứ không phải <code>"__main__"</code>, nên khối tự kiểm tra bị bỏ qua. <code>sum(not ... for v in ...)</code> đếm số giá trị NG vì <code>True</code> được tính là 1.</p>
 </details>
 </div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/tutorial/controlflow.html" rel="noopener" target="_blank">Python Tutorial: More Control Flow Tools</a>; <a href="https://docs.python.org/3/tutorial/modules.html" rel="noopener" target="_blank">Python Tutorial: Modules</a>.</p>

@@ -192,15 +192,83 @@ print(danh_gia2(tim_vat(tien_xu_ly(anh, cfg2), cfg2), cfg2))</code></pre>
 <div class="ex">
 <h3>Bài 2. Cảnh báo chậm</h3>
 <p>Thêm trường <code>gioi_han_ms</code> vào cấu hình. Sau khi chạy <code>kiem_tra</code>, nếu thời gian tổng vượt giới hạn thì ghi cảnh báo bằng <code>logging.warning</code> kèm bước chậm nhất.</p>
-<details><summary>Gợi ý</summary>
-<p>Bước chậm nhất: <code>max((k for k in kq.thoi_gian_ms if k != "tong"), key=kq.thoi_gian_ms.get)</code>.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import logging
+import sys
+
+logging.basicConfig(format="%(levelname)s %(message)s", level=logging.INFO, stream=sys.stdout, force=True)
+
+
+@dataclass
+class CauHinh3(CauHinh):
+    gioi_han_ms: float = 50.0
+
+
+def canh_bao_cham(kq, cfg):
+    """Ghi cảnh báo nếu tổng thời gian vượt giới hạn; trả về True khi chậm."""
+    tg = kq.thoi_gian_ms
+    if tg["tong"] &lt;= cfg.gioi_han_ms:
+        return False
+    cham_nhat = max((k for k in tg if k != "tong"), key=tg.get)
+    logging.warning("chậm: tổng %.1f ms &gt; giới hạn %.1f ms, bước chậm nhất '%s' (%.1f ms)",
+                    tg["tong"], cfg.gioi_han_ms, cham_nhat, tg[cham_nhat])
+    return True
+
+
+cfg3 = CauHinh3()
+print("ảnh thử có chậm không:", canh_bao_cham(kiem_tra(anh, cfg3), cfg3))
+# Thử nhánh cảnh báo với số liệu thời gian giả lập (thời gian thật thay đổi theo máy)
+kq_cham = KetQua(True, 4, thoi_gian_ms={"tien_xu_ly": 12.0, "tim_vat": 61.5, "danh_gia": 0.1, "tong": 73.6})
+canh_bao_cham(kq_cham, cfg3)</code></pre>
+<pre><code class="language-text">ảnh thử có chậm không: False
+WARNING chậm: tổng 73.6 ms &gt; giới hạn 50.0 ms, bước chậm nhất 'tim_vat' (61.5 ms)</code></pre>
+<p>Ảnh thử chỉ mất vài mili giây nên không có cảnh báo. Với số liệu giả lập, log chỉ ra ngay bước <code>tim_vat</code> là thủ phạm. Để kiểm tra nhánh cảnh báo, dùng số liệu cố định như trên thay vì cố làm máy chạy chậm: test sẽ cho cùng kết quả trên mọi máy (bài <a href="pytest-kiem-thu-ham-xu-ly-anh.html">pytest</a>). Trên trạm thật, ghi log ra file (<code>logging.FileHandler</code>) để xem lại sau ca.</p>
 </details>
 </div>
 <div class="ex">
 <h3>Bài 3. Bộ ảnh vàng</h3>
 <p>Tạo thư mục <code>anh_vang</code> gồm 10 ảnh thử, tên file chứa kết quả mong đợi (<code>khay_01_OK.png</code>, <code>khay_02_NG.png</code>…). Viết script chạy pipeline trên cả thư mục, so kết quả với tên file và in tỉ lệ đúng. Script này phải in 100% trước khi bạn mang thuật toán lên trạm.</p>
-<details><summary>Gợi ý</summary>
-<p>Kết quả mong đợi: <code>p.stem.split("_")[-1] == "OK"</code>. Đếm số ảnh có <code>kq.ok</code> khớp với mong đợi, in danh sách ảnh sai để xem lại.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">Path("anh_vang").mkdir(exist_ok=True)
+for i, so in enumerate([4, 4, 3, 4, 5, 4, 4, 2, 4, 4], start=1):     # 4 vật là OK, còn lại NG
+    a = np.full((480, 640, 3), 50, np.uint8)
+    for x in (80, 200, 320, 440, 560)[:so]:
+        cv2.circle(a, (x, 240), 40, (210, 210, 210), -1)
+    cv2.imwrite(f"anh_vang/khay_{i:02d}_{'OK' if so == 4 else 'NG'}.png", a)
+
+
+def chay_anh_vang(thu_muc, cfg):
+    dung, sai = 0, []
+    for p in sorted(Path(thu_muc).glob("*.png")):
+        mong_doi = p.stem.split("_")[-1] == "OK"
+        kq = kiem_tra(cv2.imread(str(p)), cfg)
+        if kq.ok == mong_doi:
+            dung += 1
+        else:
+            sai.append((p.name, kq.ly_do or "OK"))
+    tong = dung + len(sai)
+    print(f"đúng {dung}/{tong} ({dung / tong:.0%})")
+    for ten, ly_do in sai:
+        print(f"  SAI {ten}: thuật toán nói '{ly_do}'")
+    return dung == tong
+
+
+chay_anh_vang("anh_vang", cfg)
+print("--- sửa nhầm dien_tich_min thành 6000:")
+chay_anh_vang("anh_vang", CauHinh(dien_tich_min=6000))</code></pre>
+<pre><code class="language-text">đúng 10/10 (100%)
+--- sửa nhầm dien_tich_min thành 6000:
+đúng 3/10 (30%)
+  SAI khay_01_OK.png: thuật toán nói 'có 0 vật, cần 4'
+  SAI khay_02_OK.png: thuật toán nói 'có 0 vật, cần 4'
+  SAI khay_04_OK.png: thuật toán nói 'có 0 vật, cần 4'
+  SAI khay_06_OK.png: thuật toán nói 'có 0 vật, cần 4'
+  SAI khay_07_OK.png: thuật toán nói 'có 0 vật, cần 4'
+  SAI khay_09_OK.png: thuật toán nói 'có 0 vật, cần 4'
+  SAI khay_10_OK.png: thuật toán nói 'có 0 vật, cần 4'</code></pre>
+<p>Với cấu hình đúng, bộ ảnh vàng cho 100%. Lần chạy thứ hai mô phỏng một lần "sửa" cấu hình sai: vật có diện tích khoảng 5 000 pixel bị loại hết, mọi ảnh OK thành NG, và bộ ảnh vàng bắt được ngay, kèm tên từng ảnh sai. Trong ảnh thật, hãy đưa vào bộ ảnh vàng cả những ảnh khó: vật sát mép, vật dính nhau, ánh sáng yếu, và mỗi lỗi từng gây sự cố ở trạm.</p>
 </details>
 </div>
 <p>Bài tiếp theo: <a href="pytest-kiem-thu-ham-xu-ly-anh.html">Kiểm thử hàm xử lý ảnh với pytest</a>, biến thư mục ảnh vàng của bài tập trên thành bộ test chạy tự động mỗi lần sửa code.</p>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/library/dataclasses.html" rel="noopener" target="_blank">Python: dataclasses</a>; <a href="https://docs.python.org/3/library/json.html" rel="noopener" target="_blank">Python: json</a>; <a href="https://docs.python.org/3/howto/logging.html" rel="noopener" target="_blank">Python: Logging HOWTO</a>.</p>

@@ -374,8 +374,23 @@ pipeline 1 luồng lưu: mất 0 khung, hàng đợi lưu dài nhất 1</code></
 <div class="ex">
 <h3>Bài 2. Giám sát độ sâu hàng đợi</h3>
 <p>Thêm vào <code>chay_pipeline</code> một luồng giám sát: mỗi 0,5 giây in độ dài hai hàng đợi. Chạy với một luồng lưu trong 3 giây. Hàng đợi lưu tăng trung bình bao nhiêu ảnh mỗi giây, và con số đó khớp với thời gian lưu và chu kỳ camera thế nào?</p>
-<details><summary>Gợi ý</summary>
-<p>Luồng giám sát: <code>while not dung.is_set(): print(q_xu_ly.qsize(), q_luu.qsize()); dung.wait(0.5)</code> (dùng <code>dung.wait</code> thay vì <code>time.sleep</code> để thoát ngay khi có lệnh dừng). Tốc độ tăng ≈ (số khung camera mỗi giây) − (số ảnh lưu được mỗi giây) = 25 − 1000/t<sub>lưu</sub>. Với t<sub>lưu</sub> ≈ 45 ms: 25 − 22 ≈ 3 ảnh/giây. Theo dõi <code>qsize()</code> trong log của trạm thật là cách phát hiện sớm một khâu sắp không theo kịp, trước khi hàng đợi đầy.</p>
+<details><summary>Xem đáp án</summary>
+<p>Trong <code>chay_pipeline</code>, thêm một hàm luồng nữa ngay trước dòng tạo danh sách <code>luong</code>, và thêm nó vào danh sách:</p>
+<pre><code class="language-python"># (minh họa) đoạn chèn vào trong chay_pipeline
+    def luong_giam_sat():                    # 4. giám sát: mỗi 0,5 giây ghi độ sâu hai hàng đợi
+        t0 = time.perf_counter()
+        while not dung.wait(0.5):            # wait trả về True ngay khi có lệnh dừng
+            print(f"t={time.perf_counter() - t0:3.1f} s  q_xu_ly={q_xu_ly.qsize():2d}  q_luu={q_luu.qsize():2d}")
+
+    luong = [threading.Thread(target=luong_lay, name="lay"), threading.Thread(target=luong_xu_ly, name="xu_ly"),
+             threading.Thread(target=luong_giam_sat, name="giam_sat")]</code></pre>
+<p>Gọi <code>chay_pipeline(giay=3.0, so_luong_luu=1)</code>, một lần chạy trên máy mình (lưu PNG đo riêng mất 43 ms/khung):</p>
+<pre><code class="language-text">t=0.5 s  q_xu_ly= 0  q_luu= 3
+t=1.0 s  q_xu_ly= 0  q_luu= 5
+t=1.5 s  q_xu_ly= 0  q_luu= 6
+t=2.0 s  q_xu_ly= 0  q_luu= 9
+t=2.5 s  q_xu_ly= 0  q_luu= 9</code></pre>
+<p>Hàng đợi xử lý luôn trống (khâu xử lý theo kịp), còn hàng đợi lưu tăng từ 3 lên 9 trong 2 giây, khoảng 3 ảnh mỗi giây. Lý thuyết: tốc độ tăng ≈ (khung camera mỗi giây) − (ảnh lưu được mỗi giây) = 25 − 1000/t<sub>lưu</sub>. Với 3 ảnh/giây, t<sub>lưu</sub> thực tế ≈ 1000/22 ≈ 45 ms, chậm hơn một chút so với 43 ms đo riêng, vì khi chạy chung, luồng lưu phải tranh CPU và ổ đĩa với các luồng khác. Dùng <code>dung.wait(0.5)</code> thay vì <code>time.sleep(0.5)</code> để luồng giám sát thoát ngay khi có lệnh dừng. Ghi <code>qsize()</code> vào log của trạm thật là cách phát hiện sớm một khâu sắp không theo kịp, trước khi hàng đợi đầy.</p>
 </details>
 </div>
 <div class="ex">

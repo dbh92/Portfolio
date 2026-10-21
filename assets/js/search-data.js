@@ -21,7 +21,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "21/10/2026",
-  "m": 24,
+  "m": 25,
   "img": "assets/images/posts/luong-hang-doi-tach-chup-anh-xu-ly.webp",
   "tags": [
    "Python",
@@ -2153,7 +2153,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "14/10/2026",
-  "m": 13,
+  "m": 21,
   "img": "assets/images/posts/loss-function-gradient-descent-optimizer.webp",
   "tags": [
    "Deep Learning",
@@ -2167,7 +2167,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "14/10/2026",
-  "m": 11,
+  "m": 18,
   "img": "assets/images/posts/backpropagation-lan-truyen-nguoc.webp",
   "tags": [
    "Deep Learning",
@@ -2209,7 +2209,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "14/10/2026",
-  "m": 14,
+  "m": 24,
   "img": "assets/images/posts/batchnorm-dropout-receptive-field.webp",
   "tags": [
    "Deep Learning",
@@ -2223,7 +2223,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "14/10/2026",
-  "m": 14,
+  "m": 20,
   "img": "assets/images/posts/kien-truc-cnn-kinh-dien.webp",
   "tags": [
    "Deep Learning",
@@ -2238,7 +2238,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "14/10/2026",
-  "m": 13,
+  "m": 22,
   "img": "assets/images/posts/vanishing-exploding-gradient-weight-init.webp",
   "tags": [
    "Deep Learning",
@@ -2281,7 +2281,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "14/10/2026",
-  "m": 16,
+  "m": 25,
   "img": "assets/images/posts/r-cnn-fast-faster-r-cnn.webp",
   "tags": [
    "Object Detection",
@@ -2309,7 +2309,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "14/10/2026",
-  "m": 12,
+  "m": 20,
   "img": "assets/images/posts/gan-mang-doi-sinh.webp",
   "tags": [
    "Generative AI",
@@ -2529,7 +2529,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "09/10/2026",
-  "m": 7,
+  "m": 8,
   "img": "assets/images/posts/python-5-ham-va-module.webp",
   "tags": [
    "Python",
@@ -2543,7 +2543,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "09/10/2026",
-  "m": 8,
+  "m": 10,
   "img": "assets/images/posts/python-6-doc-ghi-file-va-xu-ly-loi.webp",
   "tags": [
    "Python",
@@ -2557,7 +2557,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "09/10/2026",
-  "m": 9,
+  "m": 10,
   "img": "assets/images/posts/python-9-numpy-co-ban.webp",
   "tags": [
    "Python",
@@ -2587,7 +2587,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "09/10/2026",
-  "m": 10,
+  "m": 12,
   "img": "assets/images/posts/opencv-2-khong-gian-mau-va-tach-mau.webp",
   "tags": [
    "OpenCV",
@@ -2617,7 +2617,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "09/10/2026",
-  "m": 9,
+  "m": 11,
   "img": "assets/images/posts/opencv-4-ve-ket-qua-len-anh.webp",
   "tags": [
    "OpenCV",
@@ -2632,7 +2632,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "09/10/2026",
-  "m": 9,
+  "m": 11,
   "img": "assets/images/posts/opencv-5-to-chuc-pipeline-xu-ly.webp",
   "tags": [
    "OpenCV",
@@ -3080,7 +3080,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "09/10/2026",
-  "m": 30,
+  "m": 31,
   "img": "assets/images/posts/anomaly-6-anomaly-detection-padim-patchcore.webp",
   "tags": [
    "AI Vision",
@@ -3095,7 +3095,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "09/10/2026",
-  "m": 60,
+  "m": 61,
   "img": "assets/images/posts/capstone-1-tram-do-kich-thuoc.webp",
   "tags": [
    "Đo lường",
@@ -3475,7 +3475,7 @@ window.HF_POSTS = [
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "02/10/2026",
-  "m": 34,
+  "m": 35,
   "img": "assets/images/posts/kiem-tra-hieu-chuan-dinh-ky-san-xuat.webp",
   "tags": [
    "Calibration",
@@ -3951,7 +3951,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "20/09/2026",
-  "m": 31,
+  "m": 32,
   "img": "assets/images/posts/hand-eye-calibration-camera-robot.webp",
   "tags": [
    "Calibration",
@@ -4056,7 +4056,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "17/09/2026",
-  "m": 38,
+  "m": 39,
   "img": "assets/images/posts/onnx-runtime-csharp-chay-mo-hinh-ai.webp",
   "tags": [
    "C#",
@@ -4276,7 +4276,7 @@ window.HF_POSTS = [
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "11/09/2026",
-  "m": 30,
+  "m": 31,
   "img": "assets/images/posts/chon-camera-ong-kinh-machine-vision.webp",
   "tags": [
    "Camera",
@@ -4494,7 +4494,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "04/09/2026",
-  "m": 32,
+  "m": 33,
   "img": "assets/images/posts/pytorch-co-ban-tensor-autograd.webp",
   "tags": [
    "PyTorch",
@@ -4783,7 +4783,7 @@ window.HF_POSTS = [
   "c": "tai-nguyen",
   "cn": "Tài nguyên",
   "d": "24/08/2026",
-  "m": 35,
+  "m": 36,
   "img": "assets/images/posts/tu-xay-dataset-anh-cong-nghiep.webp",
   "tags": [
    "Dataset",
@@ -4827,7 +4827,7 @@ window.HF_POSTS = [
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "21/08/2026",
-  "m": 30,
+  "m": 31,
   "img": "assets/images/posts/machine-learning-la-gi.webp",
   "tags": [
    "Machine Learning",
