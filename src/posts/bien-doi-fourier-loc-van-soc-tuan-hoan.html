@@ -81,6 +81,181 @@ print("Ảnh chưa lọc: số vùng 'lỗi' =", n_goc)</code></pre>
 <pre><code class="language-text">Ảnh chưa lọc: số vùng 'lỗi' = 32</code></pre>
 <p>Không lọc, mỗi vạch tối của vân sọc đều thành một "lỗi": 32 vạch trên ảnh rộng 256 px chu kỳ 8 px. Thuật toán vô dụng.</p>
 
+
+<h2>5. Hoa văn thật: nhiều đỉnh, phải tìm tự động</h2>
+<p>Vân sọc hình sin ở mục 1 chỉ có đúng hai đỉnh. Hoa văn thật thì không: một sợi lưới sáng rộng 2 px trên nền tối là một <em>xung</em>, không phải sóng sin. Theo lý thuyết Fourier, tín hiệu tuần hoàn không phải hình sin có thêm các <strong>họa tần</strong> (harmonics) ở 2, 3, 4… lần tần số cơ bản; lưới có cả sợi dọc và sợi ngang còn sinh thêm các đỉnh <strong>chéo</strong> do hai hệ sợi tương tác. Chọn tay từng đỉnh không còn khả thi, nên ta tìm tự động: điểm nào là cực đại cục bộ của phổ và cao hơn hẳn "mặt bằng" phổ thì là đỉnh.</p>
+<p>"Cao hơn hẳn" được đo bằng trung vị và MAD (median absolute deviation) của phổ log: hai đại lượng này gần như không bị vài chục đỉnh làm lệch, khác với trung bình và độ lệch chuẩn. Hệ số 1,4826 đổi MAD thành độ lệch chuẩn tương đương của phân phối chuẩn.</p>
+<pre><code class="language-python">rng = np.random.default_rng(0)
+
+
+def tao_luoi(cao=256, rong=256, chu_ky_x=8.0, chu_ky_y=16.0, pha=(0.0, 0.0), sang_soi=80):
+    """Lưới lọc dệt: sợi dọc chu kỳ 8 px, sợi ngang chu kỳ 16 px, mỗi sợi rộng khoảng 2 px."""
+    y, x = np.mgrid[0:cao, 0:rong]
+    sx = np.exp(-((((x + pha[0]) % chu_ky_x) - chu_ky_x / 2) ** 2) / 2)
+    sy = np.exp(-((((y + pha[1]) % chu_ky_y) - chu_ky_y / 2) ** 2) / 2)
+    return 90 + sang_soi * np.maximum(sx, sy)
+
+
+def them_vet(anh, x, y, r=6, do_sau=35):
+    cao, rong = anh.shape
+    yv, xv = np.mgrid[0:cao, 0:rong]
+    return anh - do_sau * np.exp(-((xv - x) ** 2 + (yv - y) ** 2) / (2 * r ** 2))
+
+
+def chup(anh):
+    return np.clip(anh + rng.normal(0, 3, anh.shape), 0, 255).astype(np.float32)
+
+
+def tim_dinh(anh, ban_kinh_tam=6, he_so=8.0):
+    """Mọi đỉnh nổi bật của phổ: cực đại cục bộ 5×5, cao hơn trung vị + he_so·σ (ước lượng bằng MAD), ngoài vùng tâm."""
+    cao, rong = anh.shape
+    pho = np.log1p(np.abs(np.fft.fftshift(np.fft.fft2(anh))))
+    cuc_dai = pho == cv2.dilate(pho, np.ones((5, 5), np.uint8))
+    trung_vi = np.median(pho)
+    sigma = 1.4826 * np.median(np.abs(pho - trung_vi))          # MAD → σ, không bị các đỉnh kéo lệch
+    y, x = np.mgrid[0:cao, 0:rong]
+    ngoai_tam = np.hypot(x - rong // 2, y - cao // 2) &gt; ban_kinh_tam
+    ys, xs = np.nonzero(cuc_dai &amp; (pho &gt; trung_vi + he_so * sigma) &amp; ngoai_tam)
+    return list(zip(xs.tolist(), ys.tolist()))
+
+
+def loc_notch(anh, cac_dinh, ban_kinh=4):
+    """Như loc_chan_dai ở mục 3 nhưng nhận ảnh, trả về ảnh đã lọc."""
+    F = np.fft.fftshift(np.fft.fft2(anh))
+    mat_na = np.ones(F.shape, np.float32)
+    for x, y in cac_dinh:
+        cv2.circle(mat_na, (x, y), ban_kinh, 0, -1)
+    mat_na = cv2.GaussianBlur(mat_na, (0, 0), ban_kinh / 2)        # bờ mềm, tránh gợn vòng
+    return np.real(np.fft.ifft2(np.fft.ifftshift(F * mat_na))).astype(np.float32)
+
+
+def do_vet(anh_loc, nguong=15, dien_tich_min=20):
+    """Mục 4 gói thành hàm: vùng tối hơn nền cục bộ quá ngưỡng."""
+    nen = cv2.GaussianBlur(anh_loc, (0, 0), 25)
+    m = ((nen - anh_loc) &gt; nguong).astype(np.uint8)
+    n, _, st, tam = cv2.connectedComponentsWithStats(m)
+    return [(tuple(int(round(v)) for v in tam[i]), int(st[i, cv2.CC_STAT_AREA]))
+            for i in range(1, n) if st[i, cv2.CC_STAT_AREA] &gt;= dien_tich_min]
+
+
+anh = chup(them_vet(tao_luoi(), 170, 90))
+dinh = tim_dinh(anh)
+print("số đỉnh tìm được:", len(dinh))
+print("10 đỉnh gần tâm nhất (lệch tâm):",
+      sorted({(x - W // 2, y - H // 2) for x, y in dinh}, key=lambda d: np.hypot(*d))[:10])
+ngoai_vet = np.hypot(xx - 170, yy - 90) &gt; 25
+for ten, cd in (("chỉ 2 đỉnh cơ bản (±32, 0)", [(W // 2 - 32, H // 2), (W // 2 + 32, H // 2)]),
+                ("tất cả đỉnh", dinh)):
+    a = loc_notch(anh, cd)
+    v = do_vet(a)
+    print(f"{ten:28s}: σ nền còn {a[ngoai_vet].std():5.1f}, {len(v)} vùng, vài vùng: {v[:2]}")</code></pre>
+<pre><code class="language-text">số đỉnh tìm được: 30
+10 đỉnh gần tâm nhất (lệch tâm): [(0, -16), (0, 16), (32, 0), (-32, 0), (0, -32), (0, 32), (32, -16), (-32, -16), (32, 16), (-32, 16)]
+chỉ 2 đỉnh cơ bản (±32, 0)  : σ nền còn  20.7, 19 vùng, vài vùng: [((58, 32), 20), ((90, 48), 20)]
+tất cả đỉnh                 : σ nền còn   6.5, 1 vùng, vài vùng: [((170, 90), 176)]</code></pre>
+<p>Hàm tìm được 30 đỉnh. Gần tâm nhất là (0, ±16) của sợi ngang chu kỳ 16 px (256/16 = 16) và (±32, 0) của sợi dọc chu kỳ 8 px, tiếp theo là họa tần (0, ±32) và các đỉnh chéo (±32, ±16). Nếu chỉ xóa hai đỉnh cơ bản của sợi dọc như mục 3, nền vẫn dao động σ ≈ 21 mức xám và phép dò báo hàng chục vùng giả. Xóa tất cả đỉnh, nền còn σ ≈ 6,5 (nhiễu cảm biến σ = 3 cộng các thành phần yếu dưới ngưỡng tìm đỉnh) và chỉ còn đúng vết bẩn tại (170, 90).</p>
+
+<h2>6. Rò phổ: khi chu kỳ không chia hết kích thước ảnh</h2>
+<p>Đỉnh phổ chỉ gọn trong một điểm khi ảnh chứa <strong>số nguyên lần</strong> chu kỳ. Lưới chu kỳ 12 px trên ảnh cao 256 px chứa 21,33 chu kỳ: đỉnh lý thuyết nằm giữa hai điểm của lưới tần số, năng lượng "rò" ra các điểm lân cận (spectral leakage). Notch bán kính 4 không còn bắt hết, phần rò sót lại thành vân mờ trên ảnh đã lọc. Khi chu kỳ ổn định và đã biết, cách sửa đơn giản nhất là cắt ROI có kích thước bằng bội số chu kỳ: 252 = 21 × 12.</p>
+<pre><code class="language-python">for cao in (256, 252):
+    goc = tao_luoi(cao=cao, chu_ky_y=12.0)                    # sợi ngang chu kỳ 12 px
+    cot = np.abs(np.fft.fftshift(np.fft.fft2(goc)))[:, W // 2]  # cột qua tâm: tần số theo phương dọc
+    k = cao / 12                                               # vị trí đỉnh lý thuyết, tính từ tâm
+    c = cao // 2 + round(k)
+    phan_tram = 100 * cot[c - 3:c + 4] / cot[c - 3:c + 4].sum()
+    a = chup(them_vet(goc, 170, 90))
+    sach = loc_notch(a, tim_dinh(a))
+    yv, xv = np.mgrid[0:cao, 0:W]
+    ngoai = np.hypot(xv - 170, yv - 90) &gt; 25
+    print(f"ảnh cao {cao}: đỉnh lý thuyết ở {k:.2f} điểm; phân bố năng lượng 7 ô quanh đỉnh (%): "
+          f"{np.round(phan_tram, 1).tolist()}")
+    print(f"    σ nền sau lọc {sach[ngoai].std():.1f}, vùng tìm được: {do_vet(sach)}")</code></pre>
+<pre><code class="language-text">ảnh cao 256: đỉnh lý thuyết ở 21.33 điểm; phân bố năng lượng 7 ô quanh đỉnh (%): [4.1, 5.9, 10.5, 42.8, 21.8, 8.9, 5.7]
+    σ nền sau lọc 7.8, vùng tìm được: [((170, 90), 191)]
+ảnh cao 252: đỉnh lý thuyết ở 21.00 điểm; phân bố năng lượng 7 ô quanh đỉnh (%): [0.0, 0.0, 0.0, 100.0, 0.0, 0.0, 0.0]
+    σ nền sau lọc 6.1, vùng tìm được: [((170, 90), 177)]</code></pre>
+<p>Với ảnh cao 256, ô chứa đỉnh chỉ giữ khoảng 43% năng lượng, phần còn lại trải ra các ô hai bên. Cắt còn 252 hàng, toàn bộ năng lượng nằm gọn trong một ô và nền sau lọc sạch hơn. Khi không thể chọn kích thước (chu kỳ thay đổi theo sản phẩm), hãy dùng notch rộng hơn, chấp nhận mất một phần năng lượng của vết lỗi, hoặc nhân ảnh với cửa sổ Hanning khi chỉ cần <em>phân tích</em> phổ (mục 7).</p>
+
+<h2>7. Đo chu kỳ dưới pixel: bước lưới, mật độ sợi</h2>
+<p>Vị trí đỉnh phổ cho chu kỳ trung bình của <em>toàn bộ</em> ảnh, nên chính xác hơn nhiều so với đo khoảng cách từng sợi. Để vượt độ phân giải của lưới tần số (một ô = rộng/k), nội suy parabol qua ba điểm quanh đỉnh. Cửa sổ Hanning nhân vào từng hàng làm đỉnh có dạng gần Gauss, giúp phép nội suy chính xác hơn hẳn khi chu kỳ không chia hết độ rộng ảnh.</p>
+<pre><code class="language-python">def chu_ky_duoi_pixel(anh, cua_so=True):
+    """Chu kỳ theo phương ngang, chính xác dưới pixel: FFT từng hàng, trung bình phổ, nội suy parabol quanh đỉnh."""
+    rong = anh.shape[1]
+    hang = anh - anh.mean(axis=1, keepdims=True)
+    if cua_so:
+        hang = hang * np.hanning(rong)                         # giảm rò phổ khi chu kỳ không chia hết độ rộng
+    pho = np.abs(np.fft.rfft(hang, axis=1)).mean(axis=0)
+    k = int(np.argmax(pho[2:])) + 2                            # bỏ 2 ô đầu (thành phần rất chậm)
+    a, b, c = np.log(pho[k - 1:k + 2])
+    k_tinh = k + 0.5 * (a - c) / (a - 2 * b + c)               # đỉnh parabol qua 3 điểm
+    return rong / k_tinh
+
+
+for that in (8.0, 8.13, 7.9, 12.37):
+    g = chup(tao_luoi(chu_ky_x=that))
+    print(f"chu kỳ thật {that:5.2f} px → không cửa sổ {chu_ky_duoi_pixel(g, False):.3f} px, "
+          f"có Hanning {chu_ky_duoi_pixel(g):.3f} px")</code></pre>
+<pre><code class="language-text">chu kỳ thật  8.00 px → không cửa sổ 7.999 px, có Hanning 8.000 px
+chu kỳ thật  8.13 px → không cửa sổ 8.135 px, có Hanning 8.129 px
+chu kỳ thật  7.90 px → không cửa sổ 7.934 px, có Hanning 7.897 px
+chu kỳ thật 12.37 px → không cửa sổ 12.265 px, có Hanning 12.379 px</code></pre>
+<p>Có cửa sổ Hanning, sai số còn khoảng một phần trăm pixel, kể cả khi chu kỳ không chia hết độ rộng ảnh; không có cửa sổ, sai số có thể lên tới 0,1 px. Nhân với hệ số mm/pixel (bài <a href="calib-1-quy-doi-pixel-sang-mm.html">quy đổi pixel sang mm</a>, chặng Calibration), bạn có phép đo bước lưới, mật độ sợi vải hay bước ren rất ổn định, dùng làm một tiêu chí kiểm tra (lưới giãn, vải co) hoặc để tự cập nhật vị trí notch khi chu kỳ trôi.</p>
+
+<h2>8. Đưa vào dây chuyền: học mặt nạ từ ảnh OK</h2>
+<p>Một tính chất làm phương pháp này rất hợp với nhà máy: <strong>phổ biên độ không đổi khi ảnh bị dịch</strong> (dịch chỉ làm thay đổi pha). Lưới đặt lệch vài pixel thì các đỉnh vẫn ở đúng chỗ cũ, nên mặt nạ học một lần từ ảnh OK dùng được cho mọi ảnh mà không cần căn chỉnh, khác với <a href="so-sanh-anh-mau-golden-template-opencv.html">golden template</a>. Quy trình: tìm đỉnh trên vài ảnh OK, giữ các đỉnh xuất hiện ở ít nhất một nửa số ảnh, dựng mặt nạ; mỗi ảnh mới chỉ còn một FFT, một phép nhân, một FFT ngược và phép dò vết.</p>
+<pre><code class="language-python">d0 = set(tim_dinh(chup(tao_luoi())))
+d1 = set(tim_dinh(chup(tao_luoi(pha=(3.4, 7.1)))))
+print(f"lưới dịch (3.4, 7.1) px: {len(d1)} đỉnh, trùng {len(d0 &amp; d1)} đỉnh với lưới không dịch")
+
+
+def hoc_mat_na(anh_ok, ban_kinh=4):
+    """Học từ vài ảnh OK: giữ các đỉnh xuất hiện ở ít nhất một nửa số ảnh, dựng mặt nạ một lần."""
+    dem = {}
+    for a in anh_ok:
+        for d in tim_dinh(a):
+            dem[d] = dem.get(d, 0) + 1
+    dinh = [d for d, n in dem.items() if n &gt;= len(anh_ok) / 2]
+    mat_na = np.ones(anh_ok[0].shape, np.float32)
+    for x, y in dinh:
+        cv2.circle(mat_na, (x, y), ban_kinh, 0, -1)
+    return cv2.GaussianBlur(mat_na, (0, 0), ban_kinh / 2), len(dinh)
+
+
+def kiem_tra(anh, mat_na, nguong=15):
+    F = np.fft.fftshift(np.fft.fft2(anh))
+    sach = np.real(np.fft.ifft2(np.fft.ifftshift(F * mat_na))).astype(np.float32)
+    return do_vet(sach, nguong)
+
+
+ok_hoc = [chup(tao_luoi(pha=tuple(rng.uniform(0, 16, 2)))) for _ in range(5)]
+MAT_NA, so_dinh = hoc_mat_na(ok_hoc)
+print("mặt nạ học từ 5 ảnh OK:", so_dinh, "đỉnh")
+
+bo_thu = []                          # 50 ảnh OK, 50 ảnh có vết: vị trí, bán kính 4–8 px, độ sâu 8–40 mức xám ngẫu nhiên
+for i in range(100):
+    goc = tao_luoi(pha=tuple(rng.uniform(0, 16, 2)), sang_soi=rng.uniform(70, 90))
+    vet = None
+    if i &gt;= 50:
+        vet = (rng.uniform(30, 226), rng.uniform(30, 226), rng.uniform(4, 8), rng.uniform(8, 40))
+        goc = them_vet(goc, *vet)
+    bo_thu.append((chup(goc), vet))
+
+for nguong in (6, 8, 10, 12):
+    overkill, lot = 0, []
+    for a, vet in bo_thu:
+        co_loi = len(kiem_tra(a, MAT_NA, nguong)) &gt; 0
+        overkill += vet is None and co_loi
+        if vet is not None and not co_loi:
+            lot.append(round(vet[3]))
+    print(f"ngưỡng {nguong:2d}: overkill {overkill:2d}/50, escape {len(lot)}/50, độ sâu các vết lọt: {sorted(lot)}")</code></pre>
+<pre><code class="language-text">lưới dịch (3.4, 7.1) px: 28 đỉnh, trùng 28 đỉnh với lưới không dịch
+mặt nạ học từ 5 ảnh OK: 28 đỉnh
+ngưỡng  6: overkill 46/50, escape 0/50, độ sâu các vết lọt: []
+ngưỡng  8: overkill  0/50, escape 0/50, độ sâu các vết lọt: []
+ngưỡng 10: overkill  0/50, escape 1/50, độ sâu các vết lọt: [9]
+ngưỡng 12: overkill  0/50, escape 4/50, độ sâu các vết lọt: [8, 8, 9, 11]</code></pre>
+<p>Bảng cho thấy cả hai phía của việc chọn ngưỡng. Ngưỡng 6 quá sát mức nhiễu còn lại sau lọc (σ ≈ 6), nên gần như mọi ảnh OK bị báo nhầm. Từ ngưỡng 10 trở lên, không còn báo nhầm nhưng bắt đầu lọt các vết nông nhất, độ sâu 8–11 mức xám. Ngưỡng 8 vừa không nhầm vừa không lọt trên bộ thử này, nhưng vùng an toàn rất hẹp: các vết sâu dưới khoảng 10 mức xám chỉ nhỉnh hơn nhiễu còn lại một chút. Đó là giới hạn của <em>ảnh</em>, không phải của ngưỡng. Nếu tiêu chuẩn chất lượng yêu cầu bắt cả các vết nông như vậy, hãy tăng tương phản và giảm nhiễu từ phần cứng (chiếu sáng, thời gian phơi sáng, lấy trung bình nhiều ảnh) thay vì ép ngưỡng sát mức nhiễu; sau đó chọn ngưỡng và xác nhận lại trên ảnh thật của nhiều lô (xem <a href="ai-vision-5-chon-nguong-va-danh-gia-theo-nha-may.html">chọn ngưỡng theo escape, overkill</a>). Toàn bộ phép kiểm tra mất vài ms cho ảnh 256 × 256; với ảnh lớn, chia thành các ô có kích thước bằng bội số chu kỳ (mục 6), vừa nhanh vừa ít rò phổ.</p>
+
 <h2>Ứng dụng khác của FFT trong Machine Vision</h2>
 <table>
   <tr><th>Ứng dụng</th><th>Cách dùng</th></tr>
@@ -99,12 +274,65 @@ print("Ảnh chưa lọc: số vùng 'lỗi' =", n_goc)</code></pre>
   <li><strong>Tốc độ</strong>: FFT nhanh nhất khi kích thước ảnh là tích của các số nhỏ (2, 3, 5). <code>cv2.getOptimalDFTSize</code> cho biết kích thước nên đệm thêm.</li>
 </ul>
 
+
+<h2>Bài tập</h2>
 <div class="ex">
-<h3>Bài tập</h3>
-<p>Thêm vân sọc thứ hai theo phương dọc, chu kỳ 16 px: <code>anh += 20 * np.sin(2 * np.pi * yy / 16)</code> (trước bước <code>clip</code>). Dự đoán vị trí hai đỉnh mới trong phổ, sửa vòng lặp tìm đỉnh để tìm 4 đỉnh, rồi lọc cả hai hoa văn.</p>
-<details><summary>Đáp án dự đoán</summary>
-<p>Chu kỳ 16 px trên ảnh cao 256 px ứng với 256/16 = 16 điểm cách tâm theo phương dọc: đỉnh tại (x=128, y=112) và (x=128, y=144).</p>
+<p><strong>Bài 1.</strong> Quay lại ảnh vân sọc ở mục 1, thêm vân sọc thứ hai theo phương dọc, chu kỳ 16 px: <code>anh += 20 * np.sin(2 * np.pi * yy / 16)</code> (trước bước <code>clip</code>). Dự đoán vị trí hai đỉnh mới trong phổ, rồi dùng <code>tim_dinh</code> và <code>loc_notch</code> của mục 5 để lọc cả hai hoa văn và tìm vết bẩn.</p>
+<details><summary>Xem đáp án</summary>
+<p>Chu kỳ 16 px trên ảnh cao 256 px ứng với 256/16 = 16 điểm cách tâm theo phương dọc: đỉnh tại (x = 128, y = 112) và (x = 128, y = 144).</p>
+<pre><code class="language-python">anh2 = 128 + 40 * np.sin(2 * np.pi * xx / 8) + 20 * np.sin(2 * np.pi * yy / 16)
+anh2 -= 35 * np.exp(-((xx - 170) ** 2 + (yy - 90) ** 2) / (2 * 6 ** 2))
+anh2 = np.clip(anh2 + np.random.default_rng(0).normal(0, 3, anh2.shape), 0, 255).astype(np.float32)
+dinh2 = tim_dinh(anh2)
+print("các đỉnh:", sorted(dinh2))
+print("vết tìm được:", do_vet(loc_notch(anh2, dinh2)))</code></pre>
+<pre><code class="language-text">các đỉnh: [(96, 128), (128, 112), (128, 144), (160, 128)]
+vết tìm được: [((170, 90), 157)]</code></pre>
+<p>Hàm tìm đúng 4 đỉnh: hai đỉnh (96, 128), (160, 128) của vân dọc chu kỳ 8 px và hai đỉnh dự đoán (128, 112), (128, 144). Lọc xong chỉ còn vết bẩn tại (170, 90).</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Camera chụp lưới thép có bước lưới đo được (bằng hàm ở mục 7) là 8,30 px; ảnh rộng 640 px. Nên cắt ROI rộng bao nhiêu pixel (không quá 640) để số chu kỳ trong ROI gần số nguyên nhất?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">chu_ky = 8.30
+ung_vien = [(abs(r / chu_ky - round(r / chu_ky)), r) for r in range(400, 641)]
+for lech, r in sorted(ung_vien)[:3]:
+    print(f"rộng {r} px = {r / chu_ky:.3f} chu kỳ (lệch {lech:.3f} chu kỳ)")</code></pre>
+<pre><code class="language-text">rộng 581 px = 70.000 chu kỳ (lệch 0.000 chu kỳ)
+rộng 415 px = 50.000 chu kỳ (lệch 0.000 chu kỳ)
+rộng 498 px = 60.000 chu kỳ (lệch 0.000 chu kỳ)</code></pre>
+<p>Rộng 581 px chứa đúng 70 chu kỳ. Các độ rộng 498 px (60 chu kỳ) và 415 px (50 chu kỳ) cũng chia hết nhưng bỏ đi nhiều ảnh hơn. Trong thực tế bước lưới trôi nhẹ theo lô, nên ROI chỉ cần "gần" bội số; nếu chu kỳ thay đổi nhiều, dùng notch rộng hơn thay vì đổi ROI theo từng ảnh.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Lỗi cũng có tính lặp: một sợi ngang bị đứt suốt chiều rộng tấm lưới. Tạo ảnh bằng cách thay dải hàng 82–94 của <code>tao_luoi()</code> bằng lưới chỉ có sợi dọc, chạy <code>kiem_tra</code> với mặt nạ đã học ở mục 8 và ngưỡng 9. Lỗi có bị bắt không, và kết quả trông thế nào? Nên báo cáo lỗi này ra sao?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">goc = tao_luoi()
+y, x = np.mgrid[0:256, 0:256]
+chi_soi_doc = 90 + 80 * np.exp(-(((x % 8.0) - 4.0) ** 2) / 2)
+dai = (y &gt;= 82) &amp; (y &lt;= 94)
+goc[dai] = chi_soi_doc[dai]                    # sợi ngang quanh y = 88 bị đứt suốt chiều rộng
+vung = kiem_tra(chup(goc), MAT_NA, 9)
+print(f"{len(vung)} vùng, tọa độ y: {sorted({tam[1] for tam, _ in vung})}, tổng diện tích {sum(s for _, s in vung)} px")
+
+loi = goc - tao_luoi()                         # riêng phần lỗi
+P2 = np.abs(np.fft.fftshift(np.fft.fft2(loi))) ** 2
+print(f"năng lượng của lỗi bị mặt nạ xóa: {100 * (P2 * (1 - MAT_NA)).sum() / P2.sum():.0f}%")</code></pre>
+<pre><code class="language-text">28 vùng, tọa độ y: [87, 88], tổng diện tích 626 px
+năng lượng của lỗi bị mặt nạ xóa: 34%</code></pre>
+<p>Lỗi vẫn bị bắt, nhưng vỡ thành hàng chục vùng nhỏ cùng nằm trên hàng y ≈ 88: phần sợi đứt nằm giữa các sợi dọc sáng, mỗi đoạn giữa hai sợi dọc thành một vùng riêng. Khoảng một phần ba năng lượng của lỗi đã bị mặt nạ xóa, vì một sợi đứt dài suốt ảnh có năng lượng tập trung đúng ở những tần số ngang của hoa văn. Báo cáo theo từng vùng ("28 lỗi nhỏ") sẽ sai bản chất. Hãy <strong>gộp các vùng</strong> gần nhau theo hướng (ví dụ <code>cv2.morphologyEx</code> với kernel ngang 1 × 15 trước khi đếm vùng), hoặc phân tích thêm <strong>profile trung bình theo hàng</strong>, nơi sợi đứt hiện ra như một hố sâu, rồi báo "đứt sợi ngang tại y = 88, dài 256 px". Lỗi càng giống hoa văn, phần bị notch xóa càng lớn: luôn thử phương pháp trên ảnh lỗi thật của từng loại.</p>
 </details>
 </div>
 
-<p class="note">Nguồn tham khảo: <a href="https://docs.opencv.org/4.x/de/dbc/tutorial_py_fourier_transform.html" rel="noopener" target="_blank">OpenCV-Python Tutorials: Fourier Transform</a>, <a href="https://numpy.org/doc/stable/reference/routines.fft.html" rel="noopener" target="_blank">NumPy: Discrete Fourier Transform (numpy.fft)</a>.</p>
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Hoa văn tuần hoàn tập trung thành các đỉnh trong phổ; vết lỗi đơn lẻ trải năng lượng ra nhiều tần số. Xóa các đỉnh (notch filter, bờ mềm, xóa cả hai đỉnh đối xứng) rồi biến đổi ngược: hoa văn biến mất, lỗi còn lại.</li>
+  <li>Hoa văn thật có họa tần và đỉnh chéo: tìm đỉnh tự động bằng cực đại cục bộ cao hơn trung vị + k·MAD, ngoài vùng tâm.</li>
+  <li>Chu kỳ không chia hết kích thước ảnh gây rò phổ: cắt ROI theo bội số chu kỳ, hoặc dùng notch rộng hơn; dùng cửa sổ Hanning khi phân tích phổ.</li>
+  <li>Đỉnh phổ + nội suy parabol + Hanning cho chu kỳ chính xác cỡ 0,01 px: đo bước lưới, mật độ sợi.</li>
+  <li>Phổ biên độ không đổi khi ảnh dịch: học mặt nạ một lần từ vài ảnh OK, không cần căn chỉnh; chọn ngưỡng dò vết ở giữa vùng không báo nhầm và không lọt lỗi.</li>
+  <li>Lỗi có tính lặp (đứt sợi, sọc) bị notch xóa một phần và có thể vỡ thành nhiều vùng: gộp vùng theo hướng, kiểm tra trên ảnh lỗi thật.</li>
+</ul>
+<p>Bài tiếp theo: <a href="../projects/dem-san-pham-bang-tai-opencv.html">Dự án chặng 3: đếm sản phẩm trên băng tải</a>, nơi bạn ghép phân ngưỡng, morphology, contour và theo dõi vật qua các khung hình thành một ứng dụng hoàn chỉnh.</p>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.opencv.org/4.x/de/dbc/tutorial_py_fourier_transform.html" rel="noopener" target="_blank">OpenCV-Python Tutorials: Fourier Transform</a>, <a href="https://numpy.org/doc/stable/reference/routines.fft.html" rel="noopener" target="_blank">NumPy: Discrete Fourier Transform (numpy.fft)</a>, <a href="https://numpy.org/doc/stable/reference/generated/numpy.hanning.html" rel="noopener" target="_blank">NumPy: numpy.hanning</a>; Gonzalez, Woods, <em>Digital Image Processing</em>, chương "Filtering in the Frequency Domain" (notch filter).</p>
