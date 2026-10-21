@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="vi" data-root="../">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lấy ảnh từ camera công nghiệp: GenICam, pypylon, camera giả lập</title>
+<meta name="description" content="Điều khiển camera công nghiệp bằng Python: node map, exposure, trigger, chiến lược lấy ảnh, ảnh hỏng, băng thông GigE/USB3 và cái bẫy tên Bayer của OpenCV.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://hocfree.vn/hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html">
+<meta property="og:site_name" content="HọcFree">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Lấy ảnh từ camera công nghiệp: GenICam, pypylon, camera giả lập">
+<meta property="og:description" content="Điều khiển camera công nghiệp bằng Python: node map, exposure, trigger, chiến lược lấy ảnh, ảnh hỏng, băng thông GigE/USB3 và cái bẫy tên Bayer của OpenCV.">
+<meta property="og:url" content="https://hocfree.vn/hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html">
+<meta property="og:image" content="https://hocfree.vn/assets/images/posts/lay-anh-camera-cong-nghiep-genicam-pypylon.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="Lấy ảnh từ camera công nghiệp: GenICam, pypylon, camera giả lập">
+<meta property="og:locale" content="vi_VN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Lấy ảnh từ camera công nghiệp: GenICam, pypylon, camera giả lập">
+<meta name="twitter:description" content="Điều khiển camera công nghiệp bằng Python: node map, exposure, trigger, chiến lược lấy ảnh, ảnh hỏng, băng thông GigE/USB3 và cái bẫy tên Bayer của OpenCV.">
+<meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/lay-anh-camera-cong-nghiep-genicam-pypylon.jpg">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/fonts.css?v=20261021">
+<link rel="stylesheet" href="../assets/css/style.css?v=20261021">
+<script>try{var t=localStorage.getItem('hf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
+<meta property="article:published_time" content="2026-10-21">
+<meta property="article:section" content="Học AI &amp; Lập trình">
+<meta property="article:tag" content="Camera">
+<meta property="article:tag" content="Machine Vision">
+<meta property="article:tag" content="Python">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "Lấy ảnh từ camera công nghiệp: GenICam, pypylon, camera giả lập", "description": "Điều khiển camera công nghiệp bằng Python: node map, exposure, trigger, chiến lược lấy ảnh, ảnh hỏng, băng thông GigE/USB3 và cái bẫy tên Bayer của OpenCV.", "image": ["https://hocfree.vn/assets/images/posts/lay-anh-camera-cong-nghiep-genicam-pypylon.jpg"], "datePublished": "2026-10-21", "dateModified": "2026-10-21", "inLanguage": "vi", "articleSection": "Học AI & Lập trình", "keywords": "Camera, Machine Vision, Python", "wordCount": 4927, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html"}, "isPartOf": {"@type": "Course", "name": "Trở thành Vision Engineer", "url": "https://hocfree.vn/lo-trinh/vision-engineer.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Learning Paths", "item": "https://hocfree.vn/lo-trinh/"}, {"@type": "ListItem", "position": 3, "name": "Trở thành Vision Engineer", "item": "https://hocfree.vn/lo-trinh/vision-engineer.html"}, {"@type": "ListItem", "position": 4, "name": "Chặng 6: Camera / Lens / Lighting", "item": "https://hocfree.vn/lo-trinh/vision-engineer/camera-lens-lighting.html"}, {"@type": "ListItem", "position": 5, "name": "Lấy ảnh từ camera công nghiệp: GenICam, pypylon, camera giả lập"}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div class="progress" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="container wide header-top">
+    <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="nav-scrim" hidden></div>
+    <a class="logo" href="../" aria-label="HọcFree – Trang chủ"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+    <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
+    <div class="header-actions">
+      <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="login-link" href="../dang-nhap.html">Đăng nhập</a>
+      <a class="btn start-btn" href="../lo-trinh/">Bắt đầu học</a>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="container wide">
+      <nav class="site-nav" id="site-nav" aria-label="Menu chính">
+        <div class="drawer-head">
+          <a class="logo" href="../" tabindex="-1"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+          <button class="icon-btn nav-close" aria-label="Đóng menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <button type="button" class="drawer-search search-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Tìm bài học, chủ đề…</span></button>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="../">Trang chủ</a></li><li class="nav-item has-panel is-mega"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-hoc">Học AI &amp; Lập trình<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel mega" id="nav-panel-hoc">
+  <div class="container wide mega-inner">
+    <div class="mega-groups"><div class="mega-group"><a class="mega-group-title" href="../hoc/#programming">Programming</a><ul><li><a href="../hoc/python.html">Python</a></li><li><a href="../hoc/csharp.html">C#</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#ai-machine-learning">AI &amp; Machine Learning</a><ul><li><a href="../hoc/machine-learning.html">Machine Learning</a></li><li><a href="../hoc/deep-learning.html">Deep Learning</a></li><li><a href="../hoc/pytorch.html">PyTorch</a></li><li><a href="../hoc/generative-ai.html">Generative AI</a></li><li><a href="../hoc/llm-ai-agents.html">LLM / AI Agents</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#computer-vision">Computer Vision</a><ul><li><a href="../hoc/opencv.html">OpenCV</a></li><li><a href="../hoc/image-processing.html">Image Processing</a></li><li><a href="../hoc/computer-vision.html">Computer Vision</a></li><li><a href="../hoc/ocr.html">OCR</a></li><li><a href="../hoc/object-detection.html">Object Detection</a></li><li><a href="../hoc/segmentation.html">Segmentation</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#vision-engineering">Vision Engineering</a><ul><li><a href="../hoc/machine-vision.html">Machine Vision</a></li><li><a href="../hoc/ai-vision.html">AI Vision</a></li><li><a href="../hoc/industrial-vision.html">Industrial Vision</a></li><li><a href="../hoc/camera-lens.html">Camera &amp; Lens</a></li><li><a href="../hoc/lighting.html">Lighting</a></li><li><a href="../hoc/calibration.html">Calibration</a></li><li><a href="../hoc/3d-vision.html">3D Vision</a></li><li><a href="../hoc/plc-robot-mes.html">PLC / Robot / MES</a></li><li><a href="../hoc/vision-deployment.html">Vision Deployment</a></li></ul></div></div>
+    <a class="feature-card" href="../lo-trinh/vision-engineer.html">
+  <span class="feature-eyebrow">⭐ Learning Path nổi bật</span>
+  <span class="feature-title">Trở thành Vision Engineer</span>
+  <span class="feature-sub">Machine Vision + AI Vision + Industrial Automation</span>
+  <span class="feature-desc">Lộ trình thực chiến từ Python, OpenCV và Machine Vision đến 3D Vision, Deep Learning, AI Vision, Camera, PLC, Robot và triển khai hệ thống Vision trong nhà máy.</span>
+  <span class="feature-chain" aria-label="Các chặng chính"><span>Python</span><i aria-hidden="true">→</i><span>OpenCV</span><i aria-hidden="true">→</i><span>Machine Vision</span><i aria-hidden="true">→</i><span>AI Vision</span><i aria-hidden="true">→</i><span class="chain-goal">🎯 Vision Engineer</span></span>
+  <span class="feature-meta">15 chặng · 5 giai đoạn · ~13 tháng</span>
+  <span class="feature-cta">Xem lộ trình →</span>
+</a>
+  </div>
+  <div class="mega-foot"><div class="container wide mega-foot-inner"><ol class="journey compact" aria-label="Học, thực hành, trở thành kỹ sư"><li><a href="../hoc/" aria-current="step"><span class="journey-n">1</span><span class="journey-t"><b>Học</b><small>Học AI &amp; Lập trình</small></span></a></li><li><a href="../projects/"><span class="journey-n">2</span><span class="journey-t"><b>Thực hành</b><small>Projects</small></span></a></li><li><a href="../lo-trinh/"><span class="journey-n">3</span><span class="journey-t"><b>Trở thành kỹ sư</b><small>Learning Paths</small></span></a></li></ol><a class="panel-all" href="../hoc/">Xem tất cả Học AI &amp; Lập trình →</a></div></div>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-projects">Projects<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-projects">
+  <p class="panel-kicker"><span>Bước 2 · Thực hành</span>Áp dụng vào dự án thật</p>
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../projects/ai-projects.html"><span class="drop-label">AI Projects</span><span class="drop-desc">Ứng dụng ML và LLM, từ ý tưởng đến bản demo</span></a></li><li><a class="drop-link" href="../projects/computer-vision-projects.html"><span class="drop-label">Computer Vision Projects</span><span class="drop-desc">Phát hiện, nhận dạng và theo dõi đối tượng</span></a></li><li><a class="drop-link" href="../projects/industrial-vision-projects.html"><span class="drop-label">Industrial Vision Projects</span><span class="drop-desc">Đo kích thước, kiểm tra lỗi, đọc mã trên dây chuyền</span></a></li></ul></div></div>
+  <a class="panel-all" href="../projects/">Xem tất cả Projects →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger is-active" aria-expanded="false" aria-controls="nav-panel-lo-trinh" aria-current="true">Learning Paths<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-lo-trinh">
+  <p class="panel-kicker"><span>Bước 3 · Trở thành kỹ sư</span>Định hướng nghề nghiệp</p>
+  <ul class="drop-list"><li><a class="drop-link is-flagship" href="../lo-trinh/vision-engineer.html"><span class="drop-label">⭐ Trở thành Vision Engineer</span><span class="drop-desc">Machine Vision + AI Vision + Industrial Automation · 15 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/toeic-700.html"><span class="drop-label">700+ TOEIC trong 5 tháng</span><span class="drop-desc">TOEIC Listening &amp; Reading + giao tiếp công sở cho người đi làm · 11 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/hsk3.html"><span class="drop-label">Tiếng Trung từ 0 đến HSK 3 trong 6 tháng</span><span class="drop-desc">Pinyin, chữ Hán, ngữ pháp, giao tiếp và luyện thi HSK 3.0 cho người Việt · 10 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/#python-developer"><span class="drop-label">Python Developer<span class="badge-soon">Sắp ra mắt</span></span><span class="drop-desc">Python, công cụ, tự động hóa</span></a></li></ul>
+  <a class="panel-all" href="../lo-trinh/">Xem tất cả lộ trình →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-kien-thuc">Kiến thức<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-kien-thuc">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Lĩnh vực</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/programming.html"><span class="drop-label">Programming</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-machine-learning.html"><span class="drop-label">AI / Machine Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/deep-learning.html"><span class="drop-label">Deep Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/machine-vision.html"><span class="drop-label">Machine Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-vision.html"><span class="drop-label">AI Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/industrial-automation.html"><span class="drop-label">Industrial Automation</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Công cụ &amp; mẹo</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/tools-frameworks.html"><span class="drop-label">Tools &amp; Frameworks</span></a></li><li><a class="drop-link" href="../kien-thuc/tips-tricks.html"><span class="drop-label">Tips &amp; Tricks</span></a></li></ul></div></div>
+  <a class="panel-all" href="../kien-thuc/">Xem tất cả Kiến thức →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tin-tuc-ai">Tin tức AI<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tin-tuc-ai">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tin-tuc-ai/ai-news.html"><span class="drop-label">AI News</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-models.html"><span class="drop-label">AI Models</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/technology.html"><span class="drop-label">Technology</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/robotics.html"><span class="drop-label">Robotics</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-industry.html"><span class="drop-label">AI Industry</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tin-tuc-ai/">Xem tất cả Tin tức AI →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-ngoai-ngu">Ngoại ngữ<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-ngoai-ngu">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Ngôn ngữ</p><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/english.html"><span class="drop-label">English</span><span class="drop-desc">Lộ trình 700 TOEIC, phương pháp học, giáo trình HF-700TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chinese.html"><span class="drop-label">Chinese</span><span class="drop-desc">Lộ trình 0 đến HSK 3 trong 6 tháng, phương pháp học, giáo trình HF-HSK3</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Tiếng Anh theo kỹ năng</p><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/toeic-listening.html"><span class="drop-label">TOEIC Listening</span><span class="drop-desc">Part 1–4: mô tả tranh, hỏi – đáp, hội thoại, bài nói</span></a></li><li><a class="drop-link" href="../ngoai-ngu/toeic-reading.html"><span class="drop-label">TOEIC Reading</span><span class="drop-desc">Part 5–7: điền từ, điền câu, đọc hiểu</span></a></li><li><a class="drop-link" href="../ngoai-ngu/ngu-phap-tieng-anh.html"><span class="drop-label">Ngữ pháp tiếng Anh</span><span class="drop-desc">Từ loại, thì, mệnh đề, liên từ cho TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/tu-vung-tieng-anh.html"><span class="drop-label">Từ vựng tiếng Anh</span><span class="drop-desc">Từ vựng công sở theo chủ đề, collocation</span></a></li><li><a class="drop-link" href="../ngoai-ngu/giao-tiep-tieng-anh.html"><span class="drop-label">Giao tiếp công sở</span><span class="drop-desc">Điện thoại, họp, thuyết trình, email</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Tiếng Trung theo kỹ năng</p><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/pinyin-phat-am.html"><span class="drop-label">Pinyin &amp; phát âm</span><span class="drop-desc">Thanh mẫu, vận mẫu, thanh điệu, biến điệu</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chu-han.html"><span class="drop-label">Chữ Hán</span><span class="drop-desc">Nét, thứ tự nét, bộ thủ, âm Hán Việt</span></a></li><li><a class="drop-link" href="../ngoai-ngu/ngu-phap-tieng-trung.html"><span class="drop-label">Ngữ pháp tiếng Trung</span><span class="drop-desc">Từ 是, 吗, 了 đến bổ ngữ, câu 把, câu 被</span></a></li><li><a class="drop-link" href="../ngoai-ngu/tu-vung-tieng-trung.html"><span class="drop-label">Từ vựng tiếng Trung</span><span class="drop-desc">Từ vựng HSK 1–3 theo chủ đề, Anki</span></a></li><li><a class="drop-link" href="../ngoai-ngu/giao-tiep-tieng-trung.html"><span class="drop-label">Giao tiếp tiếng Trung</span><span class="drop-desc">Chào hỏi, mua sắm, đi lại, công sở</span></a></li><li><a class="drop-link" href="../ngoai-ngu/luyen-thi-hsk.html"><span class="drop-label">Luyện thi HSK</span><span class="drop-desc">Đề HSK 3.0, nghe, đọc, viết, nói, đề thi thử</span></a></li></ul></div></div>
+  <a class="panel-all" href="../ngoai-ngu/">Xem tất cả Ngoại ngữ →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tai-nguyen">Tài nguyên<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tai-nguyen">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tai-nguyen/source-code.html"><span class="drop-label">Source Code</span><span class="drop-desc">Mã nguồn mẫu đi kèm bài học</span></a></li><li><a class="drop-link" href="../tai-nguyen/dataset.html"><span class="drop-label">Dataset</span><span class="drop-desc">Bộ dữ liệu ảnh để luyện tập</span></a></li><li><a class="drop-link" href="../tai-nguyen/cheat-sheets.html"><span class="drop-label">Cheat Sheets</span><span class="drop-desc">Tóm tắt nhanh trong một trang</span></a></li><li><a class="drop-link" href="../tai-nguyen/documentation.html"><span class="drop-label">Documentation</span><span class="drop-desc">Tài liệu tra cứu thư viện, API</span></a></li><li><a class="drop-link" href="../tai-nguyen/ebook.html"><span class="drop-label">Ebook / Tài liệu</span><span class="drop-desc">Sách và tài liệu tham khảo</span></a></li><li><a class="drop-link" href="../tai-nguyen/ai-tools.html"><span class="drop-label">AI Tools</span><span class="drop-desc">Công cụ AI hữu ích cho việc học</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tai-nguyen/">Xem tất cả Tài nguyên →</a>
+</div></li></ul>
+        <div class="drawer-foot">
+          <a class="btn ghost" href="../dang-nhap.html">Đăng nhập</a>
+          <a class="btn" href="../lo-trinh/">Bắt đầu học</a>
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+<div class="search-dialog" hidden>
+  <div class="search-scrim"></div>
+  <div class="search-box" role="dialog" aria-modal="true" aria-label="Tìm kiếm">
+    <form class="search-form" action="../search.html" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" placeholder="Tìm bài học, chủ đề, bài viết…" autocomplete="off" aria-label="Từ khóa tìm kiếm" aria-controls="search-suggest">
+      <button type="button" class="icon-btn search-close" aria-label="Đóng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </form>
+    <div class="search-suggest" id="search-suggest" aria-live="polite">
+      <div class="search-empty">
+        <p class="search-group-title">Chủ đề phổ biến</p>
+        <div class="chips"><a class="chip" href="../hoc/python.html">Python</a><a class="chip" href="../hoc/opencv.html">OpenCV</a><a class="chip" href="../hoc/machine-vision.html">Machine Vision</a><a class="chip" href="../hoc/deep-learning.html">Deep Learning</a><a class="chip" href="../hoc/ai-vision.html">AI Vision</a><a class="chip" href="../hoc/object-detection.html">Object Detection</a><a class="chip" href="../hoc/pytorch.html">PyTorch</a><a class="chip" href="../ngoai-ngu/english.html">English</a></div>
+        <p class="search-group-title">Lộ trình nổi bật</p>
+        <a class="search-item" href="../lo-trinh/vision-engineer.html"><span class="search-ico" aria-hidden="true">⭐</span><span>Trở thành Vision Engineer<small>Learning Path · Machine Vision + AI Vision + Industrial Automation</small></span></a>
+      </div>
+    </div>
+    <div class="search-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> chọn</span><span><kbd>Enter</kbd> mở</span><span><kbd>Esc</kbd> đóng</span></div>
+  </div>
+</div>
+<main id="main">
+  <div class="container layout article-layout">
+    <article class="article">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../lo-trinh/">Learning Paths</a><span>/</span><a href="../lo-trinh/vision-engineer.html">Vision Engineer</a><span>/</span><a href="../lo-trinh/vision-engineer/camera-lens-lighting.html">Chặng 6: Camera / Lens / Lighting</a></nav>
+      <header class="article-head">
+        <div class="course-bar" data-course="vision-engineer"><a class="course-chip" href="../lo-trinh/vision-engineer/camera-lens-lighting.html">⭐ Vision Engineer · Chặng 6</a><span class="lesson-no">Bài 3/9</span><span class="kind kind-lab">Thực hành</span><span class="lesson-min"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></svg>~75 phút</span></div>
+        <h1>Lấy ảnh từ camera công nghiệp: GenICam, pypylon, camera giả lập</h1>
+        <p class="lead">Điều khiển camera công nghiệp bằng Python: node map, exposure, trigger, chiến lược lấy ảnh, ảnh hỏng, băng thông GigE/USB3 và cái bẫy tên Bayer của OpenCV.</p>
+        <div class="article-meta">
+          <span class="avatar" aria-hidden="true">HF</span>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-21">21/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>28 phút đọc</span></div>
+        </div>
+      </header>
+      <figure class="article-cover">
+        <img src="../assets/images/posts/lay-anh-camera-cong-nghiep-genicam-pypylon.webp" alt="Lấy ảnh từ camera công nghiệp: GenICam, pypylon, camera giả lập" width="1200" height="675" fetchpriority="high" decoding="async">
+      </figure>
+      <section class="lesson-goals" aria-label="Mục tiêu bài học"><h2>Học xong bài này, bạn sẽ</h2><ul><li>Đọc, đặt tham số camera qua node map an toàn</li><li>Dùng trigger, chiến lược lấy ảnh, phát hiện ảnh hỏng</li><li>Tính băng thông GigE, USB3 và tránh bẫy tên Bayer</li></ul><p class="goals-before">Nên học trước: <a href="../kien-thuc/chon-camera-ong-kinh-machine-vision.html">Chọn camera và ống kính: độ phân giải, FOV, tiêu cự</a></p></section>
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol class="toc-plain"><li><a href="#1-genicam-gige-vision-usb3-vision-ai-lam-gi">1. GenICam, GigE Vision, USB3 Vision: ai làm gì?</a></li><li><a href="#2-bat-camera-gia-lap-mo-camera-doc-node-map">2. Bật camera giả lập, mở camera, đọc node map</a></li><li><a href="#3-dat-tham-so-an-toan-gioi-han-buoc-quyen-ghi">3. Đặt tham số an toàn: giới hạn, bước, quyền ghi</a></li><li><a href="#4-phoi-sang-gain-va-nhoe-chuyen-dong-tinh-truoc-khi-dat">4. Phơi sáng, gain và nhòe chuyển động: tính trước khi đặt</a></li><li><a href="#5-chien-luoc-lay-anh-va-bo-dem">5. Chiến lược lấy ảnh và bộ đệm</a></li><li><a href="#6-trigger-chup-dung-luc-san-pham-den">6. Trigger: chụp đúng lúc sản phẩm đến</a></li><li><a href="#7-dinh-dang-pixel-bit-depth-va-cai-bay-bayer">7. Định dạng pixel: bit depth và cái bẫy Bayer</a></li><li><a href="#8-phat-hien-anh-hong-va-anh-mat">8. Phát hiện ảnh hỏng và ảnh mất</a></li><li><a href="#9-bang-thong-mot-cong-mang-nuoi-duoc-bao-nhieu-camera">9. Băng thông: một cổng mạng nuôi được bao nhiêu camera?</a></li><li><a href="#10-dung-camera-gia-lap-de-kiem-thu-tram-truoc-khi-co-phan-cung">10. Dùng camera giả lập để kiểm thử trạm trước khi có phần cứng</a></li><li><a href="#11-cung-viec-do-voi-harvesters-camera-nhieu-hang">11. Cùng việc đó với Harvesters (camera nhiều hãng)</a></li><li><a href="#12-loi-thuong-gap">12. Lỗi thường gặp</a></li><li><a href="#tom-tat">Tóm tắt</a></li><li><a href="#bai-tap">Bài tập</a></li></ol></details>
+      <div class="prose">
+<p>Đến chặng này bạn đã lấy ảnh từ webcam bằng <code>cv2.VideoCapture</code> và đã tính được nên chọn camera, ống kính nào. Camera công nghiệp thì khác webcam ở mọi điểm quan trọng: bạn đặt được chính xác thời gian phơi sáng và gain, chọn được định dạng pixel 8, 10, 12 bit, chụp theo trigger từ cảm biến hoặc PLC, và biết chắc khung nào bị mất. Tất cả những điều đó đi qua một bộ chuẩn chung tên là <strong>GenICam</strong>. Bài này dạy cách điều khiển camera công nghiệp bằng Python qua <strong>pypylon</strong> (SDK của Basler) và <strong>camera giả lập</strong> đi kèm, nên bạn chạy được mọi đoạn code khi chưa có camera thật. Cuối bài là cách làm tương tự với <strong>Harvesters</strong>, thư viện dùng được cho camera của nhiều hãng.</p>
+<p>Cài: <code>pip install pypylon opencv-python numpy</code> (bài chạy với pypylon 26.8, OpenCV 4.13). Gói pypylon đã kèm sẵn phần runtime của pylon, gồm cả camera giả lập. Nên học trước: <a href="../kien-thuc/global-rolling-shutter-area-line-scan.html">global/rolling shutter, area/line scan</a> và <a href="../kien-thuc/chon-camera-ong-kinh-machine-vision.html">chọn camera và ống kính</a>.</p>
+
+<h2 id="1-genicam-gige-vision-usb3-vision-ai-lam-gi">1. GenICam, GigE Vision, USB3 Vision: ai làm gì?</h2>
+<p>Camera của Basler, Hikrobot, Teledyne FLIR, Allied Vision, IDS… đều nói chung một "ngôn ngữ" nhờ các chuẩn sau:</p>
+<table>
+  <tr><th>Chuẩn</th><th>Vai trò</th><th>Bạn gặp ở đâu</th></tr>
+  <tr><td><strong>GigE Vision</strong>, <strong>USB3 Vision</strong>, CoaXPress, Camera Link</td><td>Chuẩn <em>truyền dẫn</em>: cách tìm camera trên mạng/cổng, gửi lệnh, truyền ảnh</td><td>Chọn cáp, card mạng, cấu hình IP, băng thông (mục 9)</td></tr>
+  <tr><td><strong>GenICam GenApi</strong></td><td>Camera tự mô tả mọi tham số của nó trong một file XML; phần mềm đọc file đó để biết camera có những "nút" (node) nào</td><td><code>cam.ExposureTime</code>, <code>cam.PixelFormat</code>: mỗi tham số là một node</td></tr>
+  <tr><td><strong>SFNC</strong> (Standard Features Naming Convention)</td><td>Quy ước <em>tên</em> chung: phơi sáng tên là <code>ExposureTime</code>, đơn vị µs, ở mọi hãng</td><td>Code viết cho camera hãng này chạy gần như nguyên vẹn với hãng khác</td></tr>
+  <tr><td><strong>GenTL</strong></td><td>Giao diện thư viện chuẩn: mỗi hãng cung cấp một "producer" (file <code>.cti</code>), phần mềm bất kỳ (consumer) dùng được</td><td>Harvesters, Halcon, nhiều phần mềm vision khác (mục 11)</td></tr>
+</table>
+<p>pypylon là cách thuận tiện nhất để học vì nó có camera giả lập và tài liệu tốt. Mọi khái niệm trong bài (node, pixel format, chiến lược lấy ảnh, trigger, bộ đệm) giống hệt ở SDK của hãng khác, chỉ khác tên hàm. Chi tiết cách đọc tài liệu SDK xem bài <a href="../tai-nguyen/doc-tai-lieu-sdk-camera-genicam.html">đọc tài liệu SDK camera GenICam</a>.</p>
+
+<h2 id="2-bat-camera-gia-lap-mo-camera-doc-node-map">2. Bật camera giả lập, mở camera, đọc node map</h2>
+<p>Camera giả lập được bật bằng biến môi trường <code>PYLON_CAMEMU</code> (số camera giả muốn có), và phải đặt <strong>trước</strong> khi pylon khởi tạo, nên dòng <code>os.environ</code> nằm trước <code>import pypylon</code>. Với camera thật thì bỏ dòng đó: <code>CreateFirstDevice()</code> sẽ mở camera đầu tiên tìm thấy.</p>
+<pre><code class="language-python">import os
+os.environ["PYLON_CAMEMU"] = "1"                 # 1 camera giả lập; bỏ dòng này khi dùng camera thật
+
+import time
+
+import cv2
+import numpy as np
+from pypylon import genicam, pylon
+
+tl = pylon.TlFactory.GetInstance()
+for thiet_bi in tl.EnumerateDevices():
+    print("tìm thấy:", thiet_bi.GetFriendlyName(), "| model", thiet_bi.GetModelName(),
+          "| serial", thiet_bi.GetSerialNumber())
+
+cam = pylon.InstantCamera(tl.CreateFirstDevice())
+cam.Open()
+print(f"Width = {cam.Width.Value} (min {cam.Width.Min}, max {cam.Width.Max}, bước {cam.Width.Inc})")
+print(f"PixelFormat = {cam.PixelFormat.Value}; các giá trị: {list(cam.PixelFormat.Symbolics)[:6]} ...")
+print(f"ExposureTime = {cam.ExposureTime.Value} µs (min {cam.ExposureTime.Min}, max {cam.ExposureTime.Max})")
+print(f"TriggerMode = {cam.TriggerMode.Value}; TriggerSource = {cam.TriggerSource.Value}")</code></pre>
+<pre><code class="language-text">tìm thấy: Basler Emulation (0815-0000) | model Emulation | serial 0815-0000
+Width = 1024 (min 1, max 4096, bước 1)
+PixelFormat = Mono8; các giá trị: ['Mono8', 'Mono10', 'Mono12', 'Mono16', 'BGRA8Packed', 'BGR8Packed'] ...
+ExposureTime = 10000.0 µs (min 1.0, max 10000000.0)
+TriggerMode = Off; TriggerSource = Software</code></pre>
+<p>Mỗi tham số là một <strong>node</strong> có kiểu riêng, và kiểu quyết định cách dùng:</p>
+<table>
+  <tr><th>Kiểu node</th><th>Ví dụ</th><th>Thuộc tính hay dùng</th></tr>
+  <tr><td>Integer</td><td><code>Width</code>, <code>Height</code>, <code>OffsetX</code></td><td><code>.Value</code>, <code>.Min</code>, <code>.Max</code>, <code>.Inc</code> (bước: camera thật thường yêu cầu Width là bội số của 4, 8 hoặc 16)</td></tr>
+  <tr><td>Float</td><td><code>ExposureTime</code> (µs), <code>Gain</code> (dB), <code>AcquisitionFrameRate</code></td><td><code>.Value</code>, <code>.Min</code>, <code>.Max</code></td></tr>
+  <tr><td>Enumeration</td><td><code>PixelFormat</code>, <code>TriggerMode</code>, <code>TriggerSource</code></td><td><code>.Value</code> là chuỗi, <code>.Symbolics</code> là danh sách giá trị hợp lệ</td></tr>
+  <tr><td>Command</td><td><code>TriggerSoftware</code>, <code>ForceFailedBuffer</code></td><td><code>.Execute()</code></td></tr>
+  <tr><td>Boolean</td><td><code>AcquisitionFrameRateEnable</code></td><td><code>.Value</code> là True/False</td></tr>
+</table>
+<p>Một số camera Basler đời cũ (và camera giả lập) có thêm các tên kiểu cũ như <code>ExposureTimeAbs</code>, <code>GainRaw</code>. Khi một tên không có trên camera của bạn, mở <em>pylon Viewer</em> để xem node map thật của nó.</p>
+
+<h2 id="3-dat-tham-so-an-toan-gioi-han-buoc-quyen-ghi">3. Đặt tham số an toàn: giới hạn, bước, quyền ghi</h2>
+<p>Ghi một giá trị ngoài [Min, Max], hoặc không đúng bước Inc, sẽ gây ngoại lệ. Có những node chỉ ghi được khi camera <strong>không</strong> đang chụp: đổi kích thước ảnh (Width, Height, PixelFormat) làm đổi kích thước bộ đệm, nên bị khóa trong lúc lấy ảnh. Viết một hàm đặt tham số dùng chung cho cả trạm:</p>
+<pre><code class="language-python">def dat_so(node, gia_tri):
+    """Đặt node số (Integer/Float): kẹp trong [Min, Max], làm tròn theo bước Inc nếu có; trả về giá trị đã đặt."""
+    if not genicam.IsWritable(node.Node):
+        raise RuntimeError(f"{node.Node.GetName()} hiện không ghi được (camera đang chụp?)")
+    v = min(max(gia_tri, node.Min), node.Max)
+    if isinstance(node.Value, int) and node.Inc &gt; 1:
+        v = node.Min + round((v - node.Min) / node.Inc) * node.Inc
+    node.Value = type(node.Value)(v)
+    if v != gia_tri:
+        print(f"  {node.Node.GetName()}: yêu cầu {gia_tri}, đặt {node.Value}")
+    return node.Value
+
+
+dat_so(cam.ExposureTime, 2_000.0)                # 2 ms
+dat_so(cam.ExposureTime, 50_000_000.0)           # quá max: bị kẹp lại
+dat_so(cam.Width, 640)
+dat_so(cam.Height, 480)
+
+cam.StartGrabbing()
+try:
+    cam.Width.Value = 800                        # đổi kích thước khi đang chụp
+except genicam.AccessException as loi:
+    print("Không đổi được Width khi đang chụp:", str(loi).split(":")[0])
+print("ExposureTime ghi được khi đang chụp?", genicam.IsWritable(cam.ExposureTime.Node))
+cam.StopGrabbing()
+dat_so(cam.ExposureTime, 2_000.0)
+print("Width ghi được sau khi dừng?", genicam.IsWritable(cam.Width.Node))</code></pre>
+<pre><code class="language-text">  ExposureTime: yêu cầu 50000000.0, đặt 10000000.0
+Không đổi được Width khi đang chụp: Node is not writable. 
+ExposureTime ghi được khi đang chụp? True
+Width ghi được sau khi dừng? True</code></pre>
+<div class="tip"><strong>Lưu cấu hình vào camera hoặc vào file</strong>Đặt tham số bằng code mỗi lần khởi động (đọc từ file cấu hình của trạm) là cách dễ kiểm soát nhất. Ngoài ra camera có <em>user set</em> (<code>UserSetSelector</code>, <code>UserSetSave</code>, <code>UserSetDefault</code>) để lưu cấu hình ngay trong camera, và pylon lưu được toàn bộ node map ra file bằng <code>pylon.FeaturePersistence.Save(ten_file, cam.GetNodeMap())</code>. Dù cách nào, phần mềm trạm nên đọc lại và ghi log các tham số quan trọng (exposure, gain, pixel format, ROI) mỗi lần khởi động: thay camera bảo hành về mà quên cấu hình là chuyện thường gặp.</div>
+
+<h2 id="4-phoi-sang-gain-va-nhoe-chuyen-dong-tinh-truoc-khi-dat">4. Phơi sáng, gain và nhòe chuyển động: tính trước khi đặt</h2>
+<p>Thứ tự ưu tiên khi chỉnh độ sáng ảnh: <strong>đèn</strong> trước, rồi <strong>thời gian phơi sáng</strong> (bị giới hạn bởi nhòe chuyển động), cuối cùng mới đến <strong>gain</strong>, vì gain khuếch đại cả nhiễu. Gain tính theo dB: tăng 6 dB là nhân tín hiệu khoảng 2 lần (20·log₁₀2 ≈ 6,02). Với vật chuyển động, phơi sáng tối đa được quyết định bởi độ nhòe chấp nhận được (thường ≤ 1 pixel, xem bài <a href="../kien-thuc/den-strobe-dong-bo-trigger-camera.html">đèn strobe và đồng bộ trigger</a>):</p>
+<pre><code class="language-python">def phoi_sang_toi_da_us(van_toc_mm_s, mm_moi_px, nhoe_px=1.0):
+    """Thời gian phơi sáng lớn nhất (µs) để vật đi không quá nhoe_px pixel."""
+    return nhoe_px * mm_moi_px / van_toc_mm_s * 1e6
+
+
+for v in (100, 500, 2000):                       # băng tải 0,1 / 0,5 / 2 m/s
+    print(f"băng tải {v / 1000:.1f} m/s, 0,05 mm/px: phơi sáng ≤ {phoi_sang_toi_da_us(v, 0.05):6.0f} µs")
+gain_db = 20 * np.log10(4)
+print(f"cần ảnh sáng gấp 4 mà không tăng phơi sáng: gain +{gain_db:.1f} dB (nhiễu cũng gấp khoảng 4)")</code></pre>
+<pre><code class="language-text">băng tải 0.1 m/s, 0,05 mm/px: phơi sáng ≤    500 µs
+băng tải 0.5 m/s, 0,05 mm/px: phơi sáng ≤    100 µs
+băng tải 2.0 m/s, 0,05 mm/px: phơi sáng ≤     25 µs
+cần ảnh sáng gấp 4 mà không tăng phơi sáng: gain +12.0 dB (nhiễu cũng gấp khoảng 4)</code></pre>
+<p>Ở 2 m/s, phơi sáng không được quá 25 µs: hầu như chỉ đèn strobe công suất cao mới đủ sáng trong thời gian đó. Lưu ý: camera giả lập có node <code>ExposureTime</code> và <code>Gain</code> đọc ghi được bình thường, nhưng trên máy thử, ảnh test của nó <strong>không</strong> sáng tối theo hai tham số này. Đừng dùng camera giả lập để thử nghiệm độ sáng; dùng nó để thử logic phần mềm.</p>
+
+<h2 id="5-chien-luoc-lay-anh-va-bo-dem">5. Chiến lược lấy ảnh và bộ đệm</h2>
+<p>Driver nhận ảnh từ camera vào một vòng các <strong>bộ đệm</strong> (buffer, số lượng đặt bằng <code>MaxNumBuffer</code>), và chương trình của bạn lấy ảnh ra bằng <code>RetrieveResult</code>. Khi chương trình chậm hơn camera, <strong>chiến lược lấy ảnh</strong> (grab strategy) quyết định chuyện gì xảy ra:</p>
+<ul>
+  <li><code>GrabStrategy_OneByOne</code> (mặc định): lấy lần lượt từng ảnh theo thứ tự; ảnh chờ trong hàng đợi. Dùng cho <strong>kiểm tra</strong>: mỗi ảnh là một sản phẩm.</li>
+  <li><code>GrabStrategy_LatestImageOnly</code>: chỉ giữ ảnh mới nhất, ảnh cũ bị bỏ. Dùng cho <strong>hiển thị trực tiếp</strong>, căn chỉnh, lấy nét.</li>
+  <li><code>GrabStrategy_LatestImages</code>: giữ N ảnh mới nhất (<code>OutputQueueSize</code>).</li>
+</ul>
+<p>Thí nghiệm: camera chạy 100 khung/giây, chương trình mỗi ảnh mất 30 ms (khoảng 33 ảnh/giây):</p>
+<pre><code class="language-python">dat_so(cam.AcquisitionFrameRateAbs, 100)
+cam.MaxNumBuffer.Value = 5
+for ten, chien_luoc in (("OneByOne", pylon.GrabStrategy_OneByOne),
+                        ("LatestImageOnly", pylon.GrabStrategy_LatestImageOnly)):
+    cam.StartGrabbing(chien_luoc)
+    nhan = bi_bo = 0
+    t0 = time.perf_counter()
+    while time.perf_counter() - t0 &lt; 2.0:
+        kq = cam.RetrieveResult(1000, pylon.TimeoutHandling_ThrowException)
+        nhan += 1
+        bi_bo += kq.GetNumberOfSkippedImages()   # số ảnh driver đã bỏ qua trước ảnh này
+        kq.Release()                              # trả bộ đệm cho driver: BẮT BUỘC
+        time.sleep(0.03)                          # "xử lý" 30 ms
+    cam.StopGrabbing()
+    print(f"{ten:16s}: nhận {nhan} ảnh trong 2 s, driver bỏ qua {bi_bo} ảnh")</code></pre>
+<pre><code class="language-text">OneByOne        : nhận 64 ảnh trong 2 s, driver bỏ qua 0 ảnh
+LatestImageOnly : nhận 63 ảnh trong 2 s, driver bỏ qua 62 ảnh</code></pre>
+<p>Với <code>LatestImageOnly</code>, driver bỏ qua gần như một ảnh cho mỗi ảnh bạn nhận, và đếm lại cho bạn qua <code>GetNumberOfSkippedImages()</code>: hợp với màn hình xem trực tiếp. Với <code>OneByOne</code>, không ảnh nào bị bỏ qua <em>trong hàng đợi của chương trình</em>, nhưng điều đó không có nghĩa camera thật không mất ảnh: khi cả 5 bộ đệm đều đầy, camera thật vẫn chụp tiếp và ảnh không có chỗ chứa sẽ mất ở tầng driver (camera giả lập thì tự chậm lại theo chương trình nên không thấy hiện tượng này). Cách phát hiện trên camera thật nằm ở mục 8.</p>
+<div class="warn"><strong>Luôn Release kết quả</strong>Mỗi <code>RetrieveResult</code> giữ một bộ đệm cho tới khi bạn gọi <code>.Release()</code> (hoặc dùng <code>with cam.RetrieveResult(...) as kq:</code>). Giữ kết quả trong một list "để xử lý sau" là cách nhanh nhất làm cạn bộ đệm: camera ngừng gửi ảnh và chương trình treo ở timeout. Nếu cần giữ ảnh lâu, sao chép mảng ra (<code>kq.Array.copy()</code>) rồi Release ngay, như bài <a href="luong-hang-doi-tach-chup-anh-xu-ly.html">luồng và hàng đợi</a> làm với hàng đợi của nó.</div>
+
+<h2 id="6-trigger-chup-dung-luc-san-pham-den">6. Trigger: chụp đúng lúc sản phẩm đến</h2>
+<p>Trên dây chuyền, camera không chạy tự do mà chụp khi có <strong>trigger</strong>: tín hiệu từ cảm biến sản phẩm, encoder hay PLC đưa vào đường I/O của camera (<code>TriggerSource = Line1</code>), hoặc lệnh phần mềm (<code>Software</code>) khi chương trình tự quyết định lúc chụp. Bật trigger rồi thì camera chỉ chụp khi có trigger; <code>RetrieveResult</code> mà không có trigger sẽ hết thời gian chờ.</p>
+<pre><code class="language-python">cam.TriggerSelector.Value = "FrameStart"
+cam.TriggerMode.Value = "On"
+cam.TriggerSource.Value = "Software"             # dây chuyền thật: "Line1" + TriggerActivation = "RisingEdge"
+cam.StartGrabbing(pylon.GrabStrategy_OneByOne)
+for i in range(3):
+    if cam.WaitForFrameTriggerReady(200, pylon.TimeoutHandling_ThrowException):   # camera sẵn sàng nhận trigger?
+        t = time.perf_counter()
+        cam.ExecuteSoftwareTrigger()
+        with cam.RetrieveResult(1000, pylon.TimeoutHandling_ThrowException) as kq:
+            print(f"trigger {i}: nhận ảnh {kq.Array.shape} sau {1000 * (time.perf_counter() - t):.1f} ms")
+kq = cam.RetrieveResult(300, pylon.TimeoutHandling_Return)    # không trigger: chờ 300 ms rồi trả về
+print("không trigger, sau 300 ms có ảnh không?", kq.IsValid())
+cam.StopGrabbing()
+cam.TriggerMode.Value = "Off"</code></pre>
+<pre><code class="language-text">trigger 0: nhận ảnh (480, 640) sau 16.8 ms
+trigger 1: nhận ảnh (480, 640) sau 15.9 ms
+trigger 2: nhận ảnh (480, 640) sau 15.8 ms
+không trigger, sau 300 ms có ảnh không? False</code></pre>
+<p><code>TimeoutHandling_ThrowException</code> ném ngoại lệ khi hết giờ, hợp khi bạn <em>chắc chắn</em> phải có ảnh (vừa trigger xong); <code>TimeoutHandling_Return</code> trả về kết quả rỗng (<code>IsValid()</code> là False), hợp với vòng lặp chờ trigger phần cứng. Với trigger phần cứng, các tham số liên quan là <code>TriggerActivation</code> (sườn lên/xuống), <code>LineDebouncerTime</code> (lọc nhiễu tiếp điểm), <code>TriggerDelay</code> (chụp trễ một khoảng sau trigger); cách đấu dây và tính thời gian xem bài <a href="industrial-vision-1-trigger-encoder-cycle-time.html">trigger, encoder và cycle time</a>. Thời gian từ trigger tới lúc có ảnh ở trên là của camera giả lập; với camera thật, nó gồm phơi sáng, đọc cảm biến và truyền ảnh, và phải đo trên đúng phần cứng của trạm.</p>
+
+<h2 id="7-dinh-dang-pixel-bit-depth-va-cai-bay-bayer">7. Định dạng pixel: bit depth và cái bẫy Bayer</h2>
+<p><code>Mono8</code> cho mảng <code>uint8</code> (0–255). <code>Mono10</code>, <code>Mono12</code> cho mảng <code>uint16</code> với giá trị tới 1023, 4095: hữu ích khi cần đo độ sáng chính xác hoặc ảnh có dải sáng tối rộng, nhưng gấp đôi dung lượng truyền. Camera màu thường gửi ảnh <strong>Bayer</strong> thô (mỗi pixel chỉ một màu, sắp theo lưới 2 × 2) và máy tính tự nội suy ra ảnh màu: nhẹ băng thông gấp 3 lần so với gửi BGR.</p>
+<p>Bẫy kinh điển: <strong>tên mẫu Bayer của GenICam và của OpenCV không khớp nhau</strong>. Thí nghiệm dưới cho camera giả lập phát một ảnh màu tự tạo (đỏ | lục | lam) ở định dạng <code>BayerRG8</code>, rồi đổi sang BGR bằng bộ chuyển của pylon và bằng 4 mã của OpenCV:</p>
+<pre><code class="language-python">from pathlib import Path
+
+thu_muc = Path("anh_mau_mau").resolve()
+thu_muc.mkdir(exist_ok=True)
+goc = np.zeros((480, 640, 3), np.uint8)
+goc[:, :200], goc[:, 200:420], goc[:, 420:] = (0, 0, 255), (0, 255, 0), (255, 0, 0)    # BGR: đỏ | lục | lam
+cv2.imwrite(str(thu_muc / "mau.png"), goc)
+
+cam.TestImageSelector.Value = "Off"
+cam.ImageFileMode.Value = "On"                    # camera giả lập phát ảnh từ file/thư mục của bạn
+cam.ImageFilename.Value = str(thu_muc)
+cam.PixelFormat.Value = "BayerRG8"
+with cam.GrabOne(1000) as kq:
+    tho = kq.Array.copy()                         # ảnh Bayer thô: 1 kênh
+    chuyen = pylon.ImageFormatConverter()
+    chuyen.OutputPixelFormat = pylon.PixelType_BGR8packed
+    bgr_pylon = chuyen.Convert(kq).Array.copy()
+print("ô 2×2 đầu tiên của ảnh thô (vùng đỏ):", tho[:2, :2].tolist())
+print("pylon → BGR, giữa vùng đỏ:", bgr_pylon[240, 100].tolist())
+for ma in ("COLOR_BayerRG2BGR", "COLOR_BayerBG2BGR"):
+    bgr = cv2.cvtColor(tho, getattr(cv2, ma))
+    print(f"cv2.{ma}: giữa vùng đỏ = {bgr[240, 100].tolist()}, sai khác trung bình so với ảnh gốc "
+          f"{np.abs(bgr.astype(int) - goc).mean():.1f}")
+cam.PixelFormat.Value = "Mono8"</code></pre>
+<pre><code class="language-text">ô 2×2 đầu tiên của ảnh thô (vùng đỏ): [[255, 0], [0, 0]]
+pylon → BGR, giữa vùng đỏ: [0, 0, 255]
+cv2.COLOR_BayerRG2BGR: giữa vùng đỏ = [255, 0, 0], sai khác trung bình so với ảnh gốc 111.5
+cv2.COLOR_BayerBG2BGR: giữa vùng đỏ = [0, 0, 255], sai khác trung bình so với ảnh gốc 0.2</code></pre>
+<p>Ô 2 × 2 đầu tiên là [[R, G], [G, B]], đúng định nghĩa <code>BayerRG</code> của GenICam (đọc từ pixel trên cùng bên trái). Nhưng mã OpenCV "trùng tên" <code>COLOR_BayerRG2BGR</code> cho ra màu <strong>lam</strong> ở vùng đỏ; mã đúng là <code>COLOR_BayerBG2BGR</code>. OpenCV đặt tên mẫu Bayer theo một quy ước khác (tính từ pixel thứ hai, thứ ba của hàng thứ hai), nên mọi cặp tên đều lệch. Bảng tra kiểm chứng bằng thí nghiệm trên (chạy lại với cả 4 định dạng):</p>
+<table>
+  <tr><th>PixelFormat (GenICam)</th><th>Mã OpenCV đúng</th></tr>
+  <tr><td><code>BayerRG8</code></td><td><code>cv2.COLOR_BayerBG2BGR</code></td></tr>
+  <tr><td><code>BayerBG8</code></td><td><code>cv2.COLOR_BayerRG2BGR</code></td></tr>
+  <tr><td><code>BayerGR8</code></td><td><code>cv2.COLOR_BayerGB2BGR</code></td></tr>
+  <tr><td><code>BayerGB8</code></td><td><code>cv2.COLOR_BayerGR2BGR</code></td></tr>
+</table>
+<p>Cách an toàn nhất là để SDK của hãng chuyển màu (<code>ImageFormatConverter</code>), hoặc kiểm tra bằng một vật có màu đã biết ngay khi lắp camera. Lỗi đảo đỏ/lam rất dễ lọt qua nếu sản phẩm gần như xám, rồi làm hỏng bài toán kiểm màu khi đổi mã sản phẩm.</p>
+
+<h2 id="8-phat-hien-anh-hong-va-anh-mat">8. Phát hiện ảnh hỏng và ảnh mất</h2>
+<p>Trên đường truyền thật (cáp lỏng, switch quá tải, card mạng tiết kiệm điện), ảnh có thể tới không đầy đủ. <code>GrabSucceeded()</code> cho biết ảnh có hợp lệ không, và stream grabber giữ các bộ đếm thống kê. Camera giả lập mô phỏng được lỗi này bằng lệnh <code>ForceFailedBuffer</code>:</p>
+<pre><code class="language-python">cam.ImageFileMode.Value = "Off"
+cam.TestImageSelector.Value = "Testimage1"
+cam.StartGrabbing(pylon.GrabStrategy_OneByOne)
+tot = hong = 0
+for i in range(20):
+    if i == 5:                                     # giả lập 3 ảnh hỏng (đường truyền chập chờn)
+        cam.ForceFailedBufferCount.Value = 3
+        cam.ForceFailedBuffer.Execute()
+    with cam.RetrieveResult(1000, pylon.TimeoutHandling_ThrowException) as kq:
+        if kq.GrabSucceeded():
+            tot += 1
+        else:
+            hong += 1
+            print(f"ảnh {i}: hỏng ({kq.ErrorDescription})")   # trạm thật: trả 'LOI' cho sản phẩm này, ghi log
+thong_ke = cam.GetStreamGrabberNodeMap()
+print(f"tốt {tot}, hỏng {hong}; bộ đếm của driver: tổng {thong_ke.GetNode('Statistic_Total_Buffer_Count').GetValue()}, "
+      f"hỏng {thong_ke.GetNode('Statistic_Failed_Buffer_Count').GetValue()}, "
+      f"thiếu bộ đệm {thong_ke.GetNode('Statistic_Buffer_Underrun_Count').GetValue()}")
+cam.StopGrabbing()</code></pre>
+<pre><code class="language-text">ảnh 5: hỏng (The buffer was incompletely grabbed.)
+ảnh 6: hỏng (The buffer was incompletely grabbed.)
+ảnh 7: hỏng (The buffer was incompletely grabbed.)
+tốt 17, hỏng 3; bộ đếm của driver: tổng 20, hỏng 3, thiếu bộ đệm 0</code></pre>
+<ul>
+  <li><strong>Ảnh hỏng</strong> phải được xử lý như "không có kết quả" (LOI), không phải NG và càng không phải OK. Đừng truyền <code>kq.Array</code> của ảnh hỏng vào thuật toán.</li>
+  <li><strong>Ảnh mất</strong>: <code>Statistic_Buffer_Underrun_Count</code> tăng khi camera gửi ảnh mà không còn bộ đệm trống (chương trình không Release kịp, <code>MaxNumBuffer</code> quá nhỏ). Ngoài ra, camera thật đánh số khung của chính nó (với GigE là <code>BlockID</code> của kết quả; nhiều camera còn gửi kèm bộ đếm khung qua chunk data): số khung nhảy là có ảnh mất. Với trạm chạy theo trigger, so số ảnh nhận được với số trigger PLC đã phát là cách kiểm tra chắc chắn nhất. Camera giả lập không có <code>BlockID</code> hợp lệ, nên phần này chỉ kiểm chứng được trên camera thật.</li>
+  <li>Ghi các bộ đếm thống kê vào log định kỳ (ví dụ mỗi phút): con số tăng dần là dấu hiệu sớm của cáp, switch hay cấu hình mạng có vấn đề, trước khi nó thành lỗi dây chuyền.</li>
+</ul>
+
+<h2 id="9-bang-thong-mot-cong-mang-nuoi-duoc-bao-nhieu-camera">9. Băng thông: một cổng mạng nuôi được bao nhiêu camera?</h2>
+<p>Lượng dữ liệu mỗi giây = rộng × cao × số byte mỗi pixel × số khung mỗi giây. So với khả năng của đường truyền: GigE (1 Gbit/s) tối đa khoảng 125 MB/s, <em>đã gồm</em> cả lệnh điều khiển và gói gửi lại, nên phải chừa dư; USB3 Vision thường duy trì khoảng 350–400 MB/s. Hàm dưới dùng ngân sách 100 MB/s cho GigE (chừa khoảng 20%) và 350 MB/s cho USB3; đây là lựa chọn thận trọng để tính sơ bộ, con số thật xem datasheet và đo trên trạm.</p>
+<pre><code class="language-python">NGAN_SACH_MB_S = {"GigE": 100, "USB3": 350}
+BYTE_MOI_PX = {"Mono8": 1, "Mono12": 2, "BayerRG8": 1, "BGR8": 3}
+
+
+def fps_toi_da(rong, cao, pixel_format, cong, so_camera=1):
+    mb_moi_anh = rong * cao * BYTE_MOI_PX[pixel_format] / 1e6
+    return NGAN_SACH_MB_S[cong] / so_camera / mb_moi_anh, mb_moi_anh
+
+
+for rong, cao, pf, cong, n in ((2448, 2048, "Mono8", "GigE", 1), (2448, 2048, "Mono12", "GigE", 1),
+                               (2448, 2048, "BGR8", "GigE", 1), (2448, 2048, "Mono8", "GigE", 3),
+                               (2448, 2048, "Mono8", "USB3", 1)):
+    fps, mb = fps_toi_da(rong, cao, pf, cong, n)
+    print(f"{rong}×{cao} {pf:6s}: {mb:5.1f} MB/ảnh, {n} camera trên 1 cổng {cong}: tối đa ~{fps:5.1f} khung/s mỗi camera")</code></pre>
+<pre><code class="language-text">2448×2048 Mono8 :   5.0 MB/ảnh, 1 camera trên 1 cổng GigE: tối đa ~ 19.9 khung/s mỗi camera
+2448×2048 Mono12:  10.0 MB/ảnh, 1 camera trên 1 cổng GigE: tối đa ~ 10.0 khung/s mỗi camera
+2448×2048 BGR8  :  15.0 MB/ảnh, 1 camera trên 1 cổng GigE: tối đa ~  6.6 khung/s mỗi camera
+2448×2048 Mono8 :   5.0 MB/ảnh, 3 camera trên 1 cổng GigE: tối đa ~  6.6 khung/s mỗi camera
+2448×2048 Mono8 :   5.0 MB/ảnh, 1 camera trên 1 cổng USB3: tối đa ~ 69.8 khung/s mỗi camera</code></pre>
+<p>Một camera 5 MP Mono8 trên GigE chạy được khoảng 20 khung/giây; chuyển sang Mono12 hay BGR thì tốc độ giảm theo số byte mỗi pixel; ba camera chung một cổng GigE thì mỗi camera chỉ còn khoảng 6–7 khung/giây. Các nút chỉnh liên quan:</p>
+<ul>
+  <li><strong>Jumbo frame</strong> (GigE): tăng kích thước gói (<code>GevSCPSPacketSize</code>, ví dụ 8000–9000 byte) và bật jumbo frame trên card mạng: ít gói hơn, giảm tải CPU, ít mất gói. Mọi thiết bị trên đường đi (card, switch) đều phải hỗ trợ.</li>
+  <li><strong>Mỗi camera một cổng mạng</strong> là cấu hình an toàn nhất; nếu phải chung switch, giới hạn băng thông từng camera (<code>DeviceLinkThroughputLimit</code>, hoặc khoảng nghỉ giữa các gói <code>GevSCPD</code>) để chúng không gửi dồn cùng lúc.</li>
+  <li><strong>ROI</strong>: chỉ đọc vùng cần thiết của cảm biến (<code>Width</code>, <code>Height</code>, <code>OffsetX</code>, <code>OffsetY</code>) vừa giảm băng thông vừa tăng tốc độ khung của nhiều camera.</li>
+</ul>
+
+<h2 id="10-dung-camera-gia-lap-de-kiem-thu-tram-truoc-khi-co-phan-cung">10. Dùng camera giả lập để kiểm thử trạm trước khi có phần cứng</h2>
+<p><code>ImageFileMode</code> ở mục 7 có một công dụng lớn hơn: cho camera giả lập phát lần lượt các <strong>ảnh thật</strong> của bạn (thư mục ảnh OK, NG chụp thử từ trước). Toàn bộ phần mềm trạm (lấy ảnh, xử lý, gửi kết quả, lưu, xử lý lỗi) chạy được với "camera" đúng kiểu thật, trước khi camera về tới. Ví dụ với 3 ảnh tự tạo:</p>
+<pre><code class="language-python">thu_muc_sp = Path("anh_san_pham").resolve()
+thu_muc_sp.mkdir(exist_ok=True)
+for i, so_vat in enumerate((4, 3, 4)):                     # ảnh 1 thiếu một vật
+    a = np.full((480, 640), 200, np.uint8)
+    for k in range(so_vat):
+        cv2.circle(a, (100 + 140 * k, 240), 45, 40, -1)
+    cv2.imwrite(str(thu_muc_sp / f"sp_{i}.png"), a)
+
+
+def dem_vat(anh):
+    _, bw = cv2.threshold(anh, 120, 255, cv2.THRESH_BINARY_INV)
+    return cv2.connectedComponents(bw)[0] - 1
+
+
+cam.TestImageSelector.Value = "Off"
+cam.ImageFileMode.Value = "On"
+cam.ImageFilename.Value = str(thu_muc_sp)
+cam.StartGrabbing(pylon.GrabStrategy_OneByOne)
+for i in range(4):                                         # thư mục có 3 ảnh: ảnh thứ 4 quay lại ảnh đầu
+    with cam.RetrieveResult(1000, pylon.TimeoutHandling_ThrowException) as kq:
+        n = dem_vat(kq.Array)
+        print(f"ảnh {i}: {n} vật → {'OK' if n == 4 else 'NG'}")
+cam.StopGrabbing()
+cam.Close()</code></pre>
+<pre><code class="language-text">ảnh 0: 4 vật → OK
+ảnh 1: 3 vật → NG
+ảnh 2: 4 vật → OK
+ảnh 3: 4 vật → OK</code></pre>
+<p>Camera giả lập phát các file trong thư mục theo thứ tự tên rồi quay vòng. Kết hợp với <code>ForceFailedBuffer</code> (mục 8), bạn kiểm thử được cả luồng xử lý ảnh hỏng, thứ rất khó tạo ra theo ý muốn trên camera thật.</p>
+
+<h2 id="11-cung-viec-do-voi-harvesters-camera-nhieu-hang">11. Cùng việc đó với Harvesters (camera nhiều hãng)</h2>
+<p>Harvesters là thư viện Python mã nguồn mở dùng chuẩn GenTL: nạp file <code>.cti</code> (GenTL producer) do hãng camera cung cấp kèm SDK, rồi điều khiển mọi camera tương thích theo một cách. Tên node vẫn là tên SFNC như trên. Đoạn dưới là minh họa: nó cần file <code>.cti</code> thật của hãng camera bạn dùng (đường dẫn dưới chỉ là ví dụ).</p>
+<pre><code class="language-python"># (minh họa) cần file .cti (GenTL producer) của hãng camera; đường dẫn chỉ là ví dụ
+from harvesters.core import Harvester
+
+h = Harvester()
+h.add_file(r"C:\Program Files\HangCamera\GenTL\producer.cti")
+h.update()                                          # tìm camera
+print(h.device_info_list)
+ia = h.create(0)                                    # mở camera đầu tiên
+nm = ia.remote_device.node_map
+nm.ExposureTime.value = 2000.0                      # cùng tên SFNC như pypylon
+nm.PixelFormat.value = "Mono8"
+ia.start()
+with ia.fetch(timeout=1.0) as buffer:               # tự trả bộ đệm khi ra khỏi with
+    tp = buffer.payload.components[0]
+    anh = tp.data.reshape(tp.height, tp.width).copy()   # copy trước khi bộ đệm được trả lại
+ia.stop()
+ia.destroy()
+h.reset()</code></pre>
+<p>Chọn pypylon khi trạm chỉ dùng camera Basler (tài liệu, ví dụ và camera giả lập tốt); chọn Harvesters hoặc SDK đa hãng khi trạm có camera của nhiều hãng hoặc bạn muốn đổi hãng mà ít sửa code. Nguyên tắc dùng bộ đệm giống hệt: lấy, sao chép nếu cần, trả lại ngay.</p>
+
+<h2 id="12-loi-thuong-gap">12. Lỗi thường gặp</h2>
+<table>
+  <tr><th>Triệu chứng</th><th>Nguyên nhân hay gặp</th><th>Cách xử lý</th></tr>
+  <tr><td>Không tìm thấy camera GigE</td><td>Camera và card mạng khác dải IP, tường lửa chặn</td><td>Dùng công cụ cấu hình IP của hãng; đặt IP tĩnh cùng dải; cho phép phần mềm qua tường lửa</td></tr>
+  <tr><td>Mở camera báo đang bị dùng</td><td>pylon Viewer hoặc một chương trình khác đang mở camera</td><td>Mỗi lúc chỉ một chương trình điều khiển camera; đóng Viewer trước khi chạy script</td></tr>
+  <tr><td>Chương trình treo ở timeout sau vài chục ảnh</td><td>Không <code>Release</code> kết quả, bộ đệm cạn</td><td>Dùng <code>with ... as kq</code>; sao chép mảng nếu cần giữ</td></tr>
+  <tr><td>Ảnh hỏng, mất ảnh ngẫu nhiên trên GigE</td><td>Card mạng tiết kiệm điện, không bật jumbo frame, nhiều camera chung một cổng</td><td>Tắt tiết kiệm điện, bật jumbo frame, tăng bộ đệm nhận của card, tách cổng hoặc giới hạn băng thông</td></tr>
+  <tr><td>Màu đỏ và lam đổi chỗ</td><td>Sai mã chuyển Bayer</td><td>Bảng ở mục 7, hoặc dùng bộ chuyển của SDK</td></tr>
+  <tr><td>Ảnh mờ khi băng tải chạy nhanh</td><td>Phơi sáng quá dài</td><td>Tính phơi sáng tối đa (mục 4), tăng đèn hoặc dùng strobe</td></tr>
+  <tr><td><code>AccessException</code> khi đặt tham số</td><td>Đổi Width, Height, PixelFormat khi đang chụp; giá trị sai bước</td><td>Dừng chụp trước; dùng hàm đặt an toàn (mục 3)</td></tr>
+</table>
+
+<h2 id="tom-tat">Tóm tắt</h2>
+<ul>
+  <li>GigE Vision, USB3 Vision lo truyền dẫn; GenICam mô tả tham số thành node; SFNC thống nhất tên (<code>ExposureTime</code>, <code>Gain</code>, <code>PixelFormat</code>, <code>TriggerMode</code>); GenTL cho phép một phần mềm dùng camera nhiều hãng.</li>
+  <li>pypylon + camera giả lập (<code>PYLON_CAMEMU</code>) chạy được mọi logic phần mềm khi chưa có camera; giả lập không mô phỏng ảnh hưởng của phơi sáng, gain lên độ sáng ảnh.</li>
+  <li>Đặt tham số trong [Min, Max] và đúng bước; đổi kích thước ảnh chỉ khi đã dừng chụp; ghi log tham số khi khởi động.</li>
+  <li><code>OneByOne</code> cho kiểm tra, <code>LatestImageOnly</code> cho hiển thị; luôn Release kết quả; đọc các bộ đếm thống kê để phát hiện ảnh hỏng, thiếu bộ đệm.</li>
+  <li>Trigger phần mềm/phần cứng với <code>TriggerMode = On</code>; chọn kiểu timeout phù hợp; ảnh hỏng là LOI, không phải NG.</li>
+  <li>Tên Bayer của GenICam và OpenCV lệch nhau: <code>BayerRG8</code> dùng <code>COLOR_BayerBG2BGR</code>.</li>
+  <li>Tính băng thông trước: rộng × cao × byte/pixel × fps so với ngân sách đường truyền; jumbo frame, ROI, mỗi camera một cổng.</li>
+</ul>
+
+<h2 id="bai-tap">Bài tập</h2>
+<div class="ex">
+<h3 id="bai-1-ba-camera-tren-mot-may-tinh">Bài 1. Ba camera trên một máy tính</h3>
+<p>Trạm có ba camera 2448 × 2048 Mono8, mỗi camera cần 12 khung/giây. Máy tính có một cổng GigE và một card 4 cổng GigE. Dùng hàm <code>fps_toi_da</code> để quyết định: đi chung một cổng qua switch có được không? Nếu được, mỗi camera nên giới hạn băng thông bao nhiêu MB/s?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">fps_chung, mb = fps_toi_da(2448, 2048, "Mono8", "GigE", so_camera=3)
+can = 3 * 12 * mb
+print(f"chung 1 cổng: tối đa {fps_chung:.1f} khung/s mỗi camera; cần tổng {can:.0f} MB/s so với ngân sách 100 MB/s")
+print(f"mỗi camera một cổng: tối đa {fps_toi_da(2448, 2048, 'Mono8', 'GigE')[0]:.1f} khung/s, cần {12 * mb:.0f} MB/s mỗi cổng")</code></pre>
+<pre><code class="language-text">chung 1 cổng: tối đa 6.6 khung/s mỗi camera; cần tổng 180 MB/s so với ngân sách 100 MB/s
+mỗi camera một cổng: tối đa 19.9 khung/s, cần 60 MB/s mỗi cổng</code></pre>
+<p>Chung một cổng không đủ (cần khoảng 180 MB/s, vượt cả mức tối đa lý thuyết 125 MB/s). Dùng card 4 cổng, mỗi camera một cổng: mỗi cổng chỉ cần khoảng 60 MB/s, còn dư nhiều. Nếu bắt buộc phải chung (ví dụ cáp dài tới tủ điện), giảm ROI hoặc tốc độ khung, hoặc chuyển sang camera 2,5/5/10 GigE.</p>
+</details>
+</div>
+<div class="ex">
+<h3 id="bai-2-lop-camerapylon-theo-hop-dong-nguonanh">Bài 2. Lớp CameraPylon theo "hợp đồng" NguonAnh</h3>
+<p>Ở bài <a href="python-7-class-dataclass-to-chuc-code.html">class và dataclass</a> có lớp cha <code>NguonAnh</code> với phương thức <code>doc()</code> trả về <code>(ten, anh)</code> hoặc <code>None</code>. Viết lớp <code>CameraPylon(NguonAnh)</code>: mở camera đầu tiên, <code>doc()</code> trả về <code>(f"khung_{n}", anh)</code> với ảnh đã sao chép, trả <code>None</code> khi ảnh hỏng hoặc hết giờ, đếm số ảnh hỏng; <code>dong()</code> dừng và đóng camera. Thử với camera giả lập và <code>ForceFailedBuffer</code>.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">class NguonAnh:
+    def doc(self):
+        raise NotImplementedError
+
+    def dong(self):
+        pass
+
+
+class CameraPylon(NguonAnh):
+    def __init__(self, timeout_ms=1000):
+        self.cam = pylon.InstantCamera(pylon.TlFactory.GetInstance().CreateFirstDevice())
+        self.cam.Open()
+        self.cam.StartGrabbing(pylon.GrabStrategy_OneByOne)
+        self.timeout_ms, self.n, self.so_hong = timeout_ms, 0, 0
+
+    def doc(self):
+        kq = self.cam.RetrieveResult(self.timeout_ms, pylon.TimeoutHandling_Return)
+        if not kq.IsValid():                           # hết giờ
+            return None
+        with kq:
+            self.n += 1
+            if not kq.GrabSucceeded():
+                self.so_hong += 1
+                return None
+            return f"khung_{self.n}", kq.Array.copy()
+
+    def dong(self):
+        self.cam.StopGrabbing()
+        self.cam.Close()
+
+
+nguon = CameraPylon()
+nguon.cam.ForceFailedBufferCount.Value = 2
+nguon.cam.ForceFailedBuffer.Execute()
+ket_qua = [nguon.doc() for _ in range(6)]
+print([k[0] if k else None for k in ket_qua], "| ảnh hỏng:", nguon.so_hong)
+nguon.dong()</code></pre>
+<pre><code class="language-text">[None, None, 'khung_3', 'khung_4', 'khung_5', 'khung_6'] | ảnh hỏng: 2</code></pre>
+<p>Trong một trạm thật, <code>None</code> vì ảnh hỏng và <code>None</code> vì hết giờ nên được phân biệt (trả về mã lỗi riêng hoặc ném ngoại lệ riêng) để log và PLC biết vì sao sản phẩm không có kết quả. Phần còn lại của chương trình (ví dụ hàm <code>chay_kiem_tra</code> của bài class) không phải sửa gì khi đổi từ camera giả sang camera thật.</p>
+</details>
+</div>
+<div class="ex">
+<h3 id="bai-3-doc-thong-so-camera-that">Bài 3. Đọc thông số camera thật</h3>
+<p>Một trạm cũ chạy ổn định nhiều năm, nay camera hỏng và được thay bằng camera cùng model mới bảo hành về. Ảnh sau khi thay tối hơn và kết quả đo lệch. Liệt kê theo thứ tự những gì bạn kiểm tra và những gì lẽ ra phần mềm trạm nên làm sẵn để sự cố này không xảy ra.</p>
+<details><summary>Xem đáp án</summary>
+<p>Kiểm tra theo thứ tự: (1) các tham số trong camera mới so với bản ghi cấu hình cũ: exposure, gain, pixel format, ROI, trigger, gamma/LUT nếu có (camera mới về với cấu hình mặc định của nhà máy); (2) khẩu độ và nét của ống kính (có thể bị xoay khi tháo lắp); (3) vị trí lắp (dấu chuẩn trong ảnh, xem bài <a href="../kien-thuc/kiem-tra-hieu-chuan-dinh-ky-san-xuat.html">kiểm tra hiệu chuẩn định kỳ</a>); (4) hiệu chuẩn lại tỉ lệ mm/pixel vì cảm biến mới có thể lệch vị trí so với ống kính. Phần mềm lẽ ra nên: đặt <em>toàn bộ</em> tham số camera từ file cấu hình mỗi lần khởi động thay vì tin vào cấu hình lưu trong camera; ghi log serial camera cùng các tham số; phát hiện serial đổi thì khóa sản xuất cho tới khi chạy kiểm tra mẫu chuẩn.</p>
+</details>
+</div>
+<p>Bài tiếp theo: <a href="../kien-thuc/do-sau-truong-anh-khau-do-lay-net.html">Độ sâu trường ảnh, khẩu độ, lấy nét</a>.</p>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.baslerweb.com/camera-emulation" rel="noopener" target="_blank">Basler: Camera Emulation (ảnh test tùy chọn, ForceFailedBuffer)</a>, <a href="https://github.com/basler/pypylon" rel="noopener" target="_blank">pypylon trên GitHub</a>, <a href="https://www.emva.org/standards-technology/genicam/" rel="noopener" target="_blank">EMVA: GenICam (GenApi, SFNC, GenTL)</a>, <a href="https://www.automate.org/vision/vision-standards/gige-vision" rel="noopener" target="_blank">A3: GigE Vision</a>, <a href="https://www.automate.org/vision/vision-standards/usb3-vision" rel="noopener" target="_blank">A3: USB3 Vision (350–400 MB/s)</a>, <a href="https://softwareservices.flir.com/BFS-GE-16S2-BD2/latest/Family/AllocatingBandwidth.htm" rel="noopener" target="_blank">Teledyne FLIR: Allocating Bandwidth (GigE 125 MB/s)</a>, <a href="https://github.com/genicam/harvesters" rel="noopener" target="_blank">Harvesters trên GitHub</a>.</p>
+
+      </div>
+      <section class="practice"><h2><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <circle cx="12" cy="12" r="6" /> <circle cx="12" cy="12" r="2" /></svg>Bài tập thực hành</h2><ol><li>Viết lớp CameraPylon theo hợp đồng NguonAnh, thử với ForceFailedBuffer.</li><li>Tính số khung tối đa khi 3 camera 5 MP chung một cổng GigE và đề xuất cách đi dây.</li></ol><p>Làm xong bài tập mới chuyển sang bài tiếp theo: tự viết code là cách duy nhất để nhớ lâu.</p></section><div class="lesson-done" data-course="vision-engineer"><button type="button" class="lesson-done-btn" data-lesson-done="lay-anh-camera-cong-nghiep-genicam-pypylon" aria-pressed="false"><span class="box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></span><span class="off">Đánh dấu đã học xong</span><span class="on">Đã học xong bài này</span></button><a class="btn lg" href="../kien-thuc/do-sau-truong-anh-khau-do-lay-net.html">Bài tiếp theo<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a></div>
+      <footer class="article-foot">
+        <div class="tags"><a class="tag" href="../search.html?q=Camera">#Camera</a><a class="tag" href="../search.html?q=Machine Vision">#Machine Vision</a><a class="tag" href="../search.html?q=Python">#Python</a></div>
+        <div class="share">
+      <span>Chia sẻ:</span>
+      <a class="share-btn fb" href="https://www.facebook.com/sharer/sharer.php?u=https://hocfree.vn/hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html" target="_blank" rel="noopener" aria-label="Chia sẻ Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8z"/></svg></a>
+      <a class="share-btn x" href="https://twitter.com/intent/tweet?url=https://hocfree.vn/hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html" target="_blank" rel="noopener" aria-label="Chia sẻ X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+      <button class="share-btn copy-link" data-url="https://hocfree.vn/hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html" aria-label="Sao chép liên kết"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+    </div>
+      </footer>
+      <div class="author-box">
+        <span class="avatar lg" aria-hidden="true">HF</span>
+        <div>
+          <strong>Ban biên tập HọcFree</strong>
+          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và ngoại ngữ, hoàn toàn miễn phí.</p>
+        </div>
+      </div>
+      <nav class="pager lesson-pager" aria-label="Bài học trước/sau"><a class="prev" href="../kien-thuc/chon-camera-ong-kinh-machine-vision.html"><span>← Bài trước · Bài 2</span>Chọn camera và ống kính: độ phân giải, FOV, tiêu cự</a><a class="next" href="../kien-thuc/do-sau-truong-anh-khau-do-lay-net.html"><span>Bài tiếp → · Bài 4</span>Độ sâu trường ảnh, khẩu độ, lấy nét</a></nav>
+    </article>
+    <aside class="sidebar course-side" data-course="vision-engineer">
+      <section class="widget course-toc">
+        <p class="widget-title">Chặng 6/15 · Vision Engineer</p>
+        <a class="course-toc-title" href="../lo-trinh/vision-engineer/camera-lens-lighting.html">Camera / Lens / Lighting</a>
+        <div class="lc" data-lesson-count="global-rolling-shutter-area-line-scan chon-camera-ong-kinh-machine-vision lay-anh-camera-cong-nghiep-genicam-pypylon do-sau-truong-anh-khau-do-lay-net camera-4-ong-kinh-telecentric 7-kieu-chieu-sang-machine-vision mau-den-kinh-loc-phan-cuc kiem-soat-anh-sang-moi-truong-nha-may camera-8-bai-tap-chon-cau-hinh"><div class="lc-bar"><span data-lc-bar></span></div><span data-lc-text>0/9 bài</span></div>
+        <ol class="toc-lessons"><li data-lesson="global-rolling-shutter-area-line-scan"><a href="../kien-thuc/global-rolling-shutter-area-line-scan.html"><span class="tn">1</span><span class="tt">Global/rolling shutter, area/line scan</span></a></li><li data-lesson="chon-camera-ong-kinh-machine-vision"><a href="../kien-thuc/chon-camera-ong-kinh-machine-vision.html"><span class="tn">2</span><span class="tt">Chọn camera và ống kính: độ phân giải, FOV, tiêu cự</span></a></li><li data-lesson="lay-anh-camera-cong-nghiep-genicam-pypylon" class="is-current"><a href="../hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html" aria-current="page"><span class="tn">3</span><span class="tt">Lấy ảnh từ camera công nghiệp: GenICam, pypylon</span></a></li><li data-lesson="do-sau-truong-anh-khau-do-lay-net"><a href="../kien-thuc/do-sau-truong-anh-khau-do-lay-net.html"><span class="tn">4</span><span class="tt">Độ sâu trường ảnh, khẩu độ, lấy nét</span></a></li><li data-lesson="camera-4-ong-kinh-telecentric"><a href="../hoc/camera-4-ong-kinh-telecentric.html"><span class="tn">5</span><span class="tt">Ống kính telecentric: khi nào cần?</span></a></li><li data-lesson="7-kieu-chieu-sang-machine-vision"><a href="../kien-thuc/7-kieu-chieu-sang-machine-vision.html"><span class="tn">6</span><span class="tt">7 kiểu chiếu sáng và khi nào dùng</span></a></li><li data-lesson="mau-den-kinh-loc-phan-cuc"><a href="../kien-thuc/mau-den-kinh-loc-phan-cuc.html"><span class="tn">7</span><span class="tt">Màu đèn, kính lọc và phân cực</span></a></li><li data-lesson="kiem-soat-anh-sang-moi-truong-nha-may"><a href="../kien-thuc/kiem-soat-anh-sang-moi-truong-nha-may.html"><span class="tn">8</span><span class="tt">Kiểm soát ánh sáng môi trường</span></a></li><li data-lesson="camera-8-bai-tap-chon-cau-hinh"><a href="../hoc/camera-8-bai-tap-chon-cau-hinh.html"><span class="tn">9</span><span class="tt">Bài tập chặng 6: chọn camera, ống kính, đèn cho bài toán thật</span></a></li></ol>
+        <a class="more" href="../lo-trinh/vision-engineer.html">Xem toàn bộ lộ trình<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a>
+      </section>
+    </aside>
+  </div>
+  <section class="band">
+    <div class="container">
+      <div class="section-title"><h2>Có thể bạn quan tâm</h2></div>
+      <div class="card-grid"><article class="card">
+  <a class="thumb" href="../hoc/python-7-class-dataclass-to-chuc-code.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-7-class-dataclass-to-chuc-code.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-7-class-dataclass-to-chuc-code.html">Class và dataclass: tổ chức code cho trạm kiểm tra</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-21">21/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>17 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/luong-hang-doi-tach-chup-anh-xu-ly.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/luong-hang-doi-tach-chup-anh-xu-ly.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/luong-hang-doi-tach-chup-anh-xu-ly.html">Luồng và hàng đợi: tách chụp ảnh khỏi xử lý, không mất khung</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-21">21/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>24 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/msa-gage-rr-anova-he-do-camera.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/msa-gage-rr-anova-he-do-camera.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/msa-gage-rr-anova-he-do-camera.html">MSA và Gage R&amp;R cho trạm đo camera: ANOVA, ndc, dải bảo vệ</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-21">21/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>25 phút đọc</span></div>
+</article></div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <a class="logo" href="../"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+      <p>HọcFree.vn – nền tảng học miễn phí về AI, lập trình, Computer Vision, Machine Vision, tin tức AI và ngoại ngữ dành cho người Việt.</p>
+    </div>
+    <div><h3>Học &amp; thực hành</h3><ul><li><a href="../hoc/">Học AI &amp; Lập trình</a></li><li><a href="../projects/">Projects</a></li><li><a href="../lo-trinh/">Learning Paths</a></li></ul></div>
+    <div><h3>Khám phá</h3><ul><li><a href="../kien-thuc/">Kiến thức</a></li><li><a href="../tin-tuc-ai/">Tin tức AI</a></li><li><a href="../ngoai-ngu/">Ngoại ngữ</a></li><li><a href="../tai-nguyen/">Tài nguyên</a></li></ul></div>
+    <div><h3>Bài mới</h3><ul><li><a href="../hoc/python-7-class-dataclass-to-chuc-code.html">Class và dataclass: tổ chức code cho trạm kiểm tra</a></li><li><a href="../hoc/luong-hang-doi-tach-chup-anh-xu-ly.html">Luồng và hàng đợi: tách chụp ảnh khỏi xử lý, không mất khung</a></li><li><a href="../hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html">Lấy ảnh từ camera công nghiệp: GenICam, pypylon, camera giả lập</a></li><li><a href="../hoc/msa-gage-rr-anova-he-do-camera.html">MSA và Gage R&amp;R cho trạm đo camera: ANOVA, ndc, dải bảo vệ</a></li></ul></div>
+    <div>
+      <h3>HọcFree</h3>
+      <ul>
+        <li><a href="../gioi-thieu.html">Giới thiệu</a></li>
+        <li><a href="../search.html">Tìm kiếm</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">© 2026 HọcFree.vn · Kiến thức là để chia sẻ.</div>
+  </div>
+</footer>
+<button class="to-top" aria-label="Lên đầu trang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<script src="../assets/js/search-data.js?v=20261021" defer></script>
+<script src="../assets/js/main.js?v=20261021" defer></script>
+</body>
+</html>

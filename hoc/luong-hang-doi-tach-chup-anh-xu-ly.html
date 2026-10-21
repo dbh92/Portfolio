@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="vi" data-root="../">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Luồng và hàng đợi: tách chụp ảnh khỏi xử lý, không mất khung</title>
+<meta name="description" content="Pipeline producer–consumer bằng threading và queue: đo khung mất, độ trễ, GIL với OpenCV, hàng đợi đầy thì chờ hay bỏ, lỗi trong luồng và thứ tự kết quả.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://hocfree.vn/hoc/luong-hang-doi-tach-chup-anh-xu-ly.html">
+<meta property="og:site_name" content="HọcFree">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Luồng và hàng đợi: tách chụp ảnh khỏi xử lý, không mất khung">
+<meta property="og:description" content="Pipeline producer–consumer bằng threading và queue: đo khung mất, độ trễ, GIL với OpenCV, hàng đợi đầy thì chờ hay bỏ, lỗi trong luồng và thứ tự kết quả.">
+<meta property="og:url" content="https://hocfree.vn/hoc/luong-hang-doi-tach-chup-anh-xu-ly.html">
+<meta property="og:image" content="https://hocfree.vn/assets/images/posts/luong-hang-doi-tach-chup-anh-xu-ly.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="Luồng và hàng đợi: tách chụp ảnh khỏi xử lý, không mất khung">
+<meta property="og:locale" content="vi_VN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Luồng và hàng đợi: tách chụp ảnh khỏi xử lý, không mất khung">
+<meta name="twitter:description" content="Pipeline producer–consumer bằng threading và queue: đo khung mất, độ trễ, GIL với OpenCV, hàng đợi đầy thì chờ hay bỏ, lỗi trong luồng và thứ tự kết quả.">
+<meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/luong-hang-doi-tach-chup-anh-xu-ly.jpg">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/fonts.css?v=20261021">
+<link rel="stylesheet" href="../assets/css/style.css?v=20261021">
+<script>try{var t=localStorage.getItem('hf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
+<meta property="article:published_time" content="2026-10-21">
+<meta property="article:section" content="Học AI &amp; Lập trình">
+<meta property="article:tag" content="Python">
+<meta property="article:tag" content="OpenCV">
+<meta property="article:tag" content="Machine Vision">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "Luồng và hàng đợi: tách chụp ảnh khỏi xử lý, không mất khung", "description": "Pipeline producer–consumer bằng threading và queue: đo khung mất, độ trễ, GIL với OpenCV, hàng đợi đầy thì chờ hay bỏ, lỗi trong luồng và thứ tự kết quả.", "image": ["https://hocfree.vn/assets/images/posts/luong-hang-doi-tach-chup-anh-xu-ly.jpg"], "datePublished": "2026-10-21", "dateModified": "2026-10-21", "inLanguage": "vi", "articleSection": "Học AI & Lập trình", "keywords": "Python, OpenCV, Machine Vision", "wordCount": 4301, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/hoc/luong-hang-doi-tach-chup-anh-xu-ly.html"}, "isPartOf": {"@type": "Course", "name": "Trở thành Vision Engineer", "url": "https://hocfree.vn/lo-trinh/vision-engineer.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Learning Paths", "item": "https://hocfree.vn/lo-trinh/"}, {"@type": "ListItem", "position": 3, "name": "Trở thành Vision Engineer", "item": "https://hocfree.vn/lo-trinh/vision-engineer.html"}, {"@type": "ListItem", "position": 4, "name": "Chặng 2: OpenCV", "item": "https://hocfree.vn/lo-trinh/vision-engineer/opencv.html"}, {"@type": "ListItem", "position": 5, "name": "Luồng và hàng đợi: tách chụp ảnh khỏi xử lý, không mất khung"}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div class="progress" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="container wide header-top">
+    <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="nav-scrim" hidden></div>
+    <a class="logo" href="../" aria-label="HọcFree – Trang chủ"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+    <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
+    <div class="header-actions">
+      <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="login-link" href="../dang-nhap.html">Đăng nhập</a>
+      <a class="btn start-btn" href="../lo-trinh/">Bắt đầu học</a>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="container wide">
+      <nav class="site-nav" id="site-nav" aria-label="Menu chính">
+        <div class="drawer-head">
+          <a class="logo" href="../" tabindex="-1"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+          <button class="icon-btn nav-close" aria-label="Đóng menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <button type="button" class="drawer-search search-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Tìm bài học, chủ đề…</span></button>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="../">Trang chủ</a></li><li class="nav-item has-panel is-mega"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-hoc">Học AI &amp; Lập trình<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel mega" id="nav-panel-hoc">
+  <div class="container wide mega-inner">
+    <div class="mega-groups"><div class="mega-group"><a class="mega-group-title" href="../hoc/#programming">Programming</a><ul><li><a href="../hoc/python.html">Python</a></li><li><a href="../hoc/csharp.html">C#</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#ai-machine-learning">AI &amp; Machine Learning</a><ul><li><a href="../hoc/machine-learning.html">Machine Learning</a></li><li><a href="../hoc/deep-learning.html">Deep Learning</a></li><li><a href="../hoc/pytorch.html">PyTorch</a></li><li><a href="../hoc/generative-ai.html">Generative AI</a></li><li><a href="../hoc/llm-ai-agents.html">LLM / AI Agents</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#computer-vision">Computer Vision</a><ul><li><a href="../hoc/opencv.html">OpenCV</a></li><li><a href="../hoc/image-processing.html">Image Processing</a></li><li><a href="../hoc/computer-vision.html">Computer Vision</a></li><li><a href="../hoc/ocr.html">OCR</a></li><li><a href="../hoc/object-detection.html">Object Detection</a></li><li><a href="../hoc/segmentation.html">Segmentation</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#vision-engineering">Vision Engineering</a><ul><li><a href="../hoc/machine-vision.html">Machine Vision</a></li><li><a href="../hoc/ai-vision.html">AI Vision</a></li><li><a href="../hoc/industrial-vision.html">Industrial Vision</a></li><li><a href="../hoc/camera-lens.html">Camera &amp; Lens</a></li><li><a href="../hoc/lighting.html">Lighting</a></li><li><a href="../hoc/calibration.html">Calibration</a></li><li><a href="../hoc/3d-vision.html">3D Vision</a></li><li><a href="../hoc/plc-robot-mes.html">PLC / Robot / MES</a></li><li><a href="../hoc/vision-deployment.html">Vision Deployment</a></li></ul></div></div>
+    <a class="feature-card" href="../lo-trinh/vision-engineer.html">
+  <span class="feature-eyebrow">⭐ Learning Path nổi bật</span>
+  <span class="feature-title">Trở thành Vision Engineer</span>
+  <span class="feature-sub">Machine Vision + AI Vision + Industrial Automation</span>
+  <span class="feature-desc">Lộ trình thực chiến từ Python, OpenCV và Machine Vision đến 3D Vision, Deep Learning, AI Vision, Camera, PLC, Robot và triển khai hệ thống Vision trong nhà máy.</span>
+  <span class="feature-chain" aria-label="Các chặng chính"><span>Python</span><i aria-hidden="true">→</i><span>OpenCV</span><i aria-hidden="true">→</i><span>Machine Vision</span><i aria-hidden="true">→</i><span>AI Vision</span><i aria-hidden="true">→</i><span class="chain-goal">🎯 Vision Engineer</span></span>
+  <span class="feature-meta">15 chặng · 5 giai đoạn · ~13 tháng</span>
+  <span class="feature-cta">Xem lộ trình →</span>
+</a>
+  </div>
+  <div class="mega-foot"><div class="container wide mega-foot-inner"><ol class="journey compact" aria-label="Học, thực hành, trở thành kỹ sư"><li><a href="../hoc/" aria-current="step"><span class="journey-n">1</span><span class="journey-t"><b>Học</b><small>Học AI &amp; Lập trình</small></span></a></li><li><a href="../projects/"><span class="journey-n">2</span><span class="journey-t"><b>Thực hành</b><small>Projects</small></span></a></li><li><a href="../lo-trinh/"><span class="journey-n">3</span><span class="journey-t"><b>Trở thành kỹ sư</b><small>Learning Paths</small></span></a></li></ol><a class="panel-all" href="../hoc/">Xem tất cả Học AI &amp; Lập trình →</a></div></div>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-projects">Projects<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-projects">
+  <p class="panel-kicker"><span>Bước 2 · Thực hành</span>Áp dụng vào dự án thật</p>
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../projects/ai-projects.html"><span class="drop-label">AI Projects</span><span class="drop-desc">Ứng dụng ML và LLM, từ ý tưởng đến bản demo</span></a></li><li><a class="drop-link" href="../projects/computer-vision-projects.html"><span class="drop-label">Computer Vision Projects</span><span class="drop-desc">Phát hiện, nhận dạng và theo dõi đối tượng</span></a></li><li><a class="drop-link" href="../projects/industrial-vision-projects.html"><span class="drop-label">Industrial Vision Projects</span><span class="drop-desc">Đo kích thước, kiểm tra lỗi, đọc mã trên dây chuyền</span></a></li></ul></div></div>
+  <a class="panel-all" href="../projects/">Xem tất cả Projects →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger is-active" aria-expanded="false" aria-controls="nav-panel-lo-trinh" aria-current="true">Learning Paths<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-lo-trinh">
+  <p class="panel-kicker"><span>Bước 3 · Trở thành kỹ sư</span>Định hướng nghề nghiệp</p>
+  <ul class="drop-list"><li><a class="drop-link is-flagship" href="../lo-trinh/vision-engineer.html"><span class="drop-label">⭐ Trở thành Vision Engineer</span><span class="drop-desc">Machine Vision + AI Vision + Industrial Automation · 15 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/toeic-700.html"><span class="drop-label">700+ TOEIC trong 5 tháng</span><span class="drop-desc">TOEIC Listening &amp; Reading + giao tiếp công sở cho người đi làm · 11 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/hsk3.html"><span class="drop-label">Tiếng Trung từ 0 đến HSK 3 trong 6 tháng</span><span class="drop-desc">Pinyin, chữ Hán, ngữ pháp, giao tiếp và luyện thi HSK 3.0 cho người Việt · 10 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/#python-developer"><span class="drop-label">Python Developer<span class="badge-soon">Sắp ra mắt</span></span><span class="drop-desc">Python, công cụ, tự động hóa</span></a></li></ul>
+  <a class="panel-all" href="../lo-trinh/">Xem tất cả lộ trình →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-kien-thuc">Kiến thức<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-kien-thuc">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Lĩnh vực</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/programming.html"><span class="drop-label">Programming</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-machine-learning.html"><span class="drop-label">AI / Machine Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/deep-learning.html"><span class="drop-label">Deep Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/machine-vision.html"><span class="drop-label">Machine Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-vision.html"><span class="drop-label">AI Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/industrial-automation.html"><span class="drop-label">Industrial Automation</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Công cụ &amp; mẹo</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/tools-frameworks.html"><span class="drop-label">Tools &amp; Frameworks</span></a></li><li><a class="drop-link" href="../kien-thuc/tips-tricks.html"><span class="drop-label">Tips &amp; Tricks</span></a></li></ul></div></div>
+  <a class="panel-all" href="../kien-thuc/">Xem tất cả Kiến thức →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tin-tuc-ai">Tin tức AI<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tin-tuc-ai">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tin-tuc-ai/ai-news.html"><span class="drop-label">AI News</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-models.html"><span class="drop-label">AI Models</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/technology.html"><span class="drop-label">Technology</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/robotics.html"><span class="drop-label">Robotics</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-industry.html"><span class="drop-label">AI Industry</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tin-tuc-ai/">Xem tất cả Tin tức AI →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-ngoai-ngu">Ngoại ngữ<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-ngoai-ngu">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Ngôn ngữ</p><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/english.html"><span class="drop-label">English</span><span class="drop-desc">Lộ trình 700 TOEIC, phương pháp học, giáo trình HF-700TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chinese.html"><span class="drop-label">Chinese</span><span class="drop-desc">Lộ trình 0 đến HSK 3 trong 6 tháng, phương pháp học, giáo trình HF-HSK3</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Tiếng Anh theo kỹ năng</p><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/toeic-listening.html"><span class="drop-label">TOEIC Listening</span><span class="drop-desc">Part 1–4: mô tả tranh, hỏi – đáp, hội thoại, bài nói</span></a></li><li><a class="drop-link" href="../ngoai-ngu/toeic-reading.html"><span class="drop-label">TOEIC Reading</span><span class="drop-desc">Part 5–7: điền từ, điền câu, đọc hiểu</span></a></li><li><a class="drop-link" href="../ngoai-ngu/ngu-phap-tieng-anh.html"><span class="drop-label">Ngữ pháp tiếng Anh</span><span class="drop-desc">Từ loại, thì, mệnh đề, liên từ cho TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/tu-vung-tieng-anh.html"><span class="drop-label">Từ vựng tiếng Anh</span><span class="drop-desc">Từ vựng công sở theo chủ đề, collocation</span></a></li><li><a class="drop-link" href="../ngoai-ngu/giao-tiep-tieng-anh.html"><span class="drop-label">Giao tiếp công sở</span><span class="drop-desc">Điện thoại, họp, thuyết trình, email</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Tiếng Trung theo kỹ năng</p><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/pinyin-phat-am.html"><span class="drop-label">Pinyin &amp; phát âm</span><span class="drop-desc">Thanh mẫu, vận mẫu, thanh điệu, biến điệu</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chu-han.html"><span class="drop-label">Chữ Hán</span><span class="drop-desc">Nét, thứ tự nét, bộ thủ, âm Hán Việt</span></a></li><li><a class="drop-link" href="../ngoai-ngu/ngu-phap-tieng-trung.html"><span class="drop-label">Ngữ pháp tiếng Trung</span><span class="drop-desc">Từ 是, 吗, 了 đến bổ ngữ, câu 把, câu 被</span></a></li><li><a class="drop-link" href="../ngoai-ngu/tu-vung-tieng-trung.html"><span class="drop-label">Từ vựng tiếng Trung</span><span class="drop-desc">Từ vựng HSK 1–3 theo chủ đề, Anki</span></a></li><li><a class="drop-link" href="../ngoai-ngu/giao-tiep-tieng-trung.html"><span class="drop-label">Giao tiếp tiếng Trung</span><span class="drop-desc">Chào hỏi, mua sắm, đi lại, công sở</span></a></li><li><a class="drop-link" href="../ngoai-ngu/luyen-thi-hsk.html"><span class="drop-label">Luyện thi HSK</span><span class="drop-desc">Đề HSK 3.0, nghe, đọc, viết, nói, đề thi thử</span></a></li></ul></div></div>
+  <a class="panel-all" href="../ngoai-ngu/">Xem tất cả Ngoại ngữ →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tai-nguyen">Tài nguyên<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tai-nguyen">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tai-nguyen/source-code.html"><span class="drop-label">Source Code</span><span class="drop-desc">Mã nguồn mẫu đi kèm bài học</span></a></li><li><a class="drop-link" href="../tai-nguyen/dataset.html"><span class="drop-label">Dataset</span><span class="drop-desc">Bộ dữ liệu ảnh để luyện tập</span></a></li><li><a class="drop-link" href="../tai-nguyen/cheat-sheets.html"><span class="drop-label">Cheat Sheets</span><span class="drop-desc">Tóm tắt nhanh trong một trang</span></a></li><li><a class="drop-link" href="../tai-nguyen/documentation.html"><span class="drop-label">Documentation</span><span class="drop-desc">Tài liệu tra cứu thư viện, API</span></a></li><li><a class="drop-link" href="../tai-nguyen/ebook.html"><span class="drop-label">Ebook / Tài liệu</span><span class="drop-desc">Sách và tài liệu tham khảo</span></a></li><li><a class="drop-link" href="../tai-nguyen/ai-tools.html"><span class="drop-label">AI Tools</span><span class="drop-desc">Công cụ AI hữu ích cho việc học</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tai-nguyen/">Xem tất cả Tài nguyên →</a>
+</div></li></ul>
+        <div class="drawer-foot">
+          <a class="btn ghost" href="../dang-nhap.html">Đăng nhập</a>
+          <a class="btn" href="../lo-trinh/">Bắt đầu học</a>
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+<div class="search-dialog" hidden>
+  <div class="search-scrim"></div>
+  <div class="search-box" role="dialog" aria-modal="true" aria-label="Tìm kiếm">
+    <form class="search-form" action="../search.html" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" placeholder="Tìm bài học, chủ đề, bài viết…" autocomplete="off" aria-label="Từ khóa tìm kiếm" aria-controls="search-suggest">
+      <button type="button" class="icon-btn search-close" aria-label="Đóng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </form>
+    <div class="search-suggest" id="search-suggest" aria-live="polite">
+      <div class="search-empty">
+        <p class="search-group-title">Chủ đề phổ biến</p>
+        <div class="chips"><a class="chip" href="../hoc/python.html">Python</a><a class="chip" href="../hoc/opencv.html">OpenCV</a><a class="chip" href="../hoc/machine-vision.html">Machine Vision</a><a class="chip" href="../hoc/deep-learning.html">Deep Learning</a><a class="chip" href="../hoc/ai-vision.html">AI Vision</a><a class="chip" href="../hoc/object-detection.html">Object Detection</a><a class="chip" href="../hoc/pytorch.html">PyTorch</a><a class="chip" href="../ngoai-ngu/english.html">English</a></div>
+        <p class="search-group-title">Lộ trình nổi bật</p>
+        <a class="search-item" href="../lo-trinh/vision-engineer.html"><span class="search-ico" aria-hidden="true">⭐</span><span>Trở thành Vision Engineer<small>Learning Path · Machine Vision + AI Vision + Industrial Automation</small></span></a>
+      </div>
+    </div>
+    <div class="search-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> chọn</span><span><kbd>Enter</kbd> mở</span><span><kbd>Esc</kbd> đóng</span></div>
+  </div>
+</div>
+<main id="main">
+  <div class="container layout article-layout">
+    <article class="article">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../lo-trinh/">Learning Paths</a><span>/</span><a href="../lo-trinh/vision-engineer.html">Vision Engineer</a><span>/</span><a href="../lo-trinh/vision-engineer/opencv.html">Chặng 2: OpenCV</a></nav>
+      <header class="article-head">
+        <div class="course-bar" data-course="vision-engineer"><a class="course-chip" href="../lo-trinh/vision-engineer/opencv.html">⭐ Vision Engineer · Chặng 2</a><span class="lesson-no">Bài 7/8</span><span class="kind kind-lesson">Bài học</span><span class="lesson-min"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></svg>~75 phút</span></div>
+        <h1>Luồng và hàng đợi: tách chụp ảnh khỏi xử lý, không mất khung</h1>
+        <p class="lead">Pipeline producer–consumer bằng threading và queue: đo khung mất, độ trễ, GIL với OpenCV, hàng đợi đầy thì chờ hay bỏ, lỗi trong luồng và thứ tự kết quả.</p>
+        <div class="article-meta">
+          <span class="avatar" aria-hidden="true">HF</span>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-21">21/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>24 phút đọc</span></div>
+        </div>
+      </header>
+      <figure class="article-cover">
+        <img src="../assets/images/posts/luong-hang-doi-tach-chup-anh-xu-ly.webp" alt="Luồng và hàng đợi: tách chụp ảnh khỏi xử lý, không mất khung" width="1200" height="675" fetchpriority="high" decoding="async">
+      </figure>
+      <section class="lesson-goals" aria-label="Mục tiêu bài học"><h2>Học xong bài này, bạn sẽ</h2><ul><li>Đếm khung mất và đo độ trễ của vòng lặp tuần tự</li><li>Dựng pipeline producer–consumer bằng threading, queue</li><li>Chọn chính sách khi hàng đợi đầy; bắt lỗi trong luồng</li></ul><p class="goals-before">Nên học trước: <a href="../hoc/pytest-kiem-thu-ham-xu-ly-anh.html">Kiểm thử hàm xử lý ảnh với pytest</a></p></section>
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol class="toc-plain"><li><a href="#1-camera-gia-chay-tu-do-va-thoi-gian-tung-buoc">1. Camera giả chạy tự do và thời gian từng bước</a></li><li><a href="#2-vong-lap-tuan-tu-mat-khung-ma-khong-ai-biet">2. Vòng lặp tuần tự: mất khung mà không ai biết</a></li><li><a href="#3-pipeline-ba-luong-hai-hang-doi">3. Pipeline: ba luồng, hai hàng đợi</a></li><li><a href="#4-gil-khi-nao-luong-python-chay-song-song-that">4. GIL: khi nào luồng Python chạy song song thật?</a></li><li><a href="#5-khi-hang-doi-day-cho-hay-bo">5. Khi hàng đợi đầy: chờ hay bỏ?</a></li><li><a href="#6-loi-trong-luong-luong-chet-lang-le">6. Lỗi trong luồng: luồng chết lặng lẽ</a></li><li><a href="#7-nhieu-luong-xu-ly-giu-dung-thu-tu-ket-qua">7. Nhiều luồng xử lý: giữ đúng thứ tự kết quả</a></li><li><a href="#8-loi-thuong-gap">8. Lỗi thường gặp</a></li><li><a href="#tom-tat">Tóm tắt</a></li><li><a href="#bai-tap">Bài tập</a></li></ol></details>
+      <div class="prose">
+<p>Một trạm kiểm tra làm ba việc cho mỗi sản phẩm: <strong>lấy ảnh</strong> từ camera, <strong>xử lý</strong> để ra OK/NG, và <strong>lưu</strong> ảnh, kết quả cho truy xuất. Viết ba việc nối tiếp trong một vòng lặp là cách tự nhiên nhất, và cũng là nguyên nhân của một lỗi kinh điển: khi bước chậm nhất (thường là ghi ảnh xuống đĩa) cộng với các bước khác dài hơn chu kỳ camera, chương trình <strong>mất khung</strong> mà không báo gì, và kết quả tới PLC bị trễ theo bước chậm nhất. Bài này tách ba việc thành ba <strong>luồng</strong> (thread) nối với nhau bằng <strong>hàng đợi</strong> (queue), mô hình producer–consumer mà mọi phần mềm camera công nghiệp đều dùng. Bạn sẽ đo được số khung mất, độ trễ kết quả, và biết khi nào luồng Python thực sự chạy song song.</p>
+<p>Cần: Python 3.8+ (bài dùng toán tử <code>:=</code>), NumPy, OpenCV. Không cần camera thật: một "camera giả" chạy trong luồng riêng mô phỏng camera chạy tự do. Nên học trước: <a href="python-7-class-dataclass-to-chuc-code.html">class và dataclass</a>, <a href="opencv-5-to-chuc-pipeline-xu-ly.html">tổ chức pipeline xử lý</a>. Các khối code nối tiếp nhau trong cùng một file; mọi con số thời gian là của máy thử (CPU 8 luồng) và sẽ khác trên máy bạn.</p>
+
+<h2 id="1-camera-gia-chay-tu-do-va-thoi-gian-tung-buoc">1. Camera giả chạy tự do và thời gian từng bước</h2>
+<p>Camera công nghiệp ở chế độ chạy tự do (free-run) chụp đều đặn theo tốc độ khung hình, không chờ chương trình. Ảnh nằm trong bộ đệm có hạn; chương trình lấy không kịp thì ảnh cũ bị ghi đè và mất. Lớp <code>CameraTuDo</code> dưới đây mô phỏng đúng hành vi đó với bộ đệm một khung: một luồng nền chụp mỗi 40 ms (25 khung/giây), mỗi khung có <strong>số thứ tự</strong> và <strong>thời điểm chụp</strong>, nhờ đó ta đếm được khung mất (số thứ tự bị nhảy) và đo độ trễ. Khung mẫu số 0 thiếu một vật để có ảnh NG.</p>
+<p><code>threading.Condition</code> cho phép luồng lấy ảnh "ngủ" cho tới khi có khung mới thay vì hỏi liên tục; <code>wait_for</code> chờ đến khi điều kiện đúng hoặc hết thời gian.</p>
+<pre><code class="language-python">import threading
+import time
+from pathlib import Path
+
+import cv2
+import numpy as np
+
+
+class CameraTuDo:
+    """Camera giả chạy tự do (free-run) ở tốc độ cố định trong luồng riêng.
+    Chỉ giữ khung mới nhất: nếu chương trình lấy không kịp, khung cũ bị ghi đè và mất,
+    giống camera thật khi bộ đệm đầy."""
+
+    def __init__(self, fps=20, cao=1536, rong=2048, so_mau=6):
+        self.chu_ky = 1.0 / fps
+        rng = np.random.default_rng(0)
+        yy, xx = np.mgrid[0:cao, 0:rong]
+        nen = 150 + 30 * np.sin(xx / 300.0) + 20 * np.cos(yy / 200.0)
+        self.mau = []                                   # tạo trước vài khung rồi quay vòng cho nhẹ máy
+        for i in range(so_mau):
+            a = nen.copy()
+            for k in range(6 if i else 5):              # khung mẫu 0 thiếu một vật: sẽ là NG
+                cv2.circle(a, (300 + 280 * k, 700), 90, 40, -1)
+            self.mau.append(np.clip(a + rng.normal(0, 4, a.shape), 0, 255).astype(np.uint8))
+        self._dk = threading.Condition()
+        self._khung = None                              # (số khung, thời điểm chụp, ảnh)
+        self._chay = threading.Event()
+
+    def bat_dau(self):
+        self._chay.set()
+        threading.Thread(target=self._vong_chup, daemon=True, name="camera").start()
+        return self
+
+    def _vong_chup(self):
+        so, t_ke = 0, time.perf_counter()
+        while self._chay.is_set():
+            t_ke += self.chu_ky
+            time.sleep(max(0.0, t_ke - time.perf_counter()))
+            so += 1
+            with self._dk:
+                self._khung = (so, time.perf_counter(), self.mau[so % len(self.mau)])
+                self._dk.notify_all()
+
+    def lay_khung(self, sau_so=0, timeout=1.0):
+        """Chờ một khung có số thứ tự lớn hơn sau_so; trả về None nếu quá thời gian."""
+        with self._dk:
+            if self._dk.wait_for(lambda: self._khung and self._khung[0] &gt; sau_so, timeout):
+                return self._khung
+        return None
+
+    def dung(self):
+        self._chay.clear()
+
+
+def xu_ly(anh):
+    """Đếm vật tối (diện tích ≥ 1000 px): đủ 6 vật là OK."""
+    m = cv2.GaussianBlur(anh, (0, 0), 3)
+    _, bw = cv2.threshold(m, 90, 255, cv2.THRESH_BINARY_INV)        # nền tối nhất ~100, vật ~40
+    _, _, stats, _ = cv2.connectedComponentsWithStats(bw)
+    so_vat = int((stats[1:, cv2.CC_STAT_AREA] &gt;= 1000).sum())
+    return "OK" if so_vat == 6 else "NG", so_vat
+
+
+THU_MUC = Path("anh_luu")
+THU_MUC.mkdir(exist_ok=True)
+
+
+def luu(so, anh, ket_qua):
+    cv2.imwrite(str(THU_MUC / f"{so:06d}_{ket_qua}.png"), anh)     # PNG: không mất dữ liệu nhưng chậm
+
+
+cam = CameraTuDo(fps=25).bat_dau()
+_, _, anh = cam.lay_khung()
+print("kết quả các khung mẫu:", [xu_ly(a) for a in cam.mau])
+for ten, ham in (("xử lý", lambda: xu_ly(anh)), ("lưu PNG", lambda: luu(0, anh, "OK"))):
+    t = time.perf_counter()
+    for _ in range(5):
+        ham()
+    print(f"{ten}: {1000 * (time.perf_counter() - t) / 5:.0f} ms/khung")
+cam.dung()</code></pre>
+<pre><code class="language-text">kết quả các khung mẫu: [('NG', 5), ('OK', 6), ('OK', 6), ('OK', 6), ('OK', 6), ('OK', 6)]
+xử lý: 10 ms/khung
+lưu PNG: 43 ms/khung</code></pre>
+<p>Xử lý mất khoảng 10 ms, nhưng ghi một ảnh PNG 3 megapixel mất khoảng 40 ms: PNG nén không mất dữ liệu nên chậm. Tổng hai bước đã hơn 50 ms, trong khi camera cho một khung mỗi 40 ms.</p>
+
+<h2 id="2-vong-lap-tuan-tu-mat-khung-ma-khong-ai-biet">2. Vòng lặp tuần tự: mất khung mà không ai biết</h2>
+<pre><code class="language-python">def chay_tuan_tu(giay=4.0, fps=25):
+    cam = CameraTuDo(fps=fps).bat_dau()
+    da_lay, truoc, tre = 0, 0, []
+    t_dung = time.perf_counter() + giay
+    while time.perf_counter() &lt; t_dung:
+        khung = cam.lay_khung(sau_so=truoc)
+        if khung is None:
+            break
+        so, t_chup, anh = khung
+        kq, _ = xu_ly(anh)
+        luu(so, anh, kq)
+        tre.append(time.perf_counter() - t_chup)
+        da_lay += 1
+        truoc = so
+    cam.dung()
+    return truoc, da_lay, tre
+
+
+tong, da_lay, tre = chay_tuan_tu()
+print(f"tuần tự: camera chụp {tong} khung, chương trình lấy được {da_lay}, mất {tong - da_lay} "
+      f"({100 * (tong - da_lay) / tong:.0f}%); độ trễ trung vị {1000 * np.median(tre):.0f} ms")</code></pre>
+<pre><code class="language-text">tuần tự: camera chụp 98 khung, chương trình lấy được 76, mất 22 (22%); độ trễ trung vị 69 ms</code></pre>
+<p>Gần một phần tư số khung bị mất, và chương trình không hề báo lỗi: nếu không đánh số khung, bạn sẽ không bao giờ biết. Với camera chụp theo trigger từ cảm biến sản phẩm, mất khung nghĩa là có sản phẩm <strong>không được kiểm tra</strong>, và nếu trạm cho sản phẩm không có kết quả đi qua thì đó là escape (xem <a href="industrial-vision-1-trigger-encoder-cycle-time.html">trigger, encoder và cycle time</a>). Độ trễ trung vị từ lúc chụp tới lúc có kết quả cũng lên khoảng 70 ms, vì kết quả chỉ có sau khi ảnh trước đã lưu xong.</p>
+
+<h2 id="3-pipeline-ba-luong-hai-hang-doi">3. Pipeline: ba luồng, hai hàng đợi</h2>
+<p>Ý tưởng: mỗi việc một luồng, chuyển dữ liệu bằng <code>queue.Queue</code>. Hàng đợi của thư viện chuẩn đã an toàn khi nhiều luồng cùng dùng (thread-safe): <code>put</code> thêm vào, <code>get</code> lấy ra và tự chờ khi rỗng, nên các luồng không cần chia sẻ biến nào khác.</p>
+<ul>
+  <li><strong>Luồng lấy</strong> chỉ lấy khung từ camera và đẩy vào hàng đợi xử lý. Nó phải nhẹ nhất, để không bao giờ lỡ khung.</li>
+  <li><strong>Luồng xử lý</strong> ra OK/NG. Ngay lúc này kết quả đã có thể gửi PLC; ảnh được đẩy sang hàng đợi lưu để việc chậm không chặn kết quả.</li>
+  <li><strong>Luồng lưu</strong> ghi ảnh. Vì đây là bước chậm nhất, ta cho phép chạy 1 hoặc 2 luồng lưu song song.</li>
+  <li><strong>Dừng sạch</strong>: một <code>threading.Event</code> báo luồng lấy dừng; luồng lấy gửi giá trị đặc biệt <code>HET</code> (sentinel, hay gọi là "viên thuốc độc") xuống hàng đợi, mỗi luồng nhận <code>HET</code> thì chuyển tiếp cho luồng sau rồi thoát. Nhờ vậy mọi ảnh đã chụp đều được xử lý và lưu xong trước khi chương trình kết thúc.</li>
+</ul>
+<pre><code class="language-python">import queue
+
+HET = None                                  # "viên thuốc độc" (sentinel): báo luồng sau là đã hết việc
+
+
+def chay_pipeline(giay=4.0, fps=25, so_luong_luu=1, toi_da_hang_doi=50, chinh_sach="cho"):
+    cam = CameraTuDo(fps=fps).bat_dau()
+    q_xu_ly = queue.Queue(maxsize=toi_da_hang_doi)
+    q_luu = queue.Queue(maxsize=toi_da_hang_doi)
+    dung = threading.Event()
+    thong_ke = {"da_lay": 0, "cuoi": 0, "tre_kq": [], "da_luu": 0, "max_q_luu": 0, "bo_luu": 0}
+    khoa = threading.Lock()                  # bảo vệ thong_ke khi nhiều luồng lưu cùng cộng
+
+    def luong_lay():                         # 1. chỉ lấy khung, không làm gì khác: càng nhanh càng tốt
+        truoc = 0
+        while not dung.is_set():
+            khung = cam.lay_khung(sau_so=truoc, timeout=0.5)
+            if khung is None:
+                continue
+            q_xu_ly.put(khung)
+            thong_ke["da_lay"] += 1
+            truoc = khung[0]
+        thong_ke["cuoi"] = truoc
+        q_xu_ly.put(HET)
+
+    def luong_xu_ly():                       # 2. xử lý, trả kết quả ngay (gửi PLC), đẩy việc lưu đi chỗ khác
+        while (khung := q_xu_ly.get()) is not HET:
+            so, t_chup, anh = khung
+            kq, _ = xu_ly(anh)
+            thong_ke["tre_kq"].append(time.perf_counter() - t_chup)     # lúc này kết quả đã có thể gửi PLC
+            if chinh_sach == "cho":
+                q_luu.put((so, anh, kq))                 # hàng đợi đầy thì đứng chờ
+            else:
+                try:
+                    q_luu.put_nowait((so, anh, kq))      # đầy thì bỏ ảnh này, đếm lại để báo động
+                except queue.Full:
+                    thong_ke["bo_luu"] += 1
+            thong_ke["max_q_luu"] = max(thong_ke["max_q_luu"], q_luu.qsize())
+        for _ in range(so_luong_luu):
+            q_luu.put(HET)
+
+    def luong_luu():                         # 3. lưu ảnh: chậm nhất, có thể chạy nhiều luồng
+        while (viec := q_luu.get()) is not HET:
+            luu(*viec)
+            with khoa:
+                thong_ke["da_luu"] += 1
+
+    luong = [threading.Thread(target=luong_lay, name="lay"), threading.Thread(target=luong_xu_ly, name="xu_ly")]
+    luong += [threading.Thread(target=luong_luu, name=f"luu_{i}") for i in range(so_luong_luu)]
+    for t in luong:
+        t.start()
+    time.sleep(giay)
+    dung.set()                               # yêu cầu dừng: luồng lấy thoát vòng, gửi HET xuống dây chuyền
+    t_bat_dau_dung = time.perf_counter()
+    for t in luong:
+        t.join(timeout=10)
+    cam.dung()
+    thong_ke["thoi_gian_dung"] = time.perf_counter() - t_bat_dau_dung
+    return thong_ke
+
+
+for so_luong_luu in (1, 2):
+    tk = chay_pipeline(so_luong_luu=so_luong_luu)
+    mat = tk["cuoi"] - tk["da_lay"]
+    print(f"pipeline, {so_luong_luu} luồng lưu: chụp {tk['cuoi']}, mất {mat}, đã lưu {tk['da_luu']}; "
+          f"trễ kết quả trung vị {1000 * np.median(tk['tre_kq']):.0f} ms, p95 {1000 * np.percentile(tk['tre_kq'], 95):.0f} ms; "
+          f"hàng đợi lưu dài nhất {tk['max_q_luu']}; dừng hết sau {tk['thoi_gian_dung']:.1f} s")</code></pre>
+<pre><code class="language-text">pipeline, 1 luồng lưu: chụp 101, mất 0, đã lưu 101; trễ kết quả trung vị 10 ms, p95 11 ms; hàng đợi lưu dài nhất 10; dừng hết sau 0.5 s
+pipeline, 2 luồng lưu: chụp 100, mất 0, đã lưu 100; trễ kết quả trung vị 10 ms, p95 15 ms; hàng đợi lưu dài nhất 1; dừng hết sau 0.0 s</code></pre>
+<p>Đọc kết quả:</p>
+<ul>
+  <li><strong>Không mất khung nào</strong> trong cả hai cấu hình, và độ trễ từ lúc chụp tới lúc có kết quả giảm từ khoảng 70 ms xuống khoảng 10 ms: đúng bằng thời gian xử lý, vì kết quả không còn phải chờ việc lưu.</li>
+  <li><strong>Một luồng lưu không theo kịp</strong>: lưu mất khoảng 40 ms mỗi ảnh, gần bằng hoặc hơn chu kỳ camera, nên hàng đợi lưu dài dần (10 ảnh sau 4 giây) và chương trình phải chờ lưu nốt khi dừng. Chạy cả ca, hàng đợi này sẽ đầy (mục 5). Với hai luồng lưu, hàng đợi gần như không ứ.</li>
+  <li>Quy tắc chung của mọi dây chuyền sản xuất, kể cả dây chuyền phần mềm: <strong>tốc độ cả hệ = tốc độ của khâu chậm nhất</strong>. Hàng đợi chỉ hấp thụ các đợt chậm ngắn; nó không sửa được một khâu chậm hơn chu kỳ. Muốn theo kịp, khâu chậm phải nhanh lên (JPEG thay PNG, chỉ lưu ảnh NG) hoặc chạy song song.</li>
+</ul>
+<div class="tip"><strong>Vì sao dùng biến đếm thường được, mà vẫn có <code>khoa</code>?</strong>Trong bài, mỗi khóa của <code>thong_ke</code> chỉ do <em>một</em> luồng ghi (luồng lấy ghi <code>da_lay</code>, luồng xử lý ghi <code>tre_kq</code>), riêng <code>da_luu</code> do nhiều luồng lưu cùng cộng. Phép <code>x += 1</code> gồm ba bước (đọc, cộng, ghi) và hai luồng có thể xen nhau ở giữa, làm mất một lần cộng. <code>threading.Lock</code> dùng với <code>with khoa:</code> đảm bảo mỗi lúc chỉ một luồng chạy đoạn đó. Nguyên tắc an toàn nhất: các luồng trao đổi dữ liệu <em>qua hàng đợi</em>, hạn chế tối đa biến dùng chung.</div>
+
+<h2 id="4-gil-khi-nao-luong-python-chay-song-song-that">4. GIL: khi nào luồng Python chạy song song thật?</h2>
+<p>CPython có <strong>GIL</strong> (Global Interpreter Lock): tại mỗi thời điểm chỉ một luồng được chạy mã Python. Vậy vì sao pipeline ở trên nhanh hơn? Vì phần lớn thời gian nằm trong hàm của OpenCV và NumPy viết bằng C/C++, và các hàm này <strong>nhả GIL</strong> trong lúc tính, cho luồng khác chạy. Ghi file, chờ mạng, chờ camera cũng nhả GIL. Thí nghiệm sau chia cùng một lượng việc cho 1 và 4 luồng:</p>
+<pre><code class="language-python">def do_song_song(ham, so_luong, tong_viec=12):
+    """Chia tong_viec lần gọi ham cho so_luong luồng, trả về thời gian chạy (giây)."""
+    def lam():
+        for _ in range(tong_viec // so_luong):
+            ham()
+    ds = [threading.Thread(target=lam) for _ in range(so_luong)]
+    t = time.perf_counter()
+    for x in ds:
+        x.start()
+    for x in ds:
+        x.join()
+    return time.perf_counter() - t
+
+
+anh_thu = CameraTuDo().mau[1]
+
+
+def opencv_nang():
+    cv2.GaussianBlur(anh_thu, (0, 0), 5)
+
+
+def python_thuan():
+    tong = 0
+    for v in range(300_000):
+        tong += v * v
+
+
+cv2.setNumThreads(1)              # tắt luồng nội bộ của OpenCV để chỉ đo tác dụng của luồng Python
+for ten, ham in (("OpenCV GaussianBlur", opencv_nang), ("vòng lặp Python thuần", python_thuan)):
+    t1, t4 = do_song_song(ham, 1), do_song_song(ham, 4)
+    print(f"{ten:22s}: 1 luồng {t1:.2f} s, 4 luồng {t4:.2f} s → nhanh gấp {t1 / t4:.1f} lần")
+cv2.setNumThreads(-1)             # trả lại mặc định</code></pre>
+<pre><code class="language-text">OpenCV GaussianBlur   : 1 luồng 0.16 s, 4 luồng 0.05 s → nhanh gấp 3.6 lần
+vòng lặp Python thuần : 1 luồng 0.24 s, 4 luồng 0.24 s → nhanh gấp 1.0 lần</code></pre>
+<p>Với OpenCV, 4 luồng nhanh hơn khoảng 3,5 lần (máy thử có 8 luồng CPU); với vòng lặp Python thuần, không nhanh hơn chút nào. Hệ quả thực tế:</p>
+<table>
+  <tr><th>Loại việc</th><th>Luồng (threading)</th><th>Cách nên dùng</th></tr>
+  <tr><td>Chờ I/O: camera, PLC, mạng, ghi đĩa</td><td>Rất hợp</td><td>Luồng như bài này</td></tr>
+  <tr><td>Tính toán trong OpenCV, NumPy, ONNX Runtime, PyTorch</td><td>Chạy song song thật (thư viện nhả GIL)</td><td>Luồng; chú ý thư viện cũng tự dùng nhiều luồng bên trong</td></tr>
+  <tr><td>Tính toán bằng vòng lặp Python thuần</td><td>Không nhanh hơn</td><td>Vector hóa bằng NumPy (bài <a href="python-9-numpy-co-ban.html">NumPy cơ bản</a>), hoặc <code>multiprocessing</code></td></tr>
+</table>
+<p>Lệnh <code>cv2.setNumThreads(1)</code> trong thí nghiệm tắt các luồng nội bộ của OpenCV để thấy rõ tác dụng của luồng Python. Bình thường OpenCV tự chia một phép tính lớn ra nhiều lõi; khi bạn đã chạy nhiều luồng Python cùng gọi OpenCV, hai cơ chế này tranh lõi CPU với nhau. Trên trạm thật, hãy đo cả hai cách (mặc định, và <code>setNumThreads</code> nhỏ kèm nhiều luồng) rồi chọn cách cho p95 tốt hơn.</p>
+<div class="note">Từ Python 3.13 có bản build thử nghiệm "free-threaded" (bỏ GIL). Tới nay đa số thư viện và trạm sản xuất vẫn dùng bản CPython thông thường có GIL, nên các kết luận trên vẫn đúng cho môi trường bạn sẽ gặp.</div>
+
+<h2 id="5-khi-hang-doi-day-cho-hay-bo">5. Khi hàng đợi đầy: chờ hay bỏ?</h2>
+<p>Hàng đợi không có giới hạn (<code>maxsize=0</code>) sẽ "nuốt" ảnh tới khi hết RAM: 3 MB mỗi ảnh, ứ 2000 ảnh là 6 GB. Luôn đặt <code>maxsize</code>, và quyết định trước điều gì xảy ra khi đầy. Thí nghiệm dưới chạy 8 giây với một luồng lưu (không theo kịp) và hàng đợi chỉ 10 chỗ, so hai chính sách: <strong>chờ</strong> (<code>put</code> đứng chờ có chỗ) và <strong>bỏ và đếm</strong> (<code>put_nowait</code>, đầy thì bỏ ảnh đó và tăng bộ đếm).</p>
+<pre><code class="language-python">for chinh_sach in ("cho", "bo"):
+    tk = chay_pipeline(giay=8.0, so_luong_luu=1, toi_da_hang_doi=10, chinh_sach=chinh_sach)
+    print(f"chính sách '{chinh_sach}': chụp {tk['cuoi']}, mất khung {tk['cuoi'] - tk['da_lay']}, "
+          f"không lưu được {tk['bo_luu']}; trễ kết quả p95 {1000 * np.percentile(tk['tre_kq'], 95):.0f} ms, "
+          f"max {1000 * max(tk['tre_kq']):.0f} ms")</code></pre>
+<pre><code class="language-text">chính sách 'cho': chụp 200, mất khung 0, không lưu được 0; trễ kết quả p95 282 ms, max 306 ms
+chính sách 'bo': chụp 201, mất khung 0, không lưu được 16; trễ kết quả p95 11 ms, max 15 ms</code></pre>
+<ul>
+  <li><strong>"Chờ"</strong> làm sự chậm của ổ đĩa lan ngược lên trên (backpressure): luồng xử lý đứng chờ chỗ trong hàng đợi lưu, kết quả tới PLC trễ gần 300 ms (p95), gấp hơn 7 lần chu kỳ camera. Nếu ổ đĩa chậm hơn nữa, hàng đợi xử lý cũng đầy dần và luồng lấy bắt đầu mất khung. Lỗi ở khâu <em>phụ</em> (lưu ảnh) đã làm hỏng khâu <em>chính</em> (kết quả kiểm tra).</li>
+  <li><strong>"Bỏ và đếm"</strong> giữ kết quả đúng hạn, không mất khung; cái giá là một số ảnh không được lưu, nhưng được đếm. Bộ đếm này phải được ghi log và báo động (ví dụ quá 1% ảnh không lưu được trong 10 phút), vì đó là dấu hiệu ổ đĩa chậm hoặc sắp đầy.</li>
+</ul>
+<p>Chọn chính sách theo vai trò của dữ liệu, không có lựa chọn đúng cho mọi chỗ:</p>
+<table>
+  <tr><th>Hàng đợi</th><th>Khi đầy</th><th>Lý do</th></tr>
+  <tr><td>Ảnh chờ xử lý (trạm theo trigger)</td><td>Không được bỏ âm thầm: báo lỗi, trả "LOI" cho sản phẩm đó, PLC loại hoặc dừng dây chuyền</td><td>Mỗi ảnh là một sản phẩm phải có kết quả</td></tr>
+  <tr><td>Ảnh chờ lưu</td><td>Bỏ và đếm, báo động khi tỉ lệ bỏ vượt ngưỡng (ưu tiên giữ ảnh NG, bỏ ảnh OK trước)</td><td>Kết quả kiểm tra quan trọng hơn ảnh lưu trữ</td></tr>
+  <tr><td>Ảnh hiển thị cho người vận hành</td><td>Bỏ ảnh cũ, giữ ảnh mới nhất</td><td>Màn hình chỉ cần ảnh hiện tại</td></tr>
+</table>
+
+<h2 id="6-loi-trong-luong-luong-chet-lang-le">6. Lỗi trong luồng: luồng chết lặng lẽ</h2>
+<p>Ngoại lệ trong một luồng phụ <strong>không</strong> làm dừng chương trình chính: luồng đó in traceback ra stderr (thứ không ai đọc trên máy trạm) rồi chết, các luồng khác vẫn chạy và hàng đợi của nó cứ dày lên. Thí nghiệm dưới đưa một "khung hỏng" (ví dụ camera trả về dữ liệu lỗi) vào luồng xử lý viết ngây thơ, dùng <code>threading.excepthook</code> để bắt thông tin lỗi thay vì để nó in ra.</p>
+<pre><code class="language-python">def luong_ngay_tho(q):
+    while (anh := q.get()) is not HET:
+        xu_ly(anh)                               # anh = None (khung hỏng) → cv2.error, luồng chết
+
+
+q = queue.Queue()
+t = threading.Thread(target=luong_ngay_tho, args=(q,), name="xu_ly_ngay_tho")
+loi_bat_duoc = []
+threading.excepthook = lambda tham_so: loi_bat_duoc.append((tham_so.thread.name, tham_so.exc_type.__name__))
+t.start()
+for anh in [anh_thu, "khung_hong", anh_thu, anh_thu]:
+    q.put(anh)
+time.sleep(0.5)
+print("luồng còn sống?", t.is_alive(), "| việc còn trong hàng đợi:", q.qsize(), "| lỗi:", loi_bat_duoc)
+threading.excepthook = threading.__excepthook__     # trả lại mặc định
+
+
+def luong_an_toan(q, ket_qua):
+    """Mỗi việc một try/except: một khung hỏng chỉ làm hỏng kết quả của chính nó."""
+    while (viec := q.get()) is not HET:
+        so, anh = viec
+        try:
+            kq, _ = xu_ly(anh)
+        except Exception as loi:                  # bắt rộng ở đây là có chủ đích: luồng không được chết
+            kq = f"LOI ({type(loi).__name__})"    # trả "lỗi hệ thống" cho PLC, ghi log, đếm
+        ket_qua.append((so, kq))
+
+
+q, ket_qua = queue.Queue(), []
+t = threading.Thread(target=luong_an_toan, args=(q, ket_qua))
+t.start()
+for i, anh in enumerate([anh_thu, "khung_hong", anh_thu, anh_thu]):
+    q.put((i, anh))
+q.put(HET)
+t.join()
+print(ket_qua)</code></pre>
+<pre><code class="language-text">luồng còn sống? False | việc còn trong hàng đợi: 2 | lỗi: [('xu_ly_ngay_tho', 'error')]
+[(0, 'OK'), (1, 'LOI (error)'), (2, 'OK'), (3, 'OK')]</code></pre>
+<p>Luồng ngây thơ chết ở khung thứ hai, bỏ lại 2 việc trong hàng đợi không ai xử lý. Luồng an toàn bắt lỗi <em>cho từng việc</em>: khung hỏng nhận kết quả "LOI" (gửi PLC là lỗi hệ thống, không phải NG), các khung sau vẫn được xử lý. Đây là một trong số ít chỗ <code>except Exception</code> là đúng, khác với lời khuyên ở bài <a href="python-6-doc-ghi-file-va-xu-ly-loi.html">xử lý lỗi</a>, vì mục tiêu là "luồng không được chết", và lỗi vẫn được ghi lại chứ không bị nuốt. Ngoài ra, luồng chính nên kiểm tra định kỳ <code>t.is_alive()</code> của mọi luồng và dừng trạm có kiểm soát nếu một luồng chết; ở chặng Deployment bạn sẽ gặp lại ý này dưới dạng heartbeat và supervisor.</p>
+
+<h2 id="7-nhieu-luong-xu-ly-giu-dung-thu-tu-ket-qua">7. Nhiều luồng xử lý: giữ đúng thứ tự kết quả</h2>
+<p>Khi một luồng xử lý không đủ, có thể dùng nhiều luồng qua <code>concurrent.futures.ThreadPoolExecutor</code>. Nhưng khung "khó" xử lý lâu hơn, nên kết quả <strong>xong không theo thứ tự chụp</strong>. Với PLC theo dõi sản phẩm theo thứ tự trên băng tải (FIFO theo encoder), gửi kết quả sai thứ tự nghĩa là thổi nhầm sản phẩm.</p>
+<pre><code class="language-python">from concurrent.futures import ThreadPoolExecutor, as_completed
+
+
+def xu_ly_mo_phong(so):
+    """Khung số 1 và 4 'khó', mất 3 lần thời gian."""
+    time.sleep(0.06 if so in (1, 4) else 0.02)
+    return so
+
+
+with ThreadPoolExecutor(max_workers=3) as pool:
+    tuong_lai = [pool.submit(xu_ly_mo_phong, so) for so in range(6)]
+    print("as_completed (xong trước trả trước):", [f.result() for f in as_completed(tuong_lai)])
+    print("map (giữ đúng thứ tự gửi vào):      ", list(pool.map(xu_ly_mo_phong, range(6))))</code></pre>
+<pre><code class="language-text">as_completed (xong trước trả trước): [0, 2, 3, 1, 5, 4]
+map (giữ đúng thứ tự gửi vào):       [0, 1, 2, 3, 4, 5]</code></pre>
+<p><code>as_completed</code> trả kết quả theo thứ tự xong: khung 1 và 4 bị đẩy ra sau. <code>pool.map</code> vẫn chạy song song nhưng trả kết quả <em>đúng thứ tự gửi vào</em> (nó chờ khung 1 xong mới trả khung 2, dù khung 2 xong trước). Với pipeline thủ công dùng nhiều luồng xử lý, gắn số thứ tự khung vào mỗi kết quả và để một bước sau sắp xếp lại trước khi gửi; tốt hơn nữa là gửi kèm mã sản phẩm hoặc số chu kỳ để PLC đối chiếu (bài <a href="tich-hop-1-io-so-va-handshake-plc.html">handshake với PLC</a>).</p>
+
+<h2 id="8-loi-thuong-gap">8. Lỗi thường gặp</h2>
+<ul>
+  <li><strong>Không đánh số khung</strong>: mất khung mà không biết. Luôn đánh số (hoặc đọc frame ID/timestamp từ camera) và đếm khung nhảy.</li>
+  <li><strong>Hàng đợi không giới hạn</strong>: RAM tăng dần cả ca rồi máy treo vào ca đêm.</li>
+  <li><strong>Làm việc chậm trong luồng lấy ảnh</strong> (lưu, hiển thị, ghi log dài): luồng lấy phải nhẹ nhất.</li>
+  <li><strong><code>daemon=True</code> cho luồng lưu</strong>: chương trình thoát là luồng daemon bị cắt ngang, ảnh đang ghi dở bị hỏng. Chỉ dùng daemon cho luồng không giữ dữ liệu quan trọng (như camera giả ở đây); các luồng khác dừng bằng sentinel và <code>join</code>.</li>
+  <li><strong>Không bắt lỗi trong vòng lặp của luồng</strong>: luồng chết lặng lẽ (mục 6).</li>
+  <li><strong>Dùng luồng cho vòng lặp Python thuần</strong> rồi thắc mắc vì sao không nhanh hơn (mục 4).</li>
+</ul>
+
+<h2 id="tom-tat">Tóm tắt</h2>
+<ul>
+  <li>Vòng lặp tuần tự lấy – xử lý – lưu mất khung khi tổng thời gian vượt chu kỳ camera, và kết quả bị trễ theo bước chậm nhất.</li>
+  <li>Pipeline producer–consumer: mỗi việc một luồng, nối bằng <code>queue.Queue(maxsize=...)</code>; dừng sạch bằng <code>Event</code> + sentinel + <code>join</code>.</li>
+  <li>Tốc độ hệ = tốc độ khâu chậm nhất; hàng đợi chỉ hấp thụ đợt chậm ngắn. Khâu chậm phải nhanh lên hoặc chạy song song.</li>
+  <li>GIL: luồng Python chạy song song thật khi thời gian nằm trong OpenCV, NumPy, I/O; không giúp gì cho vòng lặp Python thuần.</li>
+  <li>Quyết định trước chính sách khi hàng đợi đầy: ảnh cần kết quả không được bỏ âm thầm; ảnh lưu trữ thì bỏ và đếm, báo động.</li>
+  <li>Bắt lỗi cho từng việc trong luồng; kiểm tra <code>is_alive()</code>; giữ đúng thứ tự kết quả khi xử lý song song.</li>
+</ul>
+
+<h2 id="bai-tap">Bài tập</h2>
+<div class="ex">
+<h3 id="bai-1-chi-luu-anh-ng-va-luu-jpeg-cho-anh-ok">Bài 1. Chỉ lưu ảnh NG, và lưu JPEG cho ảnh OK</h3>
+<p>Sửa hàm <code>luu</code>: ảnh NG lưu PNG, ảnh OK lưu JPEG chất lượng 90. Đo lại thời gian lưu trung bình trên các khung mẫu (5 khung OK, 1 khung NG) và trả lời: với một luồng lưu, pipeline còn ứ hàng đợi không?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">def luu(so, anh, ket_qua):
+    if ket_qua == "NG":
+        cv2.imwrite(str(THU_MUC / f"{so:06d}_NG.png"), anh)                        # bằng chứng: không mất dữ liệu
+    else:
+        cv2.imwrite(str(THU_MUC / f"{so:06d}_OK.jpg"), anh, [cv2.IMWRITE_JPEG_QUALITY, 90])
+
+
+cam_mau = CameraTuDo()
+t = time.perf_counter()
+for i, a in enumerate(cam_mau.mau):
+    luu(i, a, xu_ly(a)[0])
+print(f"lưu trung bình (5 OK JPEG + 1 NG PNG): {1000 * (time.perf_counter() - t) / len(cam_mau.mau):.0f} ms/ảnh")
+tk = chay_pipeline(so_luong_luu=1)
+print(f"pipeline 1 luồng lưu: mất {tk['cuoi'] - tk['da_lay']} khung, hàng đợi lưu dài nhất {tk['max_q_luu']}")</code></pre>
+<pre><code class="language-text">lưu trung bình (5 OK JPEG + 1 NG PNG): 23 ms/ảnh
+pipeline 1 luồng lưu: mất 0 khung, hàng đợi lưu dài nhất 1</code></pre>
+<p>JPEG nhanh hơn PNG nhiều lần, nên thời gian lưu trung bình (5 khung OK, 1 khung NG) nhỏ hơn hẳn chu kỳ 40 ms và một luồng lưu là đủ. Đổi định dạng thường rẻ hơn thêm luồng. Lưu ý: JPEG nén mất dữ liệu, không dùng cho ảnh cần phân tích lại pixel (ảnh NG làm bằng chứng, ảnh huấn luyện mô hình); ảnh OK lưu để thống kê, xem lại thì JPEG 90 đủ tốt.</p>
+</details>
+</div>
+<div class="ex">
+<h3 id="bai-2-giam-sat-do-sau-hang-doi">Bài 2. Giám sát độ sâu hàng đợi</h3>
+<p>Thêm vào <code>chay_pipeline</code> một luồng giám sát: mỗi 0,5 giây in độ dài hai hàng đợi. Chạy với một luồng lưu trong 3 giây. Hàng đợi lưu tăng trung bình bao nhiêu ảnh mỗi giây, và con số đó khớp với thời gian lưu và chu kỳ camera thế nào?</p>
+<details><summary>Gợi ý</summary>
+<p>Luồng giám sát: <code>while not dung.is_set(): print(q_xu_ly.qsize(), q_luu.qsize()); dung.wait(0.5)</code> (dùng <code>dung.wait</code> thay vì <code>time.sleep</code> để thoát ngay khi có lệnh dừng). Tốc độ tăng ≈ (số khung camera mỗi giây) − (số ảnh lưu được mỗi giây) = 25 − 1000/t<sub>lưu</sub>. Với t<sub>lưu</sub> ≈ 45 ms: 25 − 22 ≈ 3 ảnh/giây. Theo dõi <code>qsize()</code> trong log của trạm thật là cách phát hiện sớm một khâu sắp không theo kịp, trước khi hàng đợi đầy.</p>
+</details>
+</div>
+<div class="ex">
+<h3 id="bai-3-them-luong-hien-thi">Bài 3. Thêm luồng hiển thị</h3>
+<p>Người vận hành cần xem ảnh trực tiếp kèm kết quả. Thiết kế (chưa cần code) cách thêm luồng hiển thị vào pipeline sao cho hiển thị chậm (ví dụ màn hình remote desktop) không bao giờ làm chậm kết quả kiểm tra. Hàng đợi hiển thị có <code>maxsize</code> bao nhiêu và chính sách khi đầy là gì?</p>
+<details><summary>Xem đáp án</summary>
+<p>Luồng xử lý, sau khi có kết quả, đẩy (ảnh thu nhỏ, kết quả) vào hàng đợi hiển thị <code>maxsize=1</code> bằng <code>put_nowait</code>; nếu đầy thì lấy bỏ phần tử cũ (<code>get_nowait</code>) rồi đẩy phần tử mới, tức là luôn giữ <em>ảnh mới nhất</em>. Luồng hiển thị lấy ra và vẽ theo tốc độ của nó (có thể chỉ 5–10 khung/giây). Ảnh nên được thu nhỏ trước (người xem không cần 3 MP) để giảm chi phí vẽ. Lưu ý thêm: nhiều thư viện giao diện (kể cả <code>cv2.imshow</code> trên một số hệ điều hành) yêu cầu vẽ từ luồng chính, nên thường luồng chính đảm nhận hiển thị, còn lấy ảnh và xử lý chạy ở luồng phụ.</p>
+</details>
+</div>
+<p>Bài tiếp theo: <a href="opencv-du-an-chang-2-cong-cu-chup-anh-kiem-tra.html">Dự án chặng 2: công cụ chụp và lưu ảnh kiểm tra</a>. Hãy tách lấy ảnh và lưu ảnh của công cụ thành hai luồng như bài này.</p>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/library/threading.html" rel="noopener" target="_blank">Python: threading (Thread, Event, Lock, Condition, excepthook)</a>, <a href="https://docs.python.org/3/library/queue.html" rel="noopener" target="_blank">Python: queue</a>, <a href="https://docs.python.org/3/library/concurrent.futures.html" rel="noopener" target="_blank">Python: concurrent.futures</a>, <a href="https://docs.python.org/3/glossary.html#term-global-interpreter-lock" rel="noopener" target="_blank">Python glossary: global interpreter lock</a>, <a href="https://docs.python.org/3/howto/free-threading-python.html" rel="noopener" target="_blank">Python HOWTO: free-threaded Python</a>, <a href="https://docs.opencv.org/4.x/db/de0/group__core__utils.html" rel="noopener" target="_blank">OpenCV: setNumThreads (Utility and system functions)</a>.</p>
+
+      </div>
+      <section class="practice"><h2><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <circle cx="12" cy="12" r="6" /> <circle cx="12" cy="12" r="2" /></svg>Bài tập thực hành</h2><ol><li>Chạy pipeline với 1 và 2 luồng lưu, giải thích độ dài hàng đợi lưu.</li><li>Chỉ lưu PNG cho ảnh NG, JPEG cho ảnh OK; đo lại xem một luồng lưu có đủ không.</li></ol><p>Làm xong bài tập mới chuyển sang bài tiếp theo: tự viết code là cách duy nhất để nhớ lâu.</p></section><div class="lesson-done" data-course="vision-engineer"><button type="button" class="lesson-done-btn" data-lesson-done="luong-hang-doi-tach-chup-anh-xu-ly" aria-pressed="false"><span class="box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></span><span class="off">Đánh dấu đã học xong</span><span class="on">Đã học xong bài này</span></button><a class="btn lg" href="../hoc/opencv-du-an-chang-2-cong-cu-chup-anh-kiem-tra.html">Bài tiếp theo<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a></div>
+      <footer class="article-foot">
+        <div class="tags"><a class="tag" href="../search.html?q=Python">#Python</a><a class="tag" href="../search.html?q=OpenCV">#OpenCV</a><a class="tag" href="../search.html?q=Machine Vision">#Machine Vision</a></div>
+        <div class="share">
+      <span>Chia sẻ:</span>
+      <a class="share-btn fb" href="https://www.facebook.com/sharer/sharer.php?u=https://hocfree.vn/hoc/luong-hang-doi-tach-chup-anh-xu-ly.html" target="_blank" rel="noopener" aria-label="Chia sẻ Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8z"/></svg></a>
+      <a class="share-btn x" href="https://twitter.com/intent/tweet?url=https://hocfree.vn/hoc/luong-hang-doi-tach-chup-anh-xu-ly.html" target="_blank" rel="noopener" aria-label="Chia sẻ X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+      <button class="share-btn copy-link" data-url="https://hocfree.vn/hoc/luong-hang-doi-tach-chup-anh-xu-ly.html" aria-label="Sao chép liên kết"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+    </div>
+      </footer>
+      <div class="author-box">
+        <span class="avatar lg" aria-hidden="true">HF</span>
+        <div>
+          <strong>Ban biên tập HọcFree</strong>
+          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và ngoại ngữ, hoàn toàn miễn phí.</p>
+        </div>
+      </div>
+      <nav class="pager lesson-pager" aria-label="Bài học trước/sau"><a class="prev" href="../hoc/pytest-kiem-thu-ham-xu-ly-anh.html"><span>← Bài trước · Bài 6</span>Kiểm thử hàm xử lý ảnh với pytest</a><a class="next" href="../hoc/opencv-du-an-chang-2-cong-cu-chup-anh-kiem-tra.html"><span>Bài tiếp → · Bài 8</span>Dự án chặng 2: công cụ chụp và lưu ảnh kiểm tra</a></nav>
+    </article>
+    <aside class="sidebar course-side" data-course="vision-engineer">
+      <section class="widget course-toc">
+        <p class="widget-title">Chặng 2/15 · Vision Engineer</p>
+        <a class="course-toc-title" href="../lo-trinh/vision-engineer/opencv.html">OpenCV</a>
+        <div class="lc" data-lesson-count="opencv-co-ban-anh-video-camera opencv-2-khong-gian-mau-va-tach-mau opencv-3-roi-resize-xoay-lat opencv-4-ve-ket-qua-len-anh opencv-5-to-chuc-pipeline-xu-ly pytest-kiem-thu-ham-xu-ly-anh luong-hang-doi-tach-chup-anh-xu-ly opencv-du-an-chang-2-cong-cu-chup-anh-kiem-tra"><div class="lc-bar"><span data-lc-bar></span></div><span data-lc-text>0/8 bài</span></div>
+        <ol class="toc-lessons"><li data-lesson="opencv-co-ban-anh-video-camera"><a href="../hoc/opencv-co-ban-anh-video-camera.html"><span class="tn">1</span><span class="tt">Đọc, hiển thị, ghi ảnh, video và camera</span></a></li><li data-lesson="opencv-2-khong-gian-mau-va-tach-mau"><a href="../hoc/opencv-2-khong-gian-mau-va-tach-mau.html"><span class="tn">2</span><span class="tt">Không gian màu BGR, HSV, Gray và tách màu</span></a></li><li data-lesson="opencv-3-roi-resize-xoay-lat"><a href="../hoc/opencv-3-roi-resize-xoay-lat.html"><span class="tn">3</span><span class="tt">ROI, resize, xoay, lật và ghép ảnh</span></a></li><li data-lesson="opencv-4-ve-ket-qua-len-anh"><a href="../hoc/opencv-4-ve-ket-qua-len-anh.html"><span class="tn">4</span><span class="tt">Vẽ kết quả lên ảnh: khung, chữ, overlay</span></a></li><li data-lesson="opencv-5-to-chuc-pipeline-xu-ly"><a href="../hoc/opencv-5-to-chuc-pipeline-xu-ly.html"><span class="tn">5</span><span class="tt">Tổ chức pipeline xử lý bằng hàm và cấu hình</span></a></li><li data-lesson="pytest-kiem-thu-ham-xu-ly-anh"><a href="../hoc/pytest-kiem-thu-ham-xu-ly-anh.html"><span class="tn">6</span><span class="tt">Kiểm thử hàm xử lý ảnh với pytest</span></a></li><li data-lesson="luong-hang-doi-tach-chup-anh-xu-ly" class="is-current"><a href="../hoc/luong-hang-doi-tach-chup-anh-xu-ly.html" aria-current="page"><span class="tn">7</span><span class="tt">Luồng và hàng đợi: tách chụp ảnh khỏi xử lý</span></a></li><li data-lesson="opencv-du-an-chang-2-cong-cu-chup-anh-kiem-tra"><a href="../hoc/opencv-du-an-chang-2-cong-cu-chup-anh-kiem-tra.html"><span class="tn">8</span><span class="tt">Dự án chặng 2: công cụ chụp và lưu ảnh kiểm tra</span></a></li></ol>
+        <a class="more" href="../lo-trinh/vision-engineer.html">Xem toàn bộ lộ trình<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a>
+      </section>
+    </aside>
+  </div>
+  <section class="band">
+    <div class="container">
+      <div class="section-title"><h2>Có thể bạn quan tâm</h2></div>
+      <div class="card-grid"><article class="card">
+  <a class="thumb" href="../hoc/python-7-class-dataclass-to-chuc-code.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-7-class-dataclass-to-chuc-code.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-7-class-dataclass-to-chuc-code.html">Class và dataclass: tổ chức code cho trạm kiểm tra</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-21">21/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>17 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/lay-anh-camera-cong-nghiep-genicam-pypylon.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html">Lấy ảnh từ camera công nghiệp: GenICam, pypylon, camera giả lập</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-21">21/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>28 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/msa-gage-rr-anova-he-do-camera.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/msa-gage-rr-anova-he-do-camera.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/msa-gage-rr-anova-he-do-camera.html">MSA và Gage R&amp;R cho trạm đo camera: ANOVA, ndc, dải bảo vệ</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-21">21/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>25 phút đọc</span></div>
+</article></div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <a class="logo" href="../"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+      <p>HọcFree.vn – nền tảng học miễn phí về AI, lập trình, Computer Vision, Machine Vision, tin tức AI và ngoại ngữ dành cho người Việt.</p>
+    </div>
+    <div><h3>Học &amp; thực hành</h3><ul><li><a href="../hoc/">Học AI &amp; Lập trình</a></li><li><a href="../projects/">Projects</a></li><li><a href="../lo-trinh/">Learning Paths</a></li></ul></div>
+    <div><h3>Khám phá</h3><ul><li><a href="../kien-thuc/">Kiến thức</a></li><li><a href="../tin-tuc-ai/">Tin tức AI</a></li><li><a href="../ngoai-ngu/">Ngoại ngữ</a></li><li><a href="../tai-nguyen/">Tài nguyên</a></li></ul></div>
+    <div><h3>Bài mới</h3><ul><li><a href="../hoc/python-7-class-dataclass-to-chuc-code.html">Class và dataclass: tổ chức code cho trạm kiểm tra</a></li><li><a href="../hoc/luong-hang-doi-tach-chup-anh-xu-ly.html">Luồng và hàng đợi: tách chụp ảnh khỏi xử lý, không mất khung</a></li><li><a href="../hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html">Lấy ảnh từ camera công nghiệp: GenICam, pypylon, camera giả lập</a></li><li><a href="../hoc/msa-gage-rr-anova-he-do-camera.html">MSA và Gage R&amp;R cho trạm đo camera: ANOVA, ndc, dải bảo vệ</a></li></ul></div>
+    <div>
+      <h3>HọcFree</h3>
+      <ul>
+        <li><a href="../gioi-thieu.html">Giới thiệu</a></li>
+        <li><a href="../search.html">Tìm kiếm</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">© 2026 HọcFree.vn · Kiến thức là để chia sẻ.</div>
+  </div>
+</footer>
+<button class="to-top" aria-label="Lên đầu trang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<script src="../assets/js/search-data.js?v=20261021" defer></script>
+<script src="../assets/js/main.js?v=20261021" defer></script>
+</body>
+</html>

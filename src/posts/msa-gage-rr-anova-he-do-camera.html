@@ -1,0 +1,253 @@
+<p>Ở bài <a href="industrial-vision-5-dac-ta-va-nghiem-thu-fat-sat.html">đặc tả và nghiệm thu FAT/SAT</a>, bạn đã tính <strong>độ lặp lại</strong> của trạm đo (cùng trạm, nạp lại cùng chi tiết nhiều lần) thành %GRR so với dung sai, và chạy nghiên cứu loại 1 (Cg, Cgk) với mẫu chuẩn. Đó mới là một nửa câu chuyện. Khách hàng ô tô, điện tử khi nghiệm thu trạm đo sẽ hỏi thêm: khi <em>người khác</em> nạp chi tiết, hoặc trạm thứ hai cùng loại đo, kết quả có khớp không (<strong>độ tái lập</strong>, reproducibility)? Hệ đo có phân biệt được các chi tiết trong dải sản xuất không (<strong>ndc</strong>)? Sai số có đổi theo kích thước không (<strong>độ tuyến tính</strong>)? Và khi đã biết hệ đo có sai số, đặt giới hạn chấp nhận thế nào để không lọt hàng lỗi (<strong>dải bảo vệ</strong>)? Bài này trả lời từng câu bằng code NumPy, SciPy chạy được.</p>
+<p>Nên học trước: <a href="calib-1-quy-doi-pixel-sang-mm.html">quy đổi pixel sang mm và đánh giá sai số</a>, <a href="../kien-thuc/kiem-tra-hieu-chuan-dinh-ky-san-xuat.html">kiểm tra hiệu chuẩn định kỳ</a>. Các khối code nối tiếp nhau trong cùng một file.</p>
+
+<h2>1. Biến thiên của một phép đo đến từ đâu?</h2>
+<p>Mỗi kết quả đo là tổng của kích thước thật và các thành phần sai số. Phân tích hệ thống đo (MSA, Measurement System Analysis) tách tổng biến thiên ra thành:</p>
+<table>
+  <tr><th>Thành phần</th><th>Ý nghĩa</th><th>Với trạm vision thường do</th></tr>
+  <tr><td><strong>Độ lặp lại</strong> (repeatability, EV)</td><td>Cùng chi tiết, cùng điều kiện, đo nhiều lần</td><td>Nhiễu cảm biến, biên mờ, rung, độ phân giải, thuật toán tìm biên</td></tr>
+  <tr><td><strong>Độ tái lập</strong> (reproducibility, AV)</td><td>Chênh lệch có hệ thống giữa các "người đo"</td><td>Người nạp chi tiết vào đồ gá khác nhau, các trạm cùng loại hiệu chuẩn lệch nhau, ca ngày/ca đêm</td></tr>
+  <tr><td><strong>Tương tác</strong> chi tiết × người đo</td><td>Một người đo lệch khác nhau trên từng chi tiết</td><td>Chi tiết cong vênh nằm khác nhau tùy cách đặt</td></tr>
+  <tr><td><strong>Biến thiên chi tiết</strong> (PV)</td><td>Các chi tiết thật sự khác nhau</td><td>Quá trình sản xuất; đây là thứ hệ đo <em>cần</em> nhìn thấy</td></tr>
+</table>
+<p>\(GRR = \sqrt{EV^2 + AV^2}\) (AV gồm cả tương tác), tổng biến thiên \(TV = \sqrt{GRR^2 + PV^2}\). Với trạm vision tự động hoàn toàn, "người đo" không có nghĩa là người cầm thước; hãy chọn <em>nguồn tái lập có thật</em> của trạm: người nạp chi tiết, các lần tháo lắp đồ gá, các trạm giống nhau, hoặc các ngày khác nhau.</p>
+
+<h2>2. Nghiên cứu Gage R&R chéo: 10 chi tiết × 3 người nạp × 3 lần</h2>
+<p>Thiết kế kinh điển: chọn 10 chi tiết trải đều <em>dải sản xuất thực tế</em> (không phải 10 chi tiết giống hệt nhau), 3 người, mỗi người đo mỗi chi tiết 3 lần theo thứ tự ngẫu nhiên, không biết kết quả lần trước. Dữ liệu dưới đây mô phỏng trạm đo đường kính chốt Ø8,00 ± 0,05 mm: các chi tiết thật trải với σ = 0,02 mm; người nạp B đặt chi tiết lệch có hệ thống +4 µm, người C −3 µm; có một chút tương tác; độ lặp lại σ = 2,5 µm.</p>
+<pre><code class="language-python">import numpy as np
+from scipy import stats
+
+rng = np.random.default_rng(7)
+SO_CT, SO_NGUOI, SO_LAN = 10, 3, 3
+DANH_NGHIA, DUNG_SAI = 8.00, 0.05                 # Ø8,00 ± 0,05 mm → dải dung sai T = 0,10 mm
+T = 2 * DUNG_SAI
+
+that = DANH_NGHIA + rng.normal(0, 0.02, SO_CT)                      # kích thước thật 10 chi tiết
+lech_nguoi = np.array([0.0, 0.004, -0.003])                         # cách đặt chi tiết của người A, B, C
+do = (that[:, None, None] + lech_nguoi[None, :, None]
+      + rng.normal(0, 0.0012, (SO_CT, SO_NGUOI, 1))                 # tương tác chi tiết × người
+      + rng.normal(0, 0.0025, (SO_CT, SO_NGUOI, SO_LAN)))           # độ lặp lại
+do = np.round(do, 4)                                                # trạm báo kết quả tới 0,1 µm
+print("kích thước mảng:", do.shape, "| 3 lần đo chi tiết 1 của người A:", do[0, 0].tolist())
+print("trung bình theo người:", np.round(do.mean(axis=(0, 2)), 4).tolist())</code></pre>
+<pre><code class="language-text">kích thước mảng: (10, 3, 3) | 3 lần đo chi tiết 1 của người A: [8.0009, 8.0008, 7.9975]
+trung bình theo người: [7.9951, 7.9985, 7.993]</code></pre>
+<p>Mảng <code>do[i, j, k]</code>: chi tiết i, người j, lần k. Mọi phép tính dưới đây chỉ dựa vào mảng này, đúng như khi bạn nhận file Excel kết quả nghiên cứu từ xưởng.</p>
+
+<h2>3. Phân tích ANOVA hai yếu tố</h2>
+<p>Phương pháp ANOVA (phân tích phương sai) tách tổng bình phương độ lệch thành các phần do chi tiết, do người, do tương tác và do lặp lại, rồi suy ra <strong>thành phần phương sai</strong> của từng nguồn. Đây là phương pháp được ưu tiên vì nó tách được tương tác (phương pháp trung bình và khoảng (Average &amp; Range) thì không). Nếu tương tác không có ý nghĩa thống kê (p ≥ α, mặc định thường là 0,05), nó được gộp vào sai số lặp lại.</p>
+<pre><code class="language-python">def gage_rr_anova(do, dung_sai_T, alpha=0.05):
+    """Gage R&amp;R chéo bằng ANOVA. do: mảng (chi tiết, người, lần). Trả về dict thành phần độ lệch chuẩn và chỉ số."""
+    p, o, r = do.shape
+    tb = do.mean()
+    tb_ct, tb_ng, tb_o = do.mean(axis=(1, 2)), do.mean(axis=(0, 2)), do.mean(axis=2)
+    ss = {"ct": o * r * ((tb_ct - tb) ** 2).sum(),
+          "ng": p * r * ((tb_ng - tb) ** 2).sum(),
+          "tt": r * ((tb_o - tb_ct[:, None] - tb_ng[None, :] + tb) ** 2).sum(),
+          "ll": ((do - tb_o[:, :, None]) ** 2).sum()}
+    dof = {"ct": p - 1, "ng": o - 1, "tt": (p - 1) * (o - 1), "ll": p * o * (r - 1)}
+    ms = {k: ss[k] / dof[k] for k in ss}
+    F_tt = ms["tt"] / ms["ll"]
+    p_tt = stats.f.sf(F_tt, dof["tt"], dof["ll"])
+    if p_tt &gt;= alpha:                                     # tương tác không có ý nghĩa: gộp vào lặp lại
+        ms_ll = (ss["tt"] + ss["ll"]) / (dof["tt"] + dof["ll"])
+        var = {"lap_lai": ms_ll, "tuong_tac": 0.0,
+               "nguoi": max(0.0, (ms["ng"] - ms_ll) / (p * r)),
+               "chi_tiet": max(0.0, (ms["ct"] - ms_ll) / (o * r))}
+    else:
+        var = {"lap_lai": ms["ll"], "tuong_tac": max(0.0, (ms["tt"] - ms["ll"]) / r),
+               "nguoi": max(0.0, (ms["ng"] - ms["tt"]) / (p * r)),
+               "chi_tiet": max(0.0, (ms["ct"] - ms["tt"]) / (o * r))}
+    sd = {k: np.sqrt(v) for k, v in var.items()}
+    sd["tai_lap"] = np.sqrt(var["nguoi"] + var["tuong_tac"])
+    sd["grr"] = np.sqrt(var["lap_lai"] + var["nguoi"] + var["tuong_tac"])
+    sd["tong"] = np.sqrt(sd["grr"] ** 2 + var["chi_tiet"])
+    return {"ss": ss, "dof": dof, "ms": ms, "F_tt": F_tt, "p_tt": p_tt, "sd": sd,
+            "grr_tv": 100 * sd["grr"] / sd["tong"], "grr_tol": 100 * 6 * sd["grr"] / dung_sai_T,
+            "ndc": max(1, int(1.41 * sd["chi_tiet"] / sd["grr"]))}
+
+
+kq = gage_rr_anova(do, T)
+print("Nguồn         SS          df   MS")
+for k, ten in (("ct", "Chi tiết"), ("ng", "Người"), ("tt", "Tương tác"), ("ll", "Lặp lại")):
+    print(f"{ten:10s} {kq['ss'][k]:.3e}  {kq['dof'][k]:3d}  {kq['ms'][k]:.3e}")
+print(f"Tương tác: F = {kq['F_tt']:.2f}, p = {kq['p_tt']:.3f} → {'gộp vào lặp lại' if kq['p_tt'] &gt;= 0.05 else 'giữ lại'}")
+print()
+print("Thành phần         σ (µm)   %Biến thiên   %Dung sai (6σ/T)")
+for k, ten in (("lap_lai", "Lặp lại (EV)"), ("tai_lap", "Tái lập (AV)"), ("grr", "GRR"),
+               ("chi_tiet", "Chi tiết (PV)"), ("tong", "Tổng (TV)")):
+    s = kq["sd"][k]
+    print(f"{ten:16s} {1000 * s:7.2f}   {100 * s / kq['sd']['tong']:9.1f}%   {600 * s / T:10.1f}%")
+print(f"\n%GRR theo biến thiên quá trình = {kq['grr_tv']:.1f}%, theo dung sai = {kq['grr_tol']:.1f}%, ndc = {kq['ndc']}")</code></pre>
+<pre><code class="language-text">Nguồn         SS          df   MS
+Chi tiết   1.586e-02    9  1.762e-03
+Người      4.750e-04    2  2.375e-04
+Tương tác  8.441e-05   18  4.689e-06
+Lặp lại    3.314e-04   60  5.523e-06
+Tương tác: F = 0.85, p = 0.638 → gộp vào lặp lại
+
+Thành phần         σ (µm)   %Biến thiên   %Dung sai (6σ/T)
+Lặp lại (EV)        2.31        16.0%         13.9%
+Tái lập (AV)        2.78        19.3%         16.7%
+GRR                 3.62        25.1%         21.7%
+Chi tiết (PV)      13.97        96.8%         83.8%
+Tổng (TV)          14.43       100.0%         86.6%
+
+%GRR theo biến thiên quá trình = 25.1%, theo dung sai = 21.7%, ndc = 5</code></pre>
+<p>Trạm mô phỏng có %GRR theo dung sai 21,7%, nằm trong vùng "có điều kiện", và ndc = 5 vừa chạm ngưỡng; thành phần tái lập (16,7%) lớn hơn lặp lại (13,9%), nên chỗ cần sửa trước là cách nạp chi tiết, không phải camera (mục 4). Cách đọc bảng (công thức đã được kiểm chứng: <code>statsmodels</code> cho ra cùng tổng bình phương và cùng F):</p>
+<ul>
+  <li><strong>Tương tác</strong> có p lớn hơn 0,05: không đủ bằng chứng, nên được gộp vào lặp lại (dù dữ liệu mô phỏng có một chút tương tác thật, 10 chi tiết × 3 lần không đủ để thấy nó).</li>
+  <li><strong>Hai cách tính %GRR trả lời hai câu hỏi khác nhau.</strong> %GRR theo <em>dung sai</em> (6σ<sub>GRR</sub>/T) trả lời: hệ đo có đủ tốt để <em>phán OK/NG</em> không? %GRR theo <em>biến thiên quá trình</em> (σ<sub>GRR</sub>/σ<sub>TV</sub>) trả lời: hệ đo có đủ tốt để <em>theo dõi, cải tiến quá trình</em> (vẽ biểu đồ kiểm soát) không? Khách hàng thường ghi rõ họ muốn cái nào; nếu không, báo cáo cả hai.</li>
+  <li>Ngưỡng hay dùng theo hướng dẫn AIAG: dưới 10% đạt, 10–30% có thể chấp nhận có điều kiện (tùy tầm quan trọng của kích thước, chi phí cải tiến), trên 30% không đạt. Đây là quy ước, không phải định luật: một kích thước an toàn có thể đòi hỏi chặt hơn, và nhiều chuyên gia khuyên đừng áp ngưỡng máy móc mà xem hệ quả thật lên escape, overkill (mục 7).</li>
+  <li><strong>ndc</strong> (number of distinct categories) = 1,41 × PV/GRR, lấy phần nguyên: số "nhóm" chi tiết hệ đo phân biệt được trong dải sản xuất. Yêu cầu thường gặp: ndc ≥ 5. ndc nhỏ có thể do hệ đo kém, <em>hoặc</em> do 10 chi tiết chọn quá giống nhau (PV nhỏ giả tạo): luôn xem lại cách chọn mẫu trước khi kết luận.</li>
+</ul>
+<div class="warn"><strong>6σ hay 5,15σ?</strong>Các báo cáo cũ (và một số phần mềm, theo lựa chọn) dùng 5,15σ (99% phân phối) thay vì 6σ (99,73%) khi tính %GRR theo dung sai. Cùng một trạm, con số theo 5,15σ nhỏ hơn khoảng 14%. Khi so sánh với yêu cầu của khách hàng hay với báo cáo cũ, ghi rõ hệ số đã dùng.</div>
+
+<h2>4. Thành phần nào lớn thì sửa gì?</h2>
+<p>Giá trị của nghiên cứu không nằm ở con số %GRR mà ở việc nó chỉ ra <em>nguồn</em> sai số cần sửa. Biểu đồ đơn giản nhất là trung bình theo người và độ rộng (max − min) các lần đo theo chi tiết:</p>
+<pre><code class="language-python">tb_nguoi = do.mean(axis=(0, 2))
+do_rong = do.max(axis=2) - do.min(axis=2)                    # khoảng của 3 lần đo, mỗi chi tiết, mỗi người
+print("trung bình theo người (mm):", np.round(tb_nguoi, 4).tolist(),
+      f"→ chênh lớn nhất {1000 * (tb_nguoi.max() - tb_nguoi.min()):.1f} µm")
+print("khoảng 3 lần đo trung bình theo người (µm):", np.round(1000 * do_rong.mean(axis=0), 2).tolist())
+j_max = np.unravel_index(do_rong.argmax(), do_rong.shape)
+print(f"ô có khoảng lớn nhất: chi tiết {j_max[0] + 1}, người {'ABC'[j_max[1]]}: {1000 * do_rong.max():.1f} µm")
+
+kq_sau = gage_rr_anova(do - lech_nguoi[None, :, None], T)    # giả sử đã sửa cách nạp: hết lệch giữa người
+print(f"nếu loại được lệch giữa người: %GRR dung sai {kq['grr_tol']:.1f}% → {kq_sau['grr_tol']:.1f}%, "
+      f"ndc {kq['ndc']} → {kq_sau['ndc']}")</code></pre>
+<pre><code class="language-text">trung bình theo người (mm): [7.9951, 7.9985, 7.993] → chênh lớn nhất 5.6 µm
+khoảng 3 lần đo trung bình theo người (µm): [4.56, 4.38, 3.13]
+ô có khoảng lớn nhất: chi tiết 2, người A: 8.0 µm
+nếu loại được lệch giữa người: %GRR dung sai 21.7% → 14.3%, ndc 5 → 8</code></pre>
+<table>
+  <tr><th>Triệu chứng</th><th>Nguyên nhân thường gặp ở trạm vision</th><th>Hướng sửa</th></tr>
+  <tr><td>Lặp lại (EV) lớn</td><td>Nhiễu, biên mờ, rung, đèn nhấp nháy, độ phân giải không đủ, thuật toán biên nhạy nhiễu</td><td>Cải thiện ảnh trước (đèn, nét, phơi sáng), rồi thuật toán (fit nhiều điểm biên, subpixel); xem bài <a href="do-luong-1-do-canh-subpixel-fitting.html">đo cạnh subpixel</a></td></tr>
+  <tr><td>Tái lập (AV) lớn, một người lệch hẳn</td><td>Người đó đặt chi tiết khác (nghiêng, không tì sát chốt), hoặc trạm/ca đó hiệu chuẩn khác</td><td>Sửa đồ gá cho "không thể đặt sai" (poka-yoke), hướng dẫn công việc có hình; hiệu chuẩn các trạm bằng cùng mẫu chuẩn</td></tr>
+  <tr><td>Tương tác có ý nghĩa</td><td>Một số chi tiết (cong, ba via) nằm khác nhau tùy người</td><td>Xem riêng các chi tiết đó; cải tiến điểm tì của đồ gá</td></tr>
+  <tr><td>ndc nhỏ, %GRR theo TV lớn nhưng theo dung sai nhỏ</td><td>Quá trình sản xuất rất ổn định (PV nhỏ) so với dung sai</td><td>Đủ dùng để phán OK/NG; chưa đủ để vẽ biểu đồ kiểm soát. Báo cáo rõ hai mục đích</td></tr>
+</table>
+
+<h2>5. Trạm tự động hoàn toàn: nghiên cứu không có người vận hành</h2>
+<p>Khi chi tiết được robot hay băng tải đưa vào, không có người nào ảnh hưởng tới phép đo; nhiều tiêu chuẩn của khách hàng (thường gọi là nghiên cứu loại 3, type 3 study) khi đó chỉ yêu cầu đo nhiều chi tiết, mỗi chi tiết vài lần, và tính độ lặp lại gộp. Số chi tiết và số lần đo theo yêu cầu của khách hàng; ví dụ dưới dùng 25 chi tiết × 2 lần. Quan trọng: mỗi lần đo phải là một chu kỳ <em>thật</em>, chi tiết đi ra và vào lại trạm, không phải chụp lại khi chi tiết nằm yên.</p>
+<pre><code class="language-python">n_ct = 25
+that25 = DANH_NGHIA + rng.normal(0, 0.02, n_ct)
+do25 = np.round(that25[:, None] + rng.normal(0, 0.0025, (n_ct, 2)), 4)          # 2 chu kỳ tự động mỗi chi tiết
+
+hieu = do25[:, 0] - do25[:, 1]
+s_lap = np.sqrt((hieu ** 2).sum() / (2 * n_ct))       # độ lệch chuẩn gộp từ 25 cặp (mỗi cặp 1 bậc tự do)
+s_ct = np.sqrt(max(0.0, do25.mean(axis=1).var(ddof=1) - s_lap ** 2 / 2))
+print(f"σ lặp lại = {1000 * s_lap:.2f} µm (bậc tự do {n_ct}); %GRR theo dung sai = {600 * s_lap / T:.1f}%; "
+      f"ndc = {int(1.41 * s_ct / s_lap)}")</code></pre>
+<pre><code class="language-text">σ lặp lại = 2.13 µm (bậc tự do 25); %GRR theo dung sai = 12.8%; ndc = 10</code></pre>
+<p>Với hai lần đo mỗi chi tiết, công thức gộp \(\sigma^2 = \sum d_i^2 / (2n)\) (d<sub>i</sub> là hiệu hai lần đo) là ước lượng phương sai lặp lại chuẩn, mỗi cặp cho một bậc tự do. Trạm thật có thể có nguồn tái lập khác mà nghiên cứu này bỏ qua: nhiều trạm cùng loại, hay ảnh hưởng của ngày (nhiệt độ). Nếu có, thêm một yếu tố "trạm" hoặc "ngày" và dùng lại hàm ANOVA ở mục 3 với yếu tố đó thay cho "người".</p>
+
+<h2>6. Độ chệch và độ tuyến tính trên toàn dải đo</h2>
+<p>Gage R&R nói về độ <em>chụm</em>, không nói về độ <em>đúng</em>. Nghiên cứu loại 1 ở bài FAT/SAT kiểm tra độ chệch tại <em>một</em> điểm (một mẫu chuẩn). Trạm đo nhiều mã sản phẩm có kích thước khác nhau cần thêm <strong>nghiên cứu tuyến tính</strong>: 5 mẫu chuẩn trải đều dải đo, mỗi mẫu đo nhiều lần, rồi fit đường thẳng độ chệch theo giá trị chuẩn. Với trạm vision, độ dốc khác 0 gần như luôn có nghĩa là <strong>hệ số mm/pixel sai</strong>, độ chệch không đổi thường do mức cắt biên (bài <a href="calib-1-quy-doi-pixel-sang-mm.html">quy đổi pixel sang mm</a>).</p>
+<pre><code class="language-python">chuan = np.array([4.0, 6.0, 8.0, 10.0, 12.0])            # 5 chốt chuẩn đã chứng nhận (mm)
+SAI_TI_LE, LECH_BIEN = 0.0005, 0.002                      # trạm mô phỏng: tỉ lệ sai 0,05%, biên lệch +2 µm
+lan = 12
+do_tt = chuan[:, None] * (1 + SAI_TI_LE) + LECH_BIEN + rng.normal(0, 0.0025, (5, lan))
+x, lech = np.repeat(chuan, lan), (do_tt - chuan[:, None]).ravel()
+hq = stats.linregress(x, lech)
+t_tl = stats.t.ppf(0.975, len(x) - 2)
+print(f"độ chệch = {1000 * hq.intercept:+.2f} µm + {1e6 * hq.slope:.0f} µm/m × chuẩn")
+print(f"độ dốc: p = {hq.pvalue:.2g}, khoảng tin cậy 95% [{1e6 * (hq.slope - t_tl * hq.stderr):.0f}, "
+      f"{1e6 * (hq.slope + t_tl * hq.stderr):.0f}] µm/m → {'CÓ lỗi tuyến tính' if hq.pvalue &lt; 0.05 else 'không thấy lỗi tuyến tính'}")
+for c, d in zip(chuan, do_tt.mean(axis=1)):
+    print(f"  chuẩn {c:5.1f} mm: độ chệch trung bình {1000 * (d - c):+6.2f} µm")</code></pre>
+<pre><code class="language-text">độ chệch = +0.43 µm + 600 µm/m × chuẩn
+độ dốc: p = 2.8e-06, khoảng tin cậy 95% [369, 831] µm/m → CÓ lỗi tuyến tính
+  chuẩn   4.0 mm: độ chệch trung bình  +3.08 µm
+  chuẩn   6.0 mm: độ chệch trung bình  +3.56 µm
+  chuẩn   8.0 mm: độ chệch trung bình  +5.74 µm
+  chuẩn  10.0 mm: độ chệch trung bình  +5.81 µm
+  chuẩn  12.0 mm: độ chệch trung bình  +7.96 µm</code></pre>
+<p>Độ dốc ước lượng được khoảng 600 µm/m, khác 0 rất rõ (p rất nhỏ), và khoảng tin cậy 95% chứa giá trị thật đã cài vào trạm mô phỏng là 500 µm/m (sai tỉ lệ 0,05%). Ở chốt 4 mm, độ chệch chỉ khoảng 3 µm và dễ bị lờ đi; ở chốt 12 mm, nó gần 8 µm. Cách sửa không phải là bù một hằng số mà là hiệu chuẩn lại hệ số mm/pixel (hoặc toàn bộ mô hình camera), rồi chạy lại nghiên cứu tuyến tính để xác nhận. Một trạm chỉ được kiểm tra bằng mẫu chuẩn 8 mm sẽ không bao giờ phát hiện lỗi này.</p>
+
+<h2>7. Dải bảo vệ: đặt giới hạn chấp nhận khi hệ đo có sai số</h2>
+<p>%GRR 20% nghĩa là gì với hàng ra khỏi nhà máy? Chi tiết thật nằm ngay ngoài giới hạn có thể được đo thành nằm trong, và ngược lại. <strong>Dải bảo vệ</strong> (guard band) thu hẹp giới hạn <em>chấp nhận</em> của trạm vào trong giới hạn <em>dung sai</em> một khoảng k·σ<sub>GRR</sub>: giảm escape, đổi lại tăng overkill. Mô phỏng một triệu chi tiết với quá trình hơi lệch tâm:</p>
+<pre><code class="language-python">s_grr = kq["sd"]["grr"]
+n = 1_000_000
+ct_that = rng.normal(DANH_NGHIA + 0.015, 0.02, n)            # quá trình lệch tâm +15 µm, σ 20 µm
+ct_do = ct_that + rng.normal(0, s_grr, n)
+dat_that = np.abs(ct_that - DANH_NGHIA) &lt;= DUNG_SAI
+print(f"σ_GRR = {1000 * s_grr:.2f} µm; chi tiết thật sự NG: {100 * (~dat_that).mean():.2f}%")
+print(" k | giới hạn chấp nhận (mm) | escape (ppm hàng giao) | overkill (% hàng tốt)")
+for k_bv in (0, 1, 2, 3):
+    gh = DUNG_SAI - k_bv * s_grr
+    nhan = np.abs(ct_do - DANH_NGHIA) &lt;= gh
+    escape = 1e6 * (nhan &amp; ~dat_that).sum() / nhan.sum()
+    overkill = 100 * (~nhan &amp; dat_that).sum() / dat_that.sum()
+    print(f" {k_bv} | {DANH_NGHIA - gh:.4f} – {DANH_NGHIA + gh:.4f}   | {escape:12.0f}         | {overkill:8.2f}")</code></pre>
+<pre><code class="language-text">σ_GRR = 3.62 µm; chi tiết thật sự NG: 4.07%
+ k | giới hạn chấp nhận (mm) | escape (ppm hàng giao) | overkill (% hàng tốt)
+ 0 | 7.9500 – 8.0500   |         5476         |     0.81
+ 1 | 7.9536 – 8.0464   |         1241         |     2.40
+ 2 | 7.9572 – 8.0428   |          137         |     4.96
+ 3 | 7.9608 – 8.0392   |            3         |     8.41</code></pre>
+<p>Không có dải bảo vệ, khoảng 5.500 ppm (0,55%) hàng giao đi là hàng lỗi: quá trình lệch tâm nên rất nhiều chi tiết nằm sát giới hạn trên, nơi sai số đo đủ để đẩy chúng vào trong. Mỗi bước tăng k giảm escape nhiều lần (5.476 → 1.241 → 137 → 3 ppm), đổi lại overkill tăng từ 0,8% lên 2,4%, 5% và 8,4% hàng tốt bị loại. Chọn k theo chi phí của hai loại sai: lọt một chi tiết lỗi tới khách hàng thường đắt hơn nhiều so với loại nhầm một chi tiết tốt; ở ví dụ này k = 2 đưa escape xuống khoảng 140 ppm với cái giá 5% overkill, và cách bền vững hơn là đưa quá trình về giữa dung sai. Con số cụ thể phụ thuộc vào vị trí và độ rộng của quá trình so với dung sai: hãy chạy mô phỏng này với số liệu thật của bạn (độ lệch tâm, σ quá trình từ dữ liệu sản xuất, σ<sub>GRR</sub> từ nghiên cứu), không dùng một con số k chung cho mọi trạm. Đây cũng chính là bài toán escape/overkill của bài <a href="industrial-vision-3-tieu-chi-ok-ng-escape-overkill.html">tiêu chí OK/NG</a>, nhìn từ phía hệ đo.</p>
+
+<h2>8. Lập kế hoạch và báo cáo nghiên cứu</h2>
+<ul>
+  <li><strong>Chọn chi tiết</strong> trải dải sản xuất thật, có cả chi tiết gần hai giới hạn; đánh số kín, người đo không biết chi tiết nào là chi tiết nào.</li>
+  <li><strong>Thứ tự ngẫu nhiên</strong>: không đo một chi tiết ba lần liên tiếp; mỗi lần đo là một chu kỳ nạp – đo – lấy ra đầy đủ.</li>
+  <li><strong>Điều kiện như sản xuất</strong>: cùng đèn, cùng tốc độ, cùng phần mềm và cấu hình sẽ dùng; ghi phiên bản phần mềm, mã băm file hiệu chuẩn, nhiệt độ.</li>
+  <li><strong>Báo cáo</strong>: bảng ANOVA, các thành phần σ, %GRR theo dung sai và theo TV (ghi rõ 6σ hay 5,15σ), ndc, kết quả tuyến tính và độ chệch, kết luận, hành động. Đính kèm dữ liệu thô.</li>
+  <li><strong>Lặp lại</strong> khi thay đổi lớn: đổi camera, ống kính, đèn, thuật toán, đồ gá; và theo chu kỳ của hệ thống chất lượng.</li>
+</ul>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>MSA tách biến thiên thành lặp lại (EV), tái lập (AV, gồm tương tác) và chi tiết (PV); GRR = √(EV² + AV²).</li>
+  <li>ANOVA hai yếu tố tách được tương tác; gộp tương tác vào lặp lại khi p ≥ α (thường 0,05).</li>
+  <li>%GRR theo dung sai trả lời "phán OK/NG được không", theo TV trả lời "theo dõi quá trình được không"; ngưỡng thường dùng 10% / 30%, ndc ≥ 5, nhưng đừng áp máy móc.</li>
+  <li>Với trạm vision, "người đo" là nguồn tái lập có thật: người nạp, lần tháo lắp đồ gá, trạm, ngày. Trạm tự động hoàn toàn dùng nghiên cứu không có người vận hành (đo nhiều chi tiết, mỗi chi tiết vài chu kỳ).</li>
+  <li>Nghiên cứu tuyến tính với nhiều mẫu chuẩn phát hiện sai hệ số mm/pixel mà kiểm tra một mẫu chuẩn bỏ sót.</li>
+  <li>Dải bảo vệ k·σ<sub>GRR</sub> đổi overkill lấy escape; chọn k bằng mô phỏng với số liệu quá trình thật.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Một người đặt sai</h3>
+<p>Sửa dữ liệu mô phỏng: người C đặt chi tiết lệch −15 µm thay vì −3 µm. Chạy lại <code>gage_rr_anova</code>. %GRR theo dung sai và ndc thay đổi thế nào, và phần nào của bảng cho bạn biết vấn đề nằm ở người, không phải ở camera?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">do_c = do.copy()
+do_c[:, 2, :] += -0.015 - (-0.003)                     # người C lệch −15 µm thay vì −3 µm
+kq_c = gage_rr_anova(do_c, T)
+for ten, k_ in (("ban đầu", kq), ("C lệch −15 µm", kq_c)):
+    s = k_["sd"]
+    print(f"{ten:14s}: EV {1000 * s['lap_lai']:.2f} µm, AV {1000 * s['tai_lap']:.2f} µm, "
+          f"%GRR dung sai {k_['grr_tol']:.1f}%, ndc {k_['ndc']}")</code></pre>
+<pre><code class="language-text">ban đầu       : EV 2.31 µm, AV 2.78 µm, %GRR dung sai 21.7%, ndc 5
+C lệch −15 µm : EV 2.31 µm, AV 9.31 µm, %GRR dung sai 57.6%, ndc 2</code></pre>
+<p>EV (lặp lại) gần như không đổi: camera và thuật toán vẫn tốt như cũ. AV tăng vọt và kéo %GRR vượt ngưỡng: vấn đề là cách người C nạp chi tiết. Hành động: quan sát người C làm, sửa đồ gá hoặc hướng dẫn, đào tạo lại, rồi chạy lại nghiên cứu. Đổi camera tốt hơn trong trường hợp này là tốn tiền vô ích.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Chọn mẫu quá hẹp</h3>
+<p>Một kỹ thuật viên lấy 10 chi tiết liên tiếp trên dây chuyền rất ổn định: kích thước thật trải với σ chỉ 4 µm thay vì 20 µm. Mô phỏng lại (giữ nguyên lệch người, tương tác, lặp lại) và so sánh %GRR theo TV, theo dung sai, ndc. Kết luận gì về cách chọn mẫu?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">rng_h = np.random.default_rng(7)
+that_hep = DANH_NGHIA + rng_h.normal(0, 0.004, SO_CT)
+do_hep = np.round(that_hep[:, None, None] + lech_nguoi[None, :, None]
+                  + rng_h.normal(0, 0.0012, (SO_CT, SO_NGUOI, 1))
+                  + rng_h.normal(0, 0.0025, (SO_CT, SO_NGUOI, SO_LAN)), 4)
+kq_hep = gage_rr_anova(do_hep, T)
+for ten, k_ in (("mẫu trải rộng (σ 20 µm)", kq), ("mẫu hẹp (σ 4 µm)", kq_hep)):
+    print(f"{ten:24s}: %GRR theo TV {k_['grr_tv']:5.1f}%, theo dung sai {k_['grr_tol']:5.1f}%, ndc {k_['ndc']}")</code></pre>
+<pre><code class="language-text">mẫu trải rộng (σ 20 µm) : %GRR theo TV  25.1%, theo dung sai  21.7%, ndc 5
+mẫu hẹp (σ 4 µm)        : %GRR theo TV  75.9%, theo dung sai  21.7%, ndc 1</code></pre>
+<p>Cùng một trạm, cùng sai số, nhưng %GRR theo TV tăng vọt và ndc rơi xuống dưới 5 chỉ vì mẫu quá giống nhau; %GRR theo dung sai gần như không đổi vì nó không phụ thuộc vào mẫu. Nếu báo cáo theo TV, hãy chọn chi tiết đại diện cho dải biến thiên thật (lấy qua nhiều ca, nhiều lô, hoặc dùng σ quá trình lấy từ dữ liệu sản xuất dài hạn thay cho PV của 10 chi tiết, như một số phần mềm cho phép).</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 3. Trạm có hai camera giống nhau</h3>
+<p>Dây chuyền có hai trạm đo giống hệt nhau (hai camera, hai đồ gá) chạy song song. Khách hàng muốn biết kết quả hai trạm có thay thế nhau được không. Thiết kế nghiên cứu (chưa cần code): yếu tố nào thay cho "người", bao nhiêu chi tiết, bao nhiêu lần, và kết luận dựa trên con số nào?</p>
+<details><summary>Xem đáp án</summary>
+<p>Dùng nghiên cứu chéo với yếu tố "trạm" thay cho "người": ví dụ 10 chi tiết trải dải sản xuất, mỗi chi tiết đo 3 chu kỳ thật trên <em>mỗi</em> trạm, thứ tự ngẫu nhiên, rồi chạy đúng hàm <code>gage_rr_anova</code> với trục thứ hai là trạm. Thành phần "tái lập" chính là chênh lệch giữa hai trạm; xem thêm trung bình theo trạm (độ chệch tương đối giữa hai trạm) và tương tác (một trạm lệch khác nhau trên từng chi tiết, dấu hiệu đồ gá khác nhau). Kết luận dựa trên %GRR theo dung sai của toàn bộ (cả hai trạm) và độ lớn chênh lệch trung bình giữa hai trạm so với dung sai. Nếu chênh lệch có hệ thống, hiệu chuẩn hai trạm bằng cùng bộ mẫu chuẩn rồi lặp lại nghiên cứu.</p>
+</details>
+</div>
+<p>Bài tiếp theo: <a href="../projects/do-kich-thuoc-chi-tiet-bang-camera.html">Dự án chặng 8: đo kích thước chi tiết cơ khí</a>, nơi bạn ghép hiệu chuẩn, đo cạnh và đánh giá hệ đo thành một trạm hoàn chỉnh.</p>
+
+<p class="note">Nguồn tham khảo: AIAG, <em>Measurement Systems Analysis (MSA) Reference Manual</em>, 4th ed.; <a href="https://support.minitab.com/en-us/minitab/help-and-how-to/minitab-environment/settings-and-defaults/control-charts-and-quality-tools/gage-r-r-study/" rel="noopener" target="_blank">Minitab: mặc định gage R&amp;R (alpha để loại tương tác 0,05)</a>, <a href="https://support.minitab.com/minitab/help-and-how-to/quality-and-process-improvement/measurement-system-analysis/how-to/gage-study/crossed-gage-r-r-study/interpret-the-results/key-results" rel="noopener" target="_blank">Minitab: đọc kết quả crossed gage R&amp;R</a>, <a href="https://www.spcforexcel.com/knowledge/measurement-systems-analysis/acceptance-criteria-for-MSA" rel="noopener" target="_blank">SPC for Excel: Acceptance Criteria for MSA</a>, <a href="https://help.sigmazone.com/quantum-xl/v17/statistical-tools/msa/msa-statistics" rel="noopener" target="_blank">SigmaZone: MSA statistics (ndc = 1,41·PV/GRR)</a>, <a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.linregress.html" rel="noopener" target="_blank">SciPy: linregress</a>.</p>

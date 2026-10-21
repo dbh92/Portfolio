@@ -29,7 +29,7 @@
   <li><strong>Xuất ONNX và kiểm tra kết quả khớp PyTorch</strong>: <code>torch.onnx.export</code> (torch 2.14, exporter mặc định), thẻ mô hình JSON, SHA-256, bộ ảnh vàng.</li>
   <li><strong>Đo latency, logging và giám sát mô hình</strong>: log JSON Lines với <code>RotatingFileHandler</code>, heartbeat ghi nguyên tử, p95 latency.</li>
   <li><strong>Docker cho kỹ sư AI</strong>: khi trạm chạy trong container, chính sách khởi động lại của Docker đóng vai trò tầng ngoài cùng.</li>
-  <li>Chặng 9 (dự án trạm vision mô phỏng): vòng lặp có timeout ở mọi chỗ chờ, heartbeat cho PLC, dừng sạch.</li>
+  <li>Chặng 10 (dự án trạm vision mô phỏng): vòng lặp có timeout ở mọi chỗ chờ, heartbeat cho PLC, dừng sạch.</li>
   <li>Python chuẩn: <code>tomllib</code> (Python ≥ 3.11), <code>dataclasses</code>, <code>subprocess</code>, <code>signal</code>, <code>os.replace</code>, <code>shutil</code>.</li>
 </ul>
 <pre><code class="language-bash">pip install onnxruntime numpy opencv-python        # cho worker và supervisor (máy trạm)
@@ -938,7 +938,7 @@ sc query TramVision</code></pre>
 <h2>7. Mở rộng</h2>
 <ul>
   <li><strong>Chạy dài (soak test)</strong>: chạy 24 giờ với <code>TRAM_THU_LOI</code> sinh lỗi ngẫu nhiên mỗi 10–30 phút; theo dõi RAM của worker (rò bộ nhớ), số file log, số lần khởi động lại. Trạm thật phải chạy hàng tuần mà RAM không tăng dần.</li>
-  <li><strong>Supervisor báo cho PLC</strong>: khi bỏ cuộc hoặc đang khởi động lại, supervisor ghi một coil "VISION_FAULT" qua Modbus TCP (chặng 9) để PLC dừng băng tải hoặc chuyển hàng sang kiểm tra thủ công, thay vì để sản phẩm đi qua mà không được kiểm tra.</li>
+  <li><strong>Supervisor báo cho PLC</strong>: khi bỏ cuộc hoặc đang khởi động lại, supervisor ghi một coil "VISION_FAULT" qua Modbus TCP (chặng 10) để PLC dừng băng tải hoặc chuyển hàng sang kiểm tra thủ công, thay vì để sản phẩm đi qua mà không được kiểm tra.</li>
   <li><strong>Thư mục staging tự động</strong>: supervisor quét <code>staging/</code> mỗi phút; ứng viên mới được kiểm định tự động và chỉ chờ người có quyền xác nhận (ví dụ tạo file <code>APPROVE</code>) mới đổi con trỏ. Ghi tên người xác nhận vào <code>lich_su.jsonl</code>.</li>
   <li><strong>Chạy bóng (shadow mode)</strong>: worker chạy song song mô hình mới trên cùng ảnh nhưng chỉ log kết quả, không gửi cho PLC; sau một ca, so tỷ lệ khớp và các ảnh lệch rồi mới chuyển hẳn.</li>
   <li><strong>Tự quay lại</strong>: sau khi nâng cấp, nếu bộ giám sát drift (bài trước) thấy tỷ lệ NG hoặc vùng không chắc chắn vượt giới hạn trong 30 phút đầu, tự gọi <code>quay_lai()</code> và báo động.</li>

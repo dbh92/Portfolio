@@ -1,4 +1,4 @@
-<p>Đây là dự án tổng kết chặng 10. Bạn đã biết mô hình học bằng gradient descent, CNN trích đặc trưng thế nào, viết vòng lặp huấn luyện PyTorch, nạp ảnh bằng Dataset với augmentation an toàn, và chia dữ liệu theo lô để không rò rỉ (bài "Overfitting và chia train/val/test"). Giờ ghép tất cả thành một bộ phân loại OK/NG hoàn chỉnh theo cách các kỹ sư làm khi chỉ có vài trăm ảnh: <strong>transfer learning</strong>, tức lấy một mạng đã học trên hơn một triệu ảnh ImageNet (ResNet18, MobileNet) và tinh chỉnh nó cho ảnh của bạn. Sản phẩm cuối là một file ONNX đã kiểm chứng, một ngưỡng chọn theo escape, và một báo cáo ma trận nhầm lẫn mà bạn có thể đưa cho trưởng bộ phận chất lượng. Chặng 11 sẽ đi sâu vào chiến lược dữ liệu và cách chọn ngưỡng; chặng 13 đưa file ONNX này lên máy trạm.</p>
+<p>Đây là dự án tổng kết chặng 11. Bạn đã biết mô hình học bằng gradient descent, CNN trích đặc trưng thế nào, viết vòng lặp huấn luyện PyTorch, nạp ảnh bằng Dataset với augmentation an toàn, và chia dữ liệu theo lô để không rò rỉ (bài "Overfitting và chia train/val/test"). Giờ ghép tất cả thành một bộ phân loại OK/NG hoàn chỉnh theo cách các kỹ sư làm khi chỉ có vài trăm ảnh: <strong>transfer learning</strong>, tức lấy một mạng đã học trên hơn một triệu ảnh ImageNet (ResNet18, MobileNet) và tinh chỉnh nó cho ảnh của bạn. Sản phẩm cuối là một file ONNX đã kiểm chứng, một ngưỡng chọn theo escape, và một báo cáo ma trận nhầm lẫn mà bạn có thể đưa cho trưởng bộ phận chất lượng. Chặng 12 sẽ đi sâu vào chiến lược dữ liệu và cách chọn ngưỡng; chặng 14 đưa file ONNX này lên máy trạm.</p>
 <div class="tip"><strong>Mục tiêu dự án</strong>Tinh chỉnh mô hình pretrained với ít dữ liệu theo chiến lược đóng băng rồi mở băng; xử lý mất cân bằng OK/NG; chia tập theo lô; chọn ngưỡng trên tập val theo ràng buộc escape; báo cáo ma trận nhầm lẫn, recall lớp NG và số ảnh NG bị lọt trên tập test; xuất ONNX và chứng minh ONNX cho cùng kết quả với PyTorch. Thời lượng gợi ý: 150 phút. Bài viết chạy với PyTorch 2.14.1, torchvision 0.29.1, onnx 1.23.2, onnxruntime 1.31.0, onnxscript 0.7.2 (CPU).</div>
 <pre><code class="language-bash">pip install torch torchvision onnx onnxruntime onnxscript opencv-python scikit-learn numpy</code></pre>
 
@@ -78,7 +78,7 @@ tổng     11,177,538</code></pre>
 <p>Tập train có 20% NG. Lời giải dùng trọng số trong hàm loss <code>CrossEntropyLoss(weight=[1, n_OK/n_NG])</code>, mỗi lỗi trên ảnh NG "đắt" gấp 4 lần. <code>WeightedRandomSampler</code> là lựa chọn tương đương. Cân bằng lớp làm điểm số bị đẩy về phía NG; không sao, vì ngưỡng được chọn lại trên val.</p>
 
 <h3>Chọn ngưỡng theo escape</h3>
-<p>Mô hình trả về xác suất NG. Ngưỡng mặc định 0,5 không có lý do gì để đúng với nhà máy. Quy trình trong dự án: tính xác suất NG cho mọi ảnh val, lập bảng escape/overkill theo ngưỡng, chọn ngưỡng <strong>lớn nhất mà không lọt ảnh NG nào của val</strong> (ngưỡng lớn nhất thỏa ràng buộc escape cho overkill ít nhất), rồi áp dụng nguyên ngưỡng đó lên test. Với val chỉ có 12 ảnh NG, "không lọt ảnh nào" là một ước lượng rất thô; bài "Chọn ngưỡng mô hình AI theo escape, overkill và đo cycle time đúng cách" ở chặng 11 dạy cách tính khoảng tin cậy và chọn ngưỡng theo chi phí.</p>
+<p>Mô hình trả về xác suất NG. Ngưỡng mặc định 0,5 không có lý do gì để đúng với nhà máy. Quy trình trong dự án: tính xác suất NG cho mọi ảnh val, lập bảng escape/overkill theo ngưỡng, chọn ngưỡng <strong>lớn nhất mà không lọt ảnh NG nào của val</strong> (ngưỡng lớn nhất thỏa ràng buộc escape cho overkill ít nhất), rồi áp dụng nguyên ngưỡng đó lên test. Với val chỉ có 12 ảnh NG, "không lọt ảnh nào" là một ước lượng rất thô; bài "Chọn ngưỡng mô hình AI theo escape, overkill và đo cycle time đúng cách" ở chặng 12 dạy cách tính khoảng tin cậy và chọn ngưỡng theo chi phí.</p>
 
 <h3>Sơ đồ lời giải</h3>
 <pre><code class="language-text">du_an/nhan.csv (đường dẫn, nhãn, lô)
@@ -426,7 +426,7 @@ print("đã ghi ok_ng.onnx và thẻ mô hình ok_ng.json")</code></pre>
 <pre><code class="language-text">đầu vào: images ['batch', 3, 64, 64] | opset 18
 60 ảnh test: sai khác P(NG) lớn nhất 3.43e-07 | quyết định khớp 100%
 đã ghi ok_ng.onnx và thẻ mô hình ok_ng.json</code></pre>
-<p>Sai khác cỡ 10<sup>−7</sup> là sai số làm tròn float32 bình thường giữa hai thư viện; điều quan trọng là mọi quyết định OK/NG trùng nhau. Bài "Xuất ONNX và kiểm tra kết quả khớp PyTorch" ở chặng 13 đi sâu hơn: bộ ảnh vàng, kiểm tra tiền xử lý phía C#, các bẫy khi xuất.</p>
+<p>Sai khác cỡ 10<sup>−7</sup> là sai số làm tròn float32 bình thường giữa hai thư viện; điều quan trọng là mọi quyết định OK/NG trùng nhau. Bài "Xuất ONNX và kiểm tra kết quả khớp PyTorch" ở chặng 14 đi sâu hơn: bộ ảnh vàng, kiểm tra tiền xử lý phía C#, các bẫy khi xuất.</p>
 </details>
 
 <h2>5. Sai lầm thường gặp trong dự án này</h2>
@@ -461,7 +461,7 @@ print("đã ghi ok_ng.onnx và thẻ mô hình ok_ng.json")</code></pre>
   <li><strong>WeightedRandomSampler</strong> thay cho trọng số loss; so escape/overkill trên val.</li>
   <li><strong>Nhiều loại lỗi</strong>: 3 lớp OK, xước, lõm; ma trận nhầm lẫn 3×3 cho biết loại lỗi nào hay bị nhầm thành OK.</li>
   <li><strong>Bản đồ chú ý</strong> (Grad-CAM) để kiểm tra mô hình nhìn vào vết lỗi chứ không phải chấm định hướng hay mép ảnh.</li>
-  <li><strong>Chạy file ONNX trên luồng ảnh mô phỏng</strong> và đo thời gian xử lý mỗi chi tiết, chuẩn bị cho chặng 13.</li>
+  <li><strong>Chạy file ONNX trên luồng ảnh mô phỏng</strong> và đo thời gian xử lý mỗi chi tiết, chuẩn bị cho chặng 14.</li>
 <li><strong>Learning rate khác nhau cho từng nhóm tham số</strong> ở giai đoạn 2: backbone học chậm, lớp mới học nhanh, ví dụ <code>torch.optim.AdamW([{"params": backbone_params, "lr": 1e-4}, {"params": model.fc.parameters(), "lr": 1e-3}])</code>; so với một learning rate chung.</li>
 <li><strong>Label smoothing</strong> (<code>nn.CrossEntropyLoss(label_smoothing=0.1)</code>): giảm việc mô hình quá tự tin, thường giúp khi nhãn có nhiễu. Lưu ý điểm số đầu ra bị "nén" lại, nên phải chọn lại ngưỡng NG trên tập val.</li>
 <li><strong>Đọc sâu</strong>: bảng chọn chiến lược theo kích thước và độ tương đồng dữ liệu (trang 135 của slide), feature extractor so với fine-tune, AutoAugment, MixUp, CutMix trong bài <a href="transfer-learning-data-augmentation.html">Transfer Learning và Data Augmentation</a>.</li>

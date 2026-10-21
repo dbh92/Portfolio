@@ -1,0 +1,212 @@
+<p>Ba capstone vừa rồi chạy trên máy của bạn với dữ liệu mô phỏng. Ngoài nhà máy, phần lớn thời gian của một kỹ sư Vision không nằm ở viết thuật toán mà ở <strong>chạy thử</strong> (commissioning): lắp, căn chỉnh, hiệu chuẩn, chạy với sản phẩm thật, nghiệm thu, rồi <strong>xử lý sự cố</strong> trong những tuần đầu khi trạm gặp đủ thứ mà phòng thí nghiệm không có: nắng chiếu qua cửa sổ lúc 3 giờ chiều, máy dập bên cạnh làm rung giá camera, switch mạng bị ai đó cắm thêm thiết bị, lô vật liệu mới màu khác. Bài này cho bạn một quy trình chạy thử theo giai đoạn, một bảng tra triệu chứng → nguyên nhân, phương pháp tìm nguyên nhân có kỷ luật, và một công cụ chẩn đoán bằng pandas đọc log một ngày của trạm để tự tìm ra năm sự cố.</p>
+<p>Nên học trước: <a href="../hoc/industrial-vision-5-dac-ta-va-nghiem-thu-fat-sat.html">đặc tả và nghiệm thu FAT/SAT</a>, <a href="../hoc/deploy-4-do-latency-logging-giam-sat.html">đo latency, logging và giám sát</a>, <a href="kiem-tra-hieu-chuan-dinh-ky-san-xuat.html">kiểm tra hiệu chuẩn định kỳ</a>. Code cần NumPy và pandas (<code>pip install pandas</code>).</p>
+
+<h2>1. Chạy thử theo giai đoạn</h2>
+<p>Lỗi phổ biến nhất khi chạy thử là làm mọi thứ cùng lúc: bật dây chuyền, chạy phần mềm, rồi khi kết quả sai thì không biết sai ở đâu. Đi theo từng giai đoạn, mỗi giai đoạn có tiêu chí "xong" bằng con số và được ghi lại:</p>
+<table>
+  <tr><th>Giai đoạn</th><th>Việc làm</th><th>Tiêu chí xong</th></tr>
+  <tr><td>1. Cơ khí</td><td>Lắp giá camera, đèn, che chắn; siết, đánh dấu vít (sơn đánh dấu); chốt định vị đồ gá</td><td>Không rung khi gõ nhẹ khung; vị trí đúng bản vẽ; ảnh đầu tiên đúng FOV</td></tr>
+  <tr><td>2. Điện, I/O</td><td>Nguồn, nối đất, trigger, đèn, ngõ ra OK/NG; đo bằng đồng hồ, xem đèn LED I/O</td><td>Mỗi tín hiệu kiểm tra hai chiều (bật/tắt) và đúng thời gian theo giản đồ (bài <a href="../hoc/tich-hop-1-io-so-va-handshake-plc.html">handshake PLC</a>)</td></tr>
+  <tr><td>3. Mạng, camera</td><td>IP tĩnh, jumbo frame, tắt tiết kiệm điện card mạng; tham số camera từ file cấu hình</td><td>1 giờ chạy tự do ở tốc độ tối đa: không mất khung, bộ đếm lỗi của driver bằng 0 (bài <a href="../hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html">lấy ảnh từ camera công nghiệp</a>)</td></tr>
+  <tr><td>4. Quang học, hiệu chuẩn</td><td>Lấy nét, khẩu độ, phơi sáng, khóa vòng ống kính; hiệu chuẩn; lưu "dấu vân tay" (độ sáng, độ nét, dấu chuẩn)</td><td>Kiểm tra mẫu chuẩn đạt; MSA đạt (bài <a href="../hoc/msa-gage-rr-anova-he-do-camera.html">MSA</a>)</td></tr>
+  <tr><td>5. Chạy khô</td><td>Dây chuyền chạy, trạm xử lý nhưng <em>không</em> được loại hàng (chỉ ghi log), đối chiếu với QC kiểm tay</td><td>Trigger PLC = số ảnh = số kết quả; escape, overkill so với QC trong giới hạn</td></tr>
+  <tr><td>6. SAT, bàn giao</td><td>Chạy theo kịch bản nghiệm thu với bộ mẫu vàng OK/NG; đào tạo vận hành, bảo trì</td><td>Biên bản SAT ký; tài liệu bàn giao (bài sau)</td></tr>
+  <tr><td>7. Theo dõi sau bàn giao</td><td>Vài tuần đầu xem log hằng ngày, xử lý sự cố, điều chỉnh có kiểm soát</td><td>Không còn sự cố mới trong N ngày liên tiếp; các chỉ số ổn định</td></tr>
+</table>
+<div class="tip"><strong>Ghi dữ liệu chẩn đoán từ ngày đầu tiên</strong>Mọi phương pháp xử lý sự cố ở bài này dựa vào một thứ: log mỗi chu kỳ có số trigger, số khung camera, kết quả, điểm số, độ sáng vùng chuẩn, độ nét, thời gian xử lý (bài <a href="../hoc/deploy-4-do-latency-logging-giam-sat.html">logging và giám sát</a>). Thêm chúng sau khi sự cố đã xảy ra là quá muộn: bạn sẽ không có dữ liệu "lúc còn tốt" để so.</div>
+
+<h2>2. Bảng tra: triệu chứng → nguyên nhân → kiểm tra</h2>
+<table>
+  <tr><th>Triệu chứng</th><th>Nguyên nhân hay gặp</th><th>Kiểm tra đầu tiên</th></tr>
+  <tr><td>Thỉnh thoảng không có ảnh, timeout</td><td>Mạng (switch, cáp, card tiết kiệm điện), băng thông chung, trigger nhiễu hoặc rung tiếp điểm</td><td>So số trigger PLC với số khung camera; bộ đếm lỗi của driver; thời điểm có trùng thiết bị khác hoạt động không</td></tr>
+  <tr><td>Overkill tăng đột ngột</td><td>Lô vật liệu mới, đèn hỏng một nhánh, ống kính bẩn, ai đó đổi tham số</td><td>Độ sáng, độ nét vùng chuẩn; nhật ký thay đổi cấu hình; xem ảnh NG gần nhất bằng mắt</td></tr>
+  <tr><td>Overkill tăng dần theo ngày</td><td>Đèn suy giảm, bụi bám, trôi hiệu chuẩn</td><td>Xu hướng độ sáng, kết quả kiểm tra mẫu chuẩn đầu ca</td></tr>
+  <tr><td>Overkill theo giờ trong ngày</td><td>Nắng, đèn xưởng, nhiệt độ</td><td>Vẽ tỉ lệ NG và độ sáng theo giờ qua nhiều ngày</td></tr>
+  <tr><td>Kết quả nhảy khi máy bên cạnh chạy</td><td>Rung truyền qua sàn, khung</td><td>Độ nét theo thời gian, đối chiếu với lịch chạy máy bên cạnh; gia cố, đệm chống rung</td></tr>
+  <tr><td>Thời gian xử lý thỉnh thoảng rất dài</td><td>Phần mềm khác trên máy (cập nhật Windows, quét virus, sao lưu), ổ đĩa đầy hoặc chậm, bộ nhớ rò rỉ</td><td>p99 theo giờ; trình quản lý tác vụ lúc chậm; lịch tác vụ của Windows</td></tr>
+  <tr><td>Escape (khách hàng trả về hàng lỗi)</td><td>Ngưỡng bị nới, lỗi kiểu mới chưa có trong bộ dữ liệu, sản phẩm không đi qua trạm (bypass), trạm "không có kết quả thì cho qua"</td><td>Tra mã sản phẩm trong cơ sở dữ liệu: có kết quả không, điểm số bao nhiêu, ảnh lưu trông thế nào</td></tr>
+</table>
+
+<h2>3. Phương pháp tìm nguyên nhân</h2>
+<ol>
+  <li><strong>Mô tả triệu chứng bằng con số</strong>: không phải "máy báo lỗi nhiều" mà "tỉ lệ NG tăng từ 0,9% lên 4–6% từ 16:30, chủ yếu lỗi xước".</li>
+  <li><strong>Khoanh thời điểm và phạm vi</strong>: bắt đầu lúc nào, liên tục hay từng đợt, một trạm hay mọi trạm, một mã sản phẩm hay mọi mã. Thời điểm bắt đầu thường chỉ thẳng vào nguyên nhân (đổi ca, đổi lô, bảo trì, giờ nghỉ trưa).</li>
+  <li><strong>Lập giả thuyết, tìm bằng chứng trong dữ liệu đã có</strong> trước khi chạm vào trạm: log, ảnh lưu, nhật ký thay đổi, nhật ký bảo trì.</li>
+  <li><strong>Mỗi lần chỉ đổi một thứ</strong>, ghi lại, đo lại. Đổi ba tham số cùng lúc thì dù hết lỗi bạn cũng không biết vì sao, và lần sau sẽ phải đoán lại từ đầu.</li>
+  <li><strong>Xác nhận và chống tái diễn</strong>: chạy lại bộ ảnh vàng OK/NG sau mỗi thay đổi (bài <a href="../hoc/pytest-kiem-thu-ham-xu-ly-anh.html">pytest và test hồi quy</a>); thêm cảnh báo tự động cho đúng triệu chứng vừa gặp.</li>
+</ol>
+<div class="warn"><strong>Không chỉnh ngưỡng để "hết báo lỗi"</strong>Khi overkill tăng, áp lực từ sản xuất là "nới ngưỡng cho nó chạy". Nới ngưỡng mà không biết nguyên nhân là đổi overkill lấy escape mà không ai đo. Nếu buộc phải chỉnh tạm, chạy lại bộ ảnh NG để biết escape tăng bao nhiêu, ghi nhật ký người chỉnh, lý do, thời hạn, và đặt lịch quay lại.</div>
+
+<h2>4. Công cụ chẩn đoán: đọc log một ngày</h2>
+<p>Trạm ST3 ghi một dòng JSON mỗi chu kỳ (2 giây một sản phẩm, 16 giờ từ 6:00 tới 22:00): số trigger PLC, số khung camera, kết quả, độ sáng trung vị vùng chuẩn, độ nét, thời gian xử lý; chu kỳ không có ảnh thì ghi mã lỗi. Đoạn code đầu tiên <em>tạo</em> log này với năm sự cố cài sẵn; đọc lướt cũng được, vì phần chẩn đoán sau đó không dùng bất kỳ thông tin nào ngoài file log.</p>
+<pre><code class="language-python">import json
+from datetime import datetime, timedelta
+
+import numpy as np
+
+rng = np.random.default_rng(3)
+BAT_DAU = datetime(2026, 10, 21, 6, 0, 0)
+CHU_KY_S = 2.0                                   # dây chuyền: một sản phẩm mỗi 2 giây, 16 giờ = 28 800 sản phẩm
+
+
+def phut(h, m):                                  # số giây từ 6:00
+    return ((h - 6) * 60 + m) * 60
+
+
+with open("tram_st3.jsonl", "w", encoding="utf-8") as f:
+    khung = 0
+    for i in range(int(16 * 3600 / CHU_KY_S)):
+        t = i * CHU_KY_S
+        trigger = i + 1                          # PLC đánh số trigger liên tục
+        # --- các sự cố cài sẵn (phần mềm chẩn đoán không được biết) ---
+        mat_khung = phut(10, 5) &lt;= t &lt; phut(10, 12) and rng.random() &lt; 0.3         # switch mạng quá tải
+        sang = 182 * (1 - 0.18 * max(0.0, (t - phut(14, 0)) / (8 * 3600)))         # đèn yếu dần 18% từ 14:00 tới 22:00
+        sang += rng.normal(0, 1.5)
+        net = 0.42 + rng.normal(0, 0.01)
+        if phut(11, 0) &lt;= t &lt; phut(11, 40) and (t // 60) % 3 == 0:                 # máy dập bên cạnh chạy từng đợt
+            net -= 0.12 + rng.normal(0, 0.02)
+        xu_ly = rng.gamma(9, 2.0)                                                   # ms, trung bình khoảng 18 ms
+        if phut(12, 0) &lt;= t &lt; phut(12, 25):
+            xu_ly += rng.gamma(2, 25)                                               # quét virus giờ nghỉ trưa
+        p_ng = 0.006
+        if t &gt;= phut(16, 30):
+            p_ng = 0.045                                                            # lô vật liệu mới, màu đậm hơn
+            sang -= 9
+        if mat_khung:
+            ban_ghi = {"t": (BAT_DAU + timedelta(seconds=t)).isoformat(), "trigger": trigger, "loi": "TIMEOUT_ANH"}
+        else:
+            khung += 1
+            ban_ghi = {"t": (BAT_DAU + timedelta(seconds=t)).isoformat(), "trigger": trigger, "khung": khung,
+                       "kq": "NG" if rng.random() &lt; p_ng else "OK", "sang": round(sang, 1),
+                       "net": round(net, 3), "ms": round(xu_ly, 1)}
+        f.write(json.dumps(ban_ghi) + "\n")
+print(open("tram_st3.jsonl").readline().strip())
+print(sum(1 for _ in open("tram_st3.jsonl")), "dòng log")</code></pre>
+<pre><code class="language-text">{"t": "2026-10-21T06:00:00", "trigger": 1, "khung": 1, "kq": "OK", "sang": 185.1, "net": 0.394, "ms": 19.9}
+28800 dòng log</code></pre>
+<p>Công cụ chẩn đoán lấy giờ đầu ca (ngay sau kiểm tra đầu ca, lúc biết chắc trạm tốt) làm mốc, gom log theo cửa sổ 10 phút, và bật một "dấu hiệu" khi một chỉ số rời xa mốc. Tỉ lệ NG được xét trên cửa sổ trượt 30 phút, với giới hạn trên 3σ của phân phối nhị thức: 10 phút chỉ có 300 sản phẩm, quá ít để phân biệt 0,9% với 2% một cách tin cậy. Các cửa sổ liên tiếp cùng dấu hiệu được gộp thành một đợt.</p>
+<pre><code class="language-python">import pandas as pd
+
+log = pd.read_json("tram_st3.jsonl", lines=True)
+log["t"] = pd.to_datetime(log["t"])
+log = log.set_index("t")
+print(f"{len(log)} chu kỳ; thiếu ảnh {log['loi'].notna().sum()}; trigger nhảy số: {(log['trigger'].diff() != 1).sum() - 1} lần")
+
+# mốc chuẩn: giờ đầu ca, lúc trạm vừa được kiểm tra đầu ca
+moc = log.loc[:"2026-10-21 06:59:59"]
+chuan = {"sang": moc["sang"].median(), "net": moc["net"].median(), "net_sd": moc["net"].std(),
+         "ms_p99": moc["ms"].quantile(0.99), "ng": (moc["kq"] == "NG").mean()}
+print("mốc:", {k: round(float(v), 4) for k, v in chuan.items()})
+
+cua_so = log.resample("10min").agg(
+    so=("trigger", "size"), thieu=("loi", "count"),
+    ng=("kq", lambda s: (s == "NG").sum()), sang=("sang", "median"),
+    net_p10=("net", lambda s: s.quantile(0.10)), ms_p99=("ms", lambda s: s.quantile(0.99)))
+co = (cua_so["so"] - cua_so["thieu"]).rolling(3, min_periods=1).sum()    # số chu kỳ có kết quả trong 30 phút gần nhất
+ti_le_ng = cua_so["ng"].rolling(3, min_periods=1).sum() / co               # tỉ lệ NG trượt 30 phút: đủ mẫu để tin
+gioi_han_ng = chuan["ng"] + 3 * np.sqrt(chuan["ng"] * (1 - chuan["ng"]) / co)      # giới hạn trên 3σ nhị thức
+dau_hieu = pd.DataFrame({
+    "MAT_ANH": cua_so["thieu"] &gt; 0,
+    "CHAM": cua_so["ms_p99"] &gt; 3 * chuan["ms_p99"],
+    "MO_NET": cua_so["net_p10"] &lt; chuan["net"] - 5 * chuan["net_sd"],
+    "DEN_YEU": cua_so["sang"] &lt; 0.92 * chuan["sang"],
+    "NG_TANG": ti_le_ng &gt; gioi_han_ng})
+
+# gộp các cửa sổ liên tiếp cùng dấu hiệu thành một "đợt"
+for ten in dau_hieu.columns:
+    bat = dau_hieu[ten].astype(int)
+    dot = (bat.diff().fillna(bat) == 1).cumsum()[bat == 1]
+    for _, nhom in dot.groupby(dot):
+        dau, cuoi = nhom.index[0], nhom.index[-1] + pd.Timedelta("10min")
+        dong = cua_so.loc[nhom.index]
+        chi_tiet = {"MAT_ANH": f"{int(dong['thieu'].sum())} chu kỳ không có ảnh",
+                    "CHAM": f"p99 tới {dong['ms_p99'].max():.0f} ms (mốc {chuan['ms_p99']:.0f} ms)",
+                    "MO_NET": f"độ nét p10 thấp nhất {dong['net_p10'].min():.3f} (mốc {chuan['net']:.3f})",
+                    "DEN_YEU": f"độ sáng trung vị xuống {dong['sang'].min():.0f} (mốc {chuan['sang']:.0f})",
+                    "NG_TANG": f"tỉ lệ NG (trượt 30 phút) tới {100 * ti_le_ng[nhom.index].max():.1f}% "
+                               f"(mốc {100 * chuan['ng']:.1f}%)"}[ten]
+        print(f"{dau:%H:%M}–{cuoi:%H:%M}  {ten:8s} {chi_tiet}")</code></pre>
+<pre><code class="language-text">28800 chu kỳ; thiếu ảnh 61; trigger nhảy số: 0 lần
+mốc: {'sang': 182.0, 'net': 0.42, 'net_sd': 0.01, 'ms_p99': 34.6, 'ng': 0.0089}
+10:00–10:20  MAT_ANH  61 chu kỳ không có ảnh
+12:00–12:30  CHAM     p99 tới 178 ms (mốc 35 ms)
+11:00–11:40  MO_NET   độ nét p10 thấp nhất 0.284 (mốc 0.420)
+16:30–22:00  DEN_YEU  độ sáng trung vị xuống 140 (mốc 182)
+16:40–22:00  NG_TANG  tỉ lệ NG (trượt 30 phút) tới 5.7% (mốc 0.9%)</code></pre>
+<p>Đọc từng dòng như một kỹ sư đi hiện trường:</p>
+<ul>
+  <li><strong>10:00–10:20, mất ảnh</strong>: 61 chu kỳ có trigger nhưng không có ảnh, trong khi số trigger PLC liên tục, không nhảy số. Nghĩa là PLC đã phát lệnh và trạm đã nhận, nhưng ảnh không về: nghi mạng camera hoặc camera, không phải PLC. Hỏi xem 10 giờ có ai cắm thêm thiết bị vào switch, có dây chuyền nào bắt đầu chạy không; xem bộ đếm lỗi của driver.</li>
+  <li><strong>11:00–11:40, mờ ảnh</strong>: độ nét tụt từng đợt chứ không đều. Một đợt cách nhau đều đặn là dấu hiệu rung từ một máy chạy theo chu kỳ: đối chiếu lịch chạy máy dập bên cạnh.</li>
+  <li><strong>12:00–12:30, xử lý chậm</strong>: p99 gấp 5 lần bình thường, đúng giờ nghỉ trưa. Thời điểm tròn giờ trùng với một tác vụ lên lịch (quét virus, cập nhật, sao lưu) là nghi phạm hàng đầu. Sửa: loại thư mục ảnh khỏi quét virus và dời lịch quét, hoặc tách máy trạm khỏi chính sách cập nhật tự động của phòng IT.</li>
+  <li><strong>Từ 16:30, đèn yếu và NG tăng cùng lúc</strong>: hai dấu hiệu bật cùng thời điểm, cần tách xem có cùng nguyên nhân không.</li>
+</ul>
+<pre><code class="language-python">theo_gio = log.resample("30min").agg(sang=("sang", "median"), ng=("kq", lambda s: (s == "NG").mean()))
+print("giờ   | độ sáng trung vị | tỉ lệ NG")
+for t, dong in theo_gio.loc["2026-10-21 13:00":"2026-10-21 18:00"].iterrows():
+    print(f"{t:%H:%M} |      {dong['sang']:6.1f}      | {100 * dong['ng']:4.1f}%")</code></pre>
+<pre><code class="language-text">giờ   | độ sáng trung vị | tỉ lệ NG
+13:00 |       181.9      |  0.6%
+13:30 |       182.0      |  0.4%
+14:00 |       181.0      |  0.6%
+14:30 |       179.0      |  0.8%
+15:00 |       176.9      |  0.4%
+15:30 |       174.9      |  0.6%
+16:00 |       172.8      |  0.7%
+16:30 |       161.7      |  4.2%
+17:00 |       159.8      |  3.3%
+17:30 |       157.7      |  3.8%
+18:00 |       155.5      |  4.1%</code></pre>
+<p>Bảng nửa giờ tách được hai sự việc: từ 14:00 độ sáng <em>giảm dần</em> khoảng 2 mức mỗi nửa giờ trong khi tỉ lệ NG vẫn bình thường, đó là đèn suy giảm (lên kế hoạch thay hoặc tăng dòng đèn, chưa gấp); lúc 16:30 độ sáng <em>tụt bậc</em> khoảng 11 mức cùng lúc NG nhảy từ 0,7% lên hơn 4%: một sự kiện, khớp với thời điểm đổi lô vật liệu. Hành động cho sự cố thứ hai: lấy ảnh NG của lô mới cho QC xem (lỗi thật hay vật liệu tối hơn bị báo nhầm), kiểm tra chuẩn hóa độ sáng của thuật toán, và nếu là báo nhầm thì xử lý như bài <a href="../hoc/so-sanh-anh-mau-golden-template-opencv.html">golden template</a> (bài tập 4) hay bài <a href="../hoc/ai-vision-5-chon-nguong-va-danh-gia-theo-nha-may.html">chọn ngưỡng</a>: cập nhật dữ liệu có kiểm soát, không nới ngưỡng mù.</p>
+
+<h2>5. Nhật ký thay đổi và bàn giao</h2>
+<p>Mỗi thay đổi trên trạm sau khi đã chạy (tham số, ngưỡng, mô hình, phần cứng, vị trí) ghi một dòng: thời điểm, người, cái gì đổi từ giá trị nào sang giá trị nào, lý do, cách đã kiểm chứng (bộ ảnh vàng, mẫu chuẩn), ai duyệt. Nhật ký này là thứ đầu tiên bạn đọc khi có sự cố ("có ai đổi gì không?"), và là thứ đánh giá viên của khách hàng sẽ hỏi. Phần mềm có thể tự ghi một phần: mã băm file cấu hình, phiên bản mô hình, mỗi lần khởi động (bài <a href="../hoc/deploy-6-dong-goi-ung-dung-chay-24-7.html">ứng dụng chạy 24/7</a>).</p>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Chạy thử theo giai đoạn (cơ khí → điện, I/O → mạng, camera → quang học, hiệu chuẩn → chạy khô → SAT → theo dõi), mỗi giai đoạn có tiêu chí xong bằng con số.</li>
+  <li>Ghi log chẩn đoán mỗi chu kỳ từ ngày đầu: số trigger, số khung, kết quả, điểm số, độ sáng, độ nét, thời gian xử lý.</li>
+  <li>Tìm nguyên nhân có kỷ luật: triệu chứng bằng số → thời điểm, phạm vi → giả thuyết và bằng chứng từ dữ liệu → đổi một thứ mỗi lần → xác nhận bằng bộ ảnh vàng → chống tái diễn.</li>
+  <li>So với mốc lúc trạm tốt; phân biệt giảm dần (suy giảm, trôi) với tụt bậc (sự kiện); đối chiếu thời điểm với lịch của mọi thứ xung quanh.</li>
+  <li>Không nới ngưỡng mù; mọi thay đổi vào nhật ký.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Mất ảnh hay mất trigger?</h3>
+<p>Một trạm khác báo "thỉnh thoảng sản phẩm không có kết quả". Log có số trigger PLC và số khung camera. Mô tả ba mẫu dữ liệu khác nhau trong log ứng với ba nguyên nhân: (a) PLC không phát trigger; (b) trigger tới camera nhưng ảnh không về máy tính; (c) ảnh về nhưng phần mềm xử lý quá hạn và PLC đã đi tiếp.</p>
+<details><summary>Xem đáp án</summary>
+<p>(a) Số trigger trong log nhảy số (thiếu trigger), số khung liên tục theo trigger nhận được: vấn đề ở phía PLC hoặc dây trigger; so với bộ đếm sản phẩm của PLC. (b) Số trigger liên tục nhưng có chu kỳ không có khung (timeout ảnh) hoặc số khung camera nhảy số: vấn đề ở camera, mạng, driver (như sự cố 10:00 ở trên); xem bộ đếm lỗi của driver. (c) Trigger và khung đầy đủ, có kết quả trong log nhưng thời gian xử lý lớn hơn ngân sách, và PLC ghi nhận "hết giờ": vấn đề hiệu năng (như sự cố 12:00); xem p99 và các tác vụ chạy cùng lúc. Ba mẫu này chỉ phân biệt được khi log có đủ cả số trigger lẫn số khung.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Thêm luật chẩn đoán</h3>
+<p>Thêm vào công cụ chẩn đoán một luật phát hiện "đèn yếu dần": trong mỗi cửa sổ 2 giờ, fit đường thẳng độ sáng theo thời gian và bật dấu hiệu khi độ dốc âm có ý nghĩa và vượt 2 mức xám mỗi giờ. Chạy trên log và cho biết luật này bật từ lúc nào, sớm hơn luật "dưới 92% mốc" bao lâu.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">from scipy import stats
+
+sang_10 = cua_so["sang"]
+gio = (sang_10.index - sang_10.index[0]).total_seconds() / 3600
+bat_dau = None
+for i in range(12, len(sang_10) + 1):                              # cửa sổ 2 giờ = 12 cửa sổ 10 phút
+    hq = stats.linregress(gio[i - 12:i], sang_10.iloc[i - 12:i])
+    if hq.slope &lt; -2 and hq.pvalue &lt; 0.01:
+        bat_dau = sang_10.index[i - 1] + pd.Timedelta("10min")
+        print(f"luật xu hướng bật lúc {bat_dau:%H:%M}: độ dốc {hq.slope:.1f} mức xám/giờ trong 2 giờ trước đó")
+        break
+tu_nguong = dau_hieu.index[dau_hieu["DEN_YEU"]][0]
+print(f"luật dưới 92% mốc bật lúc {tu_nguong:%H:%M} → xu hướng sớm hơn {(tu_nguong - bat_dau).total_seconds() / 60:.0f} phút")</code></pre>
+<pre><code class="language-text">luật xu hướng bật lúc 15:10: độ dốc -2.5 mức xám/giờ trong 2 giờ trước đó
+luật dưới 92% mốc bật lúc 16:30 → xu hướng sớm hơn 80 phút</code></pre>
+<p>Luật theo xu hướng bật lúc 15:10, sớm hơn luật ngưỡng cố định 80 phút, khi độ sáng mới giảm khoảng 4% và chưa ảnh hưởng tới kết quả; giống cách bài <a href="kiem-tra-hieu-chuan-dinh-ky-san-xuat.html">kiểm tra hiệu chuẩn định kỳ</a> dự báo ngày chạm ngưỡng. Cửa sổ trượt chứa bước tụt lúc 16:30 cũng cho độ dốc lớn: luật xu hướng không phân biệt được trôi dần với tụt bậc, nên vẫn cần bảng nửa giờ hoặc một luật phát hiện bước nhảy riêng.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 3. Bảng kiểm bàn giao</h3>
+<p>Viết bảng kiểm 10 mục trước khi rời hiện trường sau SAT, sao cho người trực ca đêm xử lý được sự cố thường gặp mà không cần gọi bạn.</p>
+<details><summary>Xem đáp án</summary>
+<p>Gợi ý một bảng: (1) Vít, vòng ống kính đã khóa và đánh dấu sơn; ảnh tham chiếu vị trí lưu kèm. (2) File cấu hình, hiệu chuẩn, mô hình có bản sao lưu và mã băm ghi trong tài liệu. (3) Mẫu chuẩn và bộ mẫu vàng OK/NG có hộp, nhãn, vị trí cất, hướng dẫn kiểm tra đầu ca có hình. (4) Phần mềm tự khởi động khi bật máy; khởi động lại không cần đăng nhập. (5) Cảnh báo tự động cho mất ảnh, xử lý chậm, đèn yếu, mất nét, NG tăng, ổ đĩa sắp đầy; người nhận cảnh báo đã thử nhận. (6) Tác vụ tự động của Windows (cập nhật, quét virus, sao lưu) đã được loại trừ hoặc dời lịch, được IT xác nhận bằng văn bản. (7) Bảng tra sự cố một trang dán tại trạm: triệu chứng → kiểm tra → ai gọi. (8) Quyền: người vận hành không đổi được ngưỡng; kỹ thuật viên đổi được và mỗi thay đổi tự ghi nhật ký. (9) Phụ tùng: đèn, cáp, cầu chì dự phòng, kèm thông số. (10) Danh bạ: kỹ sư Vision, PLC, IT, nhà cung cấp camera, kèm khung giờ.</p>
+</details>
+</div>
+<p>Bài tiếp theo: <a href="../tai-nguyen/viet-tai-lieu-ky-thuat-du-an-vision.html">Viết tài liệu dự án Vision</a>, để những gì bạn biết về trạm không chỉ nằm trong đầu bạn.</p>
+
+<p class="note">Nguồn tham khảo: <a href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.resample.html" rel="noopener" target="_blank">pandas: DataFrame.resample</a>, <a href="https://pandas.pydata.org/docs/reference/api/pandas.read_json.html" rel="noopener" target="_blank">pandas: read_json (lines=True)</a>; Montgomery, <em>Introduction to Statistical Quality Control</em> (giới hạn kiểm soát cho tỉ lệ, biểu đồ p).</p>
