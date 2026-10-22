@@ -1,0 +1,261 @@
+<p>Đây là dự án tổng kết chặng 3D Vision. Bạn sẽ xây phần mềm cho một trạm đo <strong>độ đồng phẳng chân linh kiện</strong> (lead coplanarity), một trong những phép đo 3D kinh điển của ngành điện tử: một chân linh kiện dán bề mặt bị vênh lên vài chục micromet là không chạm pad khi hàn, gây mối hàn hở mà kiểm tra điện có thể không phát hiện ngay. Dự án dùng lại profiler laser của bài <a href="../hoc/3d-vision-2-laser-tam-giac-do-chieu-cao.html">laser tam giác</a> (tìm tâm vạch bằng trọng tâm, bản đồ chiều cao), cách đo so với mặt chuẩn, và cách đánh giá hệ đo của bài <a href="../hoc/msa-gage-rr-anova-he-do-camera.html">MSA và Gage R&amp;R</a>.</p>
+<div class="tip"><strong>Mục tiêu dự án</strong>(1) Từ bản đồ chiều cao, tìm tự động đủ 16 chân và đo chiều cao từng chân bền nhiễu. (2) Dựng mặt ngồi (seating plane) theo định nghĩa JEDEC, tính độ đồng phẳng, phán OK/NG. (3) Chứng minh bằng số rằng phương pháp tính (mặt ngồi hay mặt phẳng hồi quy) có thể đổi kết luận. (4) Đánh giá độ lặp lại qua 10 lần đặt lại linh kiện. Thời lượng dự kiến: khoảng 2,5 giờ.</div>
+
+<h2>1. Bài toán</h2>
+<p>Một nhà máy lắp ráp nhận linh kiện SOIC-16 (16 chân dạng cánh chim, bước 1,27 mm, thân 10 × 4 mm) từ nhà cung cấp và muốn kiểm tra mẫu mỗi lô trước khi đưa lên dây chuyền SMT. Linh kiện được đặt <strong>lật ngửa</strong> (chân hướng lên) vào khay đo; một profiler laser nhìn nghiêng 30° quét qua khi khay chạy, độ phân giải 0,015 mm theo vạch, bước quét 0,03 mm. Khay có thể hơi nghiêng vài µm/mm và linh kiện đặt lệch vị trí tới ±0,15 mm.</p>
+<table>
+  <tr><th>Đại lượng</th><th>Yêu cầu</th></tr>
+  <tr><td>Độ đồng phẳng (coplanarity): khoảng cách lớn nhất từ mặt tiếp xúc của một chân tới mặt ngồi</td><td>≤ 0,100 mm</td></tr>
+  <tr><td>Phương pháp</td><td>Mặt ngồi qua 3 chân đỡ linh kiện, tam giác 3 chân chứa hình chiếu trọng tâm (theo JEDEC JESD22-B108)</td></tr>
+  <tr><td>Kết quả báo cáo</td><td>OK/NG, độ đồng phẳng, chân tệ nhất, chiều cao từng chân</td></tr>
+</table>
+
+<h2>2. Yêu cầu</h2>
+<ul>
+  <li>Bù độ nghiêng của khay bằng fit mặt phẳng, không dùng "Z = 0" của cảm biến.</li>
+  <li>Tìm chân <strong>không dựa vào chiều cao danh định</strong>: chân lỗi chính là chân có chiều cao bất thường.</li>
+  <li>Chiều cao mỗi chân là một con số bền với nhiễu, điểm thiếu, mép.</li>
+  <li>Thiếu chân (tìm được khác 16) thì trạm báo lỗi đo, không phán OK.</li>
+  <li>Đo 10 lần (mỗi lần nhấc ra đặt lại) một linh kiện lỗi và một linh kiện tốt; báo cáo trung bình, độ lệch chuẩn, 6σ so với dung sai.</li>
+</ul>
+
+<h2>3. Kiến thức sử dụng</h2>
+<ul>
+  <li><a href="../hoc/3d-vision-2-laser-tam-giac-do-chieu-cao.html">Laser tam giác</a>: mô phỏng ảnh vạch laser, tìm tâm bằng trọng tâm, vùng khuất, bản đồ chiều cao, fit mặt chuẩn.</li>
+  <li><a href="../hoc/xu-ly-anh-5-dac-trung-contour-blob.html">Blob analysis</a>: <code>connectedComponentsWithStats</code> trên mặt nạ chiều cao.</li>
+  <li><a href="../hoc/xu-ly-anh-4-morphology.html">Morphology</a>: <code>erode</code> để bỏ mép vùng trước khi lấy trung vị.</li>
+  <li><a href="../hoc/msa-gage-rr-anova-he-do-camera.html">MSA</a>: độ lặp lại so với dung sai.</li>
+  <li>Hình học: mặt phẳng qua 3 điểm (tích có hướng), điểm trong tam giác.</li>
+</ul>
+
+<h2>4. Dữ liệu: trạm mô phỏng</h2>
+<p>Đoạn code này đóng vai "trạm thật": mô tả hình học khay, đáy thân và 16 mặt tiếp xúc chân (bỏ qua phần vai chân nối với thân để gọn), rồi quét bằng đúng profiler laser của bài laser tam giác (speckle, vùng khuất, tìm tâm trọng tâm). Linh kiện thử có 16 chân cao lệch nhau vài µm và <strong>chân số 6 bị vênh</strong>, thấp hơn 0,12 mm (linh kiện lật ngửa nên chân vênh lên khỏi PCB trông <em>thấp hơn</em> các chân khác). Lời giải không được dùng <code>CAO_THAT</code>, trừ khi để chấm điểm.</p>
+<pre><code class="language-python">import itertools
+
+import cv2
+import numpy as np
+
+SX, DY = 0.015, 0.03                 # 0,015 mm/pixel dọc vạch laser; bước quét 0,03 mm
+ALPHA = np.radians(30)
+RONG, CAO_ANH, HANG_0 = 800, 160, 150  # vạch laser phủ 12 mm
+THAN = (6.0, 3.6, 10.0, 4.0)         # tâm x, tâm y, dài, rộng của thân linh kiện (mm) trên khay
+DAY_THAN, CHAN_DN = 1.50, 1.65       # đáy thân cao 1,50 mm so với khay; mặt tiếp xúc chân danh định 1,65 mm
+
+
+def vi_tri_chan(dx=0.0, dy=0.0):
+    """16 chân SOIC: chân 1–8 một bên (trái → phải), 9–16 bên kia (phải → trái), bước 1,27 mm."""
+    cx, cy = THAN[0] + dx, THAN[1] + dy
+    x = cx + (np.arange(8) - 3.5) * 1.27
+    return np.r_[np.c_[x, np.full(8, cy - 2.6)], np.c_[x[::-1], np.full(8, cy + 2.6)]]
+
+
+def be_mat(x, y, cao_chan, dx=0.0, dy=0.0, nghieng=(0.004, -0.003)):
+    """Khay (nghiêng nhẹ), đáy thân linh kiện, 16 mặt tiếp xúc chân 0,40 × 0,80 mm."""
+    z = np.zeros(np.broadcast(x, y).shape)
+    cx, cy, dai, rong = THAN
+    z = np.where((np.abs(x - cx - dx) &lt;= dai / 2) &amp; (np.abs(y - cy - dy) &lt;= rong / 2), DAY_THAN, z)
+    for (px, py), h in zip(vi_tri_chan(dx, dy), cao_chan):
+        z = np.where((np.abs(x - px) &lt;= 0.20) &amp; (np.abs(y - py) &lt;= 0.40), h, z)
+    return z + nghieng[0] * x + nghieng[1] * y
+
+
+def quet(rng, cao_chan, dx=0.0, dy=0.0, nghieng=(0.004, -0.003)):
+    """Mô phỏng profiler laser (như bài Laser tam giác): trả về bản đồ chiều cao (mm), NaN là điểm thiếu."""
+    x = np.arange(RONG) * SX
+    r = np.arange(CAO_ANH)[:, None]
+    ban_do = []
+    for yq in np.arange(0.0, 7.2, DY):
+        z = be_mat(x, yq, cao_chan, dx, dy, nghieng)
+        khuat = np.zeros(RONG, bool)
+        for buoc in np.arange(DY, 1.0, DY):
+            khuat |= be_mat(x, yq + buoc, cao_chan, dx, dy, nghieng) &gt; z + buoc / np.tan(ALPHA) + 1e-6
+        anh = 230 * np.exp(-((r - (HANG_0 - z * np.sin(ALPHA) / SX)[None, :]) ** 2) / (2 * 1.6 ** 2))
+        anh = anh * rng.gamma(8.0, 1 / 8.0, anh.shape)
+        anh[:, khuat] = 0
+        anh = np.clip(np.round(anh + rng.normal(8, 3, anh.shape)), 0, 255)
+        i_max = anh.argmax(axis=0)                                   # tìm tâm vạch bằng trọng tâm (bài Laser tam giác)
+        hang = np.clip(np.arange(-4, 5)[:, None] + i_max[None, :], 0, CAO_ANH - 1)
+        w = np.clip(anh[hang, np.arange(RONG)] - 20, 0, None)
+        tam = (w * hang).sum(0) / np.maximum(w.sum(0), 1e-9)
+        ban_do.append(np.where(anh.max(0) &gt;= 40, (HANG_0 - tam) * SX / np.sin(ALPHA), np.nan))
+    return np.array(ban_do)
+
+
+# linh kiện thử: chiều cao 16 chân lệch nhau vài µm; chân 6 bị vênh, thấp hơn 0,12 mm (không chạm PCB)
+rng = np.random.default_rng(2)
+CAO_THAT = CHAN_DN + rng.normal(0, 0.006, 16)
+CAO_THAT[5] -= 0.12
+ban_do = quet(rng, CAO_THAT)
+print("bản đồ chiều cao:", ban_do.shape, f"| điểm thiếu {100 * np.isnan(ban_do).mean():.1f}%",
+      f"| cao nhất {np.nanmax(ban_do):.3f} mm")</code></pre>
+<pre><code class="language-text">bản đồ chiều cao: (241, 800) | điểm thiếu 10.3% | cao nhất 1.711 mm</code></pre>
+
+<h2>5. Gợi ý thiết kế</h2>
+<ol>
+  <li>Fit mặt khay từ các điểm thấp, đổi bản đồ sang chiều cao so với khay.</li>
+  <li>Phân ngưỡng <em>thấp</em> (chỉ tách khỏi khay), gom vùng, giữ vùng có diện tích cỡ một chân (loại thân linh kiện rất lớn và các đốm nhỏ), đánh số theo quy ước SOIC.</li>
+  <li>Chiều cao chân = trung vị phần lõi vùng (đã erode).</li>
+  <li>Thử mọi bộ 3 chân: mặt phẳng qua 3 chân là mặt ngồi nếu không chân nào vượt lên trên nó và tam giác chứa trọng tâm. Độ đồng phẳng = khoảng cách lớn nhất từ các chân tới mặt ngồi.</li>
+  <li>Gói toàn bộ thành một hàm, chạy 10 lần với linh kiện đặt lại.</li>
+</ol>
+
+<h2>6. Lời giải</h2>
+<h3>Bước 1. Mặt khay</h3>
+<pre><code class="language-python">def cao_so_voi_khay(bd):
+    """Fit mặt khay (điểm thấp hơn 0,5 mm) bằng mặt phẳng, trả về chiều cao so với khay và lưới tọa độ."""
+    yy, xx = np.mgrid[0:bd.shape[0], 0:bd.shape[1]]
+    X, Y = xx * SX, yy * DY
+    m = bd &lt; 0.5                                                   # NaN so sánh luôn False: tự bị loại
+    A = np.c_[X[m], Y[m], np.ones(m.sum())]
+    he_so, *_ = np.linalg.lstsq(A, bd[m], rcond=None)
+    return bd - (he_so[0] * X + he_so[1] * Y + he_so[2]), X, Y, he_so
+
+
+h, X, Y, khay = cao_so_voi_khay(ban_do)
+print(f"mặt khay: nghiêng {1000 * khay[0]:+.2f} µm/mm theo x, {1000 * khay[1]:+.2f} µm/mm theo y")</code></pre>
+<pre><code class="language-text">mặt khay: nghiêng +4.00 µm/mm theo x, -3.00 µm/mm theo y</code></pre>
+<p>Độ nghiêng tìm được đúng giá trị đã cài (+4 và −3 µm/mm). Trên 10 mm thân linh kiện, nghiêng 4 µm/mm là 40 µm, gần một nửa dung sai: không bù là hỏng phép đo.</p>
+
+<h3>Bước 2. Tìm chân và đo chiều cao từng chân</h3>
+<pre><code class="language-python">def tim_chan(h, X, Y, nguong=0.8, dien_tich=(200, 5000)):
+    """Tách mọi thứ cao hơn khay (ngưỡng thấp), giữ vùng có diện tích cỡ một chân (loại thân linh kiện, nhiễu),
+    đo chiều cao bền nhiễu bằng trung vị phần lõi của vùng."""
+    mn = np.nan_to_num(h, nan=-1.0) &gt; nguong                       # NaN thành −1: không bao giờ là chân
+    so, nhan, st, _ = cv2.connectedComponentsWithStats(mn.astype(np.uint8))
+    chan = []
+    for k in range(1, so):
+        if not dien_tich[0] &lt;= st[k, cv2.CC_STAT_AREA] &lt;= dien_tich[1]:
+            continue
+        vung = cv2.erode((nhan == k).astype(np.uint8), np.ones((5, 5), np.uint8)).astype(bool)   # bỏ mép 2 px
+        gt = h[vung]
+        gt = gt[~np.isnan(gt)]
+        chan.append((X[vung].mean(), Y[vung].mean(), np.median(gt), len(gt)))
+    chan = np.array(chan)
+    # đánh số như SOIC: hàng y nhỏ trái → phải là 1–8, hàng y lớn phải → trái là 9–16
+    duoi = chan[chan[:, 1] &lt; np.median(chan[:, 1])]
+    tren = chan[chan[:, 1] &gt;= np.median(chan[:, 1])]
+    return np.r_[duoi[np.argsort(duoi[:, 0])], tren[np.argsort(-tren[:, 0])]]
+
+
+print("ngưỡng sát danh định (1,56 mm):", len(tim_chan(h, X, Y, nguong=DAY_THAN + 0.06)), "chân")
+chan = tim_chan(h, X, Y)
+print(f"ngưỡng thấp + lọc diện tích: {len(chan)} chân; số điểm đo mỗi chân {int(chan[:, 3].min())}–{int(chan[:, 3].max())}")
+for i in (0, 4, 5, 6, 15):
+    print(f"  chân {i + 1:2d}: tâm ({chan[i, 0]:.2f}, {chan[i, 1]:.2f}) mm, cao {chan[i, 2]:.4f} mm")
+print(f"sai số chiều cao chân so với thật: lớn nhất {1000 * np.abs(chan[:, 2] - CAO_THAT).max():.1f} µm")</code></pre>
+<pre><code class="language-text">ngưỡng sát danh định (1,56 mm): 15 chân
+ngưỡng thấp + lọc diện tích: 16 chân; số điểm đo mỗi chân 506–529
+  chân  1: tâm (1.55, 0.99) mm, cao 1.6508 mm
+  chân  5: tâm (6.64, 0.99) mm, cao 1.6607 mm
+  chân  6: tâm (7.91, 0.99) mm, cao 1.5366 mm
+  chân  7: tâm (9.18, 0.99) mm, cao 1.6480 mm
+  chân 16: tâm (1.55, 6.21) mm, cao 1.6492 mm
+sai số chiều cao chân so với thật: lớn nhất 0.8 µm</code></pre>
+<p>Dòng đầu là cái bẫy chính của dự án: phân ngưỡng sát chiều cao danh định (1,56 mm, "chỉ lấy những gì cao hơn đáy thân") chỉ tìm được 15 chân, vì chân 6 bị vênh xuống còn khoảng 1,53 mm. Chân lỗi biến mất khỏi phép đo, và nếu phần mềm không kiểm tra số chân, linh kiện có thể được phán OK dựa trên 15 chân tốt. Ngưỡng thấp kèm lọc theo diện tích tìm đủ 16 chân; chiều cao từng chân (trung vị của khoảng 500 điểm) sai dưới 1 µm so với giá trị thật.</p>
+
+<h3>Bước 3. Mặt ngồi và độ đồng phẳng</h3>
+<p>Khi đặt lên PCB, linh kiện nằm trên ba chân "nhô xa nhất" sao cho trọng tâm rơi vào trong tam giác của ba chân đó, nếu không nó sẽ lật sang ba chân khác. Đó chính là định nghĩa mặt ngồi (seating plane) của JEDEC; độ đồng phẳng của từng chân là khoảng cách từ nó tới mặt ngồi, của linh kiện là giá trị lớn nhất. Với 16 chân chỉ có 560 bộ ba, thử hết là đủ nhanh.</p>
+<pre><code class="language-python">def trong_tam_giac(p, a, b, c):
+    """Điểm p (2D) có nằm trong tam giác abc không (kể cả trên cạnh)?"""
+    def cheo(o, u, v):
+        return (u[0] - o[0]) * (v[1] - o[1]) - (u[1] - o[1]) * (v[0] - o[0])
+    d1, d2, d3 = cheo(a, b, p), cheo(b, c, p), cheo(c, a, p)
+    return not ((min(d1, d2, d3) &lt; 0) and (max(d1, d2, d3) &gt; 0))
+
+
+def mat_ngoi(chan, trong_tam, sai_so=1e-4):
+    """Mặt phẳng đỡ (seating plane): đi qua 3 chân, mọi chân khác không vượt quá nó (linh kiện lật ngửa nên
+    'vượt' là cao hơn), tam giác 3 chân chứa hình chiếu trọng tâm. Trả về (3 chỉ số chân, khoảng cách từng chân)."""
+    P = chan[:, :3]
+    for bo in itertools.combinations(range(len(P)), 3):
+        a, b, c = P[list(bo)]
+        n = np.cross(b - a, c - a)
+        if abs(n[2]) &lt; 1e-12:
+            continue
+        n = n / np.linalg.norm(n) * np.sign(n[2])                 # pháp tuyến hướng lên
+        kc = (a - P) @ n                                          # ≥ 0: chân nằm dưới mặt phẳng
+        if kc.min() &gt;= -sai_so and trong_tam_giac(trong_tam, a[:2], b[:2], c[:2]):
+            return bo, kc
+    return None, None
+
+
+than = (np.nan_to_num(h, nan=-1) &gt; 1.3) &amp; (np.nan_to_num(h, nan=-1) &lt; 1.58)      # đáy thân: lấy trọng tâm hình chiếu
+trong_tam = (X[than].mean(), Y[than].mean())
+bo3, kc = mat_ngoi(chan, trong_tam)
+print(f"trọng tâm thân ({trong_tam[0]:.2f}, {trong_tam[1]:.2f}) mm; mặt ngồi đi qua chân {[i + 1 for i in bo3]}")
+print("khoảng cách từng chân tới mặt ngồi (µm):", np.round(1000 * kc).astype(int).tolist())
+DUNG_SAI_DP = 0.100
+dong_phang = kc.max()
+print(f"độ đồng phẳng = {1000 * dong_phang:.1f} µm (chân {kc.argmax() + 1}) → "
+      f"{'OK' if dong_phang &lt;= DUNG_SAI_DP else 'NG'} (yêu cầu ≤ {1000 * DUNG_SAI_DP:.0f} µm)")
+
+# so sánh: mặt phẳng hồi quy (bình phương tối thiểu qua 16 chân)
+A = np.c_[chan[:, 0], chan[:, 1], np.ones(len(chan))]
+hs, *_ = np.linalg.lstsq(A, chan[:, 2], rcond=None)
+du = chan[:, 2] - A @ hs
+print(f"mặt phẳng hồi quy: chân lệch xa nhất {1000 * np.abs(du).max():.1f} µm (chân {np.abs(du).argmax() + 1}), "
+      f"chênh cao nhất − thấp nhất {1000 * (du.max() - du.min()):.1f} µm")</code></pre>
+<pre><code class="language-text">trọng tâm thân (6.02, 3.58) mm; mặt ngồi đi qua chân [5, 11, 15]
+khoảng cách từng chân tới mặt ngồi (µm): [7, 12, 11, 25, 0, 125, 14, 8, 6, 10, 0, 7, 7, 8, 0, 3]
+độ đồng phẳng = 124.8 µm (chân 6) → NG (yêu cầu ≤ 100 µm)
+mặt phẳng hồi quy: chân lệch xa nhất 96.1 µm (chân 6), chênh cao nhất − thấp nhất 122.5 µm</code></pre>
+<ul>
+  <li>Mặt ngồi đi qua ba chân ở cả hai hàng, tam giác của chúng chứa trọng tâm thân; ba chân đó có khoảng cách 0, mọi chân khác dương.</li>
+  <li>Chân 6 cách mặt ngồi khoảng 125 µm, vượt yêu cầu 100 µm: <strong>NG</strong>, đúng lỗi đã cài.</li>
+  <li><strong>Mặt phẳng hồi quy cho kết luận ngược lại</strong>: fit bình phương tối thiểu qua cả 16 chân thì chân vênh kéo mặt phẳng về phía nó, và độ lệch lớn nhất chỉ còn khoảng 96 µm, tức là "OK" với cùng ngưỡng 100 µm. Mặt phẳng hồi quy mô tả hình dạng trung bình của các chân, không mô tả cách linh kiện thực sự nằm trên PCB. Bản sửa đổi JESD22-B108A có thêm phương pháp mặt phẳng hồi quy cho mục đích khác (ước lượng hành vi khi hàn reflow), nên đặc tả phải ghi rõ phương pháp; nếu không, nhà cung cấp và nhà máy sẽ có hai kết luận khác nhau cho cùng một linh kiện.</li>
+</ul>
+
+<h3>Bước 4. Độ lặp lại</h3>
+<pre><code class="language-python">def do_dong_phang(bd):
+    """Cả quy trình cho một lần quét: khay → chân → mặt ngồi → độ đồng phẳng (mm), chân tệ nhất."""
+    h_, X_, Y_, _ = cao_so_voi_khay(bd)
+    ch = tim_chan(h_, X_, Y_)
+    if len(ch) != 16:
+        return np.nan, -1                                        # thiếu chân: trạm phải báo lỗi, không phán OK
+    th = (np.nan_to_num(h_, nan=-1) &gt; 1.3) &amp; (np.nan_to_num(h_, nan=-1) &lt; 1.58)
+    _, k = mat_ngoi(ch, (X_[th].mean(), Y_[th].mean()))
+    return k.max(), int(k.argmax()) + 1
+
+
+rng_l = np.random.default_rng(10)
+CAO_TOT = CHAN_DN + rng_l.normal(0, 0.006, 16)                    # một linh kiện tốt để so sánh
+for ten, cao in (("linh kiện có chân 6 vênh", CAO_THAT), ("linh kiện tốt", CAO_TOT)):
+    kq = []
+    for lan in range(10):                                         # 10 lần nhấc ra, đặt lại khay, quét lại
+        dx, dy = rng_l.uniform(-0.15, 0.15, 2)
+        ng = (rng_l.uniform(0.002, 0.006), rng_l.uniform(-0.005, 0.0))
+        kq.append(do_dong_phang(quet(rng_l, cao, dx, dy, ng)))
+    dp = np.array([k[0] for k in kq])
+    print(f"{ten:25s}: TB {1000 * dp.mean():6.1f} µm, σ {1000 * dp.std(ddof=1):.2f} µm, "
+          f"6σ/dung sai {100 * 6 * dp.std(ddof=1) / DUNG_SAI_DP:.1f}%, chân tệ nhất {sorted({k[1] for k in kq})}, "
+          f"kết luận {sorted({'OK' if v &lt;= DUNG_SAI_DP else 'NG' for v in dp})}")</code></pre>
+<pre><code class="language-text">linh kiện có chân 6 vênh : TB  124.6 µm, σ 0.57 µm, 6σ/dung sai 3.4%, chân tệ nhất [6], kết luận ['NG']
+linh kiện tốt            : TB    7.8 µm, σ 0.48 µm, 6σ/dung sai 2.9%, chân tệ nhất [10, 11], kết luận ['OK']</code></pre>
+<p>Cả 10 lần, linh kiện lỗi đều NG ở chân 6 và linh kiện tốt đều OK; độ lệch chuẩn của độ đồng phẳng dưới 1 µm, 6σ chỉ khoảng 3% dung sai. Con số này <strong>lạc quan</strong>: mô phỏng không có nhám bề mặt và lớp mạ của chân, phản xạ gương trên thiếc, rung khay, sai số hiệu chuẩn của profiler. Trên trạm thật, hãy chạy đúng nghiên cứu này với linh kiện thật (cả loại có chân sát giới hạn) trước khi tin vào trạm; độ lặp lại vài µm đến chục µm là mức thường gặp, vẫn đủ cho dung sai 100 µm nếu chiếu sáng và góc laser hợp lý.</p>
+
+<h2>7. Tự đánh giá</h2>
+<ul>
+  <li>Phần mềm của bạn có báo lỗi (không phải OK) khi chỉ tìm được 15 chân không? Thử bằng cách xóa một chân khỏi bản đồ chiều cao (gán NaN).</li>
+  <li>Đổi chân vênh sang chân 1 (ở góc): mặt ngồi đổi sang bộ ba nào, độ đồng phẳng còn đúng không?</li>
+  <li>Cho chân 6 <em>cao hơn</em> các chân khác 0,12 mm (vênh xuống, linh kiện sẽ bập bênh): kết quả theo mặt ngồi và theo mặt phẳng hồi quy thay đổi thế nào?</li>
+  <li>Tăng nghiêng khay lên 20 µm/mm và đặt linh kiện lệch 0,5 mm: chương trình còn chạy đúng không?</li>
+</ul>
+
+<h2>8. Mở rộng</h2>
+<ul>
+  <li><strong>Đo thêm</strong>: khoảng cách chân (pitch) và độ lệch ngang từng chân từ tâm vùng; chiều dài chân, độ lệch giữa hai hàng (lead span).</li>
+  <li><strong>Hai phía</strong>: chân sát thân dễ bị khuất; thêm camera thứ hai nhìn từ phía đối diện và ghép hai bản đồ.</li>
+  <li><strong>Linh kiện BGA</strong>: thay chân bằng bi hàn; chiều cao bi đo bằng fit chỏm cầu (như đỉnh chỏm cầu ở bài laser tam giác) thay vì trung vị mặt phẳng.</li>
+  <li><strong>Đưa vào trạm</strong>: gói thành hàm trả về kết quả có cấu trúc, ghi SQLite, gửi OK/NG cho PLC như chặng PLC / Robot / MES.</li>
+</ul>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Bản đồ chiều cao → bù nghiêng bằng mặt khay fit → tách chân bằng ngưỡng thấp + diện tích → chiều cao bền nhiễu bằng trung vị lõi vùng.</li>
+  <li>Không tìm đối tượng lỗi bằng ngưỡng sát giá trị danh định: chính đối tượng lỗi sẽ biến mất. Luôn kiểm tra số đối tượng tìm được.</li>
+  <li>Mặt ngồi JEDEC: ba chân đỡ có tam giác chứa trọng tâm; độ đồng phẳng là khoảng cách lớn nhất tới mặt ngồi. Mặt phẳng hồi quy có thể đổi kết luận sát giới hạn; đặc tả phải ghi phương pháp.</li>
+  <li>Độ lặp lại trong mô phỏng là cận dưới; kiểm chứng lại bằng nghiên cứu MSA trên linh kiện thật.</li>
+</ul>
+<p>Chặng tiếp theo: <a href="../hoc/tich-hop-1-io-so-va-handshake-plc.html">PLC / Robot / MES</a>, bắt đầu với bài I/O số và handshake với PLC, để đưa kết quả của các trạm đo 2D và 3D tới dây chuyền.</p>
+
+<p class="note">Nguồn tham khảo: JEDEC JESD22-B108 / JESD22-B108A, <em>Coplanarity Test for Surface-Mount Semiconductor Devices</em> (định nghĩa mặt ngồi và độ đồng phẳng); <a href="https://patents.google.com/patent/US6713311" rel="noopener" target="_blank">US6713311B2 (mô tả phương pháp mặt ngồi theo JEDEC)</a>; <a href="https://docs.at-sensors.com/products3d/concepts-and-features/fundamentals/measuring-principle.html" rel="noopener" target="_blank">AT Sensors: Measuring principle (laser triangulation)</a>.</p>

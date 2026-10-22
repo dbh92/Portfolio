@@ -239,8 +239,41 @@ OK ST1_000003_OK.png</code></pre>
 <div class="ex">
 <h3>Bài 3. Kiểm tra cấu hình đầy đủ hơn</h3>
 <p>Mở rộng hàm <code>doc_cau_hinh</code>: báo lỗi nếu <code>roi</code> không có đúng 4 số, hoặc chiều rộng/cao của ROI (phần tử thứ 3, 4) không dương. Thử với file JSON sai để thấy thông báo lỗi.</p>
-<details><summary>Gợi ý</summary>
-<p>Thêm sau dòng kiểm tra ngưỡng: <code>if len(cau_hinh["roi"]) != 4 or cau_hinh["roi"][2] &lt;= 0 or cau_hinh["roi"][3] &lt;= 0: raise ValueError(...)</code>. Tạo file sai bằng <code>Path("sai.json").write_text('{"roi": [1, 2, 3]}')</code>.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">def doc_cau_hinh(duong_dan: str | Path) -&gt; dict:
+    """Như ở mục 4, thêm kiểm tra roi: đúng 4 số, rộng và cao dương."""
+    duong_dan = Path(duong_dan)
+    cau_hinh = dict(MAC_DINH)
+    if not duong_dan.exists():
+        duong_dan.write_text(json.dumps(MAC_DINH, indent=2, ensure_ascii=False), encoding="utf-8")
+        return cau_hinh
+    try:
+        cau_hinh.update(json.loads(duong_dan.read_text(encoding="utf-8")))
+    except json.JSONDecodeError as loi:
+        raise ValueError(f"File {duong_dan} sai cú pháp JSON: {loi}") from loi
+    if not 0 &lt;= cau_hinh["nguong"] &lt;= 255:
+        raise ValueError("nguong phải trong khoảng 0–255")
+    roi = cau_hinh["roi"]
+    if not (isinstance(roi, list) and len(roi) == 4 and all(isinstance(v, (int, float)) for v in roi)):
+        raise ValueError(f"roi phải là list 4 số [x, y, rộng, cao], nhận {roi}")
+    if roi[2] &lt;= 0 or roi[3] &lt;= 0:
+        raise ValueError(f"rộng và cao của roi phải dương, nhận {roi[2]}×{roi[3]}")
+    return cau_hinh
+
+
+for noi_dung in ('{"roi": [1, 2, 3]}', '{"roi": [10, 10, 0, 50]}', '{"roi": "100,80,400,300"}', '{"roi": [10, 10, 200, 100]}'):
+    Path("thu.json").write_text(noi_dung, encoding="utf-8")
+    try:
+        print("hợp lệ, roi =", doc_cau_hinh("thu.json")["roi"])
+    except ValueError as loi:
+        print("Cấu hình sai:", loi)</code></pre>
+<pre><code class="language-text">Cấu hình sai: roi phải là list 4 số [x, y, rộng, cao], nhận [1, 2, 3]
+Cấu hình sai: rộng và cao của roi phải dương, nhận 0×50
+Cấu hình sai: roi phải là list 4 số [x, y, rộng, cao], nhận 100,80,400,300
+hợp lệ, roi = [10, 10, 200, 100]</code></pre>
+<p>Ba file sai đều bị chặn với thông báo nói rõ sai ở đâu, kể cả trường hợp người vận hành gõ ROI thành một chuỗi. Kiểm tra <code>isinstance</code> trước <code>len</code> là cần thiết: chuỗi <code>"100,80,400,300"</code> cũng có <code>len</code>, và nếu không kiểm tra kiểu thì lỗi sẽ chỉ hiện ra muộn hơn, ở chỗ cắt ảnh theo ROI.</p>
 </details>
 </div>
-<p>Bài tiếp theo: bạn sẽ tạo <strong>môi trường ảo</strong> và cài thư viện bằng pip, chuẩn bị cho NumPy và OpenCV.</p>
+<p>Bài tiếp theo: <a href="python-7-class-dataclass-to-chuc-code.html">Class và dataclass: tổ chức code cho trạm kiểm tra</a>, gói dữ liệu và hàm thành các khối rõ ràng trước khi chương trình lớn dần.</p>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/tutorial/inputoutput.html" rel="noopener" target="_blank">Python Tutorial: Input and Output</a>; <a href="https://docs.python.org/3/tutorial/errors.html" rel="noopener" target="_blank">Python Tutorial: Errors and Exceptions</a>; <a href="https://docs.python.org/3/library/pathlib.html" rel="noopener" target="_blank">Python: pathlib</a>; <a href="https://docs.python.org/3/library/json.html" rel="noopener" target="_blank">Python: json</a>.</p>

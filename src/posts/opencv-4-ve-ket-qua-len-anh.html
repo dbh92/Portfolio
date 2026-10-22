@@ -156,8 +156,31 @@ print(ve_kich_thuoc(anh, (100, 200), (500, 200), 0.05))</code></pre>
 <div class="ex">
 <h3>Bài 2. Lưới ô có kết quả</h3>
 <p>Chia ảnh 600×400 thành 3×2 ô. Ngẫu nhiên (seed 1) đánh một ô là NG. Vẽ khung từng ô màu theo kết quả và tô bán trong suốt ô NG.</p>
-<details><summary>Gợi ý</summary>
-<p>Dùng hai vòng lặp như bài ROI để có tọa độ ô; tạo mặt nạ cho ô NG bằng <code>cv2.rectangle(mat_na, ..., 255, -1)</code> rồi gọi <code>to_ban_trong</code>. Vẽ khung các ô sau khi tô để viền không bị mờ.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">rng = np.random.default_rng(1)
+so_hang, so_cot = 2, 3
+anh = np.full((400, 600, 3), 150, np.uint8)
+h, w = 400 // so_hang, 600 // so_cot
+o_ng = int(rng.integers(0, so_hang * so_cot))          # chỉ số ô NG, đánh từ 0 theo hàng
+hang_ng, cot_ng = divmod(o_ng, so_cot)
+
+mat_na = np.zeros(anh.shape[:2], np.uint8)
+cv2.rectangle(mat_na, (cot_ng * w, hang_ng * h), ((cot_ng + 1) * w - 1, (hang_ng + 1) * h - 1), 255, -1)
+anh = to_ban_trong(anh, mat_na)                        # tô trước
+
+for i in range(so_hang * so_cot):                      # vẽ khung và chữ sau, để không bị lớp tô làm mờ
+    r, c = divmod(i, so_cot)
+    ng = i == o_ng
+    mau = (0, 0, 255) if ng else (0, 200, 0)
+    cv2.rectangle(anh, (c * w + 3, r * h + 3), ((c + 1) * w - 4, (r + 1) * h - 4), mau, 3)
+    cv2.putText(anh, f"O{i + 1} {'NG' if ng else 'OK'}", (c * w + 14, r * h + 38),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.9, mau, 2, cv2.LINE_AA)
+cv2.imwrite("luoi_o.png", anh)
+print(f"ô NG: số {o_ng + 1} (hàng {hang_ng + 1}, cột {cot_ng + 1})")
+print("màu giữa ô NG:", anh[hang_ng * h + h // 2, cot_ng * w + w // 2], "| giữa ô 1:", anh[h // 2, w // 2])</code></pre>
+<pre><code class="language-text">ô NG: số 3 (hàng 1, cột 3)
+màu giữa ô NG: [ 90  90 192] | giữa ô 1: [150 150 150]</code></pre>
+<p>Giữa ô NG có kênh đỏ cao hơn hẳn (lớp đỏ bán trong suốt), các ô OK giữ nguyên màu nền 150. <code>divmod(i, so_cot)</code> đổi chỉ số ô sang (hàng, cột), tiện hơn hai vòng lặp lồng nhau khi cần biết ô nào là ô thứ mấy, ví dụ để ghi "ô 5 NG" vào log hoặc gửi cho PLC.</p>
 </details>
 </div>
 <div class="ex">
@@ -176,3 +199,5 @@ def viet_chu_viet(anh_bgr, chu, xy, co_chu=24, mau_bgr=(255, 255, 255), font_pat
 <p>Cách này chậm hơn <code>putText</code> vài lần, nên chỉ dùng cho ảnh báo cáo, không dùng trong vòng lặp camera tốc độ cao.</p>
 </details>
 </div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.opencv.org/4.x/dc/da5/tutorial_py_drawing_functions.html" rel="noopener" target="_blank">OpenCV: Drawing Functions</a>.</p>

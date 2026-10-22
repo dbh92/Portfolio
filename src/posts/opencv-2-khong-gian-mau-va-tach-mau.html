@@ -176,7 +176,48 @@ Dây 3 cần xanh_duong: 1.00 → OK</code></pre>
 <div class="ex">
 <h3>Bài 3. Công cụ chọn ngưỡng bằng thanh trượt</h3>
 <p>Với ảnh của bạn (hoặc ảnh webcam), tạo cửa sổ có 6 thanh trượt <code>cv2.createTrackbar</code> cho H, S, V thấp và cao, hiển thị mặt nạ theo thời gian thực. Đây là công cụ bạn sẽ dùng lại nhiều lần khi cài đặt trạm thật.</p>
-<details><summary>Gợi ý</summary>
-<p>Tạo cửa sổ bằng <code>cv2.namedWindow("chinh")</code>, mỗi thanh trượt <code>cv2.createTrackbar("H thap", "chinh", 0, 179, lambda v: None)</code>. Trong vòng lặp <code>while True</code>, đọc giá trị bằng <code>cv2.getTrackbarPos</code>, gọi <code>inRange</code>, <code>imshow</code> mặt nạ và thoát khi <code>cv2.waitKey(30) == ord("q")</code>. In ra khoảng cuối cùng để chép vào file cấu hình.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python"># (minh họa) cần màn hình; chạy: python chinh_hsv.py anh.png  (không có tham số thì dùng webcam)
+import json
+import sys
+
+import cv2
+import numpy as np
+
+nguon = sys.argv[1] if len(sys.argv) &gt; 1 else None
+cap = None if nguon else cv2.VideoCapture(0)
+anh_tinh = cv2.imread(nguon) if nguon else None
+if nguon and anh_tinh is None:
+    sys.exit(f"Không đọc được {nguon}")
+
+cv2.namedWindow("chinh")
+THANH = [("H thap", 0, 179), ("H cao", 179, 179), ("S thap", 0, 255), ("S cao", 255, 255),
+         ("V thap", 0, 255), ("V cao", 255, 255)]                 # (tên, giá trị ban đầu, giá trị lớn nhất)
+for ten, ban_dau, lon_nhat in THANH:
+    cv2.createTrackbar(ten, "chinh", ban_dau, lon_nhat, lambda v: None)
+
+while True:
+    if cap is not None:
+        ok, anh = cap.read()
+        if not ok:
+            break
+    else:
+        anh = anh_tinh
+    h1, h2, s1, s2, v1, v2 = (cv2.getTrackbarPos(ten, "chinh") for ten, _, _ in THANH)
+    hsv = cv2.cvtColor(anh, cv2.COLOR_BGR2HSV)
+    mat_na = cv2.inRange(hsv, np.array([h1, s1, v1]), np.array([h2, s2, v2]))
+    ghep = np.hstack([anh, cv2.cvtColor(mat_na, cv2.COLOR_GRAY2BGR)])
+    cv2.putText(ghep, f"pixel chon: {np.count_nonzero(mat_na)}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+    cv2.imshow("chinh", ghep)
+    if cv2.waitKey(30) &amp; 0xFF == ord("q"):
+        break
+
+print(json.dumps({"hsv_thap": [h1, s1, v1], "hsv_cao": [h2, s2, v2]}))   # chép vào file cấu hình
+if cap is not None:
+    cap.release()
+cv2.destroyAllWindows()</code></pre>
+<p>Cách dùng: kéo "S thấp" lên để bỏ vùng xám, thu hẹp H quanh màu cần tách, rồi kéo "V thấp" lên để bỏ bóng tối; bấm <code>q</code> để in khoảng HSV dạng JSON. Ảnh và mặt nạ đặt cạnh nhau giúp thấy ngay pixel nào bị chọn nhầm. Hai lưu ý: H trong OpenCV chỉ chạy 0 đến 179, và màu đỏ nằm ở cả hai đầu dải H nên cần hai khoảng (mục 5 của bài); hãy chỉnh trên ảnh chụp bằng đúng camera, đúng đèn của trạm, vì khoảng HSV chọn trên ảnh điện thoại sẽ không dùng được.</p>
 </details>
 </div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.opencv.org/4.x/df/d9d/tutorial_py_colorspaces.html" rel="noopener" target="_blank">OpenCV: Changing Colorspaces</a>.</p>

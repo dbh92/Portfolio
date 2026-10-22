@@ -149,27 +149,297 @@ FAILED test_xu_ly.py::test_danh_gia_theo_nguong[0.02-OK] - AssertionError: as...
   <li><strong>Ảnh tổng hợp có đáp án biết trước</strong>: vẽ một hình tròn đặc bán kính 20 rồi kiểm tra số pixel trắng xấp xỉ π·20² ≈ 1257. Lưu ý <code>cv2.contourArea</code> đo theo đường viền nên cho số nhỏ hơn (khoảng 1200), vì vậy hãy ghi rõ test đo theo cách nào. Không cần ảnh thật.</li>
   <li><strong>Đầu vào sai</strong>: ảnh rỗng, ảnh màu khi cần ảnh xám, ROI ngoài biên. Hàm nên báo lỗi rõ ràng thay vì trả kết quả vô nghĩa.</li>
   <li><strong>Giá trị ngưỡng</strong>: đúng tại ngưỡng, ngay trên và ngay dưới ngưỡng.</li>
-  <li><strong>Ảnh hồi quy (regression)</strong>: giữ vài ảnh thật từng gây lỗi trong thư mục <code>tests/data/</code> kèm kết quả mong đợi. Mỗi lần sửa thuật toán, chạy lại để chắc không "sửa chỗ này hỏng chỗ kia".</li>
+  <li><strong>Ảnh hồi quy (regression)</strong>: giữ vài ảnh thật từng gây lỗi trong thư mục <code>tests/data/</code> kèm kết quả mong đợi. Mỗi lần sửa thuật toán, chạy lại để chắc không "sửa chỗ này hỏng chỗ kia" (làm cụ thể ở mục test hồi quy bên dưới).</li>
 </ol>
 <div class="warn"><strong>Đừng so sánh số thực bằng ==</strong>Kết quả như độ tròn, góc, kích thước mm gần như luôn có sai số làm tròn. Dùng <code>pytest.approx(gia_tri, abs=0.01)</code> hoặc <code>rel=1e-3</code> tùy độ chính xác bạn cần.</div>
 
+<h2>Test hàm OpenCV bằng ảnh tổng hợp có đáp án</h2>
+<p>Các hàm ở trên chỉ đếm pixel. Hàm đo thật trong trạm phức tạp hơn: phân ngưỡng Otsu, tìm vùng, đổi diện tích ra đường kính. Muốn test nó, ta cần ảnh mà <strong>đáp án đã biết chính xác</strong>. Thêm vào <code>xu_ly.py</code> hai hàm: <code>do_duong_kinh</code> đo đường kính (px) của vật tối lớn nhất, và <code>luu_anh_ng</code> lưu ảnh NG vào thư mục theo ngày.</p>
+<pre><code class="language-python">import math
+from pathlib import Path
+
+import cv2
+
+
+def do_duong_kinh(anh_xam):
+    """Đường kính (px) của vật tối lớn nhất trên nền sáng, suy từ diện tích (đường kính tròn tương đương)."""
+    if anh_xam.ndim != 2:
+        raise ValueError("Cần ảnh xám 2 chiều")
+    _, nhi_phan = cv2.threshold(anh_xam, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    n, _, stats, _ = cv2.connectedComponentsWithStats(nhi_phan)
+    if n &lt; 2:
+        raise ValueError("Không tìm thấy vật")
+    dien_tich = stats[1:, cv2.CC_STAT_AREA].max()
+    return 2 * math.sqrt(dien_tich / math.pi)
+
+
+def luu_anh_ng(anh, thu_muc, ma_sp):
+    """Lưu ảnh NG thành &lt;thu_muc&gt;/NG_&lt;ma_sp&gt;.png, tạo thư mục nếu chưa có; trả về đường dẫn."""
+    thu_muc = Path(thu_muc)
+    thu_muc.mkdir(parents=True, exist_ok=True)
+    duong_dan = thu_muc / f"NG_{ma_sp}.png"
+    if not cv2.imwrite(str(duong_dan), anh):
+        raise OSError(f"Không ghi được {duong_dan}")
+    return duong_dan</code></pre>
+<p>Nhiều file test cần cùng một kiểu ảnh thử, nên ta đặt fixture vào <code>tests/conftest.py</code>: pytest tự nạp file này cho mọi test trong thư mục, không cần <code>import</code>. Fixture ở đây là một <strong>"nhà máy"</strong>: nó trả về một <em>hàm</em> để mỗi test tự vẽ đĩa với bán kính, độ sáng, độ nhiễu mình cần. Biên đĩa được vẽ chính xác dưới pixel (mỗi pixel biên nhận tỉ lệ diện tích nằm trong đĩa), giống cách các bài chặng Calibration tạo ảnh thử, nên đường kính thật đúng bằng 2r.</p>
+<pre><code class="language-python"># tests/conftest.py
+import numpy as np
+import pytest
+
+
+@pytest.fixture
+def ve_dia_tron():
+    """Fixture 'nhà máy': trả về một hàm vẽ đĩa tối bán kính r (px, số thực) trên nền sáng, biên chính xác dưới pixel."""
+    def _ve(r, cao=200, rong=200, nen=200, vat=40, nhieu=0.0, hat=0):
+        yy, xx = np.mgrid[0:cao, 0:rong]
+        phu = np.clip(r + 0.5 - np.hypot(xx - rong / 2, yy - cao / 2), 0, 1)   # tỉ lệ diện tích pixel nằm trong đĩa
+        anh = nen - (nen - vat) * phu
+        if nhieu:
+            anh = anh + np.random.default_rng(hat).normal(0, nhieu, anh.shape)
+        return np.clip(np.round(anh), 0, 255).astype(np.uint8)
+    return _ve</code></pre>
+<pre><code class="language-python"># tests/test_do_luong.py
+import cv2
+import numpy as np
+import pytest
+
+from xu_ly import do_duong_kinh, luu_anh_ng
+
+
+@pytest.mark.parametrize("r", [10.0, 20.5, 35.25])
+def test_duong_kinh_dung_trong_0_3_px(ve_dia_tron, r):
+    assert do_duong_kinh(ve_dia_tron(r)) == pytest.approx(2 * r, abs=0.3)
+
+
+@pytest.mark.parametrize("hat", range(5))
+def test_nhieu_khong_lam_lech_qua_0_5_px(ve_dia_tron, hat):
+    assert do_duong_kinh(ve_dia_tron(20.0, nhieu=8.0, hat=hat)) == pytest.approx(40.0, abs=0.5)
+
+
+@pytest.mark.parametrize("nen, vat", [(200, 40), (150, 60), (240, 120)])
+def test_khong_phu_thuoc_do_sang(ve_dia_tron, nen, vat):
+    assert do_duong_kinh(ve_dia_tron(20.0, nen=nen, vat=vat)) == pytest.approx(40.0, abs=0.3)
+
+
+def test_anh_trong_bao_loi():
+    with pytest.raises(ValueError, match="Không tìm thấy vật"):
+        do_duong_kinh(np.full((100, 100), 200, np.uint8))
+
+
+def test_luu_anh_ng_tao_thu_muc_va_doc_lai_duoc(tmp_path, ve_dia_tron):
+    anh = ve_dia_tron(15.0)
+    duong_dan = luu_anh_ng(anh, tmp_path / "ng" / "2026-10-21", "SP0042")
+    assert duong_dan.name == "NG_SP0042.png"
+    doc_lai = cv2.imread(str(duong_dan), cv2.IMREAD_GRAYSCALE)
+    assert np.array_equal(doc_lai, anh)            # PNG không mất dữ liệu: đọc lại phải giống hệt</code></pre>
+<pre><code class="language-text">$ pytest -v tests/test_do_luong.py
+tests/test_do_luong.py::test_duong_kinh_dung_trong_0_3_px[10.0] PASSED   [  7%]
+tests/test_do_luong.py::test_duong_kinh_dung_trong_0_3_px[20.5] PASSED   [ 15%]
+tests/test_do_luong.py::test_duong_kinh_dung_trong_0_3_px[35.25] PASSED  [ 23%]
+tests/test_do_luong.py::test_nhieu_khong_lam_lech_qua_0_5_px[0] PASSED   [ 30%]
+tests/test_do_luong.py::test_nhieu_khong_lam_lech_qua_0_5_px[1] PASSED   [ 38%]
+tests/test_do_luong.py::test_nhieu_khong_lam_lech_qua_0_5_px[2] PASSED   [ 46%]
+tests/test_do_luong.py::test_nhieu_khong_lam_lech_qua_0_5_px[3] PASSED   [ 53%]
+tests/test_do_luong.py::test_nhieu_khong_lam_lech_qua_0_5_px[4] PASSED   [ 61%]
+tests/test_do_luong.py::test_khong_phu_thuoc_do_sang[200-40] PASSED      [ 69%]
+tests/test_do_luong.py::test_khong_phu_thuoc_do_sang[150-60] PASSED      [ 76%]
+tests/test_do_luong.py::test_khong_phu_thuoc_do_sang[240-120] PASSED     [ 84%]
+tests/test_do_luong.py::test_anh_trong_bao_loi PASSED                    [ 92%]
+tests/test_do_luong.py::test_luu_anh_ng_tao_thu_muc_va_doc_lai_duoc PASSED [100%]
+============================= 13 passed in 0.13s ==============================</code></pre>
+<p>Ba điểm đáng chú ý trong bộ test này:</p>
+<ul>
+  <li><strong>Dung sai là một quyết định kỹ thuật</strong>, không phải con số cho test qua. Đo thực tế, hàm cho 20,09 px với r = 10 và 40,89 px với r = 20,5: lệch dưới 0,15 px. Dung sai 0,3 px chặt gấp đôi sai số hiện tại, nên một thay đổi làm thuật toán kém đi sẽ bị phát hiện, trong khi các thay đổi vô hại (đổi thứ tự phép tính, nâng cấp OpenCV) vẫn qua.</li>
+  <li><strong>Nhiễu có seed cố định</strong> (<code>hat</code>): test lặp lại y hệt mỗi lần chạy. Test có nhiễu ngẫu nhiên không seed sẽ lúc qua lúc trượt ("flaky"), và người ta sẽ nhanh chóng học cách lờ nó đi.</li>
+  <li><strong><code>tmp_path</code></strong> là fixture có sẵn của pytest: một thư mục tạm riêng cho từng test, tự dọn sau đó. Test hàm ghi file mà không làm bẩn ổ đĩa, không đụng tới thư mục ảnh NG thật của trạm.</li>
+</ul>
+
+<h2>Khi một "tối ưu" làm lệch kết quả</h2>
+<p>Một đồng nghiệp thấy Otsu "chậm" và thay bằng ngưỡng cố định 100, chạy thử vài ảnh trên trạm thấy vẫn ra số. Bộ test nói gì?</p>
+<pre><code class="language-python">_, nhi_phan = cv2.threshold(anh_xam, 100, 255, cv2.THRESH_BINARY_INV)   # "tối ưu": bỏ Otsu</code></pre>
+<pre><code class="language-text">$ pytest -q --tb=line tests/test_do_luong.py
+      comparison failed
+      Obtained: 39.686235861283144
+      Expected: 40.0 ± 0.3
+tests\test_do_luong.py:20: assert 39.686235861283144 == 40.0 ± 0.3
+E   ValueError: Không tìm thấy vật
+xu_ly.py:38: ValueError: Không tìm thấy vật
+=========================== short test summary info ===========================
+FAILED tests/test_do_luong.py::test_duong_kinh_dung_trong_0_3_px[10.0] - asse...
+FAILED tests/test_do_luong.py::test_khong_phu_thuoc_do_sang[200-40] - assert ...
+FAILED tests/test_do_luong.py::test_khong_phu_thuoc_do_sang[240-120] - ValueE...
+3 failed, 10 passed in 0.20s</code></pre>
+<p>Hai loại lỗi khác nhau bị bắt cùng lúc. Lỗi dễ thấy: khi nền 240 và vật 120, vật sáng hơn ngưỡng 100 nên "không tìm thấy vật" (đèn mới sáng hơn hoặc vật liệu nhạt hơn là chuyện thường ngày). Lỗi tinh vi hơn nhiều: với nền 200, vật 40, hàm vẫn ra số, nhưng ngưỡng 100 nằm lệch khỏi điểm giữa (120) nên biên bị "ăn" vào trong và đường kính hụt 0,31 px. Trên trạm, 0,3 px có thể là 6 µm, đủ để chi tiết sát giới hạn đổi từ NG sang OK. Không ai nhìn bằng mắt thấy được lỗi này; chỉ một test có dung sai mới thấy.</p>
+
+<h2>Test hồi quy trên bộ ảnh thật</h2>
+<p>Ảnh tổng hợp kiểm tra được hành vi lý tưởng; ảnh thật kiểm tra những gì xảy ra ngoài đời: nhiễu thật, vật lệch tâm, ánh sáng không đều. Bộ ảnh hồi quy là một thư mục nhỏ các ảnh thật (ảnh từng gây lỗi, ảnh sát ngưỡng, ảnh mỗi loại NG), kèm file kết quả đúng đã được QC xác nhận. Ở đây ta tạo 5 ảnh bằng script để bạn chạy được; ngoài thực tế, bạn chép ảnh từ trạm vào <code>tests/data/</code>. Đây chính là thư mục "ảnh vàng" ở bài tập của bài <a href="opencv-5-to-chuc-pipeline-xu-ly.html">tổ chức pipeline</a>, giờ được chạy tự động.</p>
+<pre><code class="language-python"># tao_du_lieu_hoi_quy.py: chạy một lần
+import json
+from pathlib import Path
+
+import cv2
+import numpy as np
+
+thu_muc = Path("tests/data")
+thu_muc.mkdir(parents=True, exist_ok=True)
+rng = np.random.default_rng(42)
+yy, xx = np.mgrid[0:120, 0:120]
+ky_vong = {}
+for i, (r, sang) in enumerate([(18.0, 200), (18.4, 170), (19.6, 230), (20.3, 185), (17.2, 210)]):
+    phu = np.clip(r + 0.5 - np.hypot(xx - 60 - rng.uniform(-5, 5), yy - 60 - rng.uniform(-5, 5)), 0, 1)
+    anh = np.clip(np.round(sang - (sang - 50) * phu + rng.normal(0, 4, phu.shape)), 0, 255).astype(np.uint8)
+    ten = f"chot_{i:02d}.png"
+    cv2.imwrite(str(thu_muc / ten), anh)
+    ky_vong[ten] = {"duong_kinh_px": round(2 * r, 2), "ket_qua": "OK" if 35.0 &lt;= 2 * r &lt;= 39.0 else "NG"}
+(thu_muc / "ky_vong.json").write_text(json.dumps(ky_vong, ensure_ascii=False, indent=1), encoding="utf-8")
+print(json.dumps(ky_vong, ensure_ascii=False))</code></pre>
+<pre><code class="language-text">{"chot_00.png": {"duong_kinh_px": 36.0, "ket_qua": "OK"}, "chot_01.png": {"duong_kinh_px": 36.8, "ket_qua": "OK"}, "chot_02.png": {"duong_kinh_px": 39.2, "ket_qua": "NG"}, "chot_03.png": {"duong_kinh_px": 40.6, "ket_qua": "NG"}, "chot_04.png": {"duong_kinh_px": 34.4, "ket_qua": "NG"}}</code></pre>
+<p>Test đọc file kỳ vọng và tạo một test cho mỗi ảnh; <code>ids=str</code> đặt tên test bằng tên file, nên khi trượt bạn biết ngay ảnh nào:</p>
+<pre><code class="language-python"># tests/test_hoi_quy.py
+import json
+from pathlib import Path
+
+import cv2
+import pytest
+
+from xu_ly import do_duong_kinh
+
+DATA = Path(__file__).parent / "data"
+KY_VONG = json.loads((DATA / "ky_vong.json").read_text(encoding="utf-8"))
+
+
+def phan_xet(duong_kinh, d_min=35.0, d_max=39.0):
+    return "OK" if d_min &lt;= duong_kinh &lt;= d_max else "NG"
+
+
+@pytest.mark.parametrize("ten", sorted(KY_VONG), ids=str)        # mỗi ảnh là một test, tên test = tên file
+def test_anh_hoi_quy(ten):
+    anh = cv2.imread(str(DATA / ten), cv2.IMREAD_GRAYSCALE)
+    assert anh is not None, f"không đọc được {ten}"
+    d = do_duong_kinh(anh)
+    assert d == pytest.approx(KY_VONG[ten]["duong_kinh_px"], abs=0.4)
+    assert phan_xet(d) == KY_VONG[ten]["ket_qua"]</code></pre>
+<p>Với hàm gốc, cả 5 ảnh qua (<code>5 passed</code>). Với bản "tối ưu" ngưỡng cố định:</p>
+<pre><code class="language-text">$ pytest -q --tb=no tests/test_hoi_quy.py
+..F.F                                                                    [100%]
+=========================== short test summary info ===========================
+FAILED tests/test_hoi_quy.py::test_anh_hoi_quy[chot_02.png] - assert 38.71179...
+FAILED tests/test_hoi_quy.py::test_anh_hoi_quy[chot_04.png] - assert 33.94527...
+2 failed, 3 passed in 0.08s</code></pre>
+<p>Hãy nhìn kỹ <code>chot_02.png</code>: đường kính thật 39,2 px, vượt giới hạn 39,0 nên phải là NG. Bản "tối ưu" đo ra 38,71 px, tức là trạm sẽ trả <strong>OK cho một chi tiết lỗi</strong>: một ca escape, loại lỗi đắt nhất. Bộ hồi quy nên luôn có vài ảnh nằm sát hai bên giới hạn chính vì lý do này.</p>
+<div class="warn"><strong>Không "sửa" file kỳ vọng để test qua</strong>Khi test hồi quy trượt, phản xạ sai là chạy lại thuật toán mới và ghi đè <code>ky_vong.json</code> bằng kết quả mới. Giá trị kỳ vọng là kết quả <em>đúng</em> (đo bằng thiết bị chuẩn hoặc QC xác nhận), không phải kết quả của phiên bản code cũ. Chỉ cập nhật file này khi có lý do được duyệt (ví dụ đo lại chi tiết bằng CMM), và để thay đổi đó hiện rõ trong commit để người khác xem lại.</div>
+
 <h2>Tổ chức thư mục gợi ý</h2>
 <pre><code class="language-text">du_an/
-├── tram_kiem_tra/
-│   ├── __init__.py
-│   └── xu_ly.py
+├── xu_ly.py                 # hoặc gói tram_kiem_tra/ với __init__.py khi dự án lớn hơn
+├── tao_du_lieu_hoi_quy.py
 ├── tests/
-│   ├── data/            # ảnh hồi quy nhỏ
-│   └── test_xu_ly.py
+│   ├── conftest.py          # fixture dùng chung: ve_dia_tron…
+│   ├── data/                # ảnh hồi quy nhỏ + ky_vong.json (commit cùng code)
+│   ├── test_xu_ly.py
+│   ├── test_do_luong.py
+│   └── test_hoi_quy.py
 └── pyproject.toml</code></pre>
-<p>Kết hợp với <a href="../kien-thuc/git-cho-du-an-ai-vision.html">Git</a>: tập thói quen chạy <code>pytest</code> trước mỗi lần commit. Khi dự án lớn hơn, bạn có thể cho máy chủ CI (ví dụ GitHub Actions) tự chạy test mỗi lần đẩy code.</p>
+<p>Hai dòng cấu hình trong <code>pyproject.toml</code> giúp chạy <code>pytest</code> ở thư mục gốc mà không phải chỉnh <code>sys.path</code>: <code>pythonpath</code> thêm thư mục gốc vào đường dẫn import (có từ pytest 7), <code>testpaths</code> chỉ chỗ tìm test.</p>
+<pre><code class="language-text">[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+markers = ["slow: test chậm, bỏ qua bằng -m \"not slow\""]</code></pre>
+<p>Kết hợp với <a href="../kien-thuc/git-cho-du-an-ai-vision.html">Git</a>: tập thói quen chạy <code>pytest</code> trước mỗi lần commit. Ảnh hồi quy nên nhỏ (cắt ROI, PNG xám) để thư mục <code>tests/data/</code> chỉ vài MB. Khi dự án lớn hơn, bạn có thể cho máy chủ CI (ví dụ GitHub Actions) tự chạy test mỗi lần đẩy code.</p>
 
+<h2>Bài tập</h2>
 <div class="ex">
-<h3>Bài tập</h3>
-<p>Viết hàm <code>dem_vat(anh_nhi_phan)</code> đếm số vùng trắng (dùng <code>cv2.connectedComponents</code>, nhớ trừ nền). Viết test: ảnh đen trả về 0; ảnh có 3 hình vuông tách rời trả về 3; hai hình vuông chạm nhau trả về 1.</p>
-<details><summary>Gợi ý</summary>
-<p>Tạo ảnh bằng <code>np.zeros((100, 100), np.uint8)</code> rồi gán <code>anh[10:20, 10:20] = 255</code>. <code>cv2.connectedComponents</code> trả về <code>(so_nhan, nhan)</code>, trong đó nhãn 0 là nền nên số vật là <code>so_nhan - 1</code>.</p>
+<p><strong>Bài 1.</strong> Viết hàm <code>dem_vat(anh_nhi_phan)</code> đếm số vùng trắng (dùng <code>cv2.connectedComponents</code>, nhớ trừ nền). Viết test: ảnh đen trả về 0; ảnh có 3 hình vuông tách rời trả về 3; hai hình vuông chung cạnh trả về 1. Thêm một test bạn chưa chắc kết quả: hai hình vuông chỉ chạm nhau ở <em>một góc</em>.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python"># thêm vào xu_ly.py
+def dem_vat(anh_nhi_phan):
+    """Số vùng trắng tách rời (8 lân cận)."""
+    so_nhan, _ = cv2.connectedComponents(anh_nhi_phan)
+    return so_nhan - 1                      # nhãn 0 là nền</code></pre>
+<pre><code class="language-python"># tests/test_dem_vat.py
+import numpy as np
+
+from xu_ly import dem_vat
+
+
+def test_anh_den_khong_co_vat():
+    assert dem_vat(np.zeros((100, 100), np.uint8)) == 0
+
+
+def test_ba_hinh_vuong_tach_roi():
+    anh = np.zeros((100, 100), np.uint8)
+    for x in (10, 40, 70):
+        anh[10:20, x:x + 10] = 255
+    assert dem_vat(anh) == 3
+
+
+def test_hai_hinh_vuong_cham_nhau_la_mot_vat():
+    anh = np.zeros((100, 100), np.uint8)
+    anh[10:20, 10:20] = 255
+    anh[10:20, 20:30] = 255                 # chung cạnh x = 20
+    assert dem_vat(anh) == 1
+
+
+def test_cham_goc_van_la_mot_vat():
+    anh = np.zeros((100, 100), np.uint8)
+    anh[10:20, 10:20] = 255
+    anh[20:30, 20:30] = 255                 # chỉ chạm nhau ở một góc
+    assert dem_vat(anh) == 1                # connectedComponents mặc định dùng 8 lân cận</code></pre>
+<pre><code class="language-text">$ pytest -q tests/test_dem_vat.py
+....                                                                     [100%]
+4 passed in 0.08s</code></pre>
+<p>Test cuối ghi lại một quyết định dễ bị quên: <code>cv2.connectedComponents</code> mặc định dùng 8 lân cận (<code>connectivity=8</code>), nên hai vật chạm góc bị đếm là một. Nếu bài toán đếm linh kiện cần tách chúng, truyền <code>connectivity=4</code> và sửa test thành 2. Test làm cho quyết định này hiện ra rõ ràng thay vì nằm ẩn trong giá trị mặc định.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 2.</strong> Trạm có cycle time 200 ms, và hàm đo được phép dùng tối đa 30 ms trên ảnh 5 megapixel (2448 × 2048). Viết test kiểm tra điều đó, đánh dấu <code>slow</code> để có thể bỏ qua khi chạy nhanh. Làm sao để test thời gian không "lúc qua lúc trượt"?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python"># tests/test_toc_do.py
+import time
+
+import numpy as np
+import pytest
+
+from xu_ly import do_duong_kinh
+
+
+@pytest.mark.slow
+def test_anh_5_megapixel_duoi_30_ms(ve_dia_tron):
+    anh = ve_dia_tron(300.0, cao=2048, rong=2448)           # cỡ ảnh camera 5 MP
+    do_duong_kinh(anh)                                       # chạy nóng một lần (khởi tạo thư viện)
+    thoi_gian = []
+    for _ in range(5):
+        t = time.perf_counter()
+        do_duong_kinh(anh)
+        thoi_gian.append(time.perf_counter() - t)
+    trung_vi_ms = 1000 * float(np.median(thoi_gian))
+    print(f"trung vị {trung_vi_ms:.1f} ms")
+    assert trung_vi_ms &lt; 30</code></pre>
+<pre><code class="language-text">$ pytest -q -s tests/test_toc_do.py
+trung vị 12.2 ms
+.
+1 passed in 0.36s
+$ pytest -q -m "not slow"
+......................                                                   [100%]
+22 passed, 1 deselected in 0.15s</code></pre>
+<p>Ba kỹ thuật chống "flaky": chạy nóng một lần trước khi đo (lần đầu luôn chậm hơn), lấy <strong>trung vị</strong> nhiều lần thay vì một lần, và đặt giới hạn có dư so với thời gian thật (12 ms so với giới hạn 30 ms). Thời gian phụ thuộc máy, nên test này có ý nghĩa nhất khi chạy trên đúng loại máy tính của trạm; đăng ký marker <code>slow</code> trong <code>pyproject.toml</code> (mục trên) để pytest không cảnh báo marker lạ.</p>
+</details>
+</div>
+<div class="ex">
+<p><strong>Bài 3.</strong> Bạn cải tiến thuật toán đo (thêm fit đường tròn subpixel). Test hồi quy trượt ở 3/40 ảnh: đường kính mới lệch 0,5 px so với <code>ky_vong.json</code>, nhưng phán xét OK/NG vẫn giống. Đồng nghiệp đề nghị chạy lại và ghi đè file kỳ vọng. Bạn làm gì?</p>
+<details><summary>Xem đáp án</summary>
+<p>Không ghi đè ngay. Trước hết phải biết <em>bên nào đúng</em>: giá trị kỳ vọng đến từ đâu? Nếu nó được đo bằng thiết bị chuẩn (CMM, máy đo quang học), thuật toán mới đang sai thêm 0,5 px và cần xem lại. Nếu giá trị kỳ vọng chỉ là kết quả của thuật toán cũ (lỗi tổ chức thường gặp), hãy đo lại 3 chi tiết đó bằng thiết bị chuẩn rồi mới quyết định. Khi cập nhật, ghi rõ trong commit: ảnh nào, giá trị cũ, giá trị mới, căn cứ. Đồng thời xem lại dung sai 0,4 px của test: nếu thuật toán mới tốt hơn, có thể siết dung sai lại để bảo vệ cải tiến đó.</p>
 </details>
 </div>
 
-<p class="note">Nguồn tham khảo: <a href="https://docs.pytest.org/en/stable/how-to/assert.html" rel="noopener" target="_blank">pytest: assert và pytest.raises</a>, <a href="https://docs.pytest.org/en/stable/how-to/parametrize.html" rel="noopener" target="_blank">pytest: parametrize</a>, <a href="https://docs.pytest.org/en/stable/how-to/fixtures.html" rel="noopener" target="_blank">pytest: fixtures</a>.</p>
+<h2>Tóm tắt</h2>
+<ul>
+  <li>pytest: file <code>test_*.py</code>, hàm <code>test_*</code>, dùng <code>assert</code> thường. Công cụ chính: fixture, <code>pytest.raises</code>, <code>parametrize</code>, <code>pytest.approx</code>.</li>
+  <li>Test hàm xử lý ảnh bằng ảnh tổng hợp có đáp án chính xác (biên dưới pixel, nhiễu có seed); đặt fixture dùng chung trong <code>conftest.py</code>, dùng fixture "nhà máy" khi mỗi test cần tham số khác nhau.</li>
+  <li>Dung sai của test chọn theo sai số thật của thuật toán, đủ chặt để bắt được thay đổi xấu: một "tối ưu" làm lệch 0,3 px chỉ test mới thấy.</li>
+  <li>Test hồi quy trên ảnh thật với kết quả QC xác nhận, có ảnh sát hai bên giới hạn; không ghi đè file kỳ vọng để test qua.</li>
+  <li><code>tmp_path</code> cho test ghi file; marker <code>slow</code> cho test thời gian (chạy nóng, lấy trung vị, có dư).</li>
+</ul>
+<p>Bài tiếp theo: <a href="luong-hang-doi-tach-chup-anh-xu-ly.html">Luồng và hàng đợi: tách chụp ảnh khỏi xử lý</a>, để trạm không mất khung khi lưu ảnh chậm. Sau đó là dự án chặng 2; hãy viết kèm test cho các hàm của dự án ngay từ đầu.</p>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.pytest.org/en/stable/how-to/assert.html" rel="noopener" target="_blank">pytest: assert và pytest.raises</a>, <a href="https://docs.pytest.org/en/stable/how-to/parametrize.html" rel="noopener" target="_blank">pytest: parametrize</a>, <a href="https://docs.pytest.org/en/stable/how-to/fixtures.html" rel="noopener" target="_blank">pytest: fixtures, conftest.py</a>, <a href="https://docs.pytest.org/en/stable/how-to/tmp_path.html" rel="noopener" target="_blank">pytest: tmp_path</a>, <a href="https://docs.pytest.org/en/stable/how-to/mark.html" rel="noopener" target="_blank">pytest: đăng ký marker</a>, <a href="https://docs.pytest.org/en/stable/reference/reference.html#confval-pythonpath" rel="noopener" target="_blank">pytest: cấu hình pythonpath</a>.</p>

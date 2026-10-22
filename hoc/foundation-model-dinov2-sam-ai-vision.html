@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="vi" data-root="../">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Foundation model cho vision: DINOv2, SAM và khi nào nên dùng</title>
+<meta name="description" content="So sánh CNN, ResNet-18 và DINOv2 khi chỉ có vài chục ảnh, phát hiện bất thường theo patch, báo động nhầm khi đổi lô vật liệu, SAM và YOLOE theo lời mô tả.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://hocfree.vn/hoc/foundation-model-dinov2-sam-ai-vision.html">
+<meta property="og:site_name" content="HọcFree">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Foundation model cho vision: DINOv2, SAM và khi nào nên dùng">
+<meta property="og:description" content="So sánh CNN, ResNet-18 và DINOv2 khi chỉ có vài chục ảnh, phát hiện bất thường theo patch, báo động nhầm khi đổi lô vật liệu, SAM và YOLOE theo lời mô tả.">
+<meta property="og:url" content="https://hocfree.vn/hoc/foundation-model-dinov2-sam-ai-vision.html">
+<meta property="og:image" content="https://hocfree.vn/assets/images/posts/foundation-model-dinov2-sam-ai-vision.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="Foundation model cho vision: DINOv2, SAM và khi nào nên dùng">
+<meta property="og:locale" content="vi_VN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Foundation model cho vision: DINOv2, SAM và khi nào nên dùng">
+<meta name="twitter:description" content="So sánh CNN, ResNet-18 và DINOv2 khi chỉ có vài chục ảnh, phát hiện bất thường theo patch, báo động nhầm khi đổi lô vật liệu, SAM và YOLOE theo lời mô tả.">
+<meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/foundation-model-dinov2-sam-ai-vision.jpg">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/fonts.css?v=20261021">
+<link rel="stylesheet" href="../assets/css/style.css?v=20261021">
+<script>try{var t=localStorage.getItem('hf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
+<meta property="article:published_time" content="2026-10-21">
+<meta property="article:section" content="Học AI &amp; Lập trình">
+<meta property="article:tag" content="AI Vision">
+<meta property="article:tag" content="Deep Learning">
+<meta property="article:tag" content="PyTorch">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "Foundation model cho vision: DINOv2, SAM và khi nào nên dùng", "description": "So sánh CNN, ResNet-18 và DINOv2 khi chỉ có vài chục ảnh, phát hiện bất thường theo patch, báo động nhầm khi đổi lô vật liệu, SAM và YOLOE theo lời mô tả.", "image": ["https://hocfree.vn/assets/images/posts/foundation-model-dinov2-sam-ai-vision.jpg"], "datePublished": "2026-10-21", "dateModified": "2026-10-21", "inLanguage": "vi", "articleSection": "Học AI & Lập trình", "keywords": "AI Vision, Deep Learning, PyTorch", "wordCount": 3284, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/hoc/foundation-model-dinov2-sam-ai-vision.html"}, "isPartOf": {"@type": "Course", "name": "Trở thành Vision Engineer", "url": "https://hocfree.vn/lo-trinh/vision-engineer.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Learning Paths", "item": "https://hocfree.vn/lo-trinh/"}, {"@type": "ListItem", "position": 3, "name": "Trở thành Vision Engineer", "item": "https://hocfree.vn/lo-trinh/vision-engineer.html"}, {"@type": "ListItem", "position": 4, "name": "Chặng 12: AI Vision", "item": "https://hocfree.vn/lo-trinh/vision-engineer/ai-vision.html"}, {"@type": "ListItem", "position": 5, "name": "Foundation model cho vision: DINOv2, SAM và khi nào nên dùng"}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div class="progress" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="container wide header-top">
+    <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="nav-scrim" hidden></div>
+    <a class="logo" href="../" aria-label="HọcFree – Trang chủ"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+    <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
+    <div class="header-actions">
+      <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="login-link" href="../dang-nhap.html">Đăng nhập</a>
+      <a class="btn start-btn" href="../lo-trinh/">Bắt đầu học</a>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="container wide">
+      <nav class="site-nav" id="site-nav" aria-label="Menu chính">
+        <div class="drawer-head">
+          <a class="logo" href="../" tabindex="-1"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+          <button class="icon-btn nav-close" aria-label="Đóng menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <button type="button" class="drawer-search search-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Tìm bài học, chủ đề…</span></button>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="../">Trang chủ</a></li><li class="nav-item has-panel is-mega"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-hoc">Học AI &amp; Lập trình<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel mega" id="nav-panel-hoc">
+  <div class="container wide mega-inner">
+    <div class="mega-groups"><div class="mega-group"><a class="mega-group-title" href="../hoc/#programming">Programming</a><ul><li><a href="../hoc/python.html">Python</a></li><li><a href="../hoc/csharp.html">C#</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#ai-machine-learning">AI &amp; Machine Learning</a><ul><li><a href="../hoc/machine-learning.html">Machine Learning</a></li><li><a href="../hoc/deep-learning.html">Deep Learning</a></li><li><a href="../hoc/pytorch.html">PyTorch</a></li><li><a href="../hoc/generative-ai.html">Generative AI</a></li><li><a href="../hoc/llm-ai-agents.html">LLM / AI Agents</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#computer-vision">Computer Vision</a><ul><li><a href="../hoc/opencv.html">OpenCV</a></li><li><a href="../hoc/image-processing.html">Image Processing</a></li><li><a href="../hoc/computer-vision.html">Computer Vision</a></li><li><a href="../hoc/ocr.html">OCR</a></li><li><a href="../hoc/object-detection.html">Object Detection</a></li><li><a href="../hoc/segmentation.html">Segmentation</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#vision-engineering">Vision Engineering</a><ul><li><a href="../hoc/machine-vision.html">Machine Vision</a></li><li><a href="../hoc/ai-vision.html">AI Vision</a></li><li><a href="../hoc/industrial-vision.html">Industrial Vision</a></li><li><a href="../hoc/camera-lens.html">Camera &amp; Lens</a></li><li><a href="../hoc/lighting.html">Lighting</a></li><li><a href="../hoc/calibration.html">Calibration</a></li><li><a href="../hoc/3d-vision.html">3D Vision</a></li><li><a href="../hoc/plc-robot-mes.html">PLC / Robot / MES</a></li><li><a href="../hoc/vision-deployment.html">Vision Deployment</a></li></ul></div></div>
+    <a class="feature-card" href="../lo-trinh/vision-engineer.html">
+  <span class="feature-eyebrow">⭐ Learning Path nổi bật</span>
+  <span class="feature-title">Trở thành Vision Engineer</span>
+  <span class="feature-sub">Machine Vision + AI Vision + Industrial Automation</span>
+  <span class="feature-desc">Lộ trình thực chiến từ Python, OpenCV và Machine Vision đến 3D Vision, Deep Learning, AI Vision, Camera, PLC, Robot và triển khai hệ thống Vision trong nhà máy.</span>
+  <span class="feature-chain" aria-label="Các chặng chính"><span>Python</span><i aria-hidden="true">→</i><span>OpenCV</span><i aria-hidden="true">→</i><span>Machine Vision</span><i aria-hidden="true">→</i><span>AI Vision</span><i aria-hidden="true">→</i><span class="chain-goal">🎯 Vision Engineer</span></span>
+  <span class="feature-meta">15 chặng · 5 giai đoạn · ~13 tháng</span>
+  <span class="feature-cta">Xem lộ trình →</span>
+</a>
+  </div>
+  <div class="mega-foot"><div class="container wide mega-foot-inner"><ol class="journey compact" aria-label="Học, thực hành, trở thành kỹ sư"><li><a href="../hoc/" aria-current="step"><span class="journey-n">1</span><span class="journey-t"><b>Học</b><small>Học AI &amp; Lập trình</small></span></a></li><li><a href="../projects/"><span class="journey-n">2</span><span class="journey-t"><b>Thực hành</b><small>Projects</small></span></a></li><li><a href="../lo-trinh/"><span class="journey-n">3</span><span class="journey-t"><b>Trở thành kỹ sư</b><small>Learning Paths</small></span></a></li></ol><a class="panel-all" href="../hoc/">Xem tất cả Học AI &amp; Lập trình →</a></div></div>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-projects">Projects<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-projects">
+  <p class="panel-kicker"><span>Bước 2 · Thực hành</span>Áp dụng vào dự án thật</p>
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../projects/ai-projects.html"><span class="drop-label">AI Projects</span><span class="drop-desc">Ứng dụng ML và LLM, từ ý tưởng đến bản demo</span></a></li><li><a class="drop-link" href="../projects/computer-vision-projects.html"><span class="drop-label">Computer Vision Projects</span><span class="drop-desc">Phát hiện, nhận dạng và theo dõi đối tượng</span></a></li><li><a class="drop-link" href="../projects/industrial-vision-projects.html"><span class="drop-label">Industrial Vision Projects</span><span class="drop-desc">Đo kích thước, kiểm tra lỗi, đọc mã trên dây chuyền</span></a></li></ul></div></div>
+  <a class="panel-all" href="../projects/">Xem tất cả Projects →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger is-active" aria-expanded="false" aria-controls="nav-panel-lo-trinh" aria-current="true">Learning Paths<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-lo-trinh">
+  <p class="panel-kicker"><span>Bước 3 · Trở thành kỹ sư</span>Định hướng nghề nghiệp</p>
+  <ul class="drop-list"><li><a class="drop-link is-flagship" href="../lo-trinh/vision-engineer.html"><span class="drop-label">⭐ Trở thành Vision Engineer</span><span class="drop-desc">Machine Vision + AI Vision + Industrial Automation · 15 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/toeic-700.html"><span class="drop-label">700+ TOEIC trong 5 tháng</span><span class="drop-desc">TOEIC Listening &amp; Reading + giao tiếp công sở cho người đi làm · 11 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/hsk3.html"><span class="drop-label">Tiếng Trung từ 0 đến HSK 3 trong 6 tháng</span><span class="drop-desc">Pinyin, chữ Hán, ngữ pháp, giao tiếp và luyện thi HSK 3.0 cho người Việt · 10 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/#python-developer"><span class="drop-label">Python Developer<span class="badge-soon">Sắp ra mắt</span></span><span class="drop-desc">Python, công cụ, tự động hóa</span></a></li></ul>
+  <a class="panel-all" href="../lo-trinh/">Xem tất cả lộ trình →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-kien-thuc">Kiến thức<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-kien-thuc">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Lĩnh vực</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/programming.html"><span class="drop-label">Programming</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-machine-learning.html"><span class="drop-label">AI / Machine Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/deep-learning.html"><span class="drop-label">Deep Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/machine-vision.html"><span class="drop-label">Machine Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-vision.html"><span class="drop-label">AI Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/industrial-automation.html"><span class="drop-label">Industrial Automation</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Công cụ &amp; mẹo</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/tools-frameworks.html"><span class="drop-label">Tools &amp; Frameworks</span></a></li><li><a class="drop-link" href="../kien-thuc/tips-tricks.html"><span class="drop-label">Tips &amp; Tricks</span></a></li></ul></div></div>
+  <a class="panel-all" href="../kien-thuc/">Xem tất cả Kiến thức →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tin-tuc-ai">Tin tức AI<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tin-tuc-ai">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tin-tuc-ai/ai-news.html"><span class="drop-label">AI News</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-models.html"><span class="drop-label">AI Models</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/technology.html"><span class="drop-label">Technology</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/robotics.html"><span class="drop-label">Robotics</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-industry.html"><span class="drop-label">AI Industry</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tin-tuc-ai/">Xem tất cả Tin tức AI →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-ngoai-ngu">Ngoại ngữ<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-ngoai-ngu">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Ngôn ngữ</p><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/english.html"><span class="drop-label">English</span><span class="drop-desc">Lộ trình 700 TOEIC, phương pháp học, giáo trình HF-700TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chinese.html"><span class="drop-label">Chinese</span><span class="drop-desc">Lộ trình 0 đến HSK 3 trong 6 tháng, phương pháp học, giáo trình HF-HSK3</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Tiếng Anh theo kỹ năng</p><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/toeic-listening.html"><span class="drop-label">TOEIC Listening</span><span class="drop-desc">Part 1–4: mô tả tranh, hỏi – đáp, hội thoại, bài nói</span></a></li><li><a class="drop-link" href="../ngoai-ngu/toeic-reading.html"><span class="drop-label">TOEIC Reading</span><span class="drop-desc">Part 5–7: điền từ, điền câu, đọc hiểu</span></a></li><li><a class="drop-link" href="../ngoai-ngu/ngu-phap-tieng-anh.html"><span class="drop-label">Ngữ pháp tiếng Anh</span><span class="drop-desc">Từ loại, thì, mệnh đề, liên từ cho TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/tu-vung-tieng-anh.html"><span class="drop-label">Từ vựng tiếng Anh</span><span class="drop-desc">Từ vựng công sở theo chủ đề, collocation</span></a></li><li><a class="drop-link" href="../ngoai-ngu/giao-tiep-tieng-anh.html"><span class="drop-label">Giao tiếp công sở</span><span class="drop-desc">Điện thoại, họp, thuyết trình, email</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Tiếng Trung theo kỹ năng</p><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/pinyin-phat-am.html"><span class="drop-label">Pinyin &amp; phát âm</span><span class="drop-desc">Thanh mẫu, vận mẫu, thanh điệu, biến điệu</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chu-han.html"><span class="drop-label">Chữ Hán</span><span class="drop-desc">Nét, thứ tự nét, bộ thủ, âm Hán Việt</span></a></li><li><a class="drop-link" href="../ngoai-ngu/ngu-phap-tieng-trung.html"><span class="drop-label">Ngữ pháp tiếng Trung</span><span class="drop-desc">Từ 是, 吗, 了 đến bổ ngữ, câu 把, câu 被</span></a></li><li><a class="drop-link" href="../ngoai-ngu/tu-vung-tieng-trung.html"><span class="drop-label">Từ vựng tiếng Trung</span><span class="drop-desc">Từ vựng HSK 1–3 theo chủ đề, Anki</span></a></li><li><a class="drop-link" href="../ngoai-ngu/giao-tiep-tieng-trung.html"><span class="drop-label">Giao tiếp tiếng Trung</span><span class="drop-desc">Chào hỏi, mua sắm, đi lại, công sở</span></a></li><li><a class="drop-link" href="../ngoai-ngu/luyen-thi-hsk.html"><span class="drop-label">Luyện thi HSK</span><span class="drop-desc">Đề HSK 3.0, nghe, đọc, viết, nói, đề thi thử</span></a></li></ul></div></div>
+  <a class="panel-all" href="../ngoai-ngu/">Xem tất cả Ngoại ngữ →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tai-nguyen">Tài nguyên<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tai-nguyen">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tai-nguyen/source-code.html"><span class="drop-label">Source Code</span><span class="drop-desc">Mã nguồn mẫu đi kèm bài học</span></a></li><li><a class="drop-link" href="../tai-nguyen/dataset.html"><span class="drop-label">Dataset</span><span class="drop-desc">Bộ dữ liệu ảnh để luyện tập</span></a></li><li><a class="drop-link" href="../tai-nguyen/cheat-sheets.html"><span class="drop-label">Cheat Sheets</span><span class="drop-desc">Tóm tắt nhanh trong một trang</span></a></li><li><a class="drop-link" href="../tai-nguyen/documentation.html"><span class="drop-label">Documentation</span><span class="drop-desc">Tài liệu tra cứu thư viện, API</span></a></li><li><a class="drop-link" href="../tai-nguyen/ebook.html"><span class="drop-label">Ebook / Tài liệu</span><span class="drop-desc">Sách và tài liệu tham khảo</span></a></li><li><a class="drop-link" href="../tai-nguyen/ai-tools.html"><span class="drop-label">AI Tools</span><span class="drop-desc">Công cụ AI hữu ích cho việc học</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tai-nguyen/">Xem tất cả Tài nguyên →</a>
+</div></li></ul>
+        <div class="drawer-foot">
+          <a class="btn ghost" href="../dang-nhap.html">Đăng nhập</a>
+          <a class="btn" href="../lo-trinh/">Bắt đầu học</a>
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+<div class="search-dialog" hidden>
+  <div class="search-scrim"></div>
+  <div class="search-box" role="dialog" aria-modal="true" aria-label="Tìm kiếm">
+    <form class="search-form" action="../search.html" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" placeholder="Tìm bài học, chủ đề, bài viết…" autocomplete="off" aria-label="Từ khóa tìm kiếm" aria-controls="search-suggest">
+      <button type="button" class="icon-btn search-close" aria-label="Đóng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </form>
+    <div class="search-suggest" id="search-suggest" aria-live="polite">
+      <div class="search-empty">
+        <p class="search-group-title">Chủ đề phổ biến</p>
+        <div class="chips"><a class="chip" href="../hoc/python.html">Python</a><a class="chip" href="../hoc/opencv.html">OpenCV</a><a class="chip" href="../hoc/machine-vision.html">Machine Vision</a><a class="chip" href="../hoc/deep-learning.html">Deep Learning</a><a class="chip" href="../hoc/ai-vision.html">AI Vision</a><a class="chip" href="../hoc/object-detection.html">Object Detection</a><a class="chip" href="../hoc/pytorch.html">PyTorch</a><a class="chip" href="../ngoai-ngu/english.html">English</a></div>
+        <p class="search-group-title">Lộ trình nổi bật</p>
+        <a class="search-item" href="../lo-trinh/vision-engineer.html"><span class="search-ico" aria-hidden="true">⭐</span><span>Trở thành Vision Engineer<small>Learning Path · Machine Vision + AI Vision + Industrial Automation</small></span></a>
+      </div>
+    </div>
+    <div class="search-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> chọn</span><span><kbd>Enter</kbd> mở</span><span><kbd>Esc</kbd> đóng</span></div>
+  </div>
+</div>
+<main id="main">
+  <div class="container layout article-layout">
+    <article class="article">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../lo-trinh/">Learning Paths</a><span>/</span><a href="../lo-trinh/vision-engineer.html">Vision Engineer</a><span>/</span><a href="../lo-trinh/vision-engineer/ai-vision.html">Chặng 12: AI Vision</a></nav>
+      <header class="article-head">
+        <div class="course-bar" data-course="vision-engineer"><a class="course-chip" href="../lo-trinh/vision-engineer/ai-vision.html">⭐ Vision Engineer · Chặng 12</a><span class="lesson-no">Bài 6/8</span><span class="kind kind-lesson">Bài học</span><span class="lesson-min"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></svg>~75 phút</span></div>
+        <h1>Foundation model cho vision: DINOv2, SAM và khi nào nên dùng</h1>
+        <p class="lead">So sánh CNN, ResNet-18 và DINOv2 khi chỉ có vài chục ảnh, phát hiện bất thường theo patch, báo động nhầm khi đổi lô vật liệu, SAM và YOLOE theo lời mô tả.</p>
+        <div class="article-meta">
+          <span class="avatar" aria-hidden="true">HF</span>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-21">21/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>19 phút đọc</span></div>
+        </div>
+      </header>
+      <figure class="article-cover">
+        <img src="../assets/images/posts/foundation-model-dinov2-sam-ai-vision.webp" alt="Foundation model cho vision: DINOv2, SAM và khi nào nên dùng" width="1200" height="675" fetchpriority="high" decoding="async">
+      </figure>
+      <section class="lesson-goals" aria-label="Mục tiêu bài học"><h2>Học xong bài này, bạn sẽ</h2><ul><li>Biết foundation model giải quyết bài toán ít dữ liệu thế nào</li><li>Phân loại few-shot bằng đặc trưng DINOv2</li><li>Phát hiện bất thường theo patch</li><li>Biết giới hạn khi đổi lô vật liệu</li></ul><p class="goals-before">Nên học trước: <a href="../hoc/grad-cam-giai-thich-mo-hinh-ai-vision.html">Grad-CAM: mô hình đang nhìn vào đâu?</a></p></section>
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol class="toc-plain"><li><a href="#1-ba-cach-dung-foundation-model">1. Ba cách dùng foundation model</a></li><li><a href="#2-thi-nghiem-1-phan-loai-ok-ng-voi-vai-anh-co-nhan">2. Thí nghiệm 1: phân loại OK/NG với vài ảnh có nhãn</a></li><li><a href="#3-thi-nghiem-2-chi-co-anh-ok">3. Thí nghiệm 2: chỉ có ảnh OK</a></li><li><a href="#4-thay-doi-lo-vat-lieu-dac-trung-nhay-voi-gi">4. Thay đổi lô vật liệu: đặc trưng nhạy với gì?</a></li><li><a href="#5-sam-3-va-phat-hien-theo-cau-chu">5. SAM 3 và phát hiện theo câu chữ</a></li><li><a href="#6-dua-len-day-chuyen-duoc-gi-mat-gi">6. Đưa lên dây chuyền: được gì, mất gì</a></li><li><a href="#tom-tat">Tóm tắt</a></li><li><a href="#bai-tap">Bài tập</a></li></ol></details>
+      <div class="prose">
+<p>Các bài trước của chặng huấn luyện mô hình cho <em>một</em> bài toán, trên dữ liệu của chính bài toán đó. <strong>Foundation model</strong> (mô hình nền tảng) đi theo hướng ngược lại: một mô hình rất lớn được huấn luyện một lần trên hàng trăm triệu ảnh (thường không cần nhãn, hoặc kèm văn bản), rồi được dùng lại cho rất nhiều bài toán mà không cần, hoặc chỉ cần rất ít, huấn luyện thêm. Với kỹ sư Vision, có ba cách dùng đáng quan tâm: <strong>trích đặc trưng</strong> (DINOv2, DINOv3, CLIP), <strong>phân đoạn theo nhắc</strong> (họ SAM, đến SAM 3 nhận cả câu chữ), và <strong>phát hiện theo câu chữ</strong> (open-vocabulary: YOLOE, Grounding DINO). Bài này đo bằng thí nghiệm chạy thật xem đặc trưng DINOv2 mang lại gì khi có rất ít ảnh có nhãn và khi chỉ có ảnh OK, nó thất bại ở đâu, và khi nào nên hoặc không nên đưa foundation model lên dây chuyền.</p>
+<p>Cần PyTorch, scikit-learn; DINOv2 được tải qua <code>torch.hub</code> lần đầu (khoảng 85 MB). Các khối code nối tiếp nhau trong cùng một file. Nên học trước: <a href="phan-loai-anh-ok-ng-transfer-learning-pytorch.html">transfer learning</a>, <a href="anomaly-6-anomaly-detection-padim-patchcore.html">anomaly detection với PaDiM, PatchCore</a>.</p>
+
+<h2 id="1-ba-cach-dung-foundation-model">1. Ba cách dùng foundation model</h2>
+<table>
+  <tr><th>Cách dùng</th><th>Mô hình tiêu biểu</th><th>Đầu vào → đầu ra</th><th>Dùng trong nhà máy để</th></tr>
+  <tr><td>Trích đặc trưng (backbone)</td><td>DINOv2, DINOv3 (Meta, tự giám sát trên ảnh); CLIP (ảnh + văn bản)</td><td>Ảnh → vector đặc trưng cho cả ảnh và cho từng ô nhỏ (patch)</td><td>Phân loại với rất ít nhãn, anomaly detection, tìm ảnh giống nhau, làm backbone cho mô hình riêng</td></tr>
+  <tr><td>Phân đoạn theo nhắc</td><td>SAM, SAM 2 (điểm, khung); SAM 3 (thêm câu chữ, ra cuối 2025)</td><td>Ảnh + nhắc → mặt nạ</td><td>Gán nhãn phân đoạn nhanh; đếm, đo vật mới mà chưa có dữ liệu</td></tr>
+  <tr><td>Phát hiện theo câu chữ (open-vocabulary)</td><td>YOLOE, YOLO-World, Grounding DINO</td><td>Ảnh + danh sách tên lớp bằng chữ → hộp</td><td>Thử ý tưởng nhanh, tạo nhãn khởi đầu, phát hiện vật thông dụng (người, xe nâng, thùng)</td></tr>
+</table>
+<p>DINOv3 (Meta, 2025) là thế hệ sau của DINOv2 với các mô hình lớn hơn nhiều; nó dùng giấy phép riêng của Meta (cho phép dùng thương mại kèm điều kiện), khác với DINOv2 dùng Apache 2.0. Bài dùng DINOv2 ViT-S/14 (21 triệu tham số) vì nhỏ, chạy được trên CPU và tải về không cần đăng ký. Mọi ý trong bài áp dụng được cho DINOv3.</p>
+
+<h2 id="2-thi-nghiem-1-phan-loai-ok-ng-voi-vai-anh-co-nhan">2. Thí nghiệm 1: phân loại OK/NG với vài ảnh có nhãn</h2>
+<p>Ảnh 224 × 224 bề mặt gỗ ép: vân gỗ và màu thay đổi theo từng tấm; ảnh NG có một trong ba lỗi (vết nứt mảnh, đốm cháy, mảng sứt lộ lõi). Một "kho" 400 ảnh để rút vài ảnh có nhãn, và 300 ảnh thử.</p>
+<pre><code class="language-python">import time
+
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import roc_auc_score
+
+torch.manual_seed(0)
+torch.set_num_threads(8)
+S = 224
+
+
+def tao_anh(n, hat, ty_le_ng=0.5, lech_mau=(0.0, 0.0, 0.0), tan_van=(15, 30)):
+    """Ảnh 224×224 màu: bề mặt gỗ ép có vân; NG có một trong ba lỗi (vết nứt, đốm cháy, mảng sứt) ở vị trí ngẫu nhiên."""
+    g = np.random.default_rng(hat)
+    yy, xx = np.mgrid[0:S, 0:S] / S
+    anh = np.zeros((n, S, S, 3), np.float32)
+    nhan = (g.random(n) &lt; ty_le_ng).astype(np.int64)
+    vi_tri = np.zeros((n, 2))
+    for i in range(n):
+        tan = g.uniform(*tan_van)                                  # mật độ vân gỗ
+        van = 0.5 + 0.5 * np.sin(2 * np.pi * (tan * yy + 2 * np.sin(4 * xx + g.uniform(0, 6))))      # vân gỗ
+        nen = 0.55 + 0.1 * van + 0.03 * g.standard_normal((S, S))
+        anh[i] = nen[..., None] * np.array([0.85, 0.65, 0.45]) + g.uniform(-0.04, 0.04, 3) + lech_mau   # màu gỗ
+        if nhan[i]:
+            cx, cy = g.uniform(30, 194, 2)
+            loai = g.integers(3)
+            d2 = (np.arange(S)[None, :] - cx) ** 2 + (np.arange(S)[:, None] - cy) ** 2
+            if loai == 0:                                          # vết nứt mảnh
+                goc = g.uniform(0, np.pi)
+                kc = np.abs(-(np.arange(S)[None, :] - cx) * np.sin(goc) + (np.arange(S)[:, None] - cy) * np.cos(goc))
+                mat_na = (kc &lt; 1.2) &amp; (d2 &lt; 22 ** 2)
+                anh[i][mat_na] *= 0.55
+            elif loai == 1:                                        # đốm cháy tối
+                anh[i] *= (1 - 0.45 * np.exp(-d2 / (2 * 6 ** 2)))[..., None]
+            else:                                                  # mảng sứt, lộ lớp lõi sáng
+                anh[i][d2 &lt; 9 ** 2] = np.array([0.82, 0.78, 0.7])
+            vi_tri[i] = cx, cy
+    return torch.tensor(np.clip(anh, 0, 1)).permute(0, 3, 1, 2), torch.tensor(nhan), vi_tri
+
+
+X_tap, y_tap, _ = tao_anh(400, 1)                                  # nguồn để rút vài ảnh có nhãn
+X_thu, y_thu, vt_thu = tao_anh(300, 2)                             # tập thử
+print("tập thử:", tuple(X_thu.shape), "| NG:", int(y_thu.sum()))</code></pre>
+<pre><code class="language-text">tập thử: (300, 3, 224, 224) | NG: 162</code></pre>
+<p>So ba cách khi chỉ có 4, 8, 16, 32 ảnh có nhãn mỗi lớp: một CNN nhỏ huấn luyện từ đầu; đặc trưng ResNet-18 huấn luyện trên ImageNet (đóng băng) cộng hồi quy logistic; đặc trưng DINOv2 (token CLS, đóng băng) cộng hồi quy logistic. "Đóng băng" nghĩa là không huấn luyện lại backbone, chỉ học một bộ phân loại tuyến tính rất nhỏ trên vector đặc trưng: nhanh, và khó quá khớp khi dữ liệu ít.</p>
+<pre><code class="language-python">dino = torch.hub.load("facebookresearch/dinov2", "dinov2_vits14").eval()       # ViT-S/14, 21 triệu tham số
+CHUAN = (torch.tensor([0.485, 0.456, 0.406])[:, None, None], torch.tensor([0.229, 0.224, 0.225])[:, None, None])
+
+
+@torch.no_grad()
+def dac_trung(X, lo=32):
+    """Đặc trưng ảnh (token CLS, 384 chiều) và đặc trưng từng patch 14×14 px (16 × 16 patch, 384 chiều)."""
+    cls, patch = [], []
+    for i in range(0, len(X), lo):
+        ra = dino.forward_features((X[i:i + lo] - CHUAN[0]) / CHUAN[1])
+        cls.append(ra["x_norm_clstoken"])
+        patch.append(ra["x_norm_patchtokens"])
+    return torch.cat(cls), torch.cat(patch)
+
+
+t = time.perf_counter()
+cls_tap, patch_tap = dac_trung(X_tap)
+cls_thu, patch_thu = dac_trung(X_thu)
+print(f"trích đặc trưng {len(X_tap) + len(X_thu)} ảnh trên CPU: {time.perf_counter() - t:.0f} s; "
+      f"CLS {tuple(cls_thu.shape)}, patch {tuple(patch_thu.shape)}")
+
+
+class CnnNho(nn.Module):
+    def __init__(self):
+        super().__init__()
+        khoi = lambda a, b: [nn.Conv2d(a, b, 3, padding=1), nn.BatchNorm2d(b), nn.ReLU(), nn.MaxPool2d(2)]
+        self.net = nn.Sequential(*khoi(3, 16), *khoi(16, 32), *khoi(32, 64), *khoi(64, 64),
+                                 nn.AdaptiveAvgPool2d(1), nn.Flatten(), nn.Linear(64, 2))
+
+    def forward(self, x):
+        return self.net(x)
+
+
+def cnn_tu_dau(X, y, epoch=60):
+    torch.manual_seed(0)
+    mh, Xn = CnnNho(), F.interpolate(X, size=112)
+    opt = torch.optim.Adam(mh.parameters(), lr=1e-3)
+    for _ in range(epoch):
+        xb = torch.where(torch.rand(len(Xn), 1, 1, 1) &lt; 0.5, Xn.flip(3), Xn)          # lật ngang ngẫu nhiên
+        loss = F.cross_entropy(mh(xb), y)
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+    mh.eval()
+    with torch.no_grad():
+        return (mh(F.interpolate(X_thu, size=112)).argmax(1) == y_thu).float().mean().item()
+
+
+def dino_logistic(i_chon):
+    clf = LogisticRegression(max_iter=2000).fit(F.normalize(cls_tap[i_chon]).numpy(), y_tap[i_chon].numpy())
+    return clf.score(F.normalize(cls_thu).numpy(), y_thu.numpy())
+
+
+import torchvision
+
+resnet = torchvision.models.resnet18(weights=torchvision.models.ResNet18_Weights.DEFAULT).eval()
+resnet.fc = nn.Identity()                                         # bỏ lớp phân loại 1000 lớp: lấy vector 512 chiều
+
+
+@torch.no_grad()
+def dac_trung_resnet(X, lo=32):
+    return torch.cat([resnet((X[i:i + lo] - CHUAN[0]) / CHUAN[1]) for i in range(0, len(X), lo)])
+
+
+rn_tap, rn_thu = dac_trung_resnet(X_tap), dac_trung_resnet(X_thu)
+
+
+def resnet_logistic(i_chon):
+    clf = LogisticRegression(max_iter=2000).fit(F.normalize(rn_tap[i_chon]).numpy(), y_tap[i_chon].numpy())
+    return clf.score(F.normalize(rn_thu).numpy(), y_thu.numpy())
+
+
+rng = np.random.default_rng(0)
+ok_idx, ng_idx = np.nonzero(y_tap.numpy() == 0)[0], np.nonzero(y_tap.numpy() == 1)[0]
+print("ảnh có nhãn/lớp | CNN từ đầu | ResNet-18 ImageNet + logistic | DINOv2 + logistic  (accuracy TB 5 lần rút)")
+for n in (4, 8, 16, 32):
+    kq = {"cnn": [], "rn": [], "dino": []}
+    for _ in range(5):
+        i_chon = np.r_[rng.choice(ok_idx, n, replace=False), rng.choice(ng_idx, n, replace=False)]
+        kq["cnn"].append(cnn_tu_dau(X_tap[i_chon], y_tap[i_chon]))
+        kq["rn"].append(resnet_logistic(i_chon))
+        kq["dino"].append(dino_logistic(i_chon))
+    print(f"      {n:3d}      |   {100 * np.mean(kq['cnn']):5.1f}%   |            {100 * np.mean(kq['rn']):5.1f}%            |"
+          f"      {100 * np.mean(kq['dino']):5.1f}%")</code></pre>
+<pre><code class="language-text">trích đặc trưng 700 ảnh trên CPU: 31 s; CLS (300, 384), patch (300, 256, 384)
+ảnh có nhãn/lớp | CNN từ đầu | ResNet-18 ImageNet + logistic | DINOv2 + logistic  (accuracy TB 5 lần rút)
+        4      |    48.8%   |             70.1%            |       96.1%
+        8      |    51.7%   |             78.3%            |       98.9%
+       16      |    48.4%   |             83.1%            |       99.0%
+       32      |    51.1%   |             83.7%            |       99.2%</code></pre>
+<p>Với 4 ảnh mỗi lớp, CNN từ đầu chỉ ngang đoán mò, đặc trưng ImageNet đạt khoảng 70%, đặc trưng DINOv2 đã trên 95%. Đặc trưng ImageNet được học để phân biệt chó, mèo, xe; đặc trưng DINOv2 được học tự giám sát để mô tả <em>mọi</em> thứ trong ảnh, kể cả kết cấu và chi tiết nhỏ, nên tách lỗi bề mặt tốt hơn nhiều khi dữ liệu ít. Thời gian trích đặc trưng trên CPU vào khoảng vài chục ms mỗi ảnh 224 × 224 (dòng in đầu tiên), chấp nhận được với nhiều trạm; trên GPU nhanh hơn nhiều.</p>
+
+<h2 id="3-thi-nghiem-2-chi-co-anh-ok">3. Thí nghiệm 2: chỉ có ảnh OK</h2>
+<p>Đặc trưng từng patch (ô 14 × 14 px, lưới 16 × 16) của DINOv2 dùng được thay cho backbone ResNet trong PatchCore: lưu đặc trưng patch của vài chục ảnh OK làm "bộ nhớ"; với ảnh mới, mỗi patch được chấm bằng khoảng cách tới patch OK gần nhất; điểm của ảnh là patch xa nhất, và vị trí patch đó là vị trí nghi lỗi.</p>
+<pre><code class="language-python">kho = patch_tap[ok_idx[:30]].reshape(-1, 384)                     # "bộ nhớ" patch của 30 ảnh OK: 7680 vector
+print("bộ nhớ patch OK:", tuple(kho.shape))
+
+
+@torch.no_grad()
+def diem_bat_thuong(patch):
+    """Mỗi patch: khoảng cách tới patch OK gần nhất (ý tưởng PatchCore). Điểm ảnh = patch xa nhất."""
+    d = torch.stack([torch.cdist(p, kho).min(dim=1).values for p in patch])        # (N, 256)
+    return d.max(dim=1).values, d.argmax(dim=1)
+
+
+diem, vi_tri_max = diem_bat_thuong(patch_thu)
+print(f"AUROC phân biệt OK/NG (không dùng ảnh NG nào để học): {roc_auc_score(y_thu.numpy(), diem.numpy()):.3f}")
+ng = np.nonzero(y_thu.numpy() == 1)[0]
+r, c = vi_tri_max[ng] // 16, vi_tri_max[ng] % 16                  # patch xa nhất → tọa độ tâm patch (px)
+lech = np.hypot(c.numpy() * 14 + 7 - vt_thu[ng, 0], r.numpy() * 14 + 7 - vt_thu[ng, 1])
+print(f"định vị: patch bất thường nhất cách tâm lỗi trung vị {np.median(lech):.0f} px, "
+      f"{100 * np.mean(lech &lt; 21):.0f}% ảnh NG trong vòng 1,5 patch")
+nguong_95 = np.quantile(diem[y_thu == 0].numpy(), 0.95)
+print(f"ngưỡng giữ 95% ảnh OK: {nguong_95:.2f}; tỉ lệ ảnh NG vượt ngưỡng: {100 * (diem[y_thu == 1] &gt; nguong_95).float().mean():.0f}%")</code></pre>
+<pre><code class="language-text">bộ nhớ patch OK: (7680, 384)
+AUROC phân biệt OK/NG (không dùng ảnh NG nào để học): 1.000
+định vị: patch bất thường nhất cách tâm lỗi trung vị 9 px, 99% ảnh NG trong vòng 1,5 patch
+ngưỡng giữ 95% ảnh OK: 24.89; tỉ lệ ảnh NG vượt ngưỡng: 100%</code></pre>
+<p>Không dùng một ảnh NG nào, phương pháp tách OK/NG hoàn toàn trên bộ thử và chỉ đúng vị trí lỗi trong gần như mọi ảnh. Hãy đọc con số này cẩn thận: <strong>dữ liệu tổng hợp ở đây dễ</strong> (lỗi tương phản rõ trên nền vân đều). Trên lỗi thật, mờ, nằm trong vân phức tạp, kết quả sẽ thấp hơn; điều đáng học là quy trình, không phải con số 1,000.</p>
+
+<h2 id="4-thay-doi-lo-vat-lieu-dac-trung-nhay-voi-gi">4. Thay đổi lô vật liệu: đặc trưng nhạy với gì?</h2>
+<p>Đặc trưng tổng quát mô tả mọi thứ, nên phương pháp ở mục 3 báo bất thường với <em>mọi</em> thay đổi so với bộ nhớ OK, kể cả thay đổi vô hại. Thử với 100 ảnh OK của các lô gỗ khác nhau, dùng ngưỡng giữ 95% ảnh OK của lô cũ:</p>
+<pre><code class="language-python">for ten, lech, van in (("lô cũ", (0.0, 0.0, 0.0), (15, 30)), ("lô mới đậm màu hơn", (-0.06, -0.06, -0.04), (15, 30)),
+                       ("lô mới vân thưa hơn", (0.0, 0.0, 0.0), (8, 14)), ("lô mới vân dày hơn", (0.0, 0.0, 0.0), (32, 45))):
+    X_lo, _, _ = tao_anh(100, 7, ty_le_ng=0.0, lech_mau=lech, tan_van=van)     # 100 ảnh OK của một lô gỗ
+    d_lo, _ = diem_bat_thuong(dac_trung(X_lo)[1])
+    print(f"{ten:20s}: {100 * (d_lo &gt; nguong_95).float().mean():3.0f}% ảnh OK bị báo bất thường")</code></pre>
+<pre><code class="language-text">lô cũ               :   4% ảnh OK bị báo bất thường
+lô mới đậm màu hơn  :   4% ảnh OK bị báo bất thường
+lô mới vân thưa hơn :   4% ảnh OK bị báo bất thường
+lô mới vân dày hơn  :  26% ảnh OK bị báo bất thường</code></pre>
+<p>Lệch màu toàn tấm và vân thưa hơn không làm tăng báo nhầm (đặc trưng chuẩn hóa nên ít nhạy với màu chung), nhưng lô vân dày hơn khiến khoảng một phần tư ảnh OK bị báo bất thường. Không đoán trước được đặc trưng nhạy với loại thay đổi nào: phải thử trên chính các biến thiên OK thật của nhà máy (lô vật liệu, ca, đèn), giống như với variation model ở bài <a href="so-sanh-anh-mau-golden-template-opencv.html">golden template</a>. Bài tập 1 thử cách cập nhật bộ nhớ khi lô mới về.</p>
+
+<h2 id="5-sam-3-va-phat-hien-theo-cau-chu">5. SAM 3 và phát hiện theo câu chữ</h2>
+<p>SAM 3 (Meta, ra ngày 20/11/2025) nhận một cụm danh từ (ví dụ "nắp chai", "vết xước") hoặc vài khung mẫu, rồi tìm và phân đoạn <em>mọi</em> đối tượng thuộc khái niệm đó trong ảnh và video (xem thêm bài tin <a href="../tin-tuc-ai/computer-vision-2026-yolo26-sam-3-1.html">YOLO26 và SAM 3.1</a>). Thư viện Ultralytics có giao diện cho SAM 3 và cho YOLOE (open-vocabulary). Hai đoạn dưới là minh họa: trọng số SAM 3 (<code>sam3.pt</code>) phải xin quyền truy cập trên Hugging Face rồi tải thủ công; YOLOE tự tải trọng số lần đầu.</p>
+<pre><code class="language-python"># (minh họa) cần ultralytics và file sam3.pt đã được cấp quyền tải từ Hugging Face
+from ultralytics.models.sam import SAM3SemanticPredictor
+
+du_doan = SAM3SemanticPredictor(overrides=dict(conf=0.25, task="segment", mode="predict", model="sam3.pt"))
+du_doan.set_image("khay_linh_kien.jpg")                 # đặt ảnh một lần, hỏi nhiều khái niệm
+ket_qua = du_doan(text=["screw", "washer"])             # mặt nạ mọi con vít, vòng đệm trong ảnh</code></pre>
+<pre><code class="language-python"># (minh họa) phát hiện theo tên lớp bằng chữ, không cần huấn luyện
+from ultralytics import YOLOE
+
+mo_hinh = YOLOE("yoloe-26s-seg.pt")
+mo_hinh.set_classes(["forklift", "person", "pallet"])  # tên lớp tùy ý, bằng tiếng Anh
+ket_qua = mo_hinh.predict("kho_hang.jpg", conf=0.25)</code></pre>
+<p>Với vật thông dụng (người, xe nâng, thùng, pallet, chai), các mô hình này dùng được ngay. Với <strong>lỗi công nghiệp</strong> ("vết xước 0,2 mm trên nhôm anod", "bavia"), khái niệm hiếm khi có trong dữ liệu huấn luyện của chúng và kết quả thường không đủ tin cậy để phán OK/NG. Cách dùng hiệu quả nhất trong nhà máy hiện nay là làm <strong>công cụ gán nhãn</strong>: SAM 3 hoặc YOLOE đề xuất mặt nạ, hộp; người kiểm tra và sửa; rồi huấn luyện một mô hình nhỏ chuyên biệt (YOLO26, U-Net, PatchCore) để chạy trên dây chuyền. Xem bài <a href="../tai-nguyen/cong-cu-gan-nhan-du-lieu-anh-mien-phi.html">công cụ gán nhãn</a> và <a href="../tai-nguyen/sam-gan-nhan-phan-doan-nhanh.html">SAM để gán nhãn phân đoạn nhanh</a>.</p>
+
+<h2 id="6-dua-len-day-chuyen-duoc-gi-mat-gi">6. Đưa lên dây chuyền: được gì, mất gì</h2>
+<table>
+  <tr><th>Tiêu chí</th><th>Foundation model</th><th>Mô hình nhỏ chuyên biệt</th></tr>
+  <tr><td>Dữ liệu cần</td><td>Rất ít (vài ảnh mỗi lớp, hoặc chỉ ảnh OK)</td><td>Hàng trăm đến hàng nghìn ảnh có nhãn</td></tr>
+  <tr><td>Thời gian ra phiên bản đầu</td><td>Vài giờ</td><td>Vài tuần (thu dữ liệu, gán nhãn, huấn luyện)</td></tr>
+  <tr><td>Tốc độ, phần cứng</td><td>Chậm hơn, nặng hơn (DINOv2 ViT-S 21 triệu tham số; bản lớn hàng trăm triệu đến hàng tỉ); SAM 3 cần GPU</td><td>Nhanh, chạy CPU/edge (YOLO26n khoảng 2,4 triệu tham số)</td></tr>
+  <tr><td>Kiểm soát</td><td>Nhạy với thay đổi không lường trước (mục 4); khó giải thích vì sao</td><td>Biết rõ dữ liệu đã học; kiểm định bằng golden set như mọi mô hình</td></tr>
+  <tr><td>Giấy phép</td><td>Khác nhau theo mô hình (DINOv2: Apache 2.0; DINOv3, SAM: giấy phép riêng của Meta; thư viện Ultralytics: AGPL-3.0 hoặc thương mại)</td><td>Tùy kiến trúc và thư viện; thường dễ kiểm soát hơn</td></tr>
+</table>
+<p>Lộ trình thực tế hay gặp: dùng foundation model để <em>khởi động</em> (chứng minh khả thi với vài ảnh, gán nhãn nhanh, chạy bóng song song với QC), rồi chuyển sang mô hình nhỏ chuyên biệt khi đã có dữ liệu, hoặc giữ foundation model làm backbone nếu tốc độ và giấy phép cho phép. Dù cách nào, nghiệm thu vẫn theo đúng quy trình golden set, ngưỡng, escape và overkill ở bài <a href="ai-vision-5-chon-nguong-va-danh-gia-theo-nha-may.html">chọn ngưỡng</a>.</p>
+
+<h2 id="tom-tat">Tóm tắt</h2>
+<ul>
+  <li>Foundation model: trích đặc trưng (DINOv2/v3, CLIP), phân đoạn theo nhắc (SAM, SAM 3 với câu chữ), phát hiện theo câu chữ (YOLOE, Grounding DINO).</li>
+  <li>Đặc trưng DINOv2 đóng băng + hồi quy logistic phân loại tốt với vài ảnh mỗi lớp, vượt xa CNN từ đầu và đặc trưng ImageNet trong thí nghiệm.</li>
+  <li>Đặc trưng patch + khoảng cách tới bộ nhớ OK (kiểu PatchCore) phát hiện và định vị lỗi khi không có ảnh NG.</li>
+  <li>Đặc trưng tổng quát nhạy với cả thay đổi vô hại; phải thử trên biến thiên OK thật của nhà máy, cập nhật bộ nhớ khi đổi lô.</li>
+  <li>Với lỗi công nghiệp, SAM 3, YOLOE hiệu quả nhất trong vai trò công cụ gán nhãn; mô hình nhỏ chuyên biệt chạy trên dây chuyền. Kiểm tra giấy phép từng mô hình.</li>
+</ul>
+
+<h2 id="bai-tap">Bài tập</h2>
+<div class="ex">
+<h3 id="bai-1-cap-nhat-bo-nho-khi-lo-moi-ve">Bài 1. Cập nhật bộ nhớ khi lô mới về</h3>
+<p>Lô gỗ vân dày làm khoảng một phần tư ảnh OK bị báo bất thường. Thêm 5 và 20 ảnh OK của lô mới vào bộ nhớ (giữ ngưỡng chọn trên lô cũ), đo lại tỉ lệ báo nhầm trên 100 ảnh OK lô mới và tỉ lệ bắt được 100 ảnh NG lô mới.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">X_moi, _, _ = tao_anh(120, 8, ty_le_ng=0.0, tan_van=(32, 45))                # ảnh OK lô vân dày: 20 để học, 100 để thử
+p_moi = dac_trung(X_moi)[1]
+X_ng_moi, y_ng_moi, _ = tao_anh(100, 9, ty_le_ng=1.0, tan_van=(32, 45))      # ảnh NG trên lô vân dày
+p_ng_moi = dac_trung(X_ng_moi)[1]
+kho_goc = patch_tap[ok_idx[:30]].reshape(-1, 384)
+for them in (0, 5, 20):
+    kho = torch.cat([kho_goc, p_moi[:them].reshape(-1, 384)])            # diem_bat_thuong dùng biến toàn cục kho
+    d_ok, _ = diem_bat_thuong(p_moi[20:])
+    d_ng, _ = diem_bat_thuong(p_ng_moi)
+    nguong = np.quantile(diem_bat_thuong(patch_thu[y_thu == 0])[0].numpy(), 0.95)   # ngưỡng chọn lại trên OK lô cũ
+    print(f"thêm {them:2d} ảnh OK lô mới: báo nhầm OK lô mới {100 * (d_ok &gt; nguong).float().mean():3.0f}%, "
+          f"bắt được NG lô mới {100 * (d_ng &gt; nguong).float().mean():3.0f}%")
+kho = kho_goc                                                         # trả lại như mục 3</code></pre>
+<pre><code class="language-text">thêm  0 ảnh OK lô mới: báo nhầm OK lô mới  22%, bắt được NG lô mới 100%
+thêm  5 ảnh OK lô mới: báo nhầm OK lô mới  16%, bắt được NG lô mới 100%
+thêm 20 ảnh OK lô mới: báo nhầm OK lô mới  13%, bắt được NG lô mới 100%</code></pre>
+<p>Thêm ảnh lô mới làm báo nhầm giảm, nhưng chậm: 20 ảnh vẫn chưa đưa về mức của lô cũ, vì lô mới có dải mật độ vân rộng và cần nhiều mẫu hơn để phủ. Ảnh NG vẫn bị bắt đủ. Trên trạm thật: quy trình đổi lô gồm thu một lượng ảnh OK đủ đa dạng của lô mới (theo dõi tỉ lệ báo nhầm khi thêm dần), chọn lại ngưỡng trên OK của cả hai lô, chạy lại bộ ảnh NG đã lưu để chắc escape không tăng, và ghi phiên bản bộ nhớ như ghi phiên bản mô hình.</p>
+</details>
+</div>
+<div class="ex">
+<h3 id="bai-2-ke-hoach-dung-sam-3-de-gan-nhan">Bài 2. Kế hoạch dùng SAM 3 để gán nhãn</h3>
+<p>Dự án mới: phát hiện linh kiện thiếu trên bo mạch, 15 loại linh kiện, chưa có ảnh nào được gán nhãn, 3 000 ảnh thô. Lập kế hoạch dùng SAM 3 (hoặc YOLOE) để có dataset nhanh nhất mà vẫn tin được.</p>
+<details><summary>Xem đáp án</summary>
+<p>(1) Gán nhãn tay cẩn thận 50–100 ảnh làm tập "chuẩn" để đo chất lượng nhãn tự động. (2) Thử các cụm từ nhắc cho từng loại linh kiện (tên tiếng Anh, mô tả hình dạng) và khung mẫu; đo IoU so với tập chuẩn, giữ cách nhắc tốt nhất cho từng loại; loại nào nhắc bằng chữ kém thì dùng khung mẫu hoặc gán tay. (3) Chạy tự động trên 3 000 ảnh, người kiểm tra chỉ sửa và xác nhận (nhanh hơn vẽ mới nhiều lần), ưu tiên xem ảnh có điểm tin cậy thấp. (4) Huấn luyện YOLO26 nhỏ trên nhãn đã xác nhận; dùng mô hình đó tìm ảnh nó còn sai để gán nhãn thêm. (5) Chia train/val/test theo bo mạch, theo lô; tập test được kiểm tra kỹ nhất. Ghi rõ trong tài liệu dataset nhãn nào do máy đề xuất, nhãn nào người xác nhận.</p>
+</details>
+</div>
+<p>Bài tiếp theo: <a href="ai-vision-5-chon-nguong-va-danh-gia-theo-nha-may.html">Chọn ngưỡng và đánh giá theo escape, overkill, cycle time</a>.</p>
+
+<p class="note">Nguồn tham khảo: Oquab và cộng sự (2023), <a href="https://arxiv.org/abs/2304.07193" rel="noopener" target="_blank"><em>DINOv2: Learning Robust Visual Features without Supervision</em> (arXiv:2304.07193)</a>, <a href="https://github.com/facebookresearch/dinov2" rel="noopener" target="_blank">DINOv2 trên GitHub</a>, <a href="https://ai.meta.com/resources/models-and-libraries/dinov3-license" rel="noopener" target="_blank">Meta: DINOv3 License</a>, <a href="https://docs.ultralytics.com/models/sam-3" rel="noopener" target="_blank">Ultralytics: SAM 3 (Segment Anything with Concepts)</a>, <a href="https://docs.ultralytics.com/models/yoloe/" rel="noopener" target="_blank">Ultralytics: YOLOE</a>; Roth và cộng sự (2022), <em>Towards Total Recall in Industrial Anomaly Detection</em> (PatchCore).</p>
+
+      </div>
+      <section class="practice"><h2><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <circle cx="12" cy="12" r="6" /> <circle cx="12" cy="12" r="2" /></svg>Bài tập thực hành</h2><ol><li>S</li><li>o</li><li> </li><li>s</li><li>á</li><li>n</li><li>h</li><li> </li><li>C</li><li>N</li><li>N</li><li>,</li><li> </li><li>R</li><li>e</li><li>s</li><li>N</li><li>e</li><li>t</li><li>-</li><li>1</li><li>8</li><li> </li><li>v</li><li>à</li><li> </li><li>D</li><li>I</li><li>N</li><li>O</li><li>v</li><li>2</li><li> </li><li>v</li><li>ớ</li><li>i</li><li> </li><li>1</li><li>0</li><li> </li><li>ả</li><li>n</li><li>h</li><li> </li><li>m</li><li>ỗ</li><li>i</li><li> </li><li>l</li><li>ớ</li><li>p</li><li>,</li><li> </li><li>r</li><li>ồ</li><li>i</li><li> </li><li>c</li><li>ậ</li><li>p</li><li> </li><li>n</li><li>h</li><li>ậ</li><li>t</li><li> </li><li>b</li><li>ộ</li><li> </li><li>n</li><li>h</li><li>ớ</li><li> </li><li>p</li><li>a</li><li>t</li><li>c</li><li>h</li><li> </li><li>k</li><li>h</li><li>i</li><li> </li><li>đ</li><li>ổ</li><li>i</li><li> </li><li>l</li><li>ô</li></ol><p>Làm xong bài tập mới chuyển sang bài tiếp theo: tự viết code là cách duy nhất để nhớ lâu.</p></section><div class="lesson-done" data-course="vision-engineer"><button type="button" class="lesson-done-btn" data-lesson-done="foundation-model-dinov2-sam-ai-vision" aria-pressed="false"><span class="box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></span><span class="off">Đánh dấu đã học xong</span><span class="on">Đã học xong bài này</span></button><a class="btn lg" href="../hoc/ai-vision-5-chon-nguong-va-danh-gia-theo-nha-may.html">Bài tiếp theo<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a></div>
+      <footer class="article-foot">
+        <div class="tags"><a class="tag" href="../search.html?q=AI Vision">#AI Vision</a><a class="tag" href="../search.html?q=Deep Learning">#Deep Learning</a><a class="tag" href="../search.html?q=PyTorch">#PyTorch</a></div>
+        <div class="share">
+      <span>Chia sẻ:</span>
+      <a class="share-btn fb" href="https://www.facebook.com/sharer/sharer.php?u=https://hocfree.vn/hoc/foundation-model-dinov2-sam-ai-vision.html" target="_blank" rel="noopener" aria-label="Chia sẻ Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8z"/></svg></a>
+      <a class="share-btn x" href="https://twitter.com/intent/tweet?url=https://hocfree.vn/hoc/foundation-model-dinov2-sam-ai-vision.html" target="_blank" rel="noopener" aria-label="Chia sẻ X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+      <button class="share-btn copy-link" data-url="https://hocfree.vn/hoc/foundation-model-dinov2-sam-ai-vision.html" aria-label="Sao chép liên kết"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+    </div>
+      </footer>
+      <div class="author-box">
+        <span class="avatar lg" aria-hidden="true">HF</span>
+        <div>
+          <strong>Ban biên tập HọcFree</strong>
+          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và ngoại ngữ, hoàn toàn miễn phí.</p>
+        </div>
+      </div>
+      <nav class="pager lesson-pager" aria-label="Bài học trước/sau"><a class="prev" href="../hoc/grad-cam-giai-thich-mo-hinh-ai-vision.html"><span>← Bài trước · Bài 5</span>Grad-CAM: mô hình đang nhìn vào đâu?</a><a class="next" href="../hoc/ai-vision-5-chon-nguong-va-danh-gia-theo-nha-may.html"><span>Bài tiếp → · Bài 7</span>Chọn ngưỡng và đánh giá theo escape, overkill, cycle time</a></nav>
+    </article>
+    <aside class="sidebar course-side" data-course="vision-engineer">
+      <section class="widget course-toc">
+        <p class="widget-title">Chặng 12/15 · Vision Engineer</p>
+        <a class="course-toc-title" href="../lo-trinh/vision-engineer/ai-vision.html">AI Vision</a>
+        <div class="lc" data-lesson-count="rule-based-hay-deep-learning-kiem-tra-loi tu-xay-dataset-anh-cong-nghiep cong-cu-gan-nhan-du-lieu-anh-mien-phi du-lieu-tong-hop-synthetic-data-ai-vision grad-cam-giai-thich-mo-hinh-ai-vision foundation-model-dinov2-sam-ai-vision ai-vision-5-chon-nguong-va-danh-gia-theo-nha-may ai-vision-6-bai-tap-thiet-ke-chien-luoc-ai"><div class="lc-bar"><span data-lc-bar></span></div><span data-lc-text>0/8 bài</span></div>
+        <ol class="toc-lessons"><li data-lesson="rule-based-hay-deep-learning-kiem-tra-loi"><a href="../kien-thuc/rule-based-hay-deep-learning-kiem-tra-loi.html"><span class="tn">1</span><span class="tt">Rule-based hay Deep Learning?</span></a></li><li data-lesson="tu-xay-dataset-anh-cong-nghiep"><a href="../tai-nguyen/tu-xay-dataset-anh-cong-nghiep.html"><span class="tn">2</span><span class="tt">Tự xây dataset ảnh công nghiệp</span></a></li><li data-lesson="cong-cu-gan-nhan-du-lieu-anh-mien-phi"><a href="../tai-nguyen/cong-cu-gan-nhan-du-lieu-anh-mien-phi.html"><span class="tn">3</span><span class="tt">Công cụ gán nhãn miễn phí</span></a></li><li data-lesson="du-lieu-tong-hop-synthetic-data-ai-vision"><a href="../hoc/du-lieu-tong-hop-synthetic-data-ai-vision.html"><span class="tn">4</span><span class="tt">Khi thiếu ảnh lỗi: augmentation và dữ liệu tổng hợp</span></a></li><li data-lesson="grad-cam-giai-thich-mo-hinh-ai-vision"><a href="../hoc/grad-cam-giai-thich-mo-hinh-ai-vision.html"><span class="tn">5</span><span class="tt">Grad-CAM: mô hình đang nhìn vào đâu?</span></a></li><li data-lesson="foundation-model-dinov2-sam-ai-vision" class="is-current"><a href="../hoc/foundation-model-dinov2-sam-ai-vision.html" aria-current="page"><span class="tn">6</span><span class="tt">Foundation model: DINOv2, SAM, YOLOE</span></a></li><li data-lesson="ai-vision-5-chon-nguong-va-danh-gia-theo-nha-may"><a href="../hoc/ai-vision-5-chon-nguong-va-danh-gia-theo-nha-may.html"><span class="tn">7</span><span class="tt">Chọn ngưỡng và đánh giá theo escape, overkill, cycle time</span></a></li><li data-lesson="ai-vision-6-bai-tap-thiet-ke-chien-luoc-ai"><a href="../hoc/ai-vision-6-bai-tap-thiet-ke-chien-luoc-ai.html"><span class="tn">8</span><span class="tt">Bài tập chặng 12: thiết kế chiến lược AI cho một bài toán lỗi</span></a></li></ol>
+        <a class="more" href="../lo-trinh/vision-engineer.html">Xem toàn bộ lộ trình<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a>
+      </section>
+    </aside>
+  </div>
+  <section class="band">
+    <div class="container">
+      <div class="section-title"><h2>Có thể bạn quan tâm</h2></div>
+      <div class="card-grid"><article class="card">
+  <a class="thumb" href="../hoc/python-7-class-dataclass-to-chuc-code.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/python-7-class-dataclass-to-chuc-code.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/python-7-class-dataclass-to-chuc-code.html">Class và dataclass: tổ chức code cho trạm kiểm tra</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-21">21/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>17 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/luong-hang-doi-tach-chup-anh-xu-ly.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/luong-hang-doi-tach-chup-anh-xu-ly.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/luong-hang-doi-tach-chup-anh-xu-ly.html">Luồng và hàng đợi: tách chụp ảnh khỏi xử lý, không mất khung</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-21">21/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>25 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/lay-anh-camera-cong-nghiep-genicam-pypylon.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html">Lấy ảnh từ camera công nghiệp: GenICam, pypylon, camera giả lập</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-21">21/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>28 phút đọc</span></div>
+</article></div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <a class="logo" href="../"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+      <p>HọcFree.vn – nền tảng học miễn phí về AI, lập trình, Computer Vision, Machine Vision, tin tức AI và ngoại ngữ dành cho người Việt.</p>
+    </div>
+    <div><h3>Học &amp; thực hành</h3><ul><li><a href="../hoc/">Học AI &amp; Lập trình</a></li><li><a href="../projects/">Projects</a></li><li><a href="../lo-trinh/">Learning Paths</a></li></ul></div>
+    <div><h3>Khám phá</h3><ul><li><a href="../kien-thuc/">Kiến thức</a></li><li><a href="../tin-tuc-ai/">Tin tức AI</a></li><li><a href="../ngoai-ngu/">Ngoại ngữ</a></li><li><a href="../tai-nguyen/">Tài nguyên</a></li></ul></div>
+    <div><h3>Bài mới</h3><ul><li><a href="../hoc/python-7-class-dataclass-to-chuc-code.html">Class và dataclass: tổ chức code cho trạm kiểm tra</a></li><li><a href="../hoc/luong-hang-doi-tach-chup-anh-xu-ly.html">Luồng và hàng đợi: tách chụp ảnh khỏi xử lý, không mất khung</a></li><li><a href="../hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html">Lấy ảnh từ camera công nghiệp: GenICam, pypylon, camera giả lập</a></li><li><a href="../hoc/msa-gage-rr-anova-he-do-camera.html">MSA và Gage R&amp;R cho trạm đo camera: ANOVA, ndc, dải bảo vệ</a></li></ul></div>
+    <div>
+      <h3>HọcFree</h3>
+      <ul>
+        <li><a href="../gioi-thieu.html">Giới thiệu</a></li>
+        <li><a href="../search.html">Tìm kiếm</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">© 2026 HọcFree.vn · Kiến thức là để chia sẻ.</div>
+  </div>
+</footer>
+<button class="to-top" aria-label="Lên đầu trang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<script src="../assets/js/search-data.js?v=20261021" defer></script>
+<script src="../assets/js/main.js?v=20261021" defer></script>
+</body>
+</html>

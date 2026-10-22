@@ -19,7 +19,8 @@
 x = torch.tensor(1.0, requires_grad=True)
 y = (4*x**3 - 5*x**2 + 6*x - 7) ** 10
 y.backward()
-print(x.grad)   # tensor(-40960.)</code></pre>
+print(x.grad)</code></pre>
+<pre><code class="language-text">tensor(-40960.)</code></pre>
 
 <h2>Đồ thị tính toán và ví dụ f = (x + y)·z</h2>
 <p>Ta biểu diễn phép tính thành <strong>đồ thị tính toán</strong> (computational graph): mỗi nút là một phép toán đơn giản. Với \(f(x,y,z) = (x+y)z\), đặt biến trung gian \(q = x + y\), khi đó \(f = q\cdot z\).</p>
@@ -62,7 +63,9 @@ y = torch.tensor(5.0, requires_grad=True)
 z = torch.tensor(-4.0, requires_grad=True)
 f = (x + y) * z
 f.backward()
-print(f.item(), x.grad.item(), y.grad.item(), z.grad.item())   # -12.0 -4.0 -4.0 3.0</code></pre>
+print(f.item(), x.grad.item(), y.grad.item(), z.grad.item())</code></pre>
+<pre><code class="language-text">-12.0 -4.0 -4.0 3.0</code></pre>
+<p>Bốn con số khớp bảng tính tay: \(f = -12\), \(\partial f/\partial x = \partial f/\partial y = -4\), \(\partial f/\partial z = 3\).</p>
 
 <h2>Quy tắc vàng: upstream × local</h2>
 <p>Nhìn từ góc độ một nút \(f\) bất kỳ với đầu vào \(x, y\) và đầu ra \(z\) (trang 56):</p>
@@ -85,12 +88,29 @@ print(f.item(), x.grad.item(), y.grad.item(), z.grad.item())   # -12.0 -4.0 -4.0
 <li>Local gradient của sigmoid có dạng rất đẹp: \(\sigma'(z) = \sigma(z)(1-\sigma(z)) = 0.731\cdot0.269 \approx 0.197\).</li>
 <li>Từ \(z\) đi xuống qua các cổng nhân/cộng: \(\partial f/\partial w_0 = x_0\cdot0.197 = -0.197\), \(\partial f/\partial x_0 = w_0\cdot0.197 = 0.393\), \(\partial f/\partial w_1 = -0.393\), \(\partial f/\partial x_1 = -0.59\), \(\partial f/\partial w_2 = 0.197\).</li>
 </ul>
+<p>Kiểm tra bằng autograd:</p>
+<pre><code class="language-python">w = torch.tensor([2.0, -3.0, -3.0], requires_grad=True)       # w0, w1, w2 (bias)
+x = torch.tensor([-1.0, -2.0], requires_grad=True)
+f = torch.sigmoid(w[0] * x[0] + w[1] * x[1] + w[2])
+f.backward()
+print(round(f.item(), 3), w.grad.numpy().round(3), x.grad.numpy().round(3))</code></pre>
+<pre><code class="language-text">0.731 [-0.197 -0.393  0.197] [ 0.393 -0.59 ]</code></pre>
 <p>Chú ý \(\sigma'(z)\) tối đa chỉ bằng 0.25. Khi xếp chồng 10 lớp sigmoid, gradient bị nhân với các số ≤ 0.25 mười lần và gần như biến mất: đó là <strong>vanishing gradient</strong>, sẽ phân tích kỹ ở bài <a href="vanishing-exploding-gradient-weight-init.html">Vanishing/Exploding gradient</a> của chặng này.</p>
 
 <h2>Backprop cho cả một lớp Linear (dạng ma trận)</h2>
 <p>Trong thực tế ta không đi từng nút vô hướng mà xử lý cả ma trận. Với lớp \(Y = XW^T + b\) (\(X\): \(N\times D\), \(W\): \(K\times D\)), biết upstream \(dY = \partial L/\partial Y\) (\(N\times K\)):</p>
 \[ \frac{\partial L}{\partial W} = dY^T X, \qquad \frac{\partial L}{\partial X} = dY\, W, \qquad \frac{\partial L}{\partial b} = \sum_{n} dY_n \]
 <div class="tip"><strong>Mẹo nhớ: khớp kích thước</strong>Gradient theo một biến luôn có <strong>cùng kích thước với biến đó</strong>. \(\partial L/\partial W\) phải là \(K\times D\); chỉ có một cách nhân \(dY\) (\(N\times K\)) với \(X\) (\(N\times D\)) ra \(K\times D\) là \(dY^T X\). Không cần thuộc công thức, chỉ cần ghép cho khớp chiều.</div>
+<p>Kiểm chứng cả ba công thức với autograd. Gọi <code>Y.backward(dY)</code> nghĩa là cho autograd biết upstream \(\partial L/\partial Y = dY\):</p>
+<pre><code class="language-python">torch.manual_seed(0)
+X_lop = torch.randn(5, 4, requires_grad=True)          # N = 5, D = 4
+lop = torch.nn.Linear(4, 3)                         # W: 3×4, b: 3
+Y = lop(X_lop)
+dY = torch.randn(5, 3)                              # upstream giả định
+Y.backward(dY)                                      # autograd tính ∂L/∂W, ∂L/∂X_lop, ∂L/∂b với L = Σ Y·dY
+print(torch.allclose(lop.weight.grad, dY.T @ X_lop), torch.allclose(X_lop.grad, dY @ lop.weight),
+      torch.allclose(lop.bias.grad, dY.sum(0)))</code></pre>
+<pre><code class="language-text">True True True</code></pre>
 
 <h2>Tự cài backprop bằng NumPy: mạng 2 lớp học XOR</h2>
 <p>XOR là bài toán linear classifier không giải được. Mạng dưới đây có một lớp ẩn 8 neuron (tanh), đầu ra sigmoid, loss binary cross-entropy; mọi gradient được tính tay theo quy tắc upstream × local:</p>
@@ -129,15 +149,44 @@ for step in range(5001):
         print(f"step {step:4d}  loss {loss:.4f}")
 
 print(np.round(p.ravel(), 3))   # gần [0, 1, 1, 0]</code></pre>
-<p>Kết quả chạy thật: loss giảm từ 0.80 xuống 0.0005, đầu ra <code>[0. 1. 0.999 0.001]</code>.</p>
+<pre><code class="language-text">step    0  loss 0.8049
+step 1000  loss 0.0038
+step 2000  loss 0.0016
+step 3000  loss 0.0009
+step 4000  loss 0.0007
+step 5000  loss 0.0005
+[0.    1.    0.999 0.001]</code></pre>
+<p>Loss giảm từ 0,80 xuống 0,0005 và đầu ra gần đúng \([0, 1, 1, 0]\): mạng đã học XOR chỉ bằng các gradient tính tay.</p>
 <h3>Gradient check: cách kiểm tra backprop tự viết</h3>
-<p>Khi tự cài backprop (ví dụ cho một layer mới), hãy so gradient giải tích với gradient số bằng sai phân trung tâm. Sai số tương đối cỡ \(10^{-7}\) trở xuống là đúng:</p>
-<pre><code class="language-python">eps = 1e-5
-W1[1, 3] += eps; lp = loss_fn()       # loss_fn: chạy forward và trả về loss
-W1[1, 3] -= 2 * eps; lm = loss_fn()
-W1[1, 3] += eps                       # trả lại giá trị cũ
-num = (lp - lm) / (2 * eps)
-print(num, dW1[1, 3])                 # 0.0411591695 0.0411591695 (sai số tương đối ~1e-11)</code></pre>
+<p>Khi tự cài backprop (ví dụ cho một layer mới), hãy so gradient giải tích với gradient số bằng sai phân trung tâm ở đầu bài. Đoạn dưới đóng gói forward và backward của mạng XOR thành một hàm, kiểm tra từng trọng số của <code>W1</code>, rồi thử lại với một lỗi cố ý: quên bình phương trong đạo hàm của tanh.</p>
+<pre><code class="language-python">def lan_truyen(W1, b1, W2, b2, dao_ham_tanh=lambda h: 1 - h ** 2):
+    """Forward + backward của mạng XOR ở trên; trả về loss và gradient của W1."""
+    h1 = np.tanh(X @ W1 + b1)
+    p = sigmoid(h1 @ W2 + b2)
+    loss = -np.mean(y * np.log(p) + (1 - y) * np.log(1 - p))
+    dz1 = ((p - y) / len(X)) @ W2.T * dao_ham_tanh(h1)
+    return loss, X.T @ dz1
+
+
+def kiem_tra_gradient(dao_ham_tanh, eps=1e-5):
+    rng = np.random.default_rng(1)
+    W1, W2 = rng.normal(0, 0.5, (2, 8)), rng.normal(0, 0.5, (8, 1))
+    b1, b2 = np.zeros((1, 8)), np.zeros((1, 1))
+    _, dW1 = lan_truyen(W1, b1, W2, b2, dao_ham_tanh)
+    so = np.zeros_like(W1)
+    for idx in np.ndindex(W1.shape):                 # sai phân trung tâm cho TỪNG trọng số của W1
+        W1[idx] += eps; lp, _ = lan_truyen(W1, b1, W2, b2)
+        W1[idx] -= 2 * eps; lm, _ = lan_truyen(W1, b1, W2, b2)
+        W1[idx] += eps
+        so[idx] = (lp - lm) / (2 * eps)
+    return np.max(np.abs(so - dW1) / np.maximum(1e-12, np.abs(so) + np.abs(dW1)))
+
+
+print(f"backward đúng            : sai số tương đối lớn nhất {kiem_tra_gradient(lambda h: 1 - h ** 2):.1e}")
+print(f"quên bình phương (1 - h) : sai số tương đối lớn nhất {kiem_tra_gradient(lambda h: 1 - h):.1e}")</code></pre>
+<pre><code class="language-text">backward đúng            : sai số tương đối lớn nhất 1.7e-07
+quên bình phương (1 - h) : sai số tương đối lớn nhất 1.0e+00</code></pre>
+<p>Bản đúng có sai số tương đối cỡ \(10^{-7}\), mức bình thường của sai phân số (CS231n gợi ý: quanh \(10^{-7}\) là tốt, trên \(10^{-2}\) thì gần như chắc chắn sai). Bản lỗi cho sai số cỡ 1 ở ít nhất một trọng số. Đáng sợ là lỗi này không làm chương trình dừng: chạy vòng huấn luyện XOR ở trên với đạo hàm sai, loss vẫn giảm từ 0,80 xuống khoảng 0,02 và đầu ra vẫn gần \([0, 1, 1, 0]\), vì hướng gradient chỉ sai một phần. Không có gradient check, lỗi kiểu này có thể nằm im rất lâu.</p>
 
 <h2>Toàn cảnh quá trình học của neural network</h2>
 <p>Ghép mọi mảnh lại (trang 57), một vòng lặp huấn luyện gồm:</p>
@@ -149,12 +198,31 @@ print(num, dW1[1, 3])                 # 0.0411591695 0.0411591695 (sai số tư�
 <li>Lặp lại cho đến khi loss đủ nhỏ hoặc hết số epoch.</li>
 </ol>
 <p>Trong PyTorch, <strong>autograd</strong> tự động ghi lại đồ thị tính toán khi chạy forward và tự làm toàn bộ bước 3 khi gọi <code>loss.backward()</code>:</p>
-<pre><code class="language-python">for images, labels in train_loader:
+<pre><code class="language-python">torch.manual_seed(0)
+du_lieu = torch.utils.data.TensorDataset(torch.randn(64, 4), torch.randint(0, 2, (64,)))
+train_loader = torch.utils.data.DataLoader(du_lieu, batch_size=16)
+model = torch.nn.Linear(4, 2)
+criterion = torch.nn.CrossEntropyLoss()
+optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+
+for images, labels in train_loader:
     outputs = model(images)            # 1. forward
     loss = criterion(outputs, labels)  # 2. loss
     optimizer.zero_grad()              # xoá gradient cũ (PyTorch CỘNG DỒN gradient nếu không xoá)
     loss.backward()                    # 3. backward
-    optimizer.step()                   # 4. cập nhật trọng số</code></pre>
+    optimizer.step()                   # 4. cập nhật trọng số
+print(f"loss batch cuối: {loss.item():.4f}")
+
+# Quên zero_grad: gọi backward 3 lần trên cùng một batch
+model.zero_grad()
+for lan in range(1, 4):
+    criterion(model(images), labels).backward()
+    print(f"sau lần backward thứ {lan}: |grad W| = {model.weight.grad.norm():.4f}")</code></pre>
+<pre><code class="language-text">loss batch cuối: 0.7818
+sau lần backward thứ 1: |grad W| = 0.2204
+sau lần backward thứ 2: |grad W| = 0.4408
+sau lần backward thứ 3: |grad W| = 0.6612</code></pre>
+<p>Phần cuối cho thấy vì sao phải gọi <code>zero_grad()</code>: mỗi lần <code>backward()</code> <strong>cộng thêm</strong> vào <code>.grad</code>, nên sau ba lần gradient lớn gấp ba. Quên xóa thì mỗi bước cập nhật dùng tổng gradient của mọi batch trước đó và việc học hỏng. Tính chất cộng dồn này lại có ích có chủ đích: tích lũy gradient qua nhiều batch nhỏ để giả lập batch lớn khi GPU thiếu bộ nhớ (bài tập 3).</p>
 
 <h2>Parameters và Hyperparameters</h2>
 <div class="table-wrap"><table>
@@ -172,8 +240,61 @@ print(num, dW1[1, 3])                 # 0.0411591695 0.0411591695 (sai số tư�
 <li>Mỗi nút: downstream = upstream × local; nhánh rẽ thì cộng dồn.</li>
 <li>Cổng cộng phân phát, cổng nhân đổi chéo, cổng max định tuyến.</li>
 <li>Gradient luôn cùng kích thước với biến; dùng gradient check khi tự cài đặt.</li>
-<li>PyTorch: <code>zero_grad()</code> → <code>backward()</code> → <code>step()</code>.</li>
+<li>PyTorch: <code>zero_grad()</code> → <code>backward()</code> → <code>step()</code>; gradient cộng dồn nếu không xóa.</li>
 </ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Tính tay qua cổng cộng, nhân và max</h3>
+<p>Cho \(f = (a\,b + \max(b, c))\cdot d\) với \(a = 3,\ b = -4,\ c = 2,\ d = -1\). Tính \(f\) và bốn đạo hàm riêng bằng tay, rồi kiểm tra bằng autograd.</p>
+<details><summary>Xem đáp án</summary>
+<p>Forward: \(ab = -12\), \(\max(-4, 2) = 2\) (chọn \(c\)), tổng \(s = -10\), \(f = 10\). Backward: \(\partial f/\partial d = s = -10\); \(\partial f/\partial s = d = -1\). Cổng cộng phân phát \(-1\) cho cả hai nhánh. Cổng nhân đổi chéo: \(\partial f/\partial a = -1\cdot b = 4\), nhánh nhân góp cho \(b\) là \(-1\cdot a = -3\). Cổng max định tuyến toàn bộ về \(c\): \(\partial f/\partial c = -1\), nhánh max góp cho \(b\) bằng 0. Biến \(b\) dùng ở hai nơi nên cộng dồn: \(\partial f/\partial b = -3 + 0 = -3\).</p>
+<pre><code class="language-python">a, b, c, d = (torch.tensor(v, requires_grad=True) for v in (3.0, -4.0, 2.0, -1.0))
+f = (a * b + torch.maximum(b, c)) * d
+f.backward()
+print(f.item(), a.grad.item(), b.grad.item(), c.grad.item(), d.grad.item())</code></pre>
+<pre><code class="language-text">10.0 4.0 -3.0 -1.0 -10.0</code></pre>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Đổi tanh sang ReLU</h3>
+<p>Sửa mạng XOR NumPy để lớp ẩn dùng ReLU. Chỉ cần đổi hai dòng: forward và local gradient.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">np.random.seed(0)
+W1 = np.random.randn(2, 8) * 0.5;  b1 = np.zeros((1, 8))
+W2 = np.random.randn(8, 1) * 0.5;  b2 = np.zeros((1, 1))
+for step in range(5001):
+    z1 = X @ W1 + b1
+    h1 = np.maximum(0, z1)                     # ReLU thay cho tanh
+    p = sigmoid(h1 @ W2 + b2)
+    dz2 = (p - y) / len(X)
+    dW2, db2 = h1.T @ dz2, dz2.sum(axis=0, keepdims=True)
+    dz1 = (dz2 @ W2.T) * (z1 &gt; 0)              # local gradient của ReLU: 1 nếu z &gt; 0, ngược lại 0
+    dW1, db1 = X.T @ dz1, dz1.sum(axis=0, keepdims=True)
+    W1 -= 0.5 * dW1; b1 -= 0.5 * db1; W2 -= 0.5 * dW2; b2 -= 0.5 * db2
+print(np.round(p.ravel(), 3))</code></pre>
+<pre><code class="language-text">[0.002 1.    1.    0.   ]</code></pre>
+<p>Đạo hàm ReLU là 1 khi \(z &gt; 0\) và 0 khi ngược lại, nên phải giữ lại <code>z1</code> từ bước forward (không suy được từ <code>h1</code> ở điểm \(z = 0\)). Đây đúng là cổng max trong bảng: \(\mathrm{ReLU}(z) = \max(0, z)\).</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 3. Tích lũy gradient để giả lập batch lớn</h3>
+<p>GPU chỉ chứa được batch 8 ảnh nhưng bạn muốn gradient như batch 32. Viết code tích lũy gradient qua 4 batch nhỏ và kiểm tra nó bằng đúng gradient của một batch 32.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">X_lon, y_lon = torch.randn(32, 4), torch.randint(0, 2, (32,))
+model.zero_grad()
+criterion(model(X_lon), y_lon).backward()
+g_lon = model.weight.grad.clone()                          # gradient của một batch 32
+
+model.zero_grad()
+for k in range(4):                                         # 4 batch nhỏ 8 ảnh, cộng dồn gradient
+    loss = criterion(model(X_lon[8 * k:8 * k + 8]), y_lon[8 * k:8 * k + 8]) / 4   # chia 4: trung bình
+    loss.backward()
+print(torch.allclose(model.weight.grad, g_lon, atol=1e-6))</code></pre>
+<pre><code class="language-text">True</code></pre>
+<p>Mỗi loss nhỏ chia cho 4 vì <code>CrossEntropyLoss</code> lấy trung bình trên batch: tổng 4 trung bình nhỏ chia 4 bằng trung bình trên 32 mẫu. Trong vòng huấn luyện thật, chỉ gọi <code>optimizer.step()</code> và <code>zero_grad()</code> sau mỗi 4 batch. Lưu ý: BatchNorm vẫn chỉ thấy 8 ảnh mỗi lần, nên tích lũy gradient không tương đương hoàn toàn với batch lớn khi mô hình có BatchNorm (bài <a href="batchnorm-dropout-receptive-field.html">BatchNorm</a>).</p>
+</details>
+</div>
 <p>Bài tiếp theo trong chặng: <a href="batchnorm-dropout-receptive-field.html">Batch Normalization, Dropout và Receptive Field</a>. Muốn xem một pipeline huấn luyện hoàn chỉnh trên CIFAR-10, đọc thêm <a href="pytorch-huan-luyen-mang-neural.html">PyTorch cho Computer Vision: 7 bước huấn luyện</a>.</p>
 
 <h2>Tài liệu tham khảo</h2>

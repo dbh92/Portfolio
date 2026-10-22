@@ -286,7 +286,7 @@ epoch 2: shuffle thường 10 NG/50 | sampler 26 NG/50 (chỉ từ 8 ảnh NG kh
 <ul>
   <li>Chỉ dùng sampler cho <strong>train</strong>. Tập val/test phải giữ tỉ lệ tự nhiên, hoặc ít nhất bạn phải biết tỉ lệ của nó khi đọc precision.</li>
   <li>Cách thay thế là giữ shuffle thường và đặt trọng số cho hàm loss: <code>nn.CrossEntropyLoss(weight=torch.tensor([1.0, 4.0]))</code> làm mỗi lỗi trên ảnh NG "đắt" gấp 4. Hai cách có tác dụng tương tự; thử cả hai và so trên val.</li>
-  <li>Cân bằng lớp làm điểm số đầu ra của mô hình bị "đẩy" về phía NG so với tỉ lệ thật trên dây chuyền. Không sao, vì ngưỡng OK/NG sẽ được chọn lại trên tập val theo escape và overkill (chặng 11).</li>
+  <li>Cân bằng lớp làm điểm số đầu ra của mô hình bị "đẩy" về phía NG so với tỉ lệ thật trên dây chuyền. Không sao, vì ngưỡng OK/NG sẽ được chọn lại trên tập val theo escape và overkill (chặng 12).</li>
 </ul>
 
 <h2>7. Augmentation với torchvision.transforms.v2</h2>
@@ -365,7 +365,7 @@ brightness=0.10: 0.8% ảnh OK trông như NG bạc màu
 brightness=0.20: 10.2% ảnh OK trông như NG bạc màu
 brightness=0.30: 23.8% ảnh OK trông như NG bạc màu</code></pre>
 <p>Biên độ ±5% an toàn, ±10% gần như an toàn (dưới 1%); ±20–30%, giá trị hay gặp trong ví dụ trên mạng, biến 10–24% ảnh OK thành "NG mang nhãn OK", dạy mô hình bỏ qua đúng loại lỗi bạn cần bắt (escape). Biên độ augmentation nên lấy từ <strong>dữ liệu đo thật</strong>: độ sáng trung bình của ảnh OK dao động bao nhiêu giữa các ca, các lô, trong 3 tháng.</p>
-<div class="tip"><strong>Augmentation cho detection và segmentation</strong>Khi nhãn là khung bao hoặc mặt nạ, mọi phép hình học phải áp cùng lúc cho ảnh và nhãn. <code>transforms.v2</code> làm việc này tự động nếu bạn bọc nhãn bằng <code>tv_tensors.BoundingBoxes</code> hoặc <code>tv_tensors.Mask</code> như ví dụ trên. Bài "U-Net cho phân đoạn ảnh" ở chặng 12 dùng lại kỹ thuật này.</div>
+<div class="tip"><strong>Augmentation cho detection và segmentation</strong>Khi nhãn là khung bao hoặc mặt nạ, mọi phép hình học phải áp cùng lúc cho ảnh và nhãn. <code>transforms.v2</code> làm việc này tự động nếu bạn bọc nhãn bằng <code>tv_tensors.BoundingBoxes</code> hoặc <code>tv_tensors.Mask</code> như ví dụ trên. Bài "U-Net cho phân đoạn ảnh" ở chặng 13 dùng lại kỹ thuật này.</div>
 <h3>Augmentation tự động và trộn ảnh</h3>
 <p>Ngoài tự chọn từng phép biến đổi, torchvision có sẵn các <strong>chính sách augmentation tự động</strong>: <code>AutoAugment</code>, <code>RandAugment</code>, <code>TrivialAugmentWide</code> chọn ngẫu nhiên một (hoặc vài) phép biến đổi với cường độ ngẫu nhiên cho mỗi ảnh, gần như không cần tinh chỉnh. Hai kỹ thuật khác <strong>trộn hai ảnh</strong> với nhau và trộn cả nhãn: <strong>MixUp</strong> cộng hai ảnh theo tỉ lệ λ, <strong>CutMix</strong> dán một mảng ảnh này lên ảnh kia, nhãn chia theo tỉ lệ diện tích. Chúng áp dụng trên cả <em>batch</em>, sau DataLoader:</p>
 <pre><code class="language-python">import torch
@@ -512,3 +512,5 @@ tuple ('dataset/val/OK/ok_000.png', 'dataset/val/OK/ok_001.png')</code></pre>
   <li>Augmentation chỉ mô phỏng biến động có thật và không được đổi nhãn: cẩn thận với lật (chi tiết có hướng), đổi màu/độ sáng (lỗi màu), crop (lỗi nhỏ ở mép), phóng to (tiêu chí theo kích thước). Lưu lưới batch để kiểm tra bằng mắt.</li>
 </ul>
 <p>Bài tiếp theo: <strong>Overfitting và cách chia train/validation/test đúng</strong>, cách nhận biết mô hình học thuộc và chia dữ liệu theo lô để không rò rỉ.</p>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.pytorch.org/tutorials/beginner/basics/data_tutorial.html" rel="noopener" target="_blank">PyTorch Tutorials: Datasets &amp; DataLoaders</a>; <a href="https://docs.pytorch.org/vision/stable/transforms.html" rel="noopener" target="_blank">torchvision: Transforming and augmenting images</a>.</p>

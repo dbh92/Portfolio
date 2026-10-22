@@ -1,0 +1,400 @@
+<p>Đến chặng này bạn đã lấy ảnh từ webcam bằng <code>cv2.VideoCapture</code> và đã tính được nên chọn camera, ống kính nào. Camera công nghiệp thì khác webcam ở mọi điểm quan trọng: bạn đặt được chính xác thời gian phơi sáng và gain, chọn được định dạng pixel 8, 10, 12 bit, chụp theo trigger từ cảm biến hoặc PLC, và biết chắc khung nào bị mất. Tất cả những điều đó đi qua một bộ chuẩn chung tên là <strong>GenICam</strong>. Bài này dạy cách điều khiển camera công nghiệp bằng Python qua <strong>pypylon</strong> (SDK của Basler) và <strong>camera giả lập</strong> đi kèm, nên bạn chạy được mọi đoạn code khi chưa có camera thật. Cuối bài là cách làm tương tự với <strong>Harvesters</strong>, thư viện dùng được cho camera của nhiều hãng.</p>
+<p>Cài: <code>pip install pypylon opencv-python numpy</code> (bài chạy với pypylon 26.8, OpenCV 4.13). Gói pypylon đã kèm sẵn phần runtime của pylon, gồm cả camera giả lập. Nên học trước: <a href="../kien-thuc/global-rolling-shutter-area-line-scan.html">global/rolling shutter, area/line scan</a> và <a href="../kien-thuc/chon-camera-ong-kinh-machine-vision.html">chọn camera và ống kính</a>.</p>
+
+<h2>1. GenICam, GigE Vision, USB3 Vision: ai làm gì?</h2>
+<p>Camera của Basler, Hikrobot, Teledyne FLIR, Allied Vision, IDS… đều nói chung một "ngôn ngữ" nhờ các chuẩn sau:</p>
+<table>
+  <tr><th>Chuẩn</th><th>Vai trò</th><th>Bạn gặp ở đâu</th></tr>
+  <tr><td><strong>GigE Vision</strong>, <strong>USB3 Vision</strong>, CoaXPress, Camera Link</td><td>Chuẩn <em>truyền dẫn</em>: cách tìm camera trên mạng/cổng, gửi lệnh, truyền ảnh</td><td>Chọn cáp, card mạng, cấu hình IP, băng thông (mục 9)</td></tr>
+  <tr><td><strong>GenICam GenApi</strong></td><td>Camera tự mô tả mọi tham số của nó trong một file XML; phần mềm đọc file đó để biết camera có những "nút" (node) nào</td><td><code>cam.ExposureTime</code>, <code>cam.PixelFormat</code>: mỗi tham số là một node</td></tr>
+  <tr><td><strong>SFNC</strong> (Standard Features Naming Convention)</td><td>Quy ước <em>tên</em> chung: phơi sáng tên là <code>ExposureTime</code>, đơn vị µs, ở mọi hãng</td><td>Code viết cho camera hãng này chạy gần như nguyên vẹn với hãng khác</td></tr>
+  <tr><td><strong>GenTL</strong></td><td>Giao diện thư viện chuẩn: mỗi hãng cung cấp một "producer" (file <code>.cti</code>), phần mềm bất kỳ (consumer) dùng được</td><td>Harvesters, Halcon, nhiều phần mềm vision khác (mục 11)</td></tr>
+</table>
+<p>pypylon là cách thuận tiện nhất để học vì nó có camera giả lập và tài liệu tốt. Mọi khái niệm trong bài (node, pixel format, chiến lược lấy ảnh, trigger, bộ đệm) giống hệt ở SDK của hãng khác, chỉ khác tên hàm. Chi tiết cách đọc tài liệu SDK xem bài <a href="../tai-nguyen/doc-tai-lieu-sdk-camera-genicam.html">đọc tài liệu SDK camera GenICam</a>.</p>
+
+<h2>2. Bật camera giả lập, mở camera, đọc node map</h2>
+<p>Camera giả lập được bật bằng biến môi trường <code>PYLON_CAMEMU</code> (số camera giả muốn có), và phải đặt <strong>trước</strong> khi pylon khởi tạo, nên dòng <code>os.environ</code> nằm trước <code>import pypylon</code>. Với camera thật thì bỏ dòng đó: <code>CreateFirstDevice()</code> sẽ mở camera đầu tiên tìm thấy.</p>
+<pre><code class="language-python">import os
+os.environ["PYLON_CAMEMU"] = "1"                 # 1 camera giả lập; bỏ dòng này khi dùng camera thật
+
+import time
+
+import cv2
+import numpy as np
+from pypylon import genicam, pylon
+
+tl = pylon.TlFactory.GetInstance()
+for thiet_bi in tl.EnumerateDevices():
+    print("tìm thấy:", thiet_bi.GetFriendlyName(), "| model", thiet_bi.GetModelName(),
+          "| serial", thiet_bi.GetSerialNumber())
+
+cam = pylon.InstantCamera(tl.CreateFirstDevice())
+cam.Open()
+print(f"Width = {cam.Width.Value} (min {cam.Width.Min}, max {cam.Width.Max}, bước {cam.Width.Inc})")
+print(f"PixelFormat = {cam.PixelFormat.Value}; các giá trị: {list(cam.PixelFormat.Symbolics)[:6]} ...")
+print(f"ExposureTime = {cam.ExposureTime.Value} µs (min {cam.ExposureTime.Min}, max {cam.ExposureTime.Max})")
+print(f"TriggerMode = {cam.TriggerMode.Value}; TriggerSource = {cam.TriggerSource.Value}")</code></pre>
+<pre><code class="language-text">tìm thấy: Basler Emulation (0815-0000) | model Emulation | serial 0815-0000
+Width = 1024 (min 1, max 4096, bước 1)
+PixelFormat = Mono8; các giá trị: ['Mono8', 'Mono10', 'Mono12', 'Mono16', 'BGRA8Packed', 'BGR8Packed'] ...
+ExposureTime = 10000.0 µs (min 1.0, max 10000000.0)
+TriggerMode = Off; TriggerSource = Software</code></pre>
+<p>Mỗi tham số là một <strong>node</strong> có kiểu riêng, và kiểu quyết định cách dùng:</p>
+<table>
+  <tr><th>Kiểu node</th><th>Ví dụ</th><th>Thuộc tính hay dùng</th></tr>
+  <tr><td>Integer</td><td><code>Width</code>, <code>Height</code>, <code>OffsetX</code></td><td><code>.Value</code>, <code>.Min</code>, <code>.Max</code>, <code>.Inc</code> (bước: camera thật thường yêu cầu Width là bội số của 4, 8 hoặc 16)</td></tr>
+  <tr><td>Float</td><td><code>ExposureTime</code> (µs), <code>Gain</code> (dB), <code>AcquisitionFrameRate</code></td><td><code>.Value</code>, <code>.Min</code>, <code>.Max</code></td></tr>
+  <tr><td>Enumeration</td><td><code>PixelFormat</code>, <code>TriggerMode</code>, <code>TriggerSource</code></td><td><code>.Value</code> là chuỗi, <code>.Symbolics</code> là danh sách giá trị hợp lệ</td></tr>
+  <tr><td>Command</td><td><code>TriggerSoftware</code>, <code>ForceFailedBuffer</code></td><td><code>.Execute()</code></td></tr>
+  <tr><td>Boolean</td><td><code>AcquisitionFrameRateEnable</code></td><td><code>.Value</code> là True/False</td></tr>
+</table>
+<p>Một số camera Basler đời cũ (và camera giả lập) có thêm các tên kiểu cũ như <code>ExposureTimeAbs</code>, <code>GainRaw</code>. Khi một tên không có trên camera của bạn, mở <em>pylon Viewer</em> để xem node map thật của nó.</p>
+
+<h2>3. Đặt tham số an toàn: giới hạn, bước, quyền ghi</h2>
+<p>Ghi một giá trị ngoài [Min, Max], hoặc không đúng bước Inc, sẽ gây ngoại lệ. Có những node chỉ ghi được khi camera <strong>không</strong> đang chụp: đổi kích thước ảnh (Width, Height, PixelFormat) làm đổi kích thước bộ đệm, nên bị khóa trong lúc lấy ảnh. Viết một hàm đặt tham số dùng chung cho cả trạm:</p>
+<pre><code class="language-python">def dat_so(node, gia_tri):
+    """Đặt node số (Integer/Float): kẹp trong [Min, Max], làm tròn theo bước Inc nếu có; trả về giá trị đã đặt."""
+    if not genicam.IsWritable(node.Node):
+        raise RuntimeError(f"{node.Node.GetName()} hiện không ghi được (camera đang chụp?)")
+    v = min(max(gia_tri, node.Min), node.Max)
+    if isinstance(node.Value, int) and node.Inc &gt; 1:
+        v = node.Min + round((v - node.Min) / node.Inc) * node.Inc
+    node.Value = type(node.Value)(v)
+    if v != gia_tri:
+        print(f"  {node.Node.GetName()}: yêu cầu {gia_tri}, đặt {node.Value}")
+    return node.Value
+
+
+dat_so(cam.ExposureTime, 2_000.0)                # 2 ms
+dat_so(cam.ExposureTime, 50_000_000.0)           # quá max: bị kẹp lại
+dat_so(cam.Width, 640)
+dat_so(cam.Height, 480)
+
+cam.StartGrabbing()
+try:
+    cam.Width.Value = 800                        # đổi kích thước khi đang chụp
+except genicam.AccessException as loi:
+    print("Không đổi được Width khi đang chụp:", str(loi).split(":")[0])
+print("ExposureTime ghi được khi đang chụp?", genicam.IsWritable(cam.ExposureTime.Node))
+cam.StopGrabbing()
+dat_so(cam.ExposureTime, 2_000.0)
+print("Width ghi được sau khi dừng?", genicam.IsWritable(cam.Width.Node))</code></pre>
+<pre><code class="language-text">  ExposureTime: yêu cầu 50000000.0, đặt 10000000.0
+Không đổi được Width khi đang chụp: Node is not writable. 
+ExposureTime ghi được khi đang chụp? True
+Width ghi được sau khi dừng? True</code></pre>
+<div class="tip"><strong>Lưu cấu hình vào camera hoặc vào file</strong>Đặt tham số bằng code mỗi lần khởi động (đọc từ file cấu hình của trạm) là cách dễ kiểm soát nhất. Ngoài ra camera có <em>user set</em> (<code>UserSetSelector</code>, <code>UserSetSave</code>, <code>UserSetDefault</code>) để lưu cấu hình ngay trong camera, và pylon lưu được toàn bộ node map ra file bằng <code>pylon.FeaturePersistence.Save(ten_file, cam.GetNodeMap())</code>. Dù cách nào, phần mềm trạm nên đọc lại và ghi log các tham số quan trọng (exposure, gain, pixel format, ROI) mỗi lần khởi động: thay camera bảo hành về mà quên cấu hình là chuyện thường gặp.</div>
+
+<h2>4. Phơi sáng, gain và nhòe chuyển động: tính trước khi đặt</h2>
+<p>Thứ tự ưu tiên khi chỉnh độ sáng ảnh: <strong>đèn</strong> trước, rồi <strong>thời gian phơi sáng</strong> (bị giới hạn bởi nhòe chuyển động), cuối cùng mới đến <strong>gain</strong>, vì gain khuếch đại cả nhiễu. Gain tính theo dB: tăng 6 dB là nhân tín hiệu khoảng 2 lần (20·log₁₀2 ≈ 6,02). Với vật chuyển động, phơi sáng tối đa được quyết định bởi độ nhòe chấp nhận được (thường ≤ 1 pixel, xem bài <a href="../kien-thuc/den-strobe-dong-bo-trigger-camera.html">đèn strobe và đồng bộ trigger</a>):</p>
+<pre><code class="language-python">def phoi_sang_toi_da_us(van_toc_mm_s, mm_moi_px, nhoe_px=1.0):
+    """Thời gian phơi sáng lớn nhất (µs) để vật đi không quá nhoe_px pixel."""
+    return nhoe_px * mm_moi_px / van_toc_mm_s * 1e6
+
+
+for v in (100, 500, 2000):                       # băng tải 0,1 / 0,5 / 2 m/s
+    print(f"băng tải {v / 1000:.1f} m/s, 0,05 mm/px: phơi sáng ≤ {phoi_sang_toi_da_us(v, 0.05):6.0f} µs")
+gain_db = 20 * np.log10(4)
+print(f"cần ảnh sáng gấp 4 mà không tăng phơi sáng: gain +{gain_db:.1f} dB (nhiễu cũng gấp khoảng 4)")</code></pre>
+<pre><code class="language-text">băng tải 0.1 m/s, 0,05 mm/px: phơi sáng ≤    500 µs
+băng tải 0.5 m/s, 0,05 mm/px: phơi sáng ≤    100 µs
+băng tải 2.0 m/s, 0,05 mm/px: phơi sáng ≤     25 µs
+cần ảnh sáng gấp 4 mà không tăng phơi sáng: gain +12.0 dB (nhiễu cũng gấp khoảng 4)</code></pre>
+<p>Ở 2 m/s, phơi sáng không được quá 25 µs: hầu như chỉ đèn strobe công suất cao mới đủ sáng trong thời gian đó. Lưu ý: camera giả lập có node <code>ExposureTime</code> và <code>Gain</code> đọc ghi được bình thường, nhưng trên máy thử, ảnh test của nó <strong>không</strong> sáng tối theo hai tham số này. Đừng dùng camera giả lập để thử nghiệm độ sáng; dùng nó để thử logic phần mềm.</p>
+
+<h2>5. Chiến lược lấy ảnh và bộ đệm</h2>
+<p>Driver nhận ảnh từ camera vào một vòng các <strong>bộ đệm</strong> (buffer, số lượng đặt bằng <code>MaxNumBuffer</code>), và chương trình của bạn lấy ảnh ra bằng <code>RetrieveResult</code>. Khi chương trình chậm hơn camera, <strong>chiến lược lấy ảnh</strong> (grab strategy) quyết định chuyện gì xảy ra:</p>
+<ul>
+  <li><code>GrabStrategy_OneByOne</code> (mặc định): lấy lần lượt từng ảnh theo thứ tự; ảnh chờ trong hàng đợi. Dùng cho <strong>kiểm tra</strong>: mỗi ảnh là một sản phẩm.</li>
+  <li><code>GrabStrategy_LatestImageOnly</code>: chỉ giữ ảnh mới nhất, ảnh cũ bị bỏ. Dùng cho <strong>hiển thị trực tiếp</strong>, căn chỉnh, lấy nét.</li>
+  <li><code>GrabStrategy_LatestImages</code>: giữ N ảnh mới nhất (<code>OutputQueueSize</code>).</li>
+</ul>
+<p>Thí nghiệm: camera chạy 100 khung/giây, chương trình mỗi ảnh mất 30 ms (khoảng 33 ảnh/giây):</p>
+<pre><code class="language-python">dat_so(cam.AcquisitionFrameRateAbs, 100)
+cam.MaxNumBuffer.Value = 5
+for ten, chien_luoc in (("OneByOne", pylon.GrabStrategy_OneByOne),
+                        ("LatestImageOnly", pylon.GrabStrategy_LatestImageOnly)):
+    cam.StartGrabbing(chien_luoc)
+    nhan = bi_bo = 0
+    t0 = time.perf_counter()
+    while time.perf_counter() - t0 &lt; 2.0:
+        kq = cam.RetrieveResult(1000, pylon.TimeoutHandling_ThrowException)
+        nhan += 1
+        bi_bo += kq.GetNumberOfSkippedImages()   # số ảnh driver đã bỏ qua trước ảnh này
+        kq.Release()                              # trả bộ đệm cho driver: BẮT BUỘC
+        time.sleep(0.03)                          # "xử lý" 30 ms
+    cam.StopGrabbing()
+    print(f"{ten:16s}: nhận {nhan} ảnh trong 2 s, driver bỏ qua {bi_bo} ảnh")</code></pre>
+<pre><code class="language-text">OneByOne        : nhận 64 ảnh trong 2 s, driver bỏ qua 0 ảnh
+LatestImageOnly : nhận 63 ảnh trong 2 s, driver bỏ qua 62 ảnh</code></pre>
+<p>Với <code>LatestImageOnly</code>, driver bỏ qua gần như một ảnh cho mỗi ảnh bạn nhận, và đếm lại cho bạn qua <code>GetNumberOfSkippedImages()</code>: hợp với màn hình xem trực tiếp. Với <code>OneByOne</code>, không ảnh nào bị bỏ qua <em>trong hàng đợi của chương trình</em>, nhưng điều đó không có nghĩa camera thật không mất ảnh: khi cả 5 bộ đệm đều đầy, camera thật vẫn chụp tiếp và ảnh không có chỗ chứa sẽ mất ở tầng driver (camera giả lập thì tự chậm lại theo chương trình nên không thấy hiện tượng này). Cách phát hiện trên camera thật nằm ở mục 8.</p>
+<div class="warn"><strong>Luôn Release kết quả</strong>Mỗi <code>RetrieveResult</code> giữ một bộ đệm cho tới khi bạn gọi <code>.Release()</code> (hoặc dùng <code>with cam.RetrieveResult(...) as kq:</code>). Giữ kết quả trong một list "để xử lý sau" là cách nhanh nhất làm cạn bộ đệm: camera ngừng gửi ảnh và chương trình treo ở timeout. Nếu cần giữ ảnh lâu, sao chép mảng ra (<code>kq.Array.copy()</code>) rồi Release ngay, như bài <a href="luong-hang-doi-tach-chup-anh-xu-ly.html">luồng và hàng đợi</a> làm với hàng đợi của nó.</div>
+
+<h2>6. Trigger: chụp đúng lúc sản phẩm đến</h2>
+<p>Trên dây chuyền, camera không chạy tự do mà chụp khi có <strong>trigger</strong>: tín hiệu từ cảm biến sản phẩm, encoder hay PLC đưa vào đường I/O của camera (<code>TriggerSource = Line1</code>), hoặc lệnh phần mềm (<code>Software</code>) khi chương trình tự quyết định lúc chụp. Bật trigger rồi thì camera chỉ chụp khi có trigger; <code>RetrieveResult</code> mà không có trigger sẽ hết thời gian chờ.</p>
+<pre><code class="language-python">cam.TriggerSelector.Value = "FrameStart"
+cam.TriggerMode.Value = "On"
+cam.TriggerSource.Value = "Software"             # dây chuyền thật: "Line1" + TriggerActivation = "RisingEdge"
+cam.StartGrabbing(pylon.GrabStrategy_OneByOne)
+for i in range(3):
+    if cam.WaitForFrameTriggerReady(200, pylon.TimeoutHandling_ThrowException):   # camera sẵn sàng nhận trigger?
+        t = time.perf_counter()
+        cam.ExecuteSoftwareTrigger()
+        with cam.RetrieveResult(1000, pylon.TimeoutHandling_ThrowException) as kq:
+            print(f"trigger {i}: nhận ảnh {kq.Array.shape} sau {1000 * (time.perf_counter() - t):.1f} ms")
+kq = cam.RetrieveResult(300, pylon.TimeoutHandling_Return)    # không trigger: chờ 300 ms rồi trả về
+print("không trigger, sau 300 ms có ảnh không?", kq.IsValid())
+cam.StopGrabbing()
+cam.TriggerMode.Value = "Off"</code></pre>
+<pre><code class="language-text">trigger 0: nhận ảnh (480, 640) sau 16.8 ms
+trigger 1: nhận ảnh (480, 640) sau 15.9 ms
+trigger 2: nhận ảnh (480, 640) sau 15.8 ms
+không trigger, sau 300 ms có ảnh không? False</code></pre>
+<p><code>TimeoutHandling_ThrowException</code> ném ngoại lệ khi hết giờ, hợp khi bạn <em>chắc chắn</em> phải có ảnh (vừa trigger xong); <code>TimeoutHandling_Return</code> trả về kết quả rỗng (<code>IsValid()</code> là False), hợp với vòng lặp chờ trigger phần cứng. Với trigger phần cứng, các tham số liên quan là <code>TriggerActivation</code> (sườn lên/xuống), <code>LineDebouncerTime</code> (lọc nhiễu tiếp điểm), <code>TriggerDelay</code> (chụp trễ một khoảng sau trigger); cách đấu dây và tính thời gian xem bài <a href="industrial-vision-1-trigger-encoder-cycle-time.html">trigger, encoder và cycle time</a>. Thời gian từ trigger tới lúc có ảnh ở trên là của camera giả lập; với camera thật, nó gồm phơi sáng, đọc cảm biến và truyền ảnh, và phải đo trên đúng phần cứng của trạm.</p>
+
+<h2>7. Định dạng pixel: bit depth và cái bẫy Bayer</h2>
+<p><code>Mono8</code> cho mảng <code>uint8</code> (0–255). <code>Mono10</code>, <code>Mono12</code> cho mảng <code>uint16</code> với giá trị tới 1023, 4095: hữu ích khi cần đo độ sáng chính xác hoặc ảnh có dải sáng tối rộng, nhưng gấp đôi dung lượng truyền. Camera màu thường gửi ảnh <strong>Bayer</strong> thô (mỗi pixel chỉ một màu, sắp theo lưới 2 × 2) và máy tính tự nội suy ra ảnh màu: nhẹ băng thông gấp 3 lần so với gửi BGR.</p>
+<p>Bẫy kinh điển: <strong>tên mẫu Bayer của GenICam và của OpenCV không khớp nhau</strong>. Thí nghiệm dưới cho camera giả lập phát một ảnh màu tự tạo (đỏ | lục | lam) ở định dạng <code>BayerRG8</code>, rồi đổi sang BGR bằng bộ chuyển của pylon và bằng 4 mã của OpenCV:</p>
+<pre><code class="language-python">from pathlib import Path
+
+thu_muc = Path("anh_mau_mau").resolve()
+thu_muc.mkdir(exist_ok=True)
+goc = np.zeros((480, 640, 3), np.uint8)
+goc[:, :200], goc[:, 200:420], goc[:, 420:] = (0, 0, 255), (0, 255, 0), (255, 0, 0)    # BGR: đỏ | lục | lam
+cv2.imwrite(str(thu_muc / "mau.png"), goc)
+
+cam.TestImageSelector.Value = "Off"
+cam.ImageFileMode.Value = "On"                    # camera giả lập phát ảnh từ file/thư mục của bạn
+cam.ImageFilename.Value = str(thu_muc)
+cam.PixelFormat.Value = "BayerRG8"
+with cam.GrabOne(1000) as kq:
+    tho = kq.Array.copy()                         # ảnh Bayer thô: 1 kênh
+    chuyen = pylon.ImageFormatConverter()
+    chuyen.OutputPixelFormat = pylon.PixelType_BGR8packed
+    bgr_pylon = chuyen.Convert(kq).Array.copy()
+print("ô 2×2 đầu tiên của ảnh thô (vùng đỏ):", tho[:2, :2].tolist())
+print("pylon → BGR, giữa vùng đỏ:", bgr_pylon[240, 100].tolist())
+for ma in ("COLOR_BayerRG2BGR", "COLOR_BayerBG2BGR"):
+    bgr = cv2.cvtColor(tho, getattr(cv2, ma))
+    print(f"cv2.{ma}: giữa vùng đỏ = {bgr[240, 100].tolist()}, sai khác trung bình so với ảnh gốc "
+          f"{np.abs(bgr.astype(int) - goc).mean():.1f}")
+cam.PixelFormat.Value = "Mono8"</code></pre>
+<pre><code class="language-text">ô 2×2 đầu tiên của ảnh thô (vùng đỏ): [[255, 0], [0, 0]]
+pylon → BGR, giữa vùng đỏ: [0, 0, 255]
+cv2.COLOR_BayerRG2BGR: giữa vùng đỏ = [255, 0, 0], sai khác trung bình so với ảnh gốc 111.5
+cv2.COLOR_BayerBG2BGR: giữa vùng đỏ = [0, 0, 255], sai khác trung bình so với ảnh gốc 0.2</code></pre>
+<p>Ô 2 × 2 đầu tiên là [[R, G], [G, B]], đúng định nghĩa <code>BayerRG</code> của GenICam (đọc từ pixel trên cùng bên trái). Nhưng mã OpenCV "trùng tên" <code>COLOR_BayerRG2BGR</code> cho ra màu <strong>lam</strong> ở vùng đỏ; mã đúng là <code>COLOR_BayerBG2BGR</code>. OpenCV đặt tên mẫu Bayer theo một quy ước khác (tính từ pixel thứ hai, thứ ba của hàng thứ hai), nên mọi cặp tên đều lệch. Bảng tra kiểm chứng bằng thí nghiệm trên (chạy lại với cả 4 định dạng):</p>
+<table>
+  <tr><th>PixelFormat (GenICam)</th><th>Mã OpenCV đúng</th></tr>
+  <tr><td><code>BayerRG8</code></td><td><code>cv2.COLOR_BayerBG2BGR</code></td></tr>
+  <tr><td><code>BayerBG8</code></td><td><code>cv2.COLOR_BayerRG2BGR</code></td></tr>
+  <tr><td><code>BayerGR8</code></td><td><code>cv2.COLOR_BayerGB2BGR</code></td></tr>
+  <tr><td><code>BayerGB8</code></td><td><code>cv2.COLOR_BayerGR2BGR</code></td></tr>
+</table>
+<p>Cách an toàn nhất là để SDK của hãng chuyển màu (<code>ImageFormatConverter</code>), hoặc kiểm tra bằng một vật có màu đã biết ngay khi lắp camera. Lỗi đảo đỏ/lam rất dễ lọt qua nếu sản phẩm gần như xám, rồi làm hỏng bài toán kiểm màu khi đổi mã sản phẩm.</p>
+
+<h2>8. Phát hiện ảnh hỏng và ảnh mất</h2>
+<p>Trên đường truyền thật (cáp lỏng, switch quá tải, card mạng tiết kiệm điện), ảnh có thể tới không đầy đủ. <code>GrabSucceeded()</code> cho biết ảnh có hợp lệ không, và stream grabber giữ các bộ đếm thống kê. Camera giả lập mô phỏng được lỗi này bằng lệnh <code>ForceFailedBuffer</code>:</p>
+<pre><code class="language-python">cam.ImageFileMode.Value = "Off"
+cam.TestImageSelector.Value = "Testimage1"
+cam.StartGrabbing(pylon.GrabStrategy_OneByOne)
+tot = hong = 0
+for i in range(20):
+    if i == 5:                                     # giả lập 3 ảnh hỏng (đường truyền chập chờn)
+        cam.ForceFailedBufferCount.Value = 3
+        cam.ForceFailedBuffer.Execute()
+    with cam.RetrieveResult(1000, pylon.TimeoutHandling_ThrowException) as kq:
+        if kq.GrabSucceeded():
+            tot += 1
+        else:
+            hong += 1
+            print(f"ảnh {i}: hỏng ({kq.ErrorDescription})")   # trạm thật: trả 'LOI' cho sản phẩm này, ghi log
+thong_ke = cam.GetStreamGrabberNodeMap()
+print(f"tốt {tot}, hỏng {hong}; bộ đếm của driver: tổng {thong_ke.GetNode('Statistic_Total_Buffer_Count').GetValue()}, "
+      f"hỏng {thong_ke.GetNode('Statistic_Failed_Buffer_Count').GetValue()}, "
+      f"thiếu bộ đệm {thong_ke.GetNode('Statistic_Buffer_Underrun_Count').GetValue()}")
+cam.StopGrabbing()</code></pre>
+<pre><code class="language-text">ảnh 5: hỏng (The buffer was incompletely grabbed.)
+ảnh 6: hỏng (The buffer was incompletely grabbed.)
+ảnh 7: hỏng (The buffer was incompletely grabbed.)
+tốt 17, hỏng 3; bộ đếm của driver: tổng 20, hỏng 3, thiếu bộ đệm 0</code></pre>
+<ul>
+  <li><strong>Ảnh hỏng</strong> phải được xử lý như "không có kết quả" (LOI), không phải NG và càng không phải OK. Đừng truyền <code>kq.Array</code> của ảnh hỏng vào thuật toán.</li>
+  <li><strong>Ảnh mất</strong>: <code>Statistic_Buffer_Underrun_Count</code> tăng khi camera gửi ảnh mà không còn bộ đệm trống (chương trình không Release kịp, <code>MaxNumBuffer</code> quá nhỏ). Ngoài ra, camera thật đánh số khung của chính nó (với GigE là <code>BlockID</code> của kết quả; nhiều camera còn gửi kèm bộ đếm khung qua chunk data): số khung nhảy là có ảnh mất. Với trạm chạy theo trigger, so số ảnh nhận được với số trigger PLC đã phát là cách kiểm tra chắc chắn nhất. Camera giả lập không có <code>BlockID</code> hợp lệ, nên phần này chỉ kiểm chứng được trên camera thật.</li>
+  <li>Ghi các bộ đếm thống kê vào log định kỳ (ví dụ mỗi phút): con số tăng dần là dấu hiệu sớm của cáp, switch hay cấu hình mạng có vấn đề, trước khi nó thành lỗi dây chuyền.</li>
+</ul>
+
+<h2>9. Băng thông: một cổng mạng nuôi được bao nhiêu camera?</h2>
+<p>Lượng dữ liệu mỗi giây = rộng × cao × số byte mỗi pixel × số khung mỗi giây. So với khả năng của đường truyền: GigE (1 Gbit/s) tối đa khoảng 125 MB/s, <em>đã gồm</em> cả lệnh điều khiển và gói gửi lại, nên phải chừa dư; USB3 Vision thường duy trì khoảng 350–400 MB/s. Hàm dưới dùng ngân sách 100 MB/s cho GigE (chừa khoảng 20%) và 350 MB/s cho USB3; đây là lựa chọn thận trọng để tính sơ bộ, con số thật xem datasheet và đo trên trạm.</p>
+<pre><code class="language-python">NGAN_SACH_MB_S = {"GigE": 100, "USB3": 350}
+BYTE_MOI_PX = {"Mono8": 1, "Mono12": 2, "BayerRG8": 1, "BGR8": 3}
+
+
+def fps_toi_da(rong, cao, pixel_format, cong, so_camera=1):
+    mb_moi_anh = rong * cao * BYTE_MOI_PX[pixel_format] / 1e6
+    return NGAN_SACH_MB_S[cong] / so_camera / mb_moi_anh, mb_moi_anh
+
+
+for rong, cao, pf, cong, n in ((2448, 2048, "Mono8", "GigE", 1), (2448, 2048, "Mono12", "GigE", 1),
+                               (2448, 2048, "BGR8", "GigE", 1), (2448, 2048, "Mono8", "GigE", 3),
+                               (2448, 2048, "Mono8", "USB3", 1)):
+    fps, mb = fps_toi_da(rong, cao, pf, cong, n)
+    print(f"{rong}×{cao} {pf:6s}: {mb:5.1f} MB/ảnh, {n} camera trên 1 cổng {cong}: tối đa ~{fps:5.1f} khung/s mỗi camera")</code></pre>
+<pre><code class="language-text">2448×2048 Mono8 :   5.0 MB/ảnh, 1 camera trên 1 cổng GigE: tối đa ~ 19.9 khung/s mỗi camera
+2448×2048 Mono12:  10.0 MB/ảnh, 1 camera trên 1 cổng GigE: tối đa ~ 10.0 khung/s mỗi camera
+2448×2048 BGR8  :  15.0 MB/ảnh, 1 camera trên 1 cổng GigE: tối đa ~  6.6 khung/s mỗi camera
+2448×2048 Mono8 :   5.0 MB/ảnh, 3 camera trên 1 cổng GigE: tối đa ~  6.6 khung/s mỗi camera
+2448×2048 Mono8 :   5.0 MB/ảnh, 1 camera trên 1 cổng USB3: tối đa ~ 69.8 khung/s mỗi camera</code></pre>
+<p>Một camera 5 MP Mono8 trên GigE chạy được khoảng 20 khung/giây; chuyển sang Mono12 hay BGR thì tốc độ giảm theo số byte mỗi pixel; ba camera chung một cổng GigE thì mỗi camera chỉ còn khoảng 6–7 khung/giây. Các nút chỉnh liên quan:</p>
+<ul>
+  <li><strong>Jumbo frame</strong> (GigE): tăng kích thước gói (<code>GevSCPSPacketSize</code>, ví dụ 8000–9000 byte) và bật jumbo frame trên card mạng: ít gói hơn, giảm tải CPU, ít mất gói. Mọi thiết bị trên đường đi (card, switch) đều phải hỗ trợ.</li>
+  <li><strong>Mỗi camera một cổng mạng</strong> là cấu hình an toàn nhất; nếu phải chung switch, giới hạn băng thông từng camera (<code>DeviceLinkThroughputLimit</code>, hoặc khoảng nghỉ giữa các gói <code>GevSCPD</code>) để chúng không gửi dồn cùng lúc.</li>
+  <li><strong>ROI</strong>: chỉ đọc vùng cần thiết của cảm biến (<code>Width</code>, <code>Height</code>, <code>OffsetX</code>, <code>OffsetY</code>) vừa giảm băng thông vừa tăng tốc độ khung của nhiều camera.</li>
+</ul>
+
+<h2>10. Dùng camera giả lập để kiểm thử trạm trước khi có phần cứng</h2>
+<p><code>ImageFileMode</code> ở mục 7 có một công dụng lớn hơn: cho camera giả lập phát lần lượt các <strong>ảnh thật</strong> của bạn (thư mục ảnh OK, NG chụp thử từ trước). Toàn bộ phần mềm trạm (lấy ảnh, xử lý, gửi kết quả, lưu, xử lý lỗi) chạy được với "camera" đúng kiểu thật, trước khi camera về tới. Ví dụ với 3 ảnh tự tạo:</p>
+<pre><code class="language-python">thu_muc_sp = Path("anh_san_pham").resolve()
+thu_muc_sp.mkdir(exist_ok=True)
+for i, so_vat in enumerate((4, 3, 4)):                     # ảnh 1 thiếu một vật
+    a = np.full((480, 640), 200, np.uint8)
+    for k in range(so_vat):
+        cv2.circle(a, (100 + 140 * k, 240), 45, 40, -1)
+    cv2.imwrite(str(thu_muc_sp / f"sp_{i}.png"), a)
+
+
+def dem_vat(anh):
+    _, bw = cv2.threshold(anh, 120, 255, cv2.THRESH_BINARY_INV)
+    return cv2.connectedComponents(bw)[0] - 1
+
+
+cam.TestImageSelector.Value = "Off"
+cam.ImageFileMode.Value = "On"
+cam.ImageFilename.Value = str(thu_muc_sp)
+cam.StartGrabbing(pylon.GrabStrategy_OneByOne)
+for i in range(4):                                         # thư mục có 3 ảnh: ảnh thứ 4 quay lại ảnh đầu
+    with cam.RetrieveResult(1000, pylon.TimeoutHandling_ThrowException) as kq:
+        n = dem_vat(kq.Array)
+        print(f"ảnh {i}: {n} vật → {'OK' if n == 4 else 'NG'}")
+cam.StopGrabbing()
+cam.Close()</code></pre>
+<pre><code class="language-text">ảnh 0: 4 vật → OK
+ảnh 1: 3 vật → NG
+ảnh 2: 4 vật → OK
+ảnh 3: 4 vật → OK</code></pre>
+<p>Camera giả lập phát các file trong thư mục theo thứ tự tên rồi quay vòng. Kết hợp với <code>ForceFailedBuffer</code> (mục 8), bạn kiểm thử được cả luồng xử lý ảnh hỏng, thứ rất khó tạo ra theo ý muốn trên camera thật.</p>
+
+<h2>11. Cùng việc đó với Harvesters (camera nhiều hãng)</h2>
+<p>Harvesters là thư viện Python mã nguồn mở dùng chuẩn GenTL: nạp file <code>.cti</code> (GenTL producer) do hãng camera cung cấp kèm SDK, rồi điều khiển mọi camera tương thích theo một cách. Tên node vẫn là tên SFNC như trên. Đoạn dưới là minh họa: nó cần file <code>.cti</code> thật của hãng camera bạn dùng (đường dẫn dưới chỉ là ví dụ).</p>
+<pre><code class="language-python"># (minh họa) cần file .cti (GenTL producer) của hãng camera; đường dẫn chỉ là ví dụ
+from harvesters.core import Harvester
+
+h = Harvester()
+h.add_file(r"C:\Program Files\HangCamera\GenTL\producer.cti")
+h.update()                                          # tìm camera
+print(h.device_info_list)
+ia = h.create(0)                                    # mở camera đầu tiên
+nm = ia.remote_device.node_map
+nm.ExposureTime.value = 2000.0                      # cùng tên SFNC như pypylon
+nm.PixelFormat.value = "Mono8"
+ia.start()
+with ia.fetch(timeout=1.0) as buffer:               # tự trả bộ đệm khi ra khỏi with
+    tp = buffer.payload.components[0]
+    anh = tp.data.reshape(tp.height, tp.width).copy()   # copy trước khi bộ đệm được trả lại
+ia.stop()
+ia.destroy()
+h.reset()</code></pre>
+<p>Chọn pypylon khi trạm chỉ dùng camera Basler (tài liệu, ví dụ và camera giả lập tốt); chọn Harvesters hoặc SDK đa hãng khi trạm có camera của nhiều hãng hoặc bạn muốn đổi hãng mà ít sửa code. Nguyên tắc dùng bộ đệm giống hệt: lấy, sao chép nếu cần, trả lại ngay.</p>
+
+<h2>12. Lỗi thường gặp</h2>
+<table>
+  <tr><th>Triệu chứng</th><th>Nguyên nhân hay gặp</th><th>Cách xử lý</th></tr>
+  <tr><td>Không tìm thấy camera GigE</td><td>Camera và card mạng khác dải IP, tường lửa chặn</td><td>Dùng công cụ cấu hình IP của hãng; đặt IP tĩnh cùng dải; cho phép phần mềm qua tường lửa</td></tr>
+  <tr><td>Mở camera báo đang bị dùng</td><td>pylon Viewer hoặc một chương trình khác đang mở camera</td><td>Mỗi lúc chỉ một chương trình điều khiển camera; đóng Viewer trước khi chạy script</td></tr>
+  <tr><td>Chương trình treo ở timeout sau vài chục ảnh</td><td>Không <code>Release</code> kết quả, bộ đệm cạn</td><td>Dùng <code>with ... as kq</code>; sao chép mảng nếu cần giữ</td></tr>
+  <tr><td>Ảnh hỏng, mất ảnh ngẫu nhiên trên GigE</td><td>Card mạng tiết kiệm điện, không bật jumbo frame, nhiều camera chung một cổng</td><td>Tắt tiết kiệm điện, bật jumbo frame, tăng bộ đệm nhận của card, tách cổng hoặc giới hạn băng thông</td></tr>
+  <tr><td>Màu đỏ và lam đổi chỗ</td><td>Sai mã chuyển Bayer</td><td>Bảng ở mục 7, hoặc dùng bộ chuyển của SDK</td></tr>
+  <tr><td>Ảnh mờ khi băng tải chạy nhanh</td><td>Phơi sáng quá dài</td><td>Tính phơi sáng tối đa (mục 4), tăng đèn hoặc dùng strobe</td></tr>
+  <tr><td><code>AccessException</code> khi đặt tham số</td><td>Đổi Width, Height, PixelFormat khi đang chụp; giá trị sai bước</td><td>Dừng chụp trước; dùng hàm đặt an toàn (mục 3)</td></tr>
+</table>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>GigE Vision, USB3 Vision lo truyền dẫn; GenICam mô tả tham số thành node; SFNC thống nhất tên (<code>ExposureTime</code>, <code>Gain</code>, <code>PixelFormat</code>, <code>TriggerMode</code>); GenTL cho phép một phần mềm dùng camera nhiều hãng.</li>
+  <li>pypylon + camera giả lập (<code>PYLON_CAMEMU</code>) chạy được mọi logic phần mềm khi chưa có camera; giả lập không mô phỏng ảnh hưởng của phơi sáng, gain lên độ sáng ảnh.</li>
+  <li>Đặt tham số trong [Min, Max] và đúng bước; đổi kích thước ảnh chỉ khi đã dừng chụp; ghi log tham số khi khởi động.</li>
+  <li><code>OneByOne</code> cho kiểm tra, <code>LatestImageOnly</code> cho hiển thị; luôn Release kết quả; đọc các bộ đếm thống kê để phát hiện ảnh hỏng, thiếu bộ đệm.</li>
+  <li>Trigger phần mềm/phần cứng với <code>TriggerMode = On</code>; chọn kiểu timeout phù hợp; ảnh hỏng là LOI, không phải NG.</li>
+  <li>Tên Bayer của GenICam và OpenCV lệch nhau: <code>BayerRG8</code> dùng <code>COLOR_BayerBG2BGR</code>.</li>
+  <li>Tính băng thông trước: rộng × cao × byte/pixel × fps so với ngân sách đường truyền; jumbo frame, ROI, mỗi camera một cổng.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Ba camera trên một máy tính</h3>
+<p>Trạm có ba camera 2448 × 2048 Mono8, mỗi camera cần 12 khung/giây. Máy tính có một cổng GigE và một card 4 cổng GigE. Dùng hàm <code>fps_toi_da</code> để quyết định: đi chung một cổng qua switch có được không? Nếu được, mỗi camera nên giới hạn băng thông bao nhiêu MB/s?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">fps_chung, mb = fps_toi_da(2448, 2048, "Mono8", "GigE", so_camera=3)
+can = 3 * 12 * mb
+print(f"chung 1 cổng: tối đa {fps_chung:.1f} khung/s mỗi camera; cần tổng {can:.0f} MB/s so với ngân sách 100 MB/s")
+print(f"mỗi camera một cổng: tối đa {fps_toi_da(2448, 2048, 'Mono8', 'GigE')[0]:.1f} khung/s, cần {12 * mb:.0f} MB/s mỗi cổng")</code></pre>
+<pre><code class="language-text">chung 1 cổng: tối đa 6.6 khung/s mỗi camera; cần tổng 180 MB/s so với ngân sách 100 MB/s
+mỗi camera một cổng: tối đa 19.9 khung/s, cần 60 MB/s mỗi cổng</code></pre>
+<p>Chung một cổng không đủ (cần khoảng 180 MB/s, vượt cả mức tối đa lý thuyết 125 MB/s). Dùng card 4 cổng, mỗi camera một cổng: mỗi cổng chỉ cần khoảng 60 MB/s, còn dư nhiều. Nếu bắt buộc phải chung (ví dụ cáp dài tới tủ điện), giảm ROI hoặc tốc độ khung, hoặc chuyển sang camera 2,5/5/10 GigE.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Lớp CameraPylon theo "hợp đồng" NguonAnh</h3>
+<p>Ở bài <a href="python-7-class-dataclass-to-chuc-code.html">class và dataclass</a> có lớp cha <code>NguonAnh</code> với phương thức <code>doc()</code> trả về <code>(ten, anh)</code> hoặc <code>None</code>. Viết lớp <code>CameraPylon(NguonAnh)</code>: mở camera đầu tiên, <code>doc()</code> trả về <code>(f"khung_{n}", anh)</code> với ảnh đã sao chép, trả <code>None</code> khi ảnh hỏng hoặc hết giờ, đếm số ảnh hỏng; <code>dong()</code> dừng và đóng camera. Thử với camera giả lập và <code>ForceFailedBuffer</code>.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">class NguonAnh:
+    def doc(self):
+        raise NotImplementedError
+
+    def dong(self):
+        pass
+
+
+class CameraPylon(NguonAnh):
+    def __init__(self, timeout_ms=1000):
+        self.cam = pylon.InstantCamera(pylon.TlFactory.GetInstance().CreateFirstDevice())
+        self.cam.Open()
+        self.cam.StartGrabbing(pylon.GrabStrategy_OneByOne)
+        self.timeout_ms, self.n, self.so_hong = timeout_ms, 0, 0
+
+    def doc(self):
+        kq = self.cam.RetrieveResult(self.timeout_ms, pylon.TimeoutHandling_Return)
+        if not kq.IsValid():                           # hết giờ
+            return None
+        with kq:
+            self.n += 1
+            if not kq.GrabSucceeded():
+                self.so_hong += 1
+                return None
+            return f"khung_{self.n}", kq.Array.copy()
+
+    def dong(self):
+        self.cam.StopGrabbing()
+        self.cam.Close()
+
+
+nguon = CameraPylon()
+nguon.cam.ForceFailedBufferCount.Value = 2
+nguon.cam.ForceFailedBuffer.Execute()
+ket_qua = [nguon.doc() for _ in range(6)]
+print([k[0] if k else None for k in ket_qua], "| ảnh hỏng:", nguon.so_hong)
+nguon.dong()</code></pre>
+<pre><code class="language-text">[None, None, 'khung_3', 'khung_4', 'khung_5', 'khung_6'] | ảnh hỏng: 2</code></pre>
+<p>Trong một trạm thật, <code>None</code> vì ảnh hỏng và <code>None</code> vì hết giờ nên được phân biệt (trả về mã lỗi riêng hoặc ném ngoại lệ riêng) để log và PLC biết vì sao sản phẩm không có kết quả. Phần còn lại của chương trình (ví dụ hàm <code>chay_kiem_tra</code> của bài class) không phải sửa gì khi đổi từ camera giả sang camera thật.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 3. Đọc thông số camera thật</h3>
+<p>Một trạm cũ chạy ổn định nhiều năm, nay camera hỏng và được thay bằng camera cùng model mới bảo hành về. Ảnh sau khi thay tối hơn và kết quả đo lệch. Liệt kê theo thứ tự những gì bạn kiểm tra và những gì lẽ ra phần mềm trạm nên làm sẵn để sự cố này không xảy ra.</p>
+<details><summary>Xem đáp án</summary>
+<p>Kiểm tra theo thứ tự: (1) các tham số trong camera mới so với bản ghi cấu hình cũ: exposure, gain, pixel format, ROI, trigger, gamma/LUT nếu có (camera mới về với cấu hình mặc định của nhà máy); (2) khẩu độ và nét của ống kính (có thể bị xoay khi tháo lắp); (3) vị trí lắp (dấu chuẩn trong ảnh, xem bài <a href="../kien-thuc/kiem-tra-hieu-chuan-dinh-ky-san-xuat.html">kiểm tra hiệu chuẩn định kỳ</a>); (4) hiệu chuẩn lại tỉ lệ mm/pixel vì cảm biến mới có thể lệch vị trí so với ống kính. Phần mềm lẽ ra nên: đặt <em>toàn bộ</em> tham số camera từ file cấu hình mỗi lần khởi động thay vì tin vào cấu hình lưu trong camera; ghi log serial camera cùng các tham số; phát hiện serial đổi thì khóa sản xuất cho tới khi chạy kiểm tra mẫu chuẩn.</p>
+</details>
+</div>
+<p>Bài tiếp theo: <a href="../kien-thuc/do-sau-truong-anh-khau-do-lay-net.html">Độ sâu trường ảnh, khẩu độ, lấy nét</a>.</p>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.baslerweb.com/camera-emulation" rel="noopener" target="_blank">Basler: Camera Emulation (ảnh test tùy chọn, ForceFailedBuffer)</a>, <a href="https://github.com/basler/pypylon" rel="noopener" target="_blank">pypylon trên GitHub</a>, <a href="https://www.emva.org/standards-technology/genicam/" rel="noopener" target="_blank">EMVA: GenICam (GenApi, SFNC, GenTL)</a>, <a href="https://www.automate.org/vision/vision-standards/gige-vision" rel="noopener" target="_blank">A3: GigE Vision</a>, <a href="https://www.automate.org/vision/vision-standards/usb3-vision" rel="noopener" target="_blank">A3: USB3 Vision (350–400 MB/s)</a>, <a href="https://softwareservices.flir.com/BFS-GE-16S2-BD2/latest/Family/AllocatingBandwidth.htm" rel="noopener" target="_blank">Teledyne FLIR: Allocating Bandwidth (GigE 125 MB/s)</a>, <a href="https://github.com/genicam/harvesters" rel="noopener" target="_blank">Harvesters trên GitHub</a>.</p>

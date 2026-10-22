@@ -1,4 +1,4 @@
-<p>"Bài toán này có nên dùng AI không?" là câu hỏi đầu tiên của mọi dự án kiểm tra lỗi, và câu trả lời đúng hiếm khi là "luôn luôn AI" hay "không bao giờ AI". Ở chặng 10, dự án "Phân loại ảnh OK/NG bằng transfer learning" cho bạn thấy một mô hình học sâu học được lỗi từ ảnh; các chặng trước đó cho bạn bộ công cụ cổ điển: phân ngưỡng, blob, đo cạnh subpixel, so khớp mẫu. Bài mở đầu chặng 11 này dạy cách <strong>chọn</strong> giữa hai trường phái bằng tiêu chí cụ thể, chứng minh bằng một thí nghiệm chạy được vì sao luật cổ điển thắng tuyệt đối ở bài toán này nhưng thua ở bài toán khác, thiết kế hệ thống <strong>hybrid</strong> (rule-based làm cổng kiểm tra và đo, AI phán lỗi bề mặt), và ước lượng <strong>chi phí dữ liệu</strong> trước khi hứa với khách hàng. Bài sau, "Tự xây dataset ảnh công nghiệp", biến ước lượng đó thành kế hoạch thu thập thật.</p>
+<p>"Bài toán này có nên dùng AI không?" là câu hỏi đầu tiên của mọi dự án kiểm tra lỗi, và câu trả lời đúng hiếm khi là "luôn luôn AI" hay "không bao giờ AI". Ở chặng 11, dự án "Phân loại ảnh OK/NG bằng transfer learning" cho bạn thấy một mô hình học sâu học được lỗi từ ảnh; các chặng trước đó cho bạn bộ công cụ cổ điển: phân ngưỡng, blob, đo cạnh subpixel, so khớp mẫu. Bài mở đầu chặng 12 này dạy cách <strong>chọn</strong> giữa hai trường phái bằng tiêu chí cụ thể, chứng minh bằng một thí nghiệm chạy được vì sao luật cổ điển thắng tuyệt đối ở bài toán này nhưng thua ở bài toán khác, thiết kế hệ thống <strong>hybrid</strong> (rule-based làm cổng kiểm tra và đo, AI phán lỗi bề mặt), và ước lượng <strong>chi phí dữ liệu</strong> trước khi hứa với khách hàng. Bài sau, "Tự xây dataset ảnh công nghiệp", biến ước lượng đó thành kế hoạch thu thập thật.</p>
 <div class="tip"><strong>Mục tiêu cuối bài</strong>Dùng bảng tiêu chí và một hàm chấm điểm để chọn rule-based, AI hay hybrid cho từng loại lỗi; chạy thí nghiệm so sánh luật phân ngưỡng với một CNN nhỏ trên hai loại bề mặt; viết pipeline hybrid có cổng kiểm tra chất lượng ảnh, định vị, đo kích thước rồi mới gọi AI; tính số ngày thu thập ảnh lỗi, giờ công gán nhãn và chi phí dữ liệu cho một dự án. Code dùng NumPy, OpenCV và PyTorch 2.14 (CPU là đủ).</div>
 
 <h2>1. Hai cách tiếp cận</h2>
@@ -69,7 +69,7 @@ for ten, (tl, n_loi) in BAI_TOAN.items():
 Lỗi dệt trên vải mộc       điểm  +9 → AI có giám sát
 Nhãn chai: lệch và nhăn    điểm  +0 → HYBRID / thử cả hai + đo kích thước bằng rule-based
 Vết rỗ trên vỏ nhôm đúc    điểm  +7 → AI: bắt đầu bằng anomaly detection + đo kích thước bằng rule-based</code></pre>
-<p>Đọc kết quả: đếm chân IC là bài toán đo và đếm thuần túy, rule-based thắng tuyệt đối. Lỗi dệt trên vải có nền biến thiên và lỗi đa dạng, nhiều ảnh lỗi, nên dùng AI có giám sát. Nhãn chai vừa có phần đo (lệch bao nhiêu mm) vừa có phần ngoại hình (nhăn, rách) nên hybrid. Vết rỗ trên nhôm đúc nghiêng hẳn về AI nhưng chỉ thu được 60 ảnh lỗi trong thời hạn, nên bắt đầu bằng anomaly detection rồi chuyển dần sang có giám sát (chặng 12 dạy cả hai).</p>
+<p>Đọc kết quả: đếm chân IC là bài toán đo và đếm thuần túy, rule-based thắng tuyệt đối. Lỗi dệt trên vải có nền biến thiên và lỗi đa dạng, nhiều ảnh lỗi, nên dùng AI có giám sát. Nhãn chai vừa có phần đo (lệch bao nhiêu mm) vừa có phần ngoại hình (nhăn, rách) nên hybrid. Vết rỗ trên nhôm đúc nghiêng hẳn về AI nhưng chỉ thu được 60 ảnh lỗi trong thời hạn, nên bắt đầu bằng anomaly detection rồi chuyển dần sang có giám sát (chặng 13 dạy cả hai).</p>
 
 <h2>3. Thí nghiệm: luật cổ điển thắng ở đâu, thua ở đâu</h2>
 <p>Hai bài toán, cùng kích thước ảnh 64×64, cùng một luật đơn giản "đếm pixel tối hơn ngưỡng, nếu diện tích vượt mức thì NG":</p>
@@ -157,7 +157,7 @@ B. vết nứt trên vân gỗ: luật tốt nhất trên train = pixel &lt; 65,
 <p>Một kỹ sư giỏi vẫn có thể viết luật tốt hơn cho B: lọc theo hướng vuông góc với thớ, chuẩn hóa độ sáng từng tấm, loại blob tròn. Nhưng mỗi biến thể mới (gỗ loại khác, vết nứt chéo, mắt gỗ dài) lại cần thêm luật, và chuỗi luật ngày càng mong manh. Đó là tín hiệu nên để mô hình học.</p>
 
 <h3>Một CNN nhỏ học bài toán B</h3>
-<p>Mạng ba lớp tích chập, kết thúc bằng <code>AdaptiveMaxPool2d</code>: lấy giá trị lớn nhất trên toàn ảnh nên vết lỗi ở đâu cũng được "nhìn thấy". Ta huấn luyện với số ảnh train tăng dần để thấy ngay chi phí dữ liệu, mỗi lần cùng 300 bước cập nhật. Augmentation duy nhất là lật ngang, an toàn vì thớ gỗ không có chiều trái/phải (bài "Dataset, DataLoader và augmentation" ở chặng 10 giải thích cách chọn).</p>
+<p>Mạng ba lớp tích chập, kết thúc bằng <code>AdaptiveMaxPool2d</code>: lấy giá trị lớn nhất trên toàn ảnh nên vết lỗi ở đâu cũng được "nhìn thấy". Ta huấn luyện với số ảnh train tăng dần để thấy ngay chi phí dữ liệu, mỗi lần cùng 300 bước cập nhật. Augmentation duy nhất là lật ngang, an toàn vì thớ gỗ không có chiều trái/phải (bài "Dataset, DataLoader và augmentation" ở chặng 11 giải thích cách chọn).</p>
 <pre><code class="language-python">import time
 
 import numpy as np
@@ -375,7 +375,7 @@ hở_lớp_phủ          3.0            2.1       72
   <tr><td>Dữ liệu</td><td>Vài chục ảnh để chỉnh và kiểm tra</td><td>Hàng trăm đến hàng nghìn ảnh, gán nhãn, kiểm chéo</td></tr>
   <tr><td>Thời gian chờ lỗi</td><td>Thấp (cần mẫu giới hạn để nghiệm thu)</td><td>Cao với lỗi hiếm</td></tr>
   <tr><td>Kỹ sư</td><td>Cao với bài toán khó (luật mong manh)</td><td>Trung bình: pipeline dữ liệu, huấn luyện, đánh giá</td></tr>
-  <tr><td>Phần cứng</td><td>CPU</td><td>Có thể cần GPU/bộ tăng tốc (chặng 14)</td></tr>
+  <tr><td>Phần cứng</td><td>CPU</td><td>Có thể cần GPU/bộ tăng tốc (chặng 15)</td></tr>
   <tr><td>Bảo trì khi đổi mã</td><td>Chỉnh recipe</td><td>Thu thêm ảnh, huấn luyện lại, nghiệm thu lại trên golden set</td></tr>
 </table>
 
@@ -472,3 +472,5 @@ giờ công gán nhãn: 5.8 giờ</code></pre>
   <li>Ước lượng chi phí dữ liệu: lỗi hiếm nhất quyết định lịch thu thập; giờ công gán nhãn tính theo loại nhãn; nhớ chi phí lặp lại khi đổi mã sản phẩm.</li>
 </ul>
 <p>Bài tiếp theo: <strong>Tự xây dataset ảnh công nghiệp</strong>, biến ước lượng hôm nay thành kế hoạch thu thập, cấu trúc thư mục, phiên bản và cách chia tập không rò rỉ.</p>
+
+<p class="note">Nguồn tham khảo: C. Steger, M. Ulrich, C. Wiedemann, <em>Machine Vision Algorithms and Applications</em>, 2nd ed., Wiley-VCH, 2018; P. Bergmann et al., "MVTec AD: A Comprehensive Real-World Dataset for Unsupervised Anomaly Detection", <em>CVPR</em>, 2019.</p>

@@ -1,0 +1,337 @@
+<p>Camera công nghiệp chụp 2, 5, 12 megapixel; vết lỗi cần bắt thường chỉ rộng vài chục pixel, có khi dưới mười. Mô hình detection lại thường được huấn luyện và chạy ở <code>imgsz=640</code>: ảnh 1600 px bị thu nhỏ 2,5 lần, ảnh 5000 px thu nhỏ gần 8 lần, và vết lỗi biến mất trước khi vào mạng. Bài <a href="yolo26-object-detection-nhap-mon.html">Object Detection với YOLO26</a> đã cảnh báo điều này khi bàn về tham số <code>imgsz</code>. Bài này đo cụ thể bằng một mô hình YOLO26 thật huấn luyện trên CPU: so sánh thu nhỏ cả ảnh, chạy ở độ phân giải gốc, và <strong>chia ô</strong> (tiling) cả lúc huấn luyện lẫn lúc suy luận; tự viết bước gộp kết quả các ô, rồi so với thư viện <strong>SAHI</strong>.</p>
+<p>Cần: <code>pip install ultralytics sahi opencv-python</code> (bài chạy với ultralytics 8.4, sahi 0.12). Các khối code nối tiếp nhau trong cùng một file. Nên học trước: <a href="yolo26-object-detection-nhap-mon.html">YOLO26</a>, <a href="iou-map-danh-gia-object-detection.html">IoU, mAP và NMS</a>.</p>
+
+<h2>1. Lỗi nhỏ còn lại bao nhiêu pixel?</h2>
+<p>Dữ liệu tổng hợp: tấm kim loại chải xước dọc, ảnh 1600 × 1200 (2 MP), trên đó có vết rỗ tối Ø6–10 px và vết xước ngắn rộng 2 px. Câu hỏi đầu tiên luôn là: sau khi thu ảnh về kích thước đầu vào của mạng, lỗi nhỏ nhất còn bao nhiêu pixel?</p>
+<pre><code class="language-python">from pathlib import Path
+
+import cv2
+import numpy as np
+
+CAO, RONG = 1200, 1600                 # ảnh camera 2 MP của tấm kim loại
+
+
+def tao_tam(rng, so_loi):
+    """Tấm kim loại chải xước dọc + vết rỗ tối nhỏ (Ø6–10 px) và vết xước ngắn; trả về ảnh và hộp lỗi (x1, y1, x2, y2)."""
+    nen = rng.normal(0, 1, (CAO, RONG)).astype(np.float32)
+    nen = cv2.GaussianBlur(nen, (0, 0), sigmaX=0.6, sigmaY=12)               # vân chải dọc
+    anh = 150 + 18 * nen / nen.std() + 10 * np.sin(np.arange(RONG) / 300.0)[None, :]
+    hop = []
+    for _ in range(so_loi):
+        x, y = int(rng.uniform(20, RONG - 20)), int(rng.uniform(20, CAO - 20))
+        if rng.random() &lt; 0.5:                                                # vết rỗ
+            r = int(rng.integers(3, 6))
+            cv2.circle(anh, (x, y), r, float(rng.uniform(70, 100)), -1)
+            hop.append((x - r - 1, y - r - 1, x + r + 1, y + r + 1))
+        else:                                                                 # vết xước ngắn, chéo
+            dx, dy = int(rng.integers(8, 16)), int(rng.integers(-10, 10))
+            cv2.line(anh, (x, y), (x + dx, y + dy), float(rng.uniform(80, 105)), 2)
+            hop.append((min(x, x + dx) - 2, min(y, y + dy) - 2, max(x, x + dx) + 2, max(y, y + dy) + 2))
+    anh = cv2.GaussianBlur(anh, (0, 0), 0.7) + rng.normal(0, 3, anh.shape)
+    return np.clip(anh, 0, 255).astype(np.uint8), np.array(hop, float)
+
+
+rng = np.random.default_rng(0)
+anh, hop = tao_tam(rng, 6)
+w, h = hop[:, 2] - hop[:, 0], hop[:, 3] - hop[:, 1]
+print(f"ảnh {anh.shape}, {len(hop)} lỗi, kích thước lỗi {w.min():.0f}–{w.max():.0f} × {h.min():.0f}–{h.max():.0f} px")
+for kich in (320, 640, 1280):
+    he_so = kich / RONG
+    print(f"thu cả ảnh về cạnh {kich:4d} px (×{he_so:.2f}): lỗi nhỏ nhất còn khoảng "
+          f"{min(w.min(), h.min()) * he_so:.1f} px")</code></pre>
+<pre><code class="language-text">ảnh (1200, 1600), 6 lỗi, kích thước lỗi 8–17 × 5–12 px
+thu cả ảnh về cạnh  320 px (×0.20): lỗi nhỏ nhất còn khoảng 1.0 px
+thu cả ảnh về cạnh  640 px (×0.40): lỗi nhỏ nhất còn khoảng 2.0 px
+thu cả ảnh về cạnh 1280 px (×0.80): lỗi nhỏ nhất còn khoảng 4.0 px</code></pre>
+<p>Thu cả ảnh về 320 px, lỗi nhỏ nhất còn khoảng 1 px: không mạng nào bắt được. Ở 640 px còn khoảng 2 px, sát giới hạn. Quy tắc thực hành: tính kích thước lỗi nhỏ nhất <em>sau khi thu ảnh</em> và giữ nó ở mức vài pixel trở lên (con số an toàn phụ thuộc kiến trúc và tương phản của lỗi; hãy đo trên dữ liệu của bạn như mục 3).</p>
+
+<h2>2. Huấn luyện trên ô: cắt ảnh và cắt nhãn</h2>
+<p>Huấn luyện thẳng trên ảnh 1600 × 1200 ở độ phân giải gốc tốn nhiều bộ nhớ (batch nhỏ, chậm). Cách phổ biến là cắt ảnh lớn thành <strong>ô</strong> (tile) cố định, ví dụ 320 × 320, chồng lấn nhau 20%, và cắt nhãn theo từng ô:</p>
+<ul>
+  <li>Ô cuối mỗi hàng, mỗi cột áp sát mép ảnh để không bỏ sót phần dư.</li>
+  <li>Hộp lỗi bị mép ô cắt: cắt hộp theo ô; nếu phần còn lại dưới 50% diện tích hộp thì bỏ (mảnh quá nhỏ sẽ dạy mô hình những "nửa lỗi" khó hiểu).</li>
+  <li>Ô không có lỗi chiếm đa số: chỉ giữ một phần (ở đây 30%) để cân bằng, nhưng phải giữ đủ để mô hình học được nền.</li>
+  <li><strong>Chia train/val theo ảnh lớn</strong>, không theo ô: các ô của cùng một ảnh lớn chồng lấn nhau, chia theo ô là rò rỉ dữ liệu (bài <a href="../kien-thuc/overfitting-chia-train-val-test.html">chia train/val/test</a>).</li>
+</ul>
+<pre><code class="language-python">def vi_tri_o(dai, o, buoc):
+    """Vị trí bắt đầu các ô dọc một chiều; ô cuối áp sát mép để không bỏ sót phần dư."""
+    pos = list(range(0, max(dai - o, 0) + 1, buoc))
+    if pos[-1] + o &lt; dai:
+        pos.append(dai - o)
+    return pos
+
+
+def cat_o(anh, hop, o=320, chong_lan=0.2, giu_toi_thieu=0.5):
+    """Cắt ảnh lớn thành các ô o×o chồng lấn; hộp lỗi được cắt theo ô, bỏ hộp chỉ còn dưới 50% diện tích."""
+    buoc = int(o * (1 - chong_lan))
+    cao, rong = anh.shape[:2]
+    for y0 in vi_tri_o(cao, o, buoc):
+        for x0 in vi_tri_o(rong, o, buoc):
+            nhan = []
+            for x1, y1, x2, y2 in hop:
+                cx1, cy1 = max(x1, x0), max(y1, y0)
+                cx2, cy2 = min(x2, x0 + o), min(y2, y0 + o)
+                if cx2 &lt;= cx1 or cy2 &lt;= cy1:
+                    continue
+                if (cx2 - cx1) * (cy2 - cy1) &gt;= giu_toi_thieu * (x2 - x1) * (y2 - y1):
+                    nhan.append((cx1 - x0, cy1 - y0, cx2 - x0, cy2 - y0))
+            yield x0, y0, anh[y0:y0 + o, x0:x0 + o], nhan
+
+
+def ghi_yolo(thu_muc, ten, anh, nhan):
+    """Một ảnh + file nhãn YOLO: lớp, tâm x, tâm y, rộng, cao (chuẩn hóa 0–1)."""
+    o = anh.shape[0]
+    cv2.imwrite(str(thu_muc / "images" / f"{ten}.png"), anh)
+    dong = [f"0 {(x1 + x2) / 2 / o:.6f} {(y1 + y2) / 2 / o:.6f} {(x2 - x1) / o:.6f} {(y2 - y1) / o:.6f}"
+            for x1, y1, x2, y2 in nhan]
+    (thu_muc / "labels" / f"{ten}.txt").write_text("\n".join(dong), encoding="utf-8")
+
+
+GOC = Path("du_lieu_o")
+for tap, so_anh, hat in (("train", 16, 1), ("val", 4, 2)):
+    for con in ("images", "labels"):
+        (GOC / tap / con).mkdir(parents=True, exist_ok=True)
+    rng_tap = np.random.default_rng(hat)
+    dem = [0, 0]
+    for i in range(so_anh):
+        anh_lon, hop_lon = tao_tam(rng_tap, int(rng_tap.integers(4, 9)))
+        for x0, y0, o_anh, nhan in cat_o(anh_lon, hop_lon):
+            if not nhan and rng_tap.random() &gt; 0.3:                  # chỉ giữ 30% ô không có lỗi
+                continue
+            ghi_yolo(GOC / tap, f"{tap}_{i:02d}_{x0}_{y0}", o_anh, nhan)
+            dem[bool(nhan)] += 1
+    print(f"{tap}: {sum(dem)} ô ({dem[1]} ô có lỗi, {dem[0]} ô nền)")
+(GOC / "data.yaml").write_text(
+    f"path: {GOC.resolve().as_posix()}\ntrain: train/images\nval: val/images\nnames:\n  0: loi\n", encoding="utf-8")</code></pre>
+<pre><code class="language-text">train: 237 ô (118 ô có lỗi, 119 ô nền)
+val: 59 ô (32 ô có lỗi, 27 ô nền)</code></pre>
+<p>Huấn luyện YOLO26n (bản nhỏ nhất, khởi tạo từ trọng số COCO) trên các ô ở <code>imgsz=320</code>: tỉ lệ pixel giữ nguyên như ảnh gốc, nên vết lỗi vẫn rộng 6–17 px khi vào mạng.</p>
+<pre><code class="language-python"># chạy khoảng 20 phút trên CPU 8 luồng; với GPU chỉ vài phút
+from ultralytics import YOLO
+
+mo_hinh = YOLO("yolo26n.pt")
+mo_hinh.train(data="du_lieu_o/data.yaml", imgsz=320, epochs=40, batch=16, device="cpu", workers=0, seed=0,
+              plots=False, verbose=False, project=str(Path("chay").resolve()), name="o320", exist_ok=True)</code></pre>
+<pre><code class="language-text">                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95)
+                   all         59         36      0.998          1      0.995      0.749
+huấn luyện xong sau 20.0 phút</code></pre>
+
+<h2>3. Suy luận: thu nhỏ, độ phân giải gốc, hay chia ô?</h2>
+<p>Đánh giá trên 6 ảnh lớn mới (35 vết lỗi). Ghép dự đoán với lỗi thật theo IoU ≥ 0,3: với vật nhỏ, lệch 1–2 px đã làm IoU giảm mạnh, nên ngưỡng 0,5 quen thuộc là quá khắt khe. Bốn cách chạy cùng một mô hình:</p>
+<ul>
+  <li><strong>Cả ảnh, <code>imgsz</code> = 320 hoặc 640</strong>: thư viện thu cả ảnh về kích thước đó (giữ tỉ lệ, đệm viền).</li>
+  <li><strong>Cả ảnh, <code>imgsz</code> = 1600</strong>: không thu nhỏ. YOLO là mạng toàn tích chập nên chạy được ở kích thước khác lúc huấn luyện.</li>
+  <li><strong>Chia ô</strong> như lúc huấn luyện, chạy cả lô ô một lần, dời hộp về tọa độ ảnh lớn, gộp hộp trùng ở vùng chồng lấn bằng NMS.</li>
+</ul>
+<pre><code class="language-python">import time
+
+import torch
+import torchvision
+from ultralytics import YOLO
+
+mo_hinh = YOLO("chay/o320/weights/best.pt")
+rng_thu = np.random.default_rng(3)
+bo_thu = [tao_tam(rng_thu, int(rng_thu.integers(4, 9))) for _ in range(6)]       # 6 ảnh lớn chưa từng thấy
+print("ảnh thử:", len(bo_thu), "| tổng số lỗi:", sum(len(h) for _, h in bo_thu))
+
+
+def iou(a, b):
+    """IoU giữa từng hộp của a (N, 4) và từng hộp của b (M, 4)."""
+    return torchvision.ops.box_iou(torch.as_tensor(a, dtype=torch.float32), torch.as_tensor(b, dtype=torch.float32)).numpy()
+
+
+def cham(du_doan, that, nguong_iou=0.3):
+    """Ghép tham lam theo IoU: trả về (đúng, báo nhầm, bỏ sót). IoU 0,3 vì hộp vật nhỏ rất nhạy với lệch 1–2 px."""
+    if len(du_doan) == 0:
+        return 0, 0, len(that)
+    m = iou(du_doan, that)
+    dung, da_ghep = 0, set()
+    for i in np.argsort(-m.max(axis=1)):
+        j = int(m[i].argmax())
+        if m[i, j] &gt;= nguong_iou and j not in da_ghep:
+            dung += 1
+            da_ghep.add(j)
+    return dung, len(du_doan) - dung, len(that) - dung
+
+
+def ca_anh(anh, imgsz):
+    kq = mo_hinh.predict(cv2.cvtColor(anh, cv2.COLOR_GRAY2BGR), imgsz=imgsz, conf=0.25, verbose=False)[0]
+    return kq.boxes.xyxy.numpy()
+
+
+def chia_o(anh, o=320, chong_lan=0.2, nguong_nms=0.5):
+    """Suy luận từng ô, dời hộp về tọa độ ảnh lớn, gộp hộp trùng ở vùng chồng lấn bằng NMS."""
+    bgr = cv2.cvtColor(anh, cv2.COLOR_GRAY2BGR)
+    buoc = int(o * (1 - chong_lan))
+    hop, diem, cac_o, vi_tri = [], [], [], []
+    for y0 in vi_tri_o(anh.shape[0], o, buoc):
+        for x0 in vi_tri_o(anh.shape[1], o, buoc):
+            cac_o.append(bgr[y0:y0 + o, x0:x0 + o])
+            vi_tri.append((x0, y0))
+    for kq, (x0, y0) in zip(mo_hinh.predict(cac_o, imgsz=o, conf=0.25, verbose=False), vi_tri):   # cả lô ô một lần
+        if len(kq.boxes):
+            hop.append(kq.boxes.xyxy.numpy() + [x0, y0, x0, y0])
+            diem.append(kq.boxes.conf.numpy())
+    if not hop:
+        return np.zeros((0, 4))
+    hop, diem = np.vstack(hop).astype(np.float32), np.concatenate(diem).astype(np.float32)
+    giu = torchvision.ops.nms(torch.tensor(hop), torch.tensor(diem), nguong_nms).numpy()
+    return hop[giu]
+
+
+def danh_gia(ten, ham):
+    tong = np.zeros(3, int)
+    ham(bo_thu[0][0])                                                   # chạy nóng một lần
+    for anh, that in bo_thu:
+        tong += cham(ham(anh), that)
+    lan = []                                                            # thời gian: trung vị 3 lượt (CPU dao động nhiều)
+    for _ in range(3):
+        t = time.perf_counter()
+        for anh, _ in bo_thu:
+            ham(anh)
+        lan.append((time.perf_counter() - t) / len(bo_thu))
+    ms = 1000 * np.median(lan)
+    d, n, s = tong
+    print(f"{ten:28s}: recall {100 * d / (d + s):5.1f}%, precision {100 * d / max(d + n, 1):5.1f}%, "
+          f"báo nhầm {n:2d}, bỏ sót {s:2d}, {ms:5.0f} ms/ảnh")
+
+
+danh_gia("cả ảnh, imgsz = 320", lambda a: ca_anh(a, 320))
+danh_gia("cả ảnh, imgsz = 640", lambda a: ca_anh(a, 640))
+danh_gia("cả ảnh, imgsz = 1600 (gốc)", lambda a: ca_anh(a, 1600))
+danh_gia("chia ô 320, chồng lấn 20%", chia_o)</code></pre>
+<pre><code class="language-text">ảnh thử: 6 | tổng số lỗi: 35
+cả ảnh, imgsz = 320         : recall   8.6%, precision  37.5%, báo nhầm  5, bỏ sót 32,    21 ms/ảnh
+cả ảnh, imgsz = 640         : recall  94.3%, precision  94.3%, báo nhầm  2, bỏ sót  2,    37 ms/ảnh
+cả ảnh, imgsz = 1600 (gốc)  : recall 100.0%, precision 100.0%, báo nhầm  0, bỏ sót  0,   181 ms/ảnh
+chia ô 320, chồng lấn 20%   : recall 100.0%, precision  94.6%, báo nhầm  2, bỏ sót  0,   284 ms/ảnh</code></pre>
+<p>Đọc kết quả (thời gian là trung vị 3 lượt trên CPU máy thử, dao động đáng kể giữa các lần chạy; chỉ nên so sánh độ lớn):</p>
+<ul>
+  <li><strong>Thu về 320 px: bỏ sót hơn 90% lỗi.</strong> Đúng như phép tính ở mục 1. 640 px bắt được phần lớn nhưng vẫn sót và báo nhầm vài lỗi nhỏ nhất.</li>
+  <li><strong>Độ phân giải gốc bắt đủ 100%</strong>, và ở đây còn nhanh hơn chia ô. Với mạng toàn tích chập như YOLO, khi ảnh không quá lớn và bộ nhớ, thời gian cho phép, đây là cách đơn giản nhất: huấn luyện trên ô, chạy trên cả ảnh ở đúng tỉ lệ pixel.</li>
+  <li><strong>Chia ô bắt đủ 100% nhưng có báo nhầm</strong>: đó không phải lỗi của mô hình mà của bước gộp (mục 4).</li>
+</ul>
+<p>Vậy khi nào <em>bắt buộc</em> chia ô lúc suy luận? (1) Ảnh rất lớn (camera 20–100 MP, ảnh line-scan dài hàng chục nghìn dòng) không vừa bộ nhớ GPU hoặc vượt thời gian chu kỳ khi chạy một lần; (2) mô hình đã xuất ONNX hoặc TensorRT với kích thước đầu vào cố định (bài <a href="deploy-1-xuat-onnx-va-kiem-tra-sai-so.html">xuất ONNX</a>); (3) mô hình không phải toàn tích chập: phân loại, anomaly detection với đầu vào cố định 224 × 224 (bài <a href="anomaly-6-anomaly-detection-padim-patchcore.html">anomaly detection</a> đã nhắc cắt ô cho lỗi nhỏ trên chi tiết lớn); (4) muốn chạy song song các ô trên nhiều luồng hoặc nhiều thiết bị.</p>
+
+<h2>4. Gộp kết quả các ô: NMS theo IoU không đủ</h2>
+<p>Báo nhầm của cách chia ô đến từ vết lỗi nằm vắt qua mép ô: ô bên trái thấy cả vết, ô bên phải chỉ thấy một mẩu và vẫn báo nó là lỗi. Hộp mẩu nằm gọn trong hộp đầy đủ nhưng nhỏ hơn nhiều, nên IoU giữa chúng thấp (khoảng 0,24 trong một trường hợp ở bộ thử), dưới ngưỡng 0,5 của NMS, và cả hai cùng được giữ. Thước đo phù hợp là <strong>IoS</strong> (intersection over smaller: phần giao chia diện tích hộp nhỏ hơn): mẩu nằm trong hộp lớn có IoS gần 1. Khi IoS vượt ngưỡng, nhập hai hộp thành hộp hợp thay vì bỏ một hộp:</p>
+<pre><code class="language-python">def gop_ios(hop, diem, nguong=0.5):
+    """Gộp hộp trùng theo IoS (giao / diện tích hộp nhỏ hơn): mảnh lỗi bị cắt ở mép ô được nhập vào hộp lớn."""
+    thu_tu = list(np.argsort(-diem))
+    ket_qua = []
+    while thu_tu:
+        i = thu_tu.pop(0)
+        b = hop[i].copy()
+        con = []
+        for j in thu_tu:
+            c = hop[j]
+            giao = max(0, min(b[2], c[2]) - max(b[0], c[0])) * max(0, min(b[3], c[3]) - max(b[1], c[1]))
+            nho = min((b[2] - b[0]) * (b[3] - b[1]), (c[2] - c[0]) * (c[3] - c[1]))
+            if giao / nho &gt; nguong:
+                b = np.r_[np.minimum(b[:2], c[:2]), np.maximum(b[2:], c[2:])]      # nhập: lấy hộp hợp
+            else:
+                con.append(j)
+        thu_tu = con
+        ket_qua.append(b)
+    return np.array(ket_qua).reshape(-1, 4)
+
+
+def chia_o_ios(anh):
+    bgr = cv2.cvtColor(anh, cv2.COLOR_GRAY2BGR)
+    hop, diem = [], []
+    vi_tri = [(x0, y0) for y0 in vi_tri_o(anh.shape[0], 320, 256) for x0 in vi_tri_o(anh.shape[1], 320, 256)]
+    cac_o = [bgr[y0:y0 + 320, x0:x0 + 320] for x0, y0 in vi_tri]
+    for kq, (x0, y0) in zip(mo_hinh.predict(cac_o, imgsz=320, conf=0.25, verbose=False), vi_tri):
+        hop += list(kq.boxes.xyxy.numpy() + [x0, y0, x0, y0])
+        diem += list(kq.boxes.conf.numpy())
+    return gop_ios(np.array(hop), np.array(diem)) if hop else np.zeros((0, 4))
+
+
+danh_gia("chia ô 320, gộp theo IoS", chia_o_ios)</code></pre>
+<pre><code class="language-text">chia ô 320, gộp theo IoS    : recall 100.0%, precision 100.0%, báo nhầm  0, bỏ sót  0,   268 ms/ảnh</code></pre>
+<p>Gộp theo IoS loại hết báo nhầm, giữ nguyên recall. Thư viện <strong>SAHI</strong> (Slicing Aided Hyper Inference) làm đúng chuỗi việc này (cắt ô, suy luận, dời tọa độ, gộp theo IoS với thuật toán GREEDYNMM) cho nhiều loại mô hình, kể cả Ultralytics:</p>
+<pre><code class="language-python">from sahi import AutoDetectionModel
+from sahi.predict import get_sliced_prediction
+
+mo_hinh_sahi = AutoDetectionModel.from_pretrained(model_type="ultralytics", model_path="chay/o320/weights/best.pt",
+                                                  confidence_threshold=0.25, device="cpu", image_size=320)
+
+
+def sahi(anh):
+    kq = get_sliced_prediction(cv2.cvtColor(anh, cv2.COLOR_GRAY2RGB), mo_hinh_sahi, slice_height=320, slice_width=320,
+                               overlap_height_ratio=0.2, overlap_width_ratio=0.2, perform_standard_pred=False, verbose=0)
+    return np.array([d.bbox.to_xyxy() for d in kq.object_prediction_list]).reshape(-1, 4)
+
+
+danh_gia("SAHI (GREEDYNMM, IoS 0,5)", sahi)</code></pre>
+<pre><code class="language-text">SAHI (GREEDYNMM, IoS 0,5)   : recall 100.0%, precision 100.0%, báo nhầm  0, bỏ sót  0,   649 ms/ảnh</code></pre>
+<p>SAHI cho cùng độ chính xác. Trên máy thử nó chậm hơn bản tự viết khoảng hai đến bốn lần tùy lần chạy, vì suy luận từng ô một thay vì cả lô; mặc định nó còn chạy thêm một lần trên cả ảnh thu nhỏ (<code>perform_standard_pred=True</code>, ở đây tắt) để bắt vật lớn. Dùng SAHI để thử nghiệm nhanh và để có các bước gộp đã được kiểm chứng; khi đưa lên trạm có ngân sách thời gian chặt, bản tự viết chạy theo lô (hoặc chạy cả ảnh ở độ phân giải gốc như mục 3) thường nhanh hơn.</p>
+
+<h2>5. Chọn kích thước ô và chồng lấn</h2>
+<table>
+  <tr><th>Tham số</th><th>Nguyên tắc</th></tr>
+  <tr><td>Tỉ lệ pixel</td><td>Lúc suy luận phải giống lúc huấn luyện: nếu huấn luyện trên ô gốc 320 ở <code>imgsz=320</code>, suy luận ô 640 thì dùng <code>imgsz=640</code> (vẫn 1 pixel ảnh = 1 pixel mạng). Đổi tỉ lệ là đổi kích thước lỗi mô hình nhìn thấy.</td></tr>
+  <tr><td>Kích thước ô</td><td>Lớn hơn nhiều lần vật lớn nhất cần bắt (để vật lớn không bị cắt nát); càng lớn thì càng ít ô, ít chồng lấn lặp lại, nhưng tốn bộ nhớ hơn mỗi lần chạy</td></tr>
+  <tr><td>Chồng lấn</td><td>Ít nhất bằng kích thước vật lớn nhất, để mọi vật nằm trọn trong ít nhất một ô; 20% là điểm khởi đầu phổ biến</td></tr>
+  <tr><td>Gộp</td><td>Theo IoS, nhập hộp; đặt ngưỡng 0,5 rồi kiểm tra trên ảnh có lỗi nằm vắt mép ô</td></tr>
+  <tr><td>Ngưỡng conf</td><td>Mỗi ô là một cơ hội báo nhầm: N ô thì xác suất có ít nhất một báo nhầm trên ảnh tăng theo N (giống overkill theo ô và theo sản phẩm ở <a href="capstone-3-kiem-tra-loi-be-mat-ai-plc.html">capstone 3</a>). Chọn ngưỡng trên kết quả <em>sau khi gộp</em>, theo ảnh lớn</td></tr>
+</table>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Luôn tính kích thước lỗi nhỏ nhất sau khi thu ảnh về <code>imgsz</code>; thu nhỏ ảnh lớn là cách nhanh nhất để mất lỗi nhỏ.</li>
+  <li>Huấn luyện trên ô cắt từ ảnh gốc (cắt nhãn theo ô, bỏ mảnh dưới 50%, chia train/val theo ảnh lớn).</li>
+  <li>Với mạng toàn tích chập, chạy cả ảnh ở đúng tỉ lệ pixel là cách đơn giản nhất; chia ô khi ảnh quá lớn, đầu vào cố định, hoặc mô hình không toàn tích chập.</li>
+  <li>Gộp kết quả các ô theo IoS và nhập hộp, không chỉ NMS theo IoU; chồng lấn ít nhất bằng vật lớn nhất.</li>
+  <li>SAHI làm sẵn toàn bộ chuỗi; bản tự viết chạy theo lô thường nhanh hơn khi cần cycle time.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Không chồng lấn, ô lớn hơn</h3>
+<p>Chạy chia ô (gộp theo IoS) với ô 320 không chồng lấn, ô 320 chồng lấn 20%, và ô 640 chồng lấn 20% (<code>imgsz=640</code>, giữ nguyên tỉ lệ pixel). So số ô, recall, precision.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">def chia_o_tuy_chon(anh, o, chong_lan):
+    bgr = cv2.cvtColor(anh, cv2.COLOR_GRAY2BGR)
+    buoc = int(o * (1 - chong_lan))
+    vi_tri = [(x0, y0) for y0 in vi_tri_o(anh.shape[0], o, buoc) for x0 in vi_tri_o(anh.shape[1], o, buoc)]
+    hop, diem = [], []
+    for kq, (x0, y0) in zip(mo_hinh.predict([bgr[y0:y0 + o, x0:x0 + o] for x0, y0 in vi_tri], imgsz=o,
+                                             conf=0.25, verbose=False), vi_tri):
+        hop += list(kq.boxes.xyxy.numpy() + [x0, y0, x0, y0])
+        diem += list(kq.boxes.conf.numpy())
+    return gop_ios(np.array(hop), np.array(diem)) if hop else np.zeros((0, 4))
+
+
+for o, cl in ((320, 0.0), (320, 0.2), (640, 0.2)):
+    print(f"ô {o}, chồng lấn {cl:.0%}: số ô mỗi ảnh "
+          f"{len(vi_tri_o(1200, o, int(o * (1 - cl)))) * len(vi_tri_o(1600, o, int(o * (1 - cl))))}")
+    danh_gia(f"  ô {o}, chồng lấn {cl:.0%}", lambda a: chia_o_tuy_chon(a, o, cl))</code></pre>
+<pre><code class="language-text">ô 320, chồng lấn 0%: số ô mỗi ảnh 20
+  ô 320, chồng lấn 0%       : recall 100.0%, precision  97.2%, báo nhầm  1, bỏ sót  0,   166 ms/ảnh
+ô 320, chồng lấn 20%: số ô mỗi ảnh 30
+  ô 320, chồng lấn 20%      : recall 100.0%, precision 100.0%, báo nhầm  0, bỏ sót  0,   252 ms/ảnh
+ô 640, chồng lấn 20%: số ô mỗi ảnh 9
+  ô 640, chồng lấn 20%      : recall 100.0%, precision 100.0%, báo nhầm  0, bỏ sót  0,   302 ms/ảnh</code></pre>
+<p>Không chồng lấn: ít ô nhất nhưng có báo nhầm, vì vết lỗi vắt qua mép ô bị tách thành hai mảnh <em>không giao nhau</em>, không thước đo nào gộp được. Ô 640 với <code>imgsz=640</code> vẫn bắt đủ dù mô hình chỉ học trên ô 320, vì tỉ lệ pixel không đổi: đây là cách giảm số ô (9 thay vì 30) khi bộ nhớ cho phép.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Ảnh line-scan</h3>
+<p>Camera line-scan 8192 pixel mỗi dòng chụp cuộn vải; mỗi 4096 dòng xuất một ảnh 8192 × 4096. Lỗi nhỏ nhất rộng 12 px, lỗi lớn nhất (vết dầu) dài 600 px. GPU của trạm chạy mô hình ở 1024 × 1024 trong 15 ms. Đề xuất kích thước ô, chồng lấn, ước lượng số ô và thời gian mỗi ảnh. Có vấn đề gì ở ranh giới giữa hai ảnh liên tiếp?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">o, chong = 1024, 640                                   # chồng lấn ≥ vật lớn nhất (600 px)
+buoc = o - chong
+so_o = len(vi_tri_o(4096, o, buoc)) * len(vi_tri_o(8192, o, buoc))
+print(f"bước {buoc} px, {so_o} ô mỗi ảnh, khoảng {so_o * 15} ms nếu chạy tuần tự")
+o2, chong2 = 1024, 256
+so_o2 = len(vi_tri_o(4096, o2, o2 - chong2)) * len(vi_tri_o(8192, o2, o2 - chong2))
+print(f"chồng lấn 256 px: {so_o2} ô, khoảng {so_o2 * 15} ms; vết dầu dài sẽ bị cắt, cần gộp theo IoS")</code></pre>
+<pre><code class="language-text">bước 384 px, 180 ô mỗi ảnh, khoảng 2700 ms nếu chạy tuần tự
+chồng lấn 256 px: 55 ô, khoảng 825 ms; vết dầu dài sẽ bị cắt, cần gộp theo IoS</code></pre>
+<p>Chồng lấn đủ lớn cho vết dầu 600 px làm số ô và thời gian tăng gấp nhiều lần. Thường hợp lý hơn: chồng lấn vừa phải (ví dụ 256 px, đủ cho lỗi nhỏ) và chấp nhận vết lớn bị cắt, rồi gộp các mảnh theo IoS hoặc theo khoảng cách (các mảnh nối nhau thành một lỗi). Ranh giới giữa hai ảnh line-scan liên tiếp cũng là một "mép ô": giữ lại 600–1000 dòng cuối của ảnh trước nối vào đầu ảnh sau, nếu không vết lỗi nằm vắt qua ranh giới sẽ bị cắt đôi hoặc bỏ sót. Với vết lớn như vết dầu, một mô hình riêng chạy trên ảnh thu nhỏ (giống <code>perform_standard_pred</code> của SAHI) thường hiệu quả hơn tăng chồng lấn.</p>
+</details>
+</div>
+<p>Bài tiếp theo: <a href="../kien-thuc/phan-doan-anh-semantic-instance-panoptic.html">Phân đoạn ảnh: semantic, instance, panoptic</a>.</p>
+
+<p class="note">Nguồn tham khảo: Akyon, Altinuc, Temizel (2022), <a href="https://arxiv.org/abs/2202.06934" rel="noopener" target="_blank"><em>Slicing Aided Hyper Inference and Fine-tuning for Small Object Detection</em> (arXiv:2202.06934)</a>, <a href="https://github.com/obss/sahi" rel="noopener" target="_blank">SAHI trên GitHub</a>, <a href="https://docs.ultralytics.com/guides/sahi-tiled-inference/" rel="noopener" target="_blank">Ultralytics: SAHI tiled inference</a>, <a href="https://docs.ultralytics.com/modes/predict/" rel="noopener" target="_blank">Ultralytics: Predict mode (imgsz)</a>, <a href="https://docs.pytorch.org/vision/main/generated/torchvision.ops.nms.html" rel="noopener" target="_blank">torchvision.ops.nms</a>.</p>

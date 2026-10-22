@@ -1,11 +1,11 @@
-<p>Ở chặng 10 bạn đã huấn luyện mô hình <strong>phân loại</strong> ảnh OK/NG: cả ảnh nhận một nhãn. Nhiều trạm kiểm tra cần nhiều hơn thế: khay phải có đủ 4 con vít và 2 đai ốc, mỗi vết lỗi phải được khoanh vị trí để người vận hành nhìn thấy, robot cần tọa độ từng vật để gắp. Đó là bài toán <strong>Object Detection</strong> (phát hiện đối tượng): mô hình trả về danh sách hộp bao, mỗi hộp có lớp và điểm tin cậy. Bài này là bài mở đầu chặng 12, nối tiếp "Bài tập chặng 11: thiết kế chiến lược AI cho một bài toán lỗi": bạn sẽ chuẩn bị dữ liệu đúng định dạng YOLO (phần mà phần lớn lỗi dự án nằm ở đó), viết script kiểm tra nhãn, sinh file cấu hình dataset, huấn luyện, kiểm tra, dự đoán và xuất mô hình YOLO26 bằng thư viện Ultralytics, rồi biến kết quả dự đoán thành quyết định OK/NG gửi PLC. Bài sau, "IoU, mAP: đánh giá Object Detection", giải thích kỹ các con số mà bước huấn luyện in ra.</p>
+<p>Ở chặng 11 bạn đã huấn luyện mô hình <strong>phân loại</strong> ảnh OK/NG: cả ảnh nhận một nhãn. Nhiều trạm kiểm tra cần nhiều hơn thế: khay phải có đủ 4 con vít và 2 đai ốc, mỗi vết lỗi phải được khoanh vị trí để người vận hành nhìn thấy, robot cần tọa độ từng vật để gắp. Đó là bài toán <strong>Object Detection</strong> (phát hiện đối tượng): mô hình trả về danh sách hộp bao, mỗi hộp có lớp và điểm tin cậy. Bài này là bài mở đầu chặng 13, nối tiếp "Bài tập chặng 12: thiết kế chiến lược AI cho một bài toán lỗi": bạn sẽ chuẩn bị dữ liệu đúng định dạng YOLO (phần mà phần lớn lỗi dự án nằm ở đó), viết script kiểm tra nhãn, sinh file cấu hình dataset, huấn luyện, kiểm tra, dự đoán và xuất mô hình YOLO26 bằng thư viện Ultralytics, rồi biến kết quả dự đoán thành quyết định OK/NG gửi PLC. Bài sau, "IoU, mAP: đánh giá Object Detection", giải thích kỹ các con số mà bước huấn luyện in ra.</p>
 <div class="tip"><strong>Mục tiêu cuối bài</strong>Đổi qua lại giữa tọa độ pixel và nhãn YOLO <code>class cx cy w h</code>; tạo cấu trúc thư mục dataset và file <code>data.yaml</code>; viết script phát hiện nhãn sai trước khi huấn luyện; biết các tham số huấn luyện quan trọng của Ultralytics và đọc kết quả trong <code>runs/detect/</code>; chạy dự đoán, kiểm tra (<code>val</code>) và xuất ONNX; viết phần hậu xử lý đếm vật, ra quyết định OK/NG; tự làm được bài thực hành: huấn luyện YOLO26n trên ít nhất 100 ảnh của bạn và báo cáo mAP50.</div>
 
 <h2>1. Object Detection và họ YOLO</h2>
 <p>Một mô hình phát hiện đối tượng nhận một ảnh và trả về danh sách <code>(x1, y1, x2, y2, điểm tin cậy, lớp)</code>. So với các bài toán bạn đã gặp:</p>
 <table>
   <tr><th>Bài toán</th><th>Đầu ra</th><th>Ví dụ trong nhà máy</th><th>Công gán nhãn</th></tr>
-  <tr><td>Phân loại (chặng 10)</td><td>Một nhãn cho cả ảnh</td><td>Ảnh nắp chai OK hay NG</td><td>Thấp: 1 nhãn/ảnh</td></tr>
+  <tr><td>Phân loại (chặng 11)</td><td>Một nhãn cho cả ảnh</td><td>Ảnh nắp chai OK hay NG</td><td>Thấp: 1 nhãn/ảnh</td></tr>
   <tr><td>Phát hiện đối tượng</td><td>Hộp bao + lớp + điểm tin cậy</td><td>Đếm vít trên khay, khoanh vị trí vết móp, định vị vật cho robot</td><td>Trung bình: kéo hộp quanh từng vật</td></tr>
   <tr><td>Phân đoạn (bài 3–5 của chặng)</td><td>Mặt nạ từng pixel</td><td>Đo diện tích vết loang, chiều dài vết xước</td><td>Cao: vẽ đa giác</td></tr>
 </table>
@@ -29,7 +29,7 @@ r = results[0]                                 # một ảnh → một đối t�
 for (x1, y1, x2, y2), c, k in zip(r.boxes.xyxy.tolist(), r.boxes.conf.tolist(), r.boxes.cls.tolist()):
     print(f"{model.names[int(k)]:10s} {c:.2f}  ({x1:.0f}, {y1:.0f}) - ({x2:.0f}, {y2:.0f})")
 r.save("ket_qua.jpg")                          # ảnh có vẽ hộp</code></pre>
-<p>Mô hình COCO biết "người", "chai", "cốc" nhưng không biết "vít M3" hay "vết móp". Phần còn lại của bài là dạy nó lớp của bạn bằng <strong>transfer learning</strong>: bắt đầu từ trọng số COCO, huấn luyện tiếp trên dữ liệu riêng, giống ý tưởng bạn đã làm với mô hình phân loại ở chặng 10.</p>
+<p>Mô hình COCO biết "người", "chai", "cốc" nhưng không biết "vít M3" hay "vết móp". Phần còn lại của bài là dạy nó lớp của bạn bằng <strong>transfer learning</strong>: bắt đầu từ trọng số COCO, huấn luyện tiếp trên dữ liệu riêng, giống ý tưởng bạn đã làm với mô hình phân loại ở chặng 11.</p>
 
 <h2>2. Định dạng nhãn YOLO</h2>
 <p>Mỗi ảnh có một file <code>.txt</code> cùng tên. Mỗi dòng là một vật:</p>
@@ -58,7 +58,7 @@ print("dòng nhãn :", dong)
 print("đổi ngược :", [round(v, 2) for v in yolo_sang_xyxy(*map(float, dong.split()[1:]), W, H)])</code></pre>
 <pre><code class="language-text">dòng nhãn : 0 0.375000 0.351562 0.125000 0.117188
 đổi ngược : [400.0, 300.0, 560.0, 420.0]</code></pre>
-<p>Ghi 6 chữ số thập phân là đủ: sai số làm tròn nhỏ hơn 0,001 pixel. Các công cụ gán nhãn như CVAT, Label Studio (bài "Công cụ gán nhãn miễn phí" ở chặng 11) xuất thẳng định dạng này; tuy vậy bạn vẫn nên hiểu và tự kiểm tra, vì lỗi nhãn là nguyên nhân số một khiến mô hình kém.</p>
+<p>Ghi 6 chữ số thập phân là đủ: sai số làm tròn nhỏ hơn 0,001 pixel. Các công cụ gán nhãn như CVAT, Label Studio (bài "Công cụ gán nhãn miễn phí" ở chặng 12) xuất thẳng định dạng này; tuy vậy bạn vẫn nên hiểu và tự kiểm tra, vì lỗi nhãn là nguyên nhân số một khiến mô hình kém.</p>
 <div class="warn"><strong>Ba định dạng hộp hay bị nhầm</strong>YOLO: <code>cx, cy, w, h</code> chuẩn hóa. Pascal VOC: <code>x1, y1, x2, y2</code> pixel. COCO JSON: <code>x, y, w, h</code> pixel, với <code>x, y</code> là góc trên trái. Chuyển định dạng sai thường không báo lỗi gì, chỉ làm mô hình học "lệch" một cách bí ẩn. Luôn vẽ lại nhãn lên ảnh để kiểm tra bằng mắt (mục 4).</div>
 
 <h2>3. Tạo dataset mẫu và cấu trúc thư mục</h2>
@@ -129,7 +129,7 @@ print(sorted((GOC / "labels/train").glob("*.txt"))[1].read_text().strip())</code
 val 24 ảnh
 ví dụ img_001.txt :
 1 0.401562 0.341797 0.078125 0.105469</code></pre>
-<p>Ở đây chia ngẫu nhiên vì mỗi ảnh tổng hợp độc lập nhau. Với ảnh thật, <strong>đừng chia ngẫu nhiên từng ảnh</strong> khi nhiều ảnh gần như trùng nhau (chụp liên tiếp cùng một sản phẩm, cắt từ cùng một video): ảnh val sẽ là "bản sao" của ảnh train và mAP đẹp giả tạo. Chia theo lô, theo ngày hoặc theo sản phẩm, như bài "Overfitting và chia train/val/test" ở chặng 10.</p>
+<p>Ở đây chia ngẫu nhiên vì mỗi ảnh tổng hợp độc lập nhau. Với ảnh thật, <strong>đừng chia ngẫu nhiên từng ảnh</strong> khi nhiều ảnh gần như trùng nhau (chụp liên tiếp cùng một sản phẩm, cắt từ cùng một video): ảnh val sẽ là "bản sao" của ảnh train và mAP đẹp giả tạo. Chia theo lô, theo ngày hoặc theo sản phẩm, như bài "Overfitting và chia train/val/test" ở chặng 11.</p>
 <p>File <code>data.yaml</code> khai báo dataset. Nên ghi <code>path</code> là <strong>đường dẫn tuyệt đối</strong>: nếu là đường dẫn tương đối không tồn tại tính từ thư mục đang chạy, Ultralytics sẽ tìm trong thư mục datasets mặc định của nó và báo không thấy dữ liệu, một lỗi rất hay gặp. Sinh file bằng code thay vì gõ tay để không sai thứ tự lớp:</p>
 <pre><code class="language-python">from pathlib import Path
 
@@ -257,7 +257,7 @@ for p in sorted(Path("dataset_vit/images/train").glob("*.png"))[:8]:
 cv2.imwrite("kiem_tra_nhan.png", cv2.vconcat([cv2.hconcat(o[:4]), cv2.hconcat(o[4:])]))
 print("đã lưu kiem_tra_nhan.png:", cv2.imread("kiem_tra_nhan.png").shape)</code></pre>
 <pre><code class="language-text">đã lưu kiem_tra_nhan.png: (512, 1280, 3)</code></pre>
-<p>Mở ảnh: mỗi vít có hộp xanh lá, mỗi đai ốc hộp cam, hộp ôm sát mép vật. Với dữ liệu thật, hãy xem ngẫu nhiên vài chục ảnh mỗi lần có người gán nhãn mới tham gia. Quy ước gán nhãn (hộp ôm sát hay chừa viền, vật bị che quá nửa có gán không, vật cắt ngang mép ảnh xử lý thế nào) phải viết thành văn bản, như bài "Tự xây dataset ảnh công nghiệp" ở chặng 11 đã nhấn mạnh.</p>
+<p>Mở ảnh: mỗi vít có hộp xanh lá, mỗi đai ốc hộp cam, hộp ôm sát mép vật. Với dữ liệu thật, hãy xem ngẫu nhiên vài chục ảnh mỗi lần có người gán nhãn mới tham gia. Quy ước gán nhãn (hộp ôm sát hay chừa viền, vật bị che quá nửa có gán không, vật cắt ngang mép ảnh xử lý thế nào) phải viết thành văn bản, như bài "Tự xây dataset ảnh công nghiệp" ở chặng 12 đã nhấn mạnh.</p>
 
 <h2>5. Huấn luyện</h2>
 <p>Khi dữ liệu sạch, huấn luyện chỉ là vài dòng. Đoạn sau chạy trên máy của bạn (có GPU NVIDIA sẽ nhanh hơn CPU hàng chục lần; không có GPU thì dùng <code>device="cpu"</code> với ít epoch, hoặc một dịch vụ notebook có GPU):</p>
@@ -360,7 +360,7 @@ thiếu vít lỗ 3       ngưỡng 0.5: NG ['thiếu vít ở lỗ 3']
 thiếu vít lỗ 3       ngưỡng 0.3: NG ['thiếu vít ở lỗ 3']
 vít lỗ 4 điểm 0,42   ngưỡng 0.5: NG ['thiếu vít ở lỗ 4']
 vít lỗ 4 điểm 0,42   ngưỡng 0.3: OK []</code></pre>
-<p>Trường hợp thứ ba là bài học quan trọng: vít có thật nhưng mô hình chỉ cho điểm 0,42 (ví dụ do phản xạ). Ở ngưỡng 0,5 khay bị loại nhầm (overkill); ở ngưỡng 0,3 thì đúng, nhưng ngưỡng thấp lại có nguy cơ nhận vệt sáng thành vít, tức là lọt lỗi thiếu vít (escape). Không có ngưỡng nào "đúng" khi chỉ nhìn một ảnh: phải đo trên hàng trăm ảnh, như bài sau và bài chọn ngưỡng ở chặng 11 hướng dẫn. Lưu ý thêm: kiểm tra theo <strong>vị trí</strong> (mỗi lỗ một vít) chặt hơn chỉ đếm số lượng, vì đếm đủ 4 vít vẫn có thể có 2 vít nằm sai chỗ.</p>
+<p>Trường hợp thứ ba là bài học quan trọng: vít có thật nhưng mô hình chỉ cho điểm 0,42 (ví dụ do phản xạ). Ở ngưỡng 0,5 khay bị loại nhầm (overkill); ở ngưỡng 0,3 thì đúng, nhưng ngưỡng thấp lại có nguy cơ nhận vệt sáng thành vít, tức là lọt lỗi thiếu vít (escape). Không có ngưỡng nào "đúng" khi chỉ nhìn một ảnh: phải đo trên hàng trăm ảnh, như bài sau và bài chọn ngưỡng ở chặng 12 hướng dẫn. Lưu ý thêm: kiểm tra theo <strong>vị trí</strong> (mỗi lỗ một vít) chặt hơn chỉ đếm số lượng, vì đếm đủ 4 vít vẫn có thể có 2 vít nằm sai chỗ.</p>
 
 <h2>8. Xuất mô hình để triển khai</h2>
 <p>File <code>.pt</code> cần Python và PyTorch. Máy tính trạm thường chạy phần mềm C# hoặc C++, nên ta xuất sang định dạng trung gian:</p>
@@ -401,7 +401,7 @@ print("ảnh vào mạng:", blob.shape, "| hệ số co", s, "| đệm trái", l
 print("hộp trên ảnh 640 → ảnh gốc:", ve_anh_goc((200, 150, 280, 210), s, left, top))</code></pre>
 <pre><code class="language-text">ảnh vào mạng: (1, 3, 640, 640) | hệ số co 0.5 | đệm trái 0 trên 64
 hộp trên ảnh 640 → ảnh gốc: (400.0, 172.0, 560.0, 292.0)</code></pre>
-<p>Chi tiết đầy đủ (kiểm tra đầu vào/đầu ra của file ONNX, so sánh số với PyTorch, thẻ mô hình) nằm ở bài "Xuất ONNX và kiểm tra kết quả khớp PyTorch" của chặng 13. Một điểm riêng của YOLO26: vì là end-to-end, đầu ra ONNX đã là danh sách hộp cuối cùng, không cần viết NMS; nhưng luôn in tên và shape đầu ra của file trước khi viết code giải mã, đừng chép code giải mã của YOLOv8/YOLO11.</p>
+<p>Chi tiết đầy đủ (kiểm tra đầu vào/đầu ra của file ONNX, so sánh số với PyTorch, thẻ mô hình) nằm ở bài "Xuất ONNX và kiểm tra kết quả khớp PyTorch" của chặng 14. Một điểm riêng của YOLO26: vì là end-to-end, đầu ra ONNX đã là danh sách hộp cuối cùng, không cần viết NMS; nhưng luôn in tên và shape đầu ra của file trước khi viết code giải mã, đừng chép code giải mã của YOLOv8/YOLO11.</p>
 
 <h2>9. Bài thực hành: YOLO26n trên dữ liệu của bạn</h2>
 <p>Yêu cầu: huấn luyện YOLO26n trên bộ dữ liệu nhỏ của bạn (ít nhất 100 ảnh) và báo cáo mAP50. Quy trình đề xuất:</p>
@@ -498,3 +498,5 @@ print("\n".join(loi + canh_bao))</code></pre>
   <li><code>model.export(format="onnx")</code>; khi tự chạy ONNX phải làm đúng letterbox và đổi tọa độ về ảnh gốc.</li>
 </ul>
 <p>Bài tiếp theo: <strong>IoU, mAP: đánh giá Object Detection</strong>, tự tính IoU, NMS, precision, recall và mAP bằng NumPy để hiểu thật sự các con số của <code>model.val()</code>.</p>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.ultralytics.com/models/yolo26/" rel="noopener" target="_blank">Ultralytics Docs: YOLO26</a>; <a href="https://docs.ultralytics.com/modes/train/" rel="noopener" target="_blank">Ultralytics Docs: Train mode</a>; <a href="https://docs.ultralytics.com/modes/export/" rel="noopener" target="_blank">Ultralytics Docs: Export mode</a>.</p>

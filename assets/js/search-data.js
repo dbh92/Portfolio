@@ -1,6 +1,260 @@
 /* Tự động sinh bởi tools/build.py – không sửa tay */
 window.HF_POSTS = [
  {
+  "t": "Class và dataclass: tổ chức code cho trạm kiểm tra",
+  "u": "hoc/python-7-class-dataclass-to-chuc-code.html",
+  "e": "Gói dữ liệu và hàm thành class: __init__, property, dataclass có kiểm tra hợp lệ, Enum cho OK/NG/LOI, kế thừa vừa đủ để đổi camera giả sang thật.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "21/10/2026",
+  "m": 17,
+  "img": "assets/images/posts/python-7-class-dataclass-to-chuc-code.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Luồng và hàng đợi: tách chụp ảnh khỏi xử lý, không mất khung",
+  "u": "hoc/luong-hang-doi-tach-chup-anh-xu-ly.html",
+  "e": "Pipeline producer–consumer bằng threading và queue: đo khung mất, độ trễ, GIL với OpenCV, hàng đợi đầy thì chờ hay bỏ, lỗi trong luồng và thứ tự kết quả.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "21/10/2026",
+  "m": 25,
+  "img": "assets/images/posts/luong-hang-doi-tach-chup-anh-xu-ly.webp",
+  "tags": [
+   "Python",
+   "OpenCV",
+   "Machine Vision"
+  ]
+ },
+ {
+  "t": "Lấy ảnh từ camera công nghiệp: GenICam, pypylon, camera giả lập",
+  "u": "hoc/lay-anh-camera-cong-nghiep-genicam-pypylon.html",
+  "e": "Điều khiển camera công nghiệp bằng Python: node map, exposure, trigger, chiến lược lấy ảnh, ảnh hỏng, băng thông GigE/USB3 và cái bẫy tên Bayer của OpenCV.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "21/10/2026",
+  "m": 28,
+  "img": "assets/images/posts/lay-anh-camera-cong-nghiep-genicam-pypylon.webp",
+  "tags": [
+   "Camera",
+   "Machine Vision",
+   "Python"
+  ]
+ },
+ {
+  "t": "MSA và Gage R&R cho trạm đo camera: ANOVA, ndc, dải bảo vệ",
+  "u": "hoc/msa-gage-rr-anova-he-do-camera.html",
+  "e": "Gage R&R chéo bằng ANOVA tự viết, %GRR theo dung sai và theo quá trình, ndc, nghiên cứu cho trạm tự động, độ tuyến tính và dải bảo vệ giảm escape.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "21/10/2026",
+  "m": 25,
+  "img": "assets/images/posts/msa-gage-rr-anova-he-do-camera.webp",
+  "tags": [
+   "Calibration",
+   "Đo lường",
+   "Industrial Vision"
+  ]
+ },
+ {
+  "t": "Cảm biến 3D: laser, ánh sáng cấu trúc, stereo, ToF và cách chọn",
+  "u": "kien-thuc/3d-vision-1-cam-bien-3d-chon-cong-nghe.html",
+  "e": "So sánh bốn công nghệ 3D bằng con số: độ phân giải laser ΔX/sin α, sai số stereo theo Z², dịch pha, khoảng không mơ hồ của ToF, bề mặt khó và bảng chọn.",
+  "c": "kien-thuc",
+  "cn": "Kiến thức",
+  "d": "21/10/2026",
+  "m": 20,
+  "img": "assets/images/posts/3d-vision-1-cam-bien-3d-chon-cong-nghe.webp",
+  "tags": [
+   "3D Vision",
+   "Machine Vision",
+   "Camera"
+  ]
+ },
+ {
+  "t": "Laser tam giác: từ ảnh vạch laser đến bản đồ chiều cao",
+  "u": "hoc/3d-vision-2-laser-tam-giac-do-chieu-cao.html",
+  "e": "Mô phỏng profiler laser, tìm tâm vạch dưới pixel, vùng khuất và bề mặt tối, bản đồ chiều cao, đo bậc so với mặt chuẩn, đỉnh bằng fit và thể tích.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "21/10/2026",
+  "m": 22,
+  "img": "assets/images/posts/3d-vision-2-laser-tam-giac-do-chieu-cao.webp",
+  "tags": [
+   "3D Vision",
+   "Machine Vision",
+   "Python"
+  ]
+ },
+ {
+  "t": "Stereo với OpenCV: hiệu chuẩn, rectification, bản đồ độ sâu",
+  "u": "hoc/3d-vision-3-stereo-depth-map-opencv.html",
+  "e": "Trọn quy trình stereo trên cảnh có độ sâu thật: stereoCalibrate, stereoRectify, StereoSGBM, reprojectImageTo3D, bề mặt không kết cấu và độ chụm khác độ đúng.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "21/10/2026",
+  "m": 24,
+  "img": "assets/images/posts/3d-vision-3-stereo-depth-map-opencv.webp",
+  "tags": [
+   "3D Vision",
+   "OpenCV",
+   "Calibration"
+  ]
+ },
+ {
+  "t": "Đám mây điểm với Open3D: RANSAC, DBSCAN, ICP cho kiểm tra",
+  "u": "hoc/3d-vision-4-point-cloud-open3d.html",
+  "e": "Từ ảnh độ sâu tới đám mây điểm, lọc, RANSAC tìm mặt bàn, DBSCAN tách vật, đo kích thước và tư thế bền nhiễu, ICP so với mô hình để tìm vết lõm 1,5 mm.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "21/10/2026",
+  "m": 23,
+  "img": "assets/images/posts/3d-vision-4-point-cloud-open3d.webp",
+  "tags": [
+   "3D Vision",
+   "Python",
+   "Robot"
+  ]
+ },
+ {
+  "t": "Dự án: đo độ đồng phẳng chân linh kiện bằng laser 3D",
+  "u": "projects/du-an-3d-do-dong-phang-chan-linh-kien.html",
+  "e": "Trạm đo coplanarity SOIC-16: bản đồ chiều cao, tìm chân không mất chân lỗi, mặt ngồi theo JEDEC so với mặt hồi quy, độ lặp lại qua 10 lần đặt lại.",
+  "c": "projects",
+  "cn": "Projects",
+  "d": "21/10/2026",
+  "m": 18,
+  "img": "assets/images/posts/du-an-3d-do-dong-phang-chan-linh-kien.webp",
+  "tags": [
+   "3D Vision",
+   "Industrial Project",
+   "Đo lường"
+  ]
+ },
+ {
+  "t": "Chạy thử và xử lý sự cố trạm vision tại hiện trường",
+  "u": "kien-thuc/chay-thu-xu-ly-su-co-tram-vision.html",
+  "e": "Chạy thử theo giai đoạn, bảng triệu chứng → nguyên nhân, phương pháp tìm nguyên nhân, và công cụ pandas đọc log một ngày để tự tìm ra năm sự cố của trạm.",
+  "c": "kien-thuc",
+  "cn": "Kiến thức",
+  "d": "21/10/2026",
+  "m": 20,
+  "img": "assets/images/posts/chay-thu-xu-ly-su-co-tram-vision.webp",
+  "tags": [
+   "Industrial Vision",
+   "Machine Vision",
+   "Deployment"
+  ]
+ },
+ {
+  "t": "Grad-CAM: mô hình AI vision đang thật sự nhìn vào đâu?",
+  "u": "hoc/grad-cam-giai-thich-mo-hinh-ai-vision.html",
+  "e": "Mô hình học lối tắt: validation 100% nhưng bỏ sót gần hết lỗi thật. Dùng Grad-CAM và occlusion map tìm nguyên nhân, sửa dữ liệu rồi kiểm chứng lại.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "21/10/2026",
+  "m": 18,
+  "img": "assets/images/posts/grad-cam-giai-thich-mo-hinh-ai-vision.webp",
+  "tags": [
+   "AI Vision",
+   "Deep Learning",
+   "PyTorch"
+  ]
+ },
+ {
+  "t": "Foundation model cho vision: DINOv2, SAM và khi nào nên dùng",
+  "u": "hoc/foundation-model-dinov2-sam-ai-vision.html",
+  "e": "So sánh CNN, ResNet-18 và DINOv2 khi chỉ có vài chục ảnh, phát hiện bất thường theo patch, báo động nhầm khi đổi lô vật liệu, SAM và YOLOE theo lời mô tả.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "21/10/2026",
+  "m": 19,
+  "img": "assets/images/posts/foundation-model-dinov2-sam-ai-vision.webp",
+  "tags": [
+   "AI Vision",
+   "Deep Learning",
+   "PyTorch"
+  ]
+ },
+ {
+  "t": "Ảnh lớn, lỗi nhỏ: chia ô (tiling) và SAHI cho YOLO",
+  "u": "hoc/anh-lon-loi-nho-chia-o-sahi.html",
+  "e": "Lỗi vài pixel biến mất khi YOLO thu nhỏ ảnh lớn. Huấn luyện trên ô, chia ô chồng lấn, gộp hộp theo IoS và so sánh với SAHI bằng số đo thật.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "21/10/2026",
+  "m": 21,
+  "img": "assets/images/posts/anh-lon-loi-nho-chia-o-sahi.webp",
+  "tags": [
+   "Object Detection",
+   "YOLO",
+   "AI Vision"
+  ]
+ },
+ {
+  "t": "Vòng dữ liệu: chọn ảnh gán nhãn, version dataset, chạy bóng",
+  "u": "hoc/vong-du-lieu-chon-anh-chay-bong.html",
+  "e": "Sau triển khai: chọn ảnh nào cho QC gán nhãn, ước lượng số lỗi lọt, version dataset bằng mã băm, chạy bóng mô hình mới và kiểm định McNemar.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "21/10/2026",
+  "m": 17,
+  "img": "assets/images/posts/vong-du-lieu-chon-anh-chay-bong.webp",
+  "tags": [
+   "Deployment",
+   "AI Vision",
+   "Dataset"
+  ]
+ },
+ {
+  "t": "Giao diện vận hành trạm vision bằng PySide6: QThread, signal",
+  "u": "hoc/giao-dien-van-hanh-pyside6.html",
+  "e": "Màn hình vận hành: ảnh trực tiếp, OK/NG, bộ đếm, chọn mã sản phẩm. Kiểm tra chạy trong QThread, giao diện nhận kết quả qua signal, dừng sạch, test offscreen.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "21/10/2026",
+  "m": 13,
+  "img": "assets/images/posts/giao-dien-van-hanh-pyside6.webp",
+  "tags": [
+   "Python",
+   "Industrial Vision",
+   "Machine Vision"
+  ]
+ },
+ {
+  "t": "Nhiễu, SNR và flat-field: đo chất lượng ảnh camera bằng số",
+  "u": "kien-thuc/nhieu-snr-flat-field-chat-luong-anh.html",
+  "e": "Nguồn nhiễu, công thức SNR, đường cong truyền photon theo EMVA 1288, vì sao gain không thêm thông tin, tỉ lệ bắt lỗi mờ theo ánh sáng và flat-field.",
+  "c": "kien-thuc",
+  "cn": "Kiến thức",
+  "d": "21/10/2026",
+  "m": 22,
+  "img": "assets/images/posts/nhieu-snr-flat-field-chat-luong-anh.webp",
+  "tags": [
+   "Camera",
+   "Machine Vision",
+   "Image Processing"
+  ]
+ },
+ {
+  "t": "Kiểm tra màu bằng camera: Lab, ΔE2000, cân bằng trắng, CCM",
+  "u": "kien-thuc/kiem-tra-mau-lab-delta-e.html",
+  "e": "Đổi Lab đúng cách trong OpenCV, cài CIEDE2000 kiểm chứng với dữ liệu Sharma, đèn ngả màu che lỗi thật, cân bằng trắng theo thẻ xám và ma trận màu CCM.",
+  "c": "kien-thuc",
+  "cn": "Kiến thức",
+  "d": "21/10/2026",
+  "m": 20,
+  "img": "assets/images/posts/kiem-tra-mau-lab-delta-e.webp",
+  "tags": [
+   "Camera",
+   "Machine Vision",
+   "Lighting"
+  ]
+ },
+ {
   "t": "HSK 3.0 là gì? Cấp 3 cần bao nhiêu từ, thi những phần nào",
   "u": "ngoai-ngu/hsk3-tong-quan-hsk-3-0.html",
   "e": "HSK 3.0 thay HSK 2.0 tại Việt Nam từ 13/12/2026: cấp 3 khoảng 1.000 từ, đề 70 câu nghe, đọc, viết kèm phần nói, và cách đặt mục tiêu học.",
@@ -1899,7 +2153,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "14/10/2026",
-  "m": 13,
+  "m": 21,
   "img": "assets/images/posts/loss-function-gradient-descent-optimizer.webp",
   "tags": [
    "Deep Learning",
@@ -1913,7 +2167,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "14/10/2026",
-  "m": 11,
+  "m": 18,
   "img": "assets/images/posts/backpropagation-lan-truyen-nguoc.webp",
   "tags": [
    "Deep Learning",
@@ -1955,7 +2209,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "14/10/2026",
-  "m": 14,
+  "m": 24,
   "img": "assets/images/posts/batchnorm-dropout-receptive-field.webp",
   "tags": [
    "Deep Learning",
@@ -1969,7 +2223,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "14/10/2026",
-  "m": 14,
+  "m": 20,
   "img": "assets/images/posts/kien-truc-cnn-kinh-dien.webp",
   "tags": [
    "Deep Learning",
@@ -1984,7 +2238,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "14/10/2026",
-  "m": 13,
+  "m": 22,
   "img": "assets/images/posts/vanishing-exploding-gradient-weight-init.webp",
   "tags": [
    "Deep Learning",
@@ -2027,7 +2281,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "14/10/2026",
-  "m": 16,
+  "m": 25,
   "img": "assets/images/posts/r-cnn-fast-faster-r-cnn.webp",
   "tags": [
    "Object Detection",
@@ -2055,7 +2309,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "14/10/2026",
-  "m": 12,
+  "m": 20,
   "img": "assets/images/posts/gan-mang-doi-sinh.webp",
   "tags": [
    "Generative AI",
@@ -2066,11 +2320,11 @@ window.HF_POSTS = [
  {
   "t": "Kiểm thử hàm xử lý ảnh với pytest: bắt lỗi trước khi lên máy",
   "u": "hoc/pytest-kiem-thu-ham-xu-ly-anh.html",
-  "e": "Dùng fixture, parametrize, pytest.raises và pytest.approx để khóa chặt các hàm cắt ROI, đếm pixel, đánh giá OK/NG, bắt lỗi ngưỡng trước khi lên máy trạm.",
+  "e": "Khóa chặt hàm xử lý ảnh bằng pytest: fixture, parametrize, approx, ảnh tổng hợp có đáp án và bộ ảnh hồi quy bắt lỗi escape trước khi lên máy trạm.",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "10/10/2026",
-  "m": 8,
+  "m": 21,
   "img": "assets/images/posts/pytest-kiem-thu-ham-xu-ly-anh.webp",
   "tags": [
    "Python",
@@ -2110,11 +2364,11 @@ window.HF_POSTS = [
  {
   "t": "Hàm mất mát cho phân loại: cross-entropy, class weight, focal loss",
   "u": "hoc/ham-mat-mat-cross-entropy-focal-loss.html",
-  "e": "Hiểu softmax và cross-entropy bằng con số cụ thể, vì sao dữ liệu ít ảnh NG làm mô hình lười, và cách xử lý bằng trọng số lớp hoặc focal loss trong PyTorch.",
+  "e": "Cross-entropy và dữ liệu ít ảnh NG: thí nghiệm thật so sánh trọng số lớp, WeightedRandomSampler, focal loss trên 3 seed, chọn ngưỡng trên validation.",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "10/10/2026",
-  "m": 8,
+  "m": 22,
   "img": "assets/images/posts/ham-mat-mat-cross-entropy-focal-loss.webp",
   "tags": [
    "Deep Learning",
@@ -2167,28 +2421,29 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "So sánh với ảnh mẫu (golden template) bằng OpenCV: tìm thiếu, thừa",
+  "t": "Golden template và variation model: so với ảnh mẫu bằng OpenCV",
   "u": "hoc/so-sanh-anh-mau-golden-template-opencv.html",
-  "e": "Phát hiện linh kiện thiếu và vật thừa bằng cách so với ảnh mẫu: absdiff, căn chỉnh bằng phaseCorrelate và dải dung sai từ dilate, erode để không báo nhầm ở cạnh.",
+  "e": "Tìm linh kiện thiếu, vật thừa bằng ảnh mẫu: căn chỉnh phaseCorrelate và ECC, dải dung sai, variation model, đo escape và overkill trên 200 ảnh thử.",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "10/10/2026",
-  "m": 8,
+  "m": 30,
   "img": "assets/images/posts/so-sanh-anh-mau-golden-template-opencv.webp",
   "tags": [
    "OpenCV",
    "Machine Vision",
-   "Python"
+   "Python",
+   "Image Processing"
   ]
  },
  {
   "t": "Biến đổi Fourier: lọc vân sọc tuần hoàn để lộ vết lỗi bề mặt",
   "u": "hoc/bien-doi-fourier-loc-van-soc-tuan-hoan.html",
-  "e": "Dùng FFT tìm đỉnh tần số của hoa văn lặp lại trên vải, lưới, kim loại, xóa bằng notch filter rồi phát hiện vết bẩn mờ. Code NumPy và OpenCV có kết quả kiểm chứng.",
+  "e": "FFT tìm đỉnh tần số của hoa văn lặp trên vải, lưới, kim loại; lọc notch để lộ vết lỗi, tránh rò phổ, đo chu kỳ dưới pixel và học mặt nạ từ ảnh OK.",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "10/10/2026",
-  "m": 8,
+  "m": 25,
   "img": "assets/images/posts/bien-doi-fourier-loc-van-soc-tuan-hoan.webp",
   "tags": [
    "Image Processing",
@@ -2274,7 +2529,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "09/10/2026",
-  "m": 7,
+  "m": 8,
   "img": "assets/images/posts/python-5-ham-va-module.webp",
   "tags": [
    "Python",
@@ -2288,7 +2543,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "09/10/2026",
-  "m": 8,
+  "m": 10,
   "img": "assets/images/posts/python-6-doc-ghi-file-va-xu-ly-loi.webp",
   "tags": [
    "Python",
@@ -2302,7 +2557,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "09/10/2026",
-  "m": 9,
+  "m": 10,
   "img": "assets/images/posts/python-9-numpy-co-ban.webp",
   "tags": [
    "Python",
@@ -2332,7 +2587,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "09/10/2026",
-  "m": 10,
+  "m": 12,
   "img": "assets/images/posts/opencv-2-khong-gian-mau-va-tach-mau.webp",
   "tags": [
    "OpenCV",
@@ -2362,7 +2617,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "09/10/2026",
-  "m": 9,
+  "m": 11,
   "img": "assets/images/posts/opencv-4-ve-ket-qua-len-anh.webp",
   "tags": [
    "OpenCV",
@@ -2377,7 +2632,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "09/10/2026",
-  "m": 8,
+  "m": 11,
   "img": "assets/images/posts/opencv-5-to-chuc-pipeline-xu-ly.webp",
   "tags": [
    "OpenCV",
@@ -2572,7 +2827,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "09/10/2026",
-  "m": 25,
+  "m": 26,
   "img": "assets/images/posts/tich-hop-8-luu-ket-qua-sqlite-anh-ng.webp",
   "tags": [
    "Python",
@@ -2596,7 +2851,7 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Hệ thống Machine Vision gồm những gì: camera, quang học, chiếu sáng, I/O",
+  "t": "Hệ thống Machine Vision gồm gì: camera, quang học, chiếu sáng, I/O",
   "u": "hoc/machine-vision-1-kien-truc-he-thong.html",
   "e": "Sơ đồ khối một trạm Machine Vision, đi dọc trạm kiểm tra nắp chai từ cảm biến tới van loại, và mô phỏng vì sao chiếu sáng quyết định thành công.",
   "c": "hoc",
@@ -2626,7 +2881,7 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Chọn công cụ Machine Vision: Halcon, VisionPro, OpenCV hay smart camera",
+  "t": "Chọn công cụ Machine Vision: Halcon, VisionPro, OpenCV, smart camera",
   "u": "hoc/machine-vision-3-thu-vien-va-phan-mem.html",
   "e": "So sánh thư viện thương mại và mã nguồn mở, khi nào dùng smart camera, tính chi phí theo số trạm và các bẫy bản quyền.",
   "c": "hoc",
@@ -2640,7 +2895,7 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Bài tập: phân tích một yêu cầu kiểm tra Machine Vision từ email khách hàng",
+  "t": "Bài tập: phân tích yêu cầu kiểm tra Machine Vision từ email khách",
   "u": "hoc/machine-vision-4-phan-tich-yeu-cau-kiem-tra.html",
   "e": "Biến email khách hàng thành bài toán kỹ thuật: tính FOV và độ phân giải, sổ rủi ro, câu hỏi cần làm rõ, phần cứng sơ bộ, có lời giải mẫu.",
   "c": "hoc",
@@ -2744,7 +2999,7 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Dự án: đóng gói ứng dụng vision chạy 24/7, tự khởi động lại, cập nhật mô hình",
+  "t": "Dự án: ứng dụng vision chạy 24/7, tự khởi động lại, cập nhật mô hình",
   "u": "hoc/deploy-6-dong-goi-ung-dung-chay-24-7.html",
   "e": "Cấu hình TOML có kiểm tra, supervisor tự khởi động lại khi lỗi hay treo, cập nhật mô hình nguyên tử có rollback, chạy như dịch vụ Windows/Linux.",
   "c": "hoc",
@@ -2789,7 +3044,7 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Chọn ngưỡng mô hình AI theo escape, overkill và đo cycle time đúng cách",
+  "t": "Chọn ngưỡng mô hình AI theo escape, overkill; đo cycle time đúng",
   "u": "hoc/ai-vision-5-chon-nguong-va-danh-gia-theo-nha-may.html",
   "e": "Vẽ đường PR và ROC, chọn ngưỡng theo ràng buộc lọt lỗi rồi tối thiểu loại nhầm, xây golden set có phiên bản để nghiệm thu và đo cycle time p99.",
   "c": "hoc",
@@ -2825,7 +3080,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "09/10/2026",
-  "m": 30,
+  "m": 31,
   "img": "assets/images/posts/anomaly-6-anomaly-detection-padim-patchcore.webp",
   "tags": [
    "AI Vision",
@@ -2840,7 +3095,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "09/10/2026",
-  "m": 60,
+  "m": 61,
   "img": "assets/images/posts/capstone-1-tram-do-kich-thuoc.webp",
   "tags": [
    "Đo lường",
@@ -2849,7 +3104,7 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Capstone: trạm đọc DataMatrix, OCR/OCV số seri và chống trùng theo lệnh sản xuất",
+  "t": "Capstone: trạm đọc DataMatrix, OCR/OCV số seri, chống trùng theo lệnh",
   "u": "hoc/capstone-2-tram-doc-ma-va-ocr.html",
   "e": "Dự án portfolio: đọc mã 2D và số seri trong một chu kỳ, OCV chất lượng in, xác minh lệnh sản xuất, Luhn, chống trùng SQLite, đo p99 theo tốc độ dây chuyền.",
   "c": "hoc",
@@ -2864,7 +3119,7 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Capstone: kiểm tra lỗi bề mặt bằng AI, ONNX real-time, PLC và giám sát drift",
+  "t": "Capstone: kiểm tra bề mặt bằng AI, ONNX real-time, PLC, giám sát drift",
   "u": "hoc/capstone-3-kiem-tra-loi-be-mat-ai-plc.html",
   "e": "Dự án portfolio: dữ liệu chia theo lô, huấn luyện CNN, chọn ngưỡng theo escape, xuất ONNX kiểm sai số, trạm ONNX Runtime trả PLC, lưu ảnh NG, giám sát drift.",
   "c": "hoc",
@@ -3039,7 +3294,7 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Tăng tốc suy luận: đo đúng cách, ONNX Runtime, INT8, TensorRT, OpenVINO",
+  "t": "Tăng tốc suy luận: đo đúng, ONNX Runtime, INT8, TensorRT, OpenVINO",
   "u": "hoc/toi-uu-toc-do-suy-luan-onnx-tensorrt-openvino.html",
   "e": "Đo p50/p99 đúng cách, chỉnh luồng và tối ưu đồ thị, lượng tử hóa INT8 bằng ONNX Runtime và đánh giá bằng escape/overkill, chọn runtime theo phần cứng.",
   "c": "hoc",
@@ -3156,7 +3411,7 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Object Detection với YOLO26: chuẩn bị dữ liệu, huấn luyện và xuất mô hình",
+  "t": "Object Detection với YOLO26: dữ liệu, huấn luyện và xuất mô hình",
   "u": "hoc/yolo26-object-detection-nhap-mon.html",
   "e": "Nhãn YOLO, script kiểm tra nhãn, data.yaml, huấn luyện và kiểm tra YOLO26 bằng Ultralytics, từ hộp bao đến quyết định OK/NG, letterbox và xuất ONNX.",
   "c": "hoc",
@@ -3220,7 +3475,7 @@ window.HF_POSTS = [
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "02/10/2026",
-  "m": 34,
+  "m": 35,
   "img": "assets/images/posts/kiem-tra-hieu-chuan-dinh-ky-san-xuat.webp",
   "tags": [
    "Calibration",
@@ -3380,7 +3635,7 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Kiểm soát ánh sáng môi trường: nắng, đèn xưởng nhấp nháy, giám sát độ sáng",
+  "t": "Ánh sáng môi trường nhà máy: nắng, đèn nhấp nháy, giám sát độ sáng",
   "u": "kien-thuc/kiem-soat-anh-sang-moi-truong-nha-may.html",
   "e": "Mô phỏng nhấp nháy 100 Hz theo thời gian phơi sáng, ngân sách che chắn – kính lọc – đèn chớp bằng số và hàm giám sát vùng chuẩn có cảnh báo, dừng trạm, xu hướng EWMA.",
   "c": "kien-thuc",
@@ -3696,7 +3951,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "20/09/2026",
-  "m": 31,
+  "m": 32,
   "img": "assets/images/posts/hand-eye-calibration-camera-robot.webp",
   "tags": [
    "Calibration",
@@ -3801,7 +4056,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "17/09/2026",
-  "m": 38,
+  "m": 39,
   "img": "assets/images/posts/onnx-runtime-csharp-chay-mo-hinh-ai.webp",
   "tags": [
    "C#",
@@ -3941,7 +4196,7 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "OCR bằng Deep Learning: PaddleOCR, EasyOCR và cách chọn so với Tesseract",
+  "t": "OCR bằng Deep Learning: PaddleOCR, EasyOCR, khi nào hơn Tesseract",
   "u": "hoc/ocr-deep-learning-paddleocr-easyocr.html",
   "e": "Hiểu phát hiện chữ và nhận dạng chữ (DBNet, CRNN, CTC), tự huấn luyện mô hình nhỏ, dùng EasyOCR, PaddleOCR 3.x và so sánh độ chính xác, thời gian.",
   "c": "hoc",
@@ -4021,7 +4276,7 @@ window.HF_POSTS = [
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "11/09/2026",
-  "m": 30,
+  "m": 31,
   "img": "assets/images/posts/chon-camera-ong-kinh-machine-vision.webp",
   "tags": [
    "Camera",
@@ -4088,7 +4343,7 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Overfitting và chia train/val/test không rò rỉ: đọc đường loss, tìm ảnh trùng",
+  "t": "Overfitting, chia train/val/test không rò rỉ: đọc loss, tìm ảnh trùng",
   "u": "kien-thuc/overfitting-chia-train-val-test.html",
   "e": "Nhận biết quá khớp qua loss train/val, chia dữ liệu theo lô và ngày, tìm ảnh trùng bằng dHash, đo hiệu quả dropout, augmentation, early stopping.",
   "c": "kien-thuc",
@@ -4175,7 +4430,7 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Hiệu chuẩn camera: ma trận nội tại, méo ống kính và sai số reprojection",
+  "t": "Hiệu chuẩn camera: ma trận nội tại, méo ống kính, sai số reprojection",
   "u": "hoc/hieu-chuan-camera-intrinsic-meo-ong-kinh.html",
   "e": "Mô hình pinhole và hệ số méo, hiệu chuẩn bàn cờ với OpenCV trên bộ ảnh có đáp án, đánh giá reprojection từng ảnh, khử méo, lưu YAML và cách chụp ảnh hiệu chuẩn đúng.",
   "c": "hoc",
@@ -4239,7 +4494,7 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "04/09/2026",
-  "m": 32,
+  "m": 33,
   "img": "assets/images/posts/pytorch-co-ban-tensor-autograd.webp",
   "tags": [
    "PyTorch",
@@ -4522,13 +4777,13 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Tự xây dataset ảnh công nghiệp: kế hoạch, phiên bản, chia tập chống rò rỉ",
+  "t": "Tự xây dataset ảnh công nghiệp: kế hoạch, phiên bản, chia tập đúng",
   "u": "tai-nguyen/tu-xay-dataset-anh-cong-nghiep.html",
   "e": "Lập kế hoạch thu thập theo lô và ca, đặt tên file, manifest SHA-256, dataset card, tìm ảnh trùng bằng pHash và chia tập theo nhóm không rò rỉ.",
   "c": "tai-nguyen",
   "cn": "Tài nguyên",
   "d": "24/08/2026",
-  "m": 35,
+  "m": 36,
   "img": "assets/images/posts/tu-xay-dataset-anh-cong-nghiep.webp",
   "tags": [
    "Dataset",
@@ -4566,13 +4821,13 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Machine Learning là gì? Luật viết tay, học máy và các loại bài toán nhà máy",
+  "t": "Machine Learning là gì? Luật viết tay, học máy và bài toán nhà máy",
   "u": "kien-thuc/machine-learning-la-gi.html",
   "e": "Phân biệt lập trình truyền thống và học máy qua ví dụ OK/NG chạy được, gọi đúng tên bài toán phân loại, hồi quy, phân cụm, bất thường và quy trình dự án ML.",
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "21/08/2026",
-  "m": 30,
+  "m": 31,
   "img": "assets/images/posts/machine-learning-la-gi.webp",
   "tags": [
    "Machine Learning",
@@ -4600,7 +4855,7 @@ window.HF_TOPICS = [
   "u": "hoc/python.html",
   "s": "Học AI & Lập trình",
   "g": "Programming",
-  "n": 60
+  "n": 66
  },
  {
   "t": "C#",
@@ -4621,14 +4876,14 @@ window.HF_TOPICS = [
   "u": "hoc/deep-learning.html",
   "s": "Học AI & Lập trình",
   "g": "AI & Machine Learning",
-  "n": 30
+  "n": 32
  },
  {
   "t": "PyTorch",
   "u": "hoc/pytorch.html",
   "s": "Học AI & Lập trình",
   "g": "AI & Machine Learning",
-  "n": 22
+  "n": 24
  },
  {
   "t": "Generative AI",
@@ -4649,14 +4904,14 @@ window.HF_TOPICS = [
   "u": "hoc/opencv.html",
   "s": "Học AI & Lập trình",
   "g": "Computer Vision",
-  "n": 32
+  "n": 34
  },
  {
   "t": "Image Processing",
   "u": "hoc/image-processing.html",
   "s": "Học AI & Lập trình",
   "g": "Computer Vision",
-  "n": 9
+  "n": 11
  },
  {
   "t": "Computer Vision",
@@ -4677,7 +4932,7 @@ window.HF_TOPICS = [
   "u": "hoc/object-detection.html",
   "s": "Học AI & Lập trình",
   "g": "Computer Vision",
-  "n": 11
+  "n": 12
  },
  {
   "t": "Segmentation",
@@ -4691,56 +4946,63 @@ window.HF_TOPICS = [
   "u": "hoc/machine-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 46
+  "n": 54
  },
  {
   "t": "AI Vision",
   "u": "hoc/ai-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 10
+  "n": 14
  },
  {
   "t": "Industrial Vision",
   "u": "hoc/industrial-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 31
+  "n": 34
  },
  {
   "t": "Camera & Lens",
   "u": "hoc/camera-lens.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 12
+  "n": 16
  },
  {
   "t": "Lighting",
   "u": "hoc/lighting.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 0
+  "n": 7
  },
  {
   "t": "Calibration",
   "u": "hoc/calibration.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 7
+  "n": 9
+ },
+ {
+  "t": "3D Vision",
+  "u": "hoc/3d-vision.html",
+  "s": "Học AI & Lập trình",
+  "g": "Vision Engineering",
+  "n": 5
  },
  {
   "t": "PLC / Robot / MES",
   "u": "hoc/plc-robot-mes.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 14
+  "n": 15
  },
  {
   "t": "Vision Deployment",
   "u": "hoc/vision-deployment.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 7
+  "n": 9
  },
  {
   "t": "AI Projects",
@@ -4761,14 +5023,14 @@ window.HF_TOPICS = [
   "u": "projects/industrial-vision-projects.html",
   "s": "Projects",
   "g": "",
-  "n": 2
+  "n": 3
  },
  {
   "t": "Programming",
   "u": "kien-thuc/programming.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 11
+  "n": 12
  },
  {
   "t": "AI / Machine Learning",
@@ -4782,7 +5044,7 @@ window.HF_TOPICS = [
   "u": "kien-thuc/deep-learning.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 30
+  "n": 32
  },
  {
   "t": "Computer Vision",
@@ -4796,14 +5058,14 @@ window.HF_TOPICS = [
   "u": "kien-thuc/machine-vision.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 46
+  "n": 54
  },
  {
   "t": "AI Vision",
   "u": "kien-thuc/ai-vision.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 10
+  "n": 14
  },
  {
   "t": "Industrial Automation",
@@ -4971,7 +5233,7 @@ window.HF_TOPICS = [
   "u": "tai-nguyen/dataset.html",
   "s": "Tài nguyên",
   "g": "",
-  "n": 8
+  "n": 9
  },
  {
   "t": "Cheat Sheets",
@@ -5037,21 +5299,21 @@ window.HF_TOPICS = [
   "t": "Chặng 1: Python",
   "u": "lo-trinh/vision-engineer/python.html",
   "s": "Vision Engineer",
-  "g": "11 bài học",
+  "g": "12 bài học",
   "n": -1
  },
  {
   "t": "Chặng 2: OpenCV",
   "u": "lo-trinh/vision-engineer/opencv.html",
   "s": "Vision Engineer",
-  "g": "6 bài học",
+  "g": "8 bài học",
   "n": -1
  },
  {
   "t": "Chặng 3: Image Processing",
   "u": "lo-trinh/vision-engineer/image-processing.html",
   "s": "Vision Engineer",
-  "g": "8 bài học",
+  "g": "9 bài học",
   "n": -1
  },
  {
@@ -5072,63 +5334,70 @@ window.HF_TOPICS = [
   "t": "Chặng 6: Camera / Lens / Lighting",
   "u": "lo-trinh/vision-engineer/camera-lens-lighting.html",
   "s": "Vision Engineer",
-  "g": "8 bài học",
+  "g": "11 bài học",
   "n": -1
  },
  {
   "t": "Chặng 7: Measurement / Matching / OCR",
   "u": "lo-trinh/vision-engineer/measurement-matching-ocr.html",
   "s": "Vision Engineer",
-  "g": "8 bài học",
+  "g": "9 bài học",
   "n": -1
  },
  {
   "t": "Chặng 8: Calibration",
   "u": "lo-trinh/vision-engineer/calibration.html",
   "s": "Vision Engineer",
-  "g": "6 bài học",
-  "n": -1
- },
- {
-  "t": "Chặng 9: PLC / Robot / MES",
-  "u": "lo-trinh/vision-engineer/plc-robot-mes.html",
-  "s": "Vision Engineer",
-  "g": "9 bài học",
-  "n": -1
- },
- {
-  "t": "Chặng 10: Deep Learning",
-  "u": "lo-trinh/vision-engineer/deep-learning.html",
-  "s": "Vision Engineer",
-  "g": "12 bài học",
-  "n": -1
- },
- {
-  "t": "Chặng 11: AI Vision",
-  "u": "lo-trinh/vision-engineer/ai-vision.html",
-  "s": "Vision Engineer",
   "g": "7 bài học",
   "n": -1
  },
  {
-  "t": "Chặng 12: Detection / Segmentation / Anomaly Detection",
+  "t": "Chặng 9: 3D Vision",
+  "u": "lo-trinh/vision-engineer/3d-vision.html",
+  "s": "Vision Engineer",
+  "g": "5 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 10: PLC / Robot / MES",
+  "u": "lo-trinh/vision-engineer/plc-robot-mes.html",
+  "s": "Vision Engineer",
+  "g": "10 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 11: Deep Learning",
+  "u": "lo-trinh/vision-engineer/deep-learning.html",
+  "s": "Vision Engineer",
+  "g": "13 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 12: AI Vision",
+  "u": "lo-trinh/vision-engineer/ai-vision.html",
+  "s": "Vision Engineer",
+  "g": "8 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 13: Detection / Segmentation / Anomaly Detection",
   "u": "lo-trinh/vision-engineer/detection-segmentation-anomaly.html",
   "s": "Vision Engineer",
   "g": "8 bài học",
   "n": -1
  },
  {
-  "t": "Chặng 13: Deployment",
+  "t": "Chặng 14: Deployment",
   "u": "lo-trinh/vision-engineer/deployment.html",
   "s": "Vision Engineer",
-  "g": "6 bài học",
+  "g": "7 bài học",
   "n": -1
  },
  {
-  "t": "Chặng 14: Real-world Projects",
+  "t": "Chặng 15: Real-world Projects",
   "u": "lo-trinh/vision-engineer/real-world-projects.html",
   "s": "Vision Engineer",
-  "g": "5 bài học",
+  "g": "6 bài học",
   "n": -1
  },
  {

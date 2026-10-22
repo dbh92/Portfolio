@@ -1,4 +1,4 @@
-<p>Hầu hết các bài trong lộ trình dạy máy tính <em>hiểu</em> ảnh: phân loại, phát hiện, phân vùng. <strong>Generative Adversarial Network</strong> (GAN, mạng đối sinh) làm điều ngược lại: <em>tạo ra</em> những bức ảnh chưa từng tồn tại, từ khuôn mặt người, phong cảnh đến ảnh sản phẩm lỗi tổng hợp. Yann LeCun từng gọi GAN là "ý tưởng thú vị nhất trong machine learning của 10 năm qua". Bài trước, "Khi thiếu ảnh lỗi: augmentation và dữ liệu tổng hợp", tạo ảnh lỗi bằng cắt dán và vẽ thủ tục; GAN là cách để mạng nơ-ron tự <em>học</em> sinh ảnh. Bài này tương ứng phần "Other topics" (module 06) của bài giảng gốc.</p>
+<p>Hầu hết các bài trong lộ trình dạy máy tính <em>hiểu</em> ảnh: phân loại, phát hiện, phân vùng. <strong>Generative Adversarial Network</strong> (GAN, mạng đối sinh) làm điều ngược lại: <em>tạo ra</em> những bức ảnh chưa từng tồn tại, từ khuôn mặt người, phong cảnh đến ảnh sản phẩm lỗi tổng hợp. Yann LeCun từng gọi GAN là "ý tưởng thú vị nhất trong machine learning của 10 năm qua". Bài <a href="du-lieu-tong-hop-synthetic-data-ai-vision.html">Khi thiếu ảnh lỗi: augmentation và dữ liệu tổng hợp</a> của chặng AI Vision tạo ảnh lỗi bằng cắt dán và vẽ thủ tục; GAN là cách để mạng nơ-ron tự <em>học</em> sinh ảnh. Bài này tương ứng phần "Other topics" (module 06) của bài giảng gốc.</p>
 
 <h2>Mô hình phân biệt và mô hình sinh</h2>
 <div class="table-wrap"><table>
@@ -58,6 +58,7 @@
 <pre><code class="language-python">import torch
 import torch.nn as nn
 
+torch.manual_seed(0)
 nz, ngf, ndf = 100, 64, 64        # kích thước vector nhiễu, số kênh cơ sở của G và D
 
 
@@ -108,6 +109,15 @@ opt_g = torch.optim.Adam(G.parameters(), lr=2e-4, betas=(0.5, 0.999))
 opt_d = torch.optim.Adam(D.parameters(), lr=2e-4, betas=(0.5, 0.999))
 fixed_z = torch.randn(64, nz, 1, 1, device=device)    # để theo dõi ảnh sinh qua các epoch
 
+dem = lambda m: sum(p.numel() for p in m.parameters())
+print(f"G: {dem(G):,} tham số, D: {dem(D):,} tham số")
+with torch.no_grad():
+    anh = G(fixed_z[:4])
+    print("G(z):", tuple(anh.shape), f"giá trị trong [{anh.min():.2f}, {anh.max():.2f}]", "| D(G(z)):", tuple(D(anh).shape))</code></pre>
+<pre><code class="language-text">G: 3,576,704 tham số, D: 2,765,568 tham số
+G(z): (4, 3, 64, 64) giá trị trong [-0.73, 0.82] | D(G(z)): (4,)</code></pre>
+<p>Kiến trúc chạy đúng: G biến 100 số ngẫu nhiên thành ảnh 3×64×64 trong khoảng [−1, 1] (nhờ Tanh), D trả một logit cho mỗi ảnh. Vòng huấn luyện cho dữ liệu ảnh thật (cần một <code>DataLoader</code> ảnh 64×64, ví dụ bộ khuôn mặt CelebA, và GPU):</p>
+<pre><code class="language-python"># (minh họa) cần DataLoader `loader` trả ảnh 64×64 đã chuẩn hoá về [-1, 1] và số epoch `num_epochs`
 for epoch in range(num_epochs):
     for real, _ in loader:                 # real: ảnh 64x64 đã chuẩn hoá về [-1, 1]
         real = real.to(device)
@@ -147,6 +157,83 @@ for epoch in range(num_epochs):
 </ul>
 <p><strong>Đánh giá</strong>: <strong>FID</strong> (Fréchet Inception Distance) so sánh phân phối đặc trưng Inception-v3 của ảnh thật và ảnh sinh; càng thấp càng tốt, đo cả chất lượng lẫn độ đa dạng. Inception Score (IS) cũ hơn, ít dùng hơn.</p>
 
+<h2>Thí nghiệm: nhìn thấy mode collapse bằng số</h2>
+<p>Huấn luyện DCGAN trên ảnh cần GPU và hàng giờ. Để thấy các hiện tượng ở trên trong một phút trên CPU, dùng thí nghiệm kinh điển trong các bài báo về GAN: dữ liệu "thật" là 8 cụm điểm 2D xếp trên một vòng tròn. Mỗi cụm là một <strong>mode</strong>. G và D là hai MLP nhỏ, vòng huấn luyện giống hệt vòng DCGAN ở trên. Vì biết chính xác phân phối thật, ta đo được hai thứ mà với ảnh thì rất khó: G phủ được bao nhiêu mode (độ đa dạng), và bao nhiêu phần trăm mẫu sinh ra nằm gọn trong một cụm (chất lượng).</p>
+<pre><code class="language-python">import numpy as np
+import torch
+import torch.nn as nn
+
+TAM = torch.tensor([[np.cos(a), np.sin(a)] for a in np.arange(8) * np.pi / 4], dtype=torch.float32) * 2.0
+
+
+def lay_that(n, rng):
+    """Dữ liệu thật: 8 cụm Gauss nhỏ (σ = 0,05) xếp trên vòng tròn bán kính 2."""
+    return TAM[torch.randint(0, 8, (n,), generator=rng)] + 0.05 * torch.randn(n, 2, generator=rng)
+
+
+def danh_gia(mau):
+    """Một mẫu 'tốt' nếu cách tâm cụm gần nhất dưới 0,15 (3σ). Mode được phủ nếu có ít nhất 1% mẫu tốt."""
+    kc = torch.cdist(mau, TAM)
+    gan, cum = kc.min(dim=1)
+    tot = gan &lt; 0.15
+    so_mode = sum(int((cum[tot] == k).sum()) &gt;= 0.01 * len(mau) for k in range(8))
+    return so_mode, tot.float().mean().item()
+
+
+def huan_luyen_gan(so_buoc=3000, lr_d=1e-3, lr_g=1e-3, seed=0, in_moc=(), bao_hoa=False):
+    torch.manual_seed(seed)
+    rng = torch.Generator().manual_seed(seed)
+    G = nn.Sequential(nn.Linear(2, 128), nn.ReLU(), nn.Linear(128, 128), nn.ReLU(), nn.Linear(128, 2))
+    D = nn.Sequential(nn.Linear(2, 128), nn.ReLU(), nn.Linear(128, 128), nn.ReLU(), nn.Linear(128, 1))
+    bce = nn.BCEWithLogitsLoss()
+    opt_g = torch.optim.Adam(G.parameters(), lr=lr_g, betas=(0.5, 0.999))
+    opt_d = torch.optim.Adam(D.parameters(), lr=lr_d, betas=(0.5, 0.999))
+    mot, khong = torch.ones(256, 1), torch.zeros(256, 1)
+    for buoc in range(1, so_buoc + 1):
+        that, gia = lay_that(256, rng), G(torch.randn(256, 2))
+        loss_d = bce(D(that), mot) + bce(D(gia.detach()), khong)     # (1) cập nhật D
+        opt_d.zero_grad(); loss_d.backward(); opt_d.step()
+        if bao_hoa:                                                    # (2) cập nhật G
+            loss_g = -bce(D(gia), khong)                               # loss gốc: minimize log(1 - D(G(z)))
+        else:
+            loss_g = bce(D(gia), mot)                                  # non-saturating: maximize log D(G(z))
+        opt_g.zero_grad(); loss_g.backward(); opt_g.step()
+        if buoc in in_moc:
+            with torch.no_grad():
+                so_mode, ty_le = danh_gia(G(torch.randn(2000, 2)))
+            print(f"  bước {buoc:5d}: loss_D {loss_d.item():.3f}  loss_G {loss_g.item():.3f} | "
+                  f"phủ {so_mode}/8 mode, {ty_le:.0%} mẫu tốt")
+    with torch.no_grad():
+        return danh_gia(G(torch.randn(2000, 2)))
+
+
+print("8 cụm Gauss, seed 0, non-saturating loss, lr = 1e-3 cho cả G và D:")
+huan_luyen_gan(in_moc=(250, 500, 1000, 2000, 3000))</code></pre>
+<pre><code class="language-text">8 cụm Gauss, seed 0, non-saturating loss, lr = 1e-3 cho cả G và D:
+  bước   250: loss_D 1.041  loss_G 1.467 | phủ 1/8 mode, 1% mẫu tốt
+  bước   500: loss_D 1.174  loss_G 0.877 | phủ 7/8 mode, 20% mẫu tốt
+  bước  1000: loss_D 1.188  loss_G 1.258 | phủ 8/8 mode, 52% mẫu tốt
+  bước  2000: loss_D 1.265  loss_G 0.873 | phủ 8/8 mode, 84% mẫu tốt
+  bước  3000: loss_D 1.368  loss_G 0.917 | phủ 8/8 mode, 91% mẫu tốt</code></pre>
+<p>Ở 250 bước, G mới sinh điểm quanh một vùng (1/8 mode); dần dần nó trải ra phủ cả 8 cụm, và tỉ lệ mẫu tốt tăng lên 91%. Để ý loss: loss_D tăng dần về 1,37, gần \(2\ln 2 \approx 1{,}386\), là giá trị khi D chỉ đoán được 50/50 (bài tập 2). Loss không "giảm đều" như bài toán phân loại, đúng như mẹo đọc loss ở trên.</p>
+<p>Giờ so vài cấu hình, mỗi cấu hình 3 seed (khoảng 3 phút):</p>
+<pre><code class="language-python">CAU_HINH = {"chuẩn (non-saturating)": {}, "loss gốc (bão hòa)": dict(bao_hoa=True),
+            "D học nhanh hơn G 10 lần": dict(lr_g=1e-4), "G học nhanh hơn D 10 lần": dict(lr_d=1e-4)}
+print("sau 3000 bước, 3 seed:")
+for ten, ts in CAU_HINH.items():
+    kq = [huan_luyen_gan(seed=s, **ts) for s in range(3)]
+    print(f"  {ten:25s}: " + "   ".join(f"{m}/8 mode, {t:.0%} tốt" for m, t in kq))</code></pre>
+<pre><code class="language-text">sau 3000 bước, 3 seed:
+  chuẩn (non-saturating)   : 8/8 mode, 91% tốt   7/8 mode, 90% tốt   8/8 mode, 93% tốt
+  loss gốc (bão hòa)       : 8/8 mode, 81% tốt   8/8 mode, 88% tốt   8/8 mode, 79% tốt
+  D học nhanh hơn G 10 lần : 7/8 mode, 70% tốt   5/8 mode, 74% tốt   6/8 mode, 72% tốt
+  G học nhanh hơn D 10 lần : 0/8 mode, 0% tốt   0/8 mode, 0% tốt   1/8 mode, 11% tốt</code></pre>
+<ul>
+  <li>Cấu hình chuẩn thường phủ 7 đến 8 mode: ngay cả khi mọi thứ "đúng", GAN vẫn hay bỏ sót một mode tùy seed. Với ảnh, mode bị bỏ sót có thể chính là kiểu lỗi hiếm mà bạn cần sinh thêm.</li>
+  <li>Loss gốc (bão hòa) trên bài toán đơn giản này vẫn chạy được: vẫn phủ đủ 8 mode, chỉ kém hơn một chút về tỉ lệ mẫu tốt (79 đến 88% so với 90 đến 93%). Vấn đề bão hòa chỉ nghiêm trọng khi D thắng áp đảo từ đầu, điều hay xảy ra với ảnh thật hơn là với điểm 2D. Đừng ngạc nhiên khi một mẹo "bắt buộc" trên lý thuyết không tạo khác biệt trên một bài toán cụ thể.</li>
+  <li>Mất cân bằng tốc độ học làm hỏng rõ rệt: D học nhanh hơn thì G phủ ít mode hơn; G học nhanh hơn D thì G liên tục "đánh lừa" được một D yếu và sụp hẳn, gần như không mẫu nào rơi vào cụm thật.</li>
+</ul>
+
 <h2>Các biến thể GAN nổi bật</h2>
 <div class="table-wrap"><table>
 <tr><th>Mô hình</th><th>Năm</th><th>Ý tưởng</th><th>Ứng dụng</th></tr>
@@ -174,8 +261,39 @@ for epoch in range(num_epochs):
 <li>DCGAN: conv stride 2, transposed conv, BatchNorm, ReLU/LeakyReLU, Tanh, Adam(2e-4, β₁ = 0,5).</li>
 <li>Khó khăn: mode collapse, dao động, khó đánh giá; WGAN-GP, spectral norm giúp ổn định; đánh giá bằng FID.</li>
 <li>Biến thể: cGAN, pix2pix, CycleGAN, StyleGAN; ứng dụng: dữ liệu tổng hợp, phát hiện bất thường, chuyển miền ảnh.</li>
+<li>Thí nghiệm 8 cụm Gauss: GAN chuẩn vẫn có thể bỏ sót mode; mất cân bằng tốc độ học giữa G và D là nguyên nhân hỏng hay gặp.</li>
 </ul>
-<p>GAN là một trong các cách tạo dữ liệu tổng hợp; xem cách làm thực tế, rẻ hơn trong bài <a href="du-lieu-tong-hop-synthetic-data-ai-vision.html">Khi thiếu ảnh lỗi: augmentation và dữ liệu tổng hợp</a>, và so sánh với GAN trên chính dữ liệu của bạn. Bài tiếp theo trong chặng: <a href="ai-vision-5-chon-nguong-va-danh-gia-theo-nha-may.html">Chọn ngưỡng và đánh giá theo escape, overkill, cycle time</a>.</p>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Vì sao cần non-saturating loss?</h3>
+<p>Khi G còn kém, \(D(G(z)) \approx 0{,}01\). Dùng autograd tính gradient theo logit của D cho hai loss của G: \(\log(1 - D(G(z)))\) và \(-\log D(G(z))\).</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">for ten, ham in (("loss gốc  log(1 - D)", lambda l: torch.log(1 - torch.sigmoid(l))),
+                 ("non-saturating -log D", lambda l: -torch.log(torch.sigmoid(l)))):
+    logit = torch.tensor(np.log(0.01 / 0.99), requires_grad=True)     # D(G(z)) = 0,01: D dễ dàng bắt ảnh giả
+    ham(logit).backward()
+    print(f"{ten}: gradient theo logit = {logit.grad.item():+.3f}")</code></pre>
+<pre><code class="language-text">loss gốc  log(1 - D): gradient theo logit = -0.010
+non-saturating -log D: gradient theo logit = -0.990</code></pre>
+<p>Với \(D = \sigma(\ell)\): đạo hàm của \(\log(1 - \sigma(\ell))\) là \(-\sigma(\ell) = -0{,}01\), còn của \(-\log\sigma(\ell)\) là \(-(1 - \sigma(\ell)) = -0{,}99\). Cùng hướng, nhưng loss non-saturating cho tín hiệu mạnh gấp 99 lần đúng vào lúc G cần học nhất.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Các con số ở điểm cân bằng</h3>
+<p>Tại một điểm \(x\) có \(p_{data}(x) = 0{,}6\), \(p_g(x) = 0{,}2\), D tối ưu bằng bao nhiêu? Khi \(p_g = p_{data}\), loss_D (tổng hai BCE) và \(V(D^*, G)\) bằng bao nhiêu?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">p_data, p_g = 0.6, 0.2                        # mật độ tại một điểm x
+print(f"D*(x) = {p_data / (p_data + p_g):.2f}")
+print("loss_D tại cân bằng (D = 1/2 mọi nơi) = 2·ln 2 =", round(2 * np.log(2), 3))
+print("V(D*, G) khi p_g = p_data = -log 4 =", round(-np.log(4), 3))</code></pre>
+<pre><code class="language-text">D*(x) = 0.75
+loss_D tại cân bằng (D = 1/2 mọi nơi) = 2·ln 2 = 1.386
+V(D*, G) khi p_g = p_data = -log 4 = -1.386</code></pre>
+<p>\(D^* = 0{,}6/(0{,}6 + 0{,}2) = 0{,}75\). Khi \(p_g = p_{data}\), \(D^* = 1/2\) ở mọi nơi; mỗi BCE bằng \(\ln 2\), nên loss_D bằng \(2\ln 2 \approx 1{,}386\), và \(V = 2\log\tfrac12 = -\log 4\). Vì vậy loss_D tiến về khoảng 1,39 trong thí nghiệm là dấu hiệu tốt; loss_D tụt về 0 mới là dấu hiệu D thắng áp đảo.</p>
+</details>
+</div>
+<p>GAN là một trong các cách tạo dữ liệu tổng hợp; xem cách làm thực tế, rẻ hơn trong bài <a href="du-lieu-tong-hop-synthetic-data-ai-vision.html">Khi thiếu ảnh lỗi: augmentation và dữ liệu tổng hợp</a>, và so sánh với GAN trên chính dữ liệu của bạn. Đây là bài đọc thêm của chặng AI Vision; quay lại lộ trình với bài <a href="ai-vision-5-chon-nguong-va-danh-gia-theo-nha-may.html">Chọn ngưỡng và đánh giá theo escape, overkill, cycle time</a>.</p>
 
 <h2>Tài liệu tham khảo</h2>
 <ul>

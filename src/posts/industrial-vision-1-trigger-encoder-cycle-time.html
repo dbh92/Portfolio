@@ -83,7 +83,7 @@ Chu kỳ 40 ms | băng tải 1750 mm/s | truyền ảnh 45.5 ms | hạn chót 15
    ✗ chỉ riêng truyền ảnh đã vượt chu kỳ: giảm ROI/độ phân giải hoặc đổi giao tiếp</code></pre>
 <ul>
   <li><strong>Ví dụ 1</strong> rất thoải mái: hơn 300 ms cho xử lý. Chỉ cần lưu ý có 1,6 sản phẩm nằm giữa camera và van, nên vẫn phải theo dõi sản phẩm (mục 6).</li>
-  <li><strong>Ví dụ 2</strong>: cùng camera, nhưng nếu viết một luồng thì chỉ còn 38 ms cho trường hợp chậm nhất; chuyển sang pipeline thì có 70 ms. Đây là lý do code trạm thật tách luồng nhận ảnh và luồng xử lý (chặng 9 và phần triển khai). 3 sản phẩm "trên đường" tới van, kết quả <strong>bắt buộc</strong> phải gắn ID sản phẩm.</li>
+  <li><strong>Ví dụ 2</strong>: cùng camera, nhưng nếu viết một luồng thì chỉ còn 38 ms cho trường hợp chậm nhất; chuyển sang pipeline thì có 70 ms. Đây là lý do code trạm thật tách luồng nhận ảnh và luồng xử lý (chặng 10 và phần triển khai). 3 sản phẩm "trên đường" tới van, kết quả <strong>bắt buộc</strong> phải gắn ID sản phẩm.</li>
   <li><strong>Ví dụ 3</strong>: chỉ riêng truyền ảnh 45,5 ms đã vượt chu kỳ 40 ms. Không thuật toán nào cứu được. Phải giảm dữ liệu: chỉ đọc ROI từ cảm biến (hầu hết camera công nghiệp hỗ trợ), gộp pixel (binning), camera độ phân giải thấp hơn, hoặc giao tiếp nhanh hơn (USB3 Vision, 5/10GigE, CoaXPress). Nhớ rằng tốc độ khung tối đa của camera ở độ phân giải đó cũng phải lớn hơn 25 khung/giây.</li>
 </ul>
 <div class="warn"><strong>Trung bình không phải là con số để nghiệm thu</strong>Trên Windows hay Linux thông thường (không thời gian thực), thời gian xử lý có đuôi dài: cập nhật hệ điều hành, phần mềm diệt virus quét file, ghi ảnh ra ổ cứng chậm, bộ thu gom rác của .NET/Python. Hãy đo hàng chục nghìn lần, xem giá trị lớn nhất và phân vị cao (P99,9), đưa việc lưu ảnh và ghi log sang luồng nền, và để PLC xử lý trường hợp kết quả không về kịp (mục 6).</div>
@@ -234,7 +234,7 @@ sp 5: OK → cho qua
 sp 6: KHÔNG có kết quả đúng hạn → THỔI (NG an toàn) + báo động
 sp 7: NG → THỔI
 Số trigger 8, số kết quả đúng hạn 6</code></pre>
-<p>Hai sản phẩm 4 và 6 bị thổi bỏ dù có thể là hàng tốt: đó là cái giá chấp nhận được của nguyên tắc an toàn, và báo động giúp kỹ sư tìm nguyên nhân (PC quá tải, mạng chập chờn). Dòng cuối là phép kiểm tra sức khỏe đơn giản nhất cho một trạm: <strong>số trigger phải bằng số kết quả đúng hạn</strong>. Lệch nhau là có vấn đề, kể cả khi chưa ai phàn nàn. Giao tiếp I/O và handshake chi tiết với PLC được dạy ở chặng 9.</p>
+<p>Hai sản phẩm 4 và 6 bị thổi bỏ dù có thể là hàng tốt: đó là cái giá chấp nhận được của nguyên tắc an toàn, và báo động giúp kỹ sư tìm nguyên nhân (PC quá tải, mạng chập chờn). Dòng cuối là phép kiểm tra sức khỏe đơn giản nhất cho một trạm: <strong>số trigger phải bằng số kết quả đúng hạn</strong>. Lệch nhau là có vấn đề, kể cả khi chưa ai phàn nàn. Giao tiếp I/O và handshake chi tiết với PLC được dạy ở chặng 10.</p>
 
 <h2>7. Checklist thiết kế thời gian cho một trạm</h2>
 <table>
@@ -307,3 +307,5 @@ phát lệnh sớm 24 mm = 960 xung</code></pre>
   <li>Loại hàng theo hẹn giờ thất bại khi băng tải đổi tốc độ; theo dõi sản phẩm bằng hàng đợi có ID, thiếu kết quả thì loại và báo động.</li>
 </ul>
 <p>Bài tiếp theo: <strong>Đèn strobe và đồng bộ trigger</strong>, để ảnh chụp sản phẩm đang chạy không bị nhòe.</p>
+
+<p class="note">Nguồn tham khảo: <a href="https://www.emva.org/standards-technology/genicam/" rel="noopener" target="_blank">EMVA: GenICam</a>; B. G. Batchelor (ed.), <em>Machine Vision Handbook</em>, Springer, 2012.</p>

@@ -172,7 +172,7 @@ if vuot:
  48.65– 54.93 ms |                                          1
 Chu kỳ vượt 8.0 ms: 10/500
 Chu kỳ chậm nhất #381: 54.93 ms, bước chậm nhất: chup</code></pre>
-<p>Lần chạy này có một chu kỳ 55 ms, gấp 10 lần trung vị, trong khi p99 chỉ khoảng 10 ms: một sự kiện hiếm mà trung bình và cả p99 đều che mất. Bảng từng bước chỉ ra thủ phạm là bước "chụp": lệnh <code>sleep(0.004)</code> bị hệ điều hành đánh thức trễ khoảng 50 ms vì máy đang bận việc khác. Trên trạm thật, chuyện tương tự xảy ra với thread nhận ảnh khi phần mềm diệt virus quét đĩa hay Windows Update chạy nền. Lần chạy của bạn có thể không có chu kỳ như vậy, hoặc có ở bước khác. Câu hỏi đúng khi có chu kỳ vượt ngân sách không phải "trung bình bao nhiêu" mà "<strong>bước nào</strong> gây ra chu kỳ chậm". Nhờ ghi từng bước cho từng chu kỳ, bạn trả lời được ngay. Nếu thủ phạm là I/O, chuyển việc ghi sang thread nền (như dự án trạm vision mô phỏng ở chặng 9); nếu là suy luận, xem lại số luồng và các tiến trình khác trên máy.</p>
+<p>Lần chạy này có một chu kỳ 55 ms, gấp 10 lần trung vị, trong khi p99 chỉ khoảng 10 ms: một sự kiện hiếm mà trung bình và cả p99 đều che mất. Bảng từng bước chỉ ra thủ phạm là bước "chụp": lệnh <code>sleep(0.004)</code> bị hệ điều hành đánh thức trễ khoảng 50 ms vì máy đang bận việc khác. Trên trạm thật, chuyện tương tự xảy ra với thread nhận ảnh khi phần mềm diệt virus quét đĩa hay Windows Update chạy nền. Lần chạy của bạn có thể không có chu kỳ như vậy, hoặc có ở bước khác. Câu hỏi đúng khi có chu kỳ vượt ngân sách không phải "trung bình bao nhiêu" mà "<strong>bước nào</strong> gây ra chu kỳ chậm". Nhờ ghi từng bước cho từng chu kỳ, bạn trả lời được ngay. Nếu thủ phạm là I/O, chuyển việc ghi sang thread nền (như dự án trạm vision mô phỏng ở chặng 10); nếu là suy luận, xem lại số luồng và các tiến trình khác trên máy.</p>
 <div class="warn"><strong>Đo sai cách hay gặp</strong>(1) Dùng <code>time.time()</code>: đồng hồ hệ thống có thể bị chỉnh (đồng bộ NTP), dùng <code>time.perf_counter()</code> để đo khoảng thời gian. (2) Đo mô hình trên GPU mà không đồng bộ: lệnh GPU chạy bất đồng bộ, thời gian đo được chỉ là thời gian <em>gửi lệnh</em>. Với ONNX Runtime, <code>run()</code> trả về khi đã có kết quả nên đo được trực tiếp. (3) Đo trên laptop rồi suy ra cho máy trạm: luôn đo lại trên phần cứng đích, với camera thật, trong vài giờ.</div>
 
 <h2>3. Log có cấu trúc: JSON Lines</h2>
@@ -259,7 +259,7 @@ print("lỗi:", [(b["tin"], b["loi"].splitlines()[-1]) for b in ban_ghi if b["mu
 <pre><code class="language-text">số chu kỳ còn trong log: 314 | NG: 11
 p99 tổng: 6.26 ms
 lỗi: [('loi_ghi_plc', 'ZeroDivisionError: division by zero')]</code></pre>
-<p>Số NG và p99 phụ thuộc lần chạy (p99 tùy máy). Một phần chu kỳ đầu đã "rơi" khỏi log vì file thứ 4 bị xóa khi xoay vòng: đó là cái giá của giới hạn dung lượng, và là lý do <strong>kết quả từng sản phẩm</strong> phải lưu vào cơ sở dữ liệu (SQLite như ở chặng 9), không chỉ trong log. Log để chẩn đoán; CSDL để truy xuất nguồn gốc.</p>
+<p>Số NG và p99 phụ thuộc lần chạy (p99 tùy máy). Một phần chu kỳ đầu đã "rơi" khỏi log vì file thứ 4 bị xóa khi xoay vòng: đó là cái giá của giới hạn dung lượng, và là lý do <strong>kết quả từng sản phẩm</strong> phải lưu vào cơ sở dữ liệu (SQLite như ở chặng 10), không chỉ trong log. Log để chẩn đoán; CSDL để truy xuất nguồn gốc.</p>
 
 <h2>4. Chính sách log: ghi gì, ở mức nào</h2>
 <table>
@@ -430,7 +430,7 @@ cửa sổ  sáng   sáng±   PSI     KS p     NG%  k.chắc%  cảnh báo (* = 
 <p>Khi có cảnh báo drift, hành động <strong>không</strong> phải là tự động hạ ngưỡng hay huấn luyện lại ngay. Quy trình đúng: (1) báo kỹ thuật viên kiểm tra phần cứng (đèn, kính, nét, vị trí camera); (2) lưu các ảnh "không chắc chắn" để xem lại; (3) nếu nguyên nhân là thay đổi thật của sản phẩm (phôi mới), thu thập dữ liệu và huấn luyện lại, rồi cập nhật mô hình theo quy trình an toàn ở dự án cuối chặng.</p>
 
 <h2>6. Heartbeat: cho bên ngoài biết trạm còn sống</h2>
-<p>Ở chặng 9, heartbeat là một thanh ghi Modbus tăng mỗi giây để PLC biết vision còn chạy. Cùng ý tưởng áp dụng cho phần mềm giám sát (dự án cuối chặng: tiến trình giám sát tự khởi động lại trạm khi treo) và cho bảng điều khiển của nhà máy: trạm ghi một file JSON nhỏ mỗi giây, chứa thời điểm, số chu kỳ và vài chỉ số sức khỏe.</p>
+<p>Ở chặng 10, heartbeat là một thanh ghi Modbus tăng mỗi giây để PLC biết vision còn chạy. Cùng ý tưởng áp dụng cho phần mềm giám sát (dự án cuối chặng: tiến trình giám sát tự khởi động lại trạm khi treo) và cho bảng điều khiển của nhà máy: trạm ghi một file JSON nhỏ mỗi giây, chứa thời điểm, số chu kỳ và vài chỉ số sức khỏe.</p>
 <pre><code class="language-python">import os
 
 
@@ -555,3 +555,5 @@ for w in range(14):
   <li>Heartbeat ghi nguyên tử từ vòng lặp chính; bên giám sát phân biệt MẤT và TREO.</li>
 </ul>
 <p>Bài tiếp theo: <strong>Docker cho kỹ sư AI</strong>, đóng gói ứng dụng cùng toàn bộ môi trường để chạy giống nhau trên mọi máy.</p>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/howto/logging.html" rel="noopener" target="_blank">Python: Logging HOWTO</a>; <a href="https://docs.python.org/3/library/json.html" rel="noopener" target="_blank">Python: json</a>; <a href="https://developers.google.com/machine-learning/guides/rules-of-ml" rel="noopener" target="_blank">Google, <em>Rules of Machine Learning: Best Practices for ML Engineering</em></a>.</p>

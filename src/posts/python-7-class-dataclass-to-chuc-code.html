@@ -1,0 +1,428 @@
+<p>Đến bài trước, chương trình của bạn gồm các hàm và dữ liệu nằm rời nhau: một dict đếm OK/NG, một list kết quả, vài biến dung sai, và hàm nào cũng phải nhận đủ các thứ đó qua tham số. Khi chương trình lớn dần (một trạm kiểm tra thật có camera, cấu hình, bộ đếm ca, kết nối PLC), cách viết này rất dễ rối. Bài này dạy <strong>class</strong>: gói dữ liệu và các hàm làm việc với dữ liệu đó thành một khối. Bạn sẽ gặp class ở gần như mọi bài sau của lộ trình: <code>Dataset</code> của PyTorch, bộ cấu hình dùng <code>@dataclass</code>, lớp điều khiển camera, client Modbus.</p>
+
+<h2>1. Vì sao cần class?</h2>
+<p>Hãy xem một bộ đếm kết quả ca viết bằng dict và hàm:</p>
+<pre><code class="language-python">bo_dem = {"ok": 0, "ng": 0}
+
+
+def ghi(bo_dem, ket_qua):
+    bo_dem["ok" if ket_qua == "OK" else "ng"] += 1
+
+
+for kq in ["OK", "OK", "NG", "Ok", "OK"]:
+    ghi(bo_dem, kq)
+print(bo_dem)</code></pre>
+<pre><code class="language-text">{'ok': 3, 'ng': 2}</code></pre>
+<p>Chương trình chạy, nhưng có hai vấn đề. Thứ nhất, <code>"Ok"</code> viết sai chữ hoa đã bị đếm là NG mà không ai báo. Thứ hai, ai cũng có thể sửa thẳng <code>bo_dem["ng"] = 0</code> ở bất kỳ đâu trong chương trình. Class giải quyết cả hai: dữ liệu và các thao tác hợp lệ trên dữ liệu được gói chung, và chính class kiểm tra đầu vào.</p>
+
+<h2>2. Định nghĩa class đầu tiên</h2>
+<pre><code class="language-python">class BoDemCa:
+    """Đếm kết quả OK/NG của một ca sản xuất."""
+
+    def __init__(self, ten_ca):
+        self.ten_ca = ten_ca          # thuộc tính (attribute): dữ liệu riêng của từng đối tượng
+        self.so_ok = 0
+        self.so_ng = 0
+
+    def ghi(self, ket_qua):           # phương thức (method): hàm gắn với đối tượng
+        if ket_qua == "OK":
+            self.so_ok += 1
+        elif ket_qua == "NG":
+            self.so_ng += 1
+        else:
+            raise ValueError(f"Kết quả không hợp lệ: {ket_qua!r} (chỉ nhận 'OK' hoặc 'NG')")
+
+    def tong(self):
+        return self.so_ok + self.so_ng
+
+    def ti_le_ng(self):
+        return self.so_ng / self.tong() if self.tong() else 0.0
+
+
+ca_sang = BoDemCa("Ca sáng")          # tạo một đối tượng (object, instance) từ class
+ca_dem = BoDemCa("Ca đêm")
+for kq in ["OK", "OK", "NG", "OK"]:
+    ca_sang.ghi(kq)
+ca_dem.ghi("NG")
+print(ca_sang.ten_ca, ca_sang.tong(), f"{100 * ca_sang.ti_le_ng():.1f}%")
+print(ca_dem.ten_ca, ca_dem.tong(), f"{100 * ca_dem.ti_le_ng():.1f}%")
+try:
+    ca_sang.ghi("Ok")
+except ValueError as loi:
+    print("Lỗi:", loi)</code></pre>
+<pre><code class="language-text">Ca sáng 4 25.0%
+Ca đêm 1 100.0%
+Lỗi: Kết quả không hợp lệ: 'Ok' (chỉ nhận 'OK' hoặc 'NG')</code></pre>
+<ul>
+  <li><strong>Class</strong> là bản thiết kế (<code>BoDemCa</code>); <strong>đối tượng</strong> là một sản phẩm làm theo bản thiết kế đó (<code>ca_sang</code>, <code>ca_dem</code>). Hai đối tượng có dữ liệu riêng, không lẫn vào nhau.</li>
+  <li><code>__init__</code> chạy tự động khi tạo đối tượng, dùng để đặt giá trị ban đầu. Hai dấu gạch dưới mỗi bên là quy ước của Python cho các phương thức "đặc biệt".</li>
+  <li><code>self</code> là chính đối tượng đang được gọi. <code>ca_sang.ghi("OK")</code> thực chất là <code>BoDemCa.ghi(ca_sang, "OK")</code>, nên phương thức nào cũng có <code>self</code> là tham số đầu tiên.</li>
+  <li>Giá trị sai giờ bị chặn ngay ở cửa: <code>"Ok"</code> gây lỗi rõ ràng thay vì âm thầm thành NG.</li>
+</ul>
+<p>Quy ước đặt tên: class viết hoa chữ đầu mỗi từ (<code>BoDemCa</code>, <code>CameraGia</code>), hàm và biến viết thường có gạch dưới (<code>ti_le_ng</code>), như bài <a href="python-5-ham-va-module.html">hàm và module</a>.</p>
+
+<h2>3. In đối tượng cho dễ đọc và thuộc tính tính toán</h2>
+<p>In thẳng một đối tượng chỉ cho ra dạng <code>&lt;__main__.BoDemCa object at 0x...&gt;</code>, vô dụng khi đọc log. Phương thức đặc biệt <code>__repr__</code> quyết định đối tượng được in thế nào. Còn <code>@property</code> biến một phương thức thành thứ dùng như thuộc tính (không cần dấu <code>()</code>), hợp với các giá trị tính từ dữ liệu khác:</p>
+<pre><code class="language-python">class DungSai:
+    """Một kích thước danh nghĩa với dung sai hai phía, ví dụ 25,00 ± 0,05 mm."""
+
+    def __init__(self, danh_nghia, duoi, tren):
+        if duoi &gt;= tren:
+            raise ValueError("giới hạn dưới phải nhỏ hơn giới hạn trên")
+        self.danh_nghia = danh_nghia
+        self.duoi = duoi              # độ lệch cho phép phía dưới (số âm)
+        self.tren = tren              # độ lệch cho phép phía trên (số dương)
+
+    @property
+    def gioi_han_duoi(self):
+        return self.danh_nghia + self.duoi
+
+    @property
+    def gioi_han_tren(self):
+        return self.danh_nghia + self.tren
+
+    def danh_gia(self, gia_tri):
+        return "OK" if self.gioi_han_duoi &lt;= gia_tri &lt;= self.gioi_han_tren else "NG"
+
+    def __repr__(self):
+        return f"DungSai({self.danh_nghia} {self.duoi:+} / {self.tren:+} mm)"
+
+
+duong_kinh = DungSai(25.00, -0.05, +0.05)
+print(duong_kinh)
+print(duong_kinh.gioi_han_duoi, duong_kinh.gioi_han_tren)
+for d in (24.94, 25.00, 25.05, 25.06):
+    print(d, duong_kinh.danh_gia(d))</code></pre>
+<pre><code class="language-text">DungSai(25.0 -0.05 / +0.05 mm)
+24.95 25.05
+24.94 NG
+25.0 OK
+25.05 OK
+25.06 NG</code></pre>
+<p>Hai giới hạn được <em>tính</em> từ danh nghĩa và độ lệch, không lưu riêng, nên không bao giờ "lệch pha" khi ai đó đổi <code>danh_nghia</code>. Kiểm tra hợp lệ đặt trong <code>__init__</code>: một đối tượng <code>DungSai</code> đã tạo được thì chắc chắn hợp lệ.</p>
+<div class="warn"><strong>So sánh số thực ở biên dung sai</strong><code>25.00 + 0.05</code> trong máy tính là <code>25.05</code> đúng không? Kết quả in ở trên cho thấy 25,05 được đánh giá OK, nhưng với các con số khác, sai số làm tròn số thực (bài <a href="python-2-bien-kieu-du-lieu-toan-tu.html">biến và kiểu dữ liệu</a>) có thể làm một giá trị đúng bằng giới hạn rơi sang NG. Trong trạm thật, kết quả đo luôn được làm tròn đến độ phân giải của phép đo (ví dụ 0,001 mm) trước khi so với giới hạn.</div>
+
+<h2>4. dataclass: class cho dữ liệu, viết ngắn gọn</h2>
+<p>Rất nhiều class chỉ để <em>chứa dữ liệu</em>: một bản ghi kết quả đo, một bộ cấu hình. Viết <code>__init__</code> và <code>__repr__</code> cho chúng rất nhàm. Decorator <code>@dataclass</code> trong thư viện chuẩn tự sinh các phương thức đó từ danh sách trường có khai báo kiểu:</p>
+<pre><code class="language-python">from dataclasses import asdict, dataclass, field
+from datetime import datetime
+
+
+@dataclass
+class KetQuaDo:
+    ma_sp: str
+    gia_tri_mm: float
+    ket_qua: str
+    ly_do: str = ""                                      # trường có giá trị mặc định đứng sau
+    thoi_diem: datetime = field(default_factory=datetime.now)
+
+    def __post_init__(self):                             # chạy ngay sau __init__ tự sinh
+        if self.ket_qua not in ("OK", "NG"):
+            raise ValueError(f"ket_qua phải là 'OK' hoặc 'NG', nhận {self.ket_qua!r}")
+
+
+kq1 = KetQuaDo("SP-0001", 25.012, "OK", thoi_diem=datetime(2026, 10, 21, 8, 0, 5))
+kq2 = KetQuaDo("SP-0002", 25.061, "NG", "vượt giới hạn trên", datetime(2026, 10, 21, 8, 0, 7))
+print(kq1)
+print(kq2.ly_do, kq2.gia_tri_mm)
+print(asdict(kq1))
+print(kq1 == KetQuaDo("SP-0001", 25.012, "OK", thoi_diem=datetime(2026, 10, 21, 8, 0, 5)))</code></pre>
+<pre><code class="language-text">KetQuaDo(ma_sp='SP-0001', gia_tri_mm=25.012, ket_qua='OK', ly_do='', thoi_diem=datetime.datetime(2026, 10, 21, 8, 0, 5))
+vượt giới hạn trên 25.061
+{'ma_sp': 'SP-0001', 'gia_tri_mm': 25.012, 'ket_qua': 'OK', 'ly_do': '', 'thoi_diem': datetime.datetime(2026, 10, 21, 8, 0, 5)}
+True</code></pre>
+<ul>
+  <li>Từ 5 dòng khai báo, <code>@dataclass</code> sinh <code>__init__</code> (theo đúng thứ tự trường), <code>__repr__</code> dễ đọc và <code>__eq__</code> (hai bản ghi bằng nhau khi mọi trường bằng nhau).</li>
+  <li><code>__post_init__</code> là chỗ đặt kiểm tra hợp lệ.</li>
+  <li><code>asdict</code> đổi thành dict, sẵn sàng ghi ra JSON hay CSV như bài <a href="python-6-doc-ghi-file-va-xu-ly-loi.html">đọc ghi file</a>.</li>
+  <li>Kiểu khai báo (<code>str</code>, <code>float</code>) chỉ là ghi chú cho người đọc và công cụ kiểm tra; Python <strong>không</strong> tự ép hay kiểm tra kiểu lúc chạy.</li>
+</ul>
+<div class="warn"><strong>Giá trị mặc định là list hay dict: dùng default_factory</strong>Viết <code>loi: list = []</code> trong dataclass sẽ bị Python từ chối (<code>ValueError: mutable default ... is not allowed</code>), vì mọi đối tượng sẽ dùng chung một list. Viết <code>loi: list = field(default_factory=list)</code> để mỗi đối tượng có list riêng. Cùng lý do đó, <code>thoi_diem</code> ở trên dùng <code>default_factory=datetime.now</code>: thời điểm được lấy lúc tạo từng bản ghi, không phải một lần lúc định nghĩa class.</div>
+
+<h3>Cấu hình bất biến với frozen=True</h3>
+<p>Cấu hình của trạm được đọc một lần lúc khởi động và không nên bị sửa giữa chừng bởi một dòng code vô tình. <code>frozen=True</code> làm đối tượng chỉ đọc; muốn đổi thì tạo bản mới bằng <code>dataclasses.replace</code>:</p>
+<pre><code class="language-python">from dataclasses import FrozenInstanceError, replace
+
+
+@dataclass(frozen=True)
+class CauHinhTram:
+    ma_tram: str = "ST3"
+    nguong: int = 128
+    roi: tuple = (100, 80, 400, 300)
+
+
+cfg = CauHinhTram()
+try:
+    cfg.nguong = 90
+except FrozenInstanceError as loi:
+    print("Không sửa được:", loi)
+cfg_moi = replace(cfg, nguong=90)
+print(cfg)
+print(cfg_moi)</code></pre>
+<pre><code class="language-text">Không sửa được: cannot assign to field 'nguong'
+CauHinhTram(ma_tram='ST3', nguong=128, roi=(100, 80, 400, 300))
+CauHinhTram(ma_tram='ST3', nguong=90, roi=(100, 80, 400, 300))</code></pre>
+
+<h2>5. Enum: tập giá trị cố định, không gõ nhầm</h2>
+<p>Kết quả kiểm tra chỉ có vài giá trị: OK, NG, và thường thêm "lỗi hệ thống" (camera mất kết nối, không căn được ảnh) cần tách riêng khỏi NG. Chuỗi ký tự dễ gõ sai; <code>Enum</code> tạo một tập giá trị có tên, gõ sai là lỗi ngay:</p>
+<pre><code class="language-python">from enum import Enum
+
+
+class KetQua(Enum):
+    OK = "OK"
+    NG = "NG"
+    LOI = "LOI"            # lỗi hệ thống: không đánh giá được sản phẩm
+
+
+kq = KetQua("NG")                      # đổi từ chuỗi (ví dụ đọc từ file) sang Enum
+print(kq, kq.value, kq is KetQua.NG)
+print([k.name for k in KetQua])
+try:
+    KetQua("Ok")
+except ValueError as loi:
+    print("Lỗi:", loi)
+print(KetQua.OK == "OK")               # Enum KHÔNG bằng chuỗi: so với KetQua.OK hoặc dùng .value</code></pre>
+<pre><code class="language-text">KetQua.NG NG True
+['OK', 'NG', 'LOI']
+Lỗi: 'Ok' is not a valid KetQua
+False</code></pre>
+<p>Dòng cuối là cái bẫy hay gặp: so <code>KetQua.OK == "OK"</code> luôn là <code>False</code>. Trong code, so với <code>KetQua.OK</code>; khi ghi ra file hay gửi PLC thì dùng <code>.value</code>.</p>
+
+<h2>6. Kế thừa vừa đủ: nhiều nguồn ảnh, một cách dùng</h2>
+<p>Trạm thật lấy ảnh từ camera; khi phát triển và kiểm thử, bạn lấy ảnh từ thư mục; khi viết bài tập, bạn dùng "camera giả" sinh dữ liệu. Nếu ba nguồn có <strong>cùng một phương thức</strong> <code>doc()</code>, phần còn lại của chương trình không cần biết đang dùng nguồn nào. <strong>Kế thừa</strong> (inheritance) cho phép viết một class cha mô tả "hợp đồng" chung, các class con thực hiện cụ thể:</p>
+<pre><code class="language-python">from pathlib import Path
+
+
+class NguonAnh:
+    """Lớp cha: mọi nguồn ảnh phải có doc() trả về (tên, dữ liệu), hoặc None khi hết."""
+
+    def doc(self):
+        raise NotImplementedError("lớp con phải viết doc()")
+
+    def dong(self):                                  # mặc định không cần dọn dẹp gì
+        pass
+
+
+class CameraGia(NguonAnh):
+    """Camera giả: trả về 'ảnh' là list độ sáng, dùng cho bài tập và kiểm thử."""
+
+    def __init__(self, so_khung):
+        self.so_khung = so_khung
+        self.dem = 0
+
+    def doc(self):
+        if self.dem &gt;= self.so_khung:
+            return None
+        self.dem += 1
+        return f"khung_{self.dem:03d}", [120 + 10 * self.dem] * 4
+
+
+class ThuMucAnh(NguonAnh):
+    """Đọc lần lượt các file trong thư mục (ở đây đọc nội dung văn bản cho đơn giản)."""
+
+    def __init__(self, thu_muc, mau="*.txt"):
+        self.ds = sorted(Path(thu_muc).glob(mau))
+        self.vi_tri = 0
+
+    def doc(self):
+        if self.vi_tri &gt;= len(self.ds):
+            return None
+        p = self.ds[self.vi_tri]
+        self.vi_tri += 1
+        return p.name, p.read_text(encoding="utf-8")
+
+
+def chay_kiem_tra(nguon: NguonAnh, toi_da=10):
+    """Không cần biết nguồn là camera hay thư mục: chỉ gọi doc() cho tới khi hết."""
+    so_anh = 0
+    while so_anh &lt; toi_da and (khung := nguon.doc()) is not None:
+        ten, du_lieu = khung
+        print(f"  xử lý {ten}: {du_lieu}")
+        so_anh += 1
+    nguon.dong()
+    return so_anh
+
+
+print("Camera giả:")
+chay_kiem_tra(CameraGia(so_khung=3))
+Path("anh_thu").mkdir(exist_ok=True)
+for i in range(2):
+    Path(f"anh_thu/anh_{i}.txt").write_text(f"nội dung ảnh {i}", encoding="utf-8")
+print("Thư mục:")
+print("đã xử lý", chay_kiem_tra(ThuMucAnh("anh_thu")), "ảnh")
+print(isinstance(CameraGia(1), NguonAnh), issubclass(ThuMucAnh, NguonAnh))</code></pre>
+<pre><code class="language-text">Camera giả:
+  xử lý khung_001: [130, 130, 130, 130]
+  xử lý khung_002: [140, 140, 140, 140]
+  xử lý khung_003: [150, 150, 150, 150]
+Thư mục:
+  xử lý anh_0.txt: nội dung ảnh 0
+  xử lý anh_1.txt: nội dung ảnh 1
+đã xử lý 2 ảnh
+True True</code></pre>
+<ul>
+  <li><code>class CameraGia(NguonAnh)</code>: <code>CameraGia</code> kế thừa <code>NguonAnh</code>, có sẵn mọi phương thức của lớp cha (<code>dong()</code>) và tự viết lại (<em>ghi đè</em>, override) <code>doc()</code>.</li>
+  <li>Lớp cha ném <code>NotImplementedError</code> trong <code>doc()</code>: quên viết <code>doc()</code> ở lớp con là lỗi rõ ràng ngay lần gọi đầu tiên.</li>
+  <li><code>(khung := nguon.doc())</code> là toán tử gán trong biểu thức (Python 3.8+): gán và kiểm tra trong cùng một dòng của <code>while</code>.</li>
+  <li>Ở chặng OpenCV, bạn sẽ thêm lớp <code>CameraUSB(NguonAnh)</code> đọc webcam bằng <code>cv2.VideoCapture</code>; <code>chay_kiem_tra</code> không phải sửa một dòng nào.</li>
+</ul>
+<div class="tip"><strong>Đừng lạm dụng kế thừa</strong>Một hai tầng kế thừa để có "hợp đồng" chung là đủ cho hầu hết code của trạm. Cây kế thừa năm sáu tầng (<code>Camera → CameraCongNghiep → CameraGigE → CameraBasler → ...</code>) rất khó đọc và khó sửa. Khi chỉ muốn tái sử dụng chức năng, cách thường tốt hơn là để một đối tượng <em>chứa</em> đối tượng khác (ví dụ trạm kiểm tra có thuộc tính <code>self.nguon</code> và <code>self.bo_dem</code>).</div>
+
+<h2>7. Ghép lại: một trạm kiểm tra nhỏ</h2>
+<p>Đoạn cuối ghép mọi thứ của bài: nguồn ảnh, dung sai, bản ghi kết quả, bộ đếm, enum. Class <code>TramKiemTra</code> <em>chứa</em> các đối tượng kia thay vì kế thừa chúng.</p>
+<pre><code class="language-python">import json
+
+
+class CameraDo(NguonAnh):
+    """Camera giả trả về một giá trị đo (mm) mỗi lần đọc."""
+
+    def __init__(self, cac_gia_tri):
+        self.cac_gia_tri = list(cac_gia_tri)
+
+    def doc(self):
+        return self.cac_gia_tri.pop(0) if self.cac_gia_tri else None
+
+
+class TramKiemTra:
+    def __init__(self, nguon, dung_sai, ten_ca):
+        self.nguon = nguon
+        self.dung_sai = dung_sai
+        self.bo_dem = BoDemCa(ten_ca)
+        self.ban_ghi = []
+
+    def chay(self):
+        so = 0
+        while (gia_tri := self.nguon.doc()) is not None:
+            so += 1
+            kq = KetQua(self.dung_sai.danh_gia(round(gia_tri, 3)))
+            ly_do = "" if kq is KetQua.OK else ("dưới giới hạn" if gia_tri &lt; self.dung_sai.danh_nghia else "trên giới hạn")
+            self.bo_dem.ghi(kq.value)
+            self.ban_ghi.append(KetQuaDo(f"SP-{so:04d}", gia_tri, kq.value, ly_do,
+                                         datetime(2026, 10, 21, 8, 0, so)))
+
+    def luu(self, duong_dan):
+        dong = [json.dumps(asdict(b), ensure_ascii=False, default=str) for b in self.ban_ghi]
+        Path(duong_dan).write_text("\n".join(dong) + "\n", encoding="utf-8")
+
+
+tram = TramKiemTra(CameraDo([25.012, 24.991, 25.061, 25.003, 24.948]), DungSai(25.00, -0.05, 0.05), "Ca sáng")
+tram.chay()
+tram.luu("ket_qua_ca.jsonl")
+print(f"{tram.bo_dem.ten_ca}: {tram.bo_dem.tong()} sản phẩm, NG {100 * tram.bo_dem.ti_le_ng():.0f}%")
+for b in tram.ban_ghi:
+    if b.ket_qua == KetQua.NG.value:
+        print(" ", b.ma_sp, b.gia_tri_mm, b.ly_do)
+print(Path("ket_qua_ca.jsonl").read_text(encoding="utf-8").splitlines()[2])</code></pre>
+<pre><code class="language-text">Ca sáng: 5 sản phẩm, NG 40%
+  SP-0003 25.061 trên giới hạn
+  SP-0005 24.948 dưới giới hạn
+{"ma_sp": "SP-0003", "gia_tri_mm": 25.061, "ket_qua": "NG", "ly_do": "trên giới hạn", "thoi_diem": "2026-10-21 08:00:03"}</code></pre>
+<p><code>default=str</code> trong <code>json.dumps</code> đổi những thứ JSON không biết (ở đây <code>datetime</code>) thành chuỗi. Mỗi class làm một việc và có tên nói rõ việc đó; muốn đổi camera giả sang thư mục ảnh thật hay camera thật, chỉ thay đối tượng truyền vào <code>TramKiemTra</code>.</p>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Class gói dữ liệu (thuộc tính) và thao tác (phương thức); đối tượng là một bản cụ thể. <code>__init__</code> đặt giá trị ban đầu, <code>self</code> là chính đối tượng.</li>
+  <li>Kiểm tra hợp lệ ngay trong <code>__init__</code> hoặc phương thức nhận dữ liệu: dữ liệu sai bị chặn ở cửa.</li>
+  <li><code>__repr__</code> để in dễ đọc; <code>@property</code> cho giá trị tính từ thuộc tính khác.</li>
+  <li><code>@dataclass</code> cho class chứa dữ liệu: tự sinh <code>__init__</code>, <code>__repr__</code>, <code>__eq__</code>; <code>__post_init__</code> để kiểm tra; <code>field(default_factory=...)</code> cho mặc định là list, dict, thời điểm; <code>frozen=True</code> cho cấu hình chỉ đọc.</li>
+  <li><code>Enum</code> cho tập giá trị cố định như OK/NG/LOI; nhớ <code>KetQua.OK != "OK"</code>.</li>
+  <li>Kế thừa để nhiều class có chung "hợp đồng" (cùng phương thức <code>doc()</code>); ưu tiên chứa đối tượng khác hơn là kế thừa nhiều tầng.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Bộ đếm theo lý do NG</h3>
+<p>Mở rộng <code>BoDemCa</code>: phương thức <code>ghi(ket_qua, ly_do="")</code> lưu thêm số lần của từng lý do NG vào một dict, và phương thức <code>pareto()</code> trả về list <code>(ly_do, so_lan)</code> sắp xếp giảm dần. Thêm <code>__repr__</code> in tên ca, tổng và tỉ lệ NG.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">class BoDemCa2(BoDemCa):
+    def __init__(self, ten_ca):
+        super().__init__(ten_ca)               # chạy __init__ của lớp cha trước
+        self.ly_do_ng = {}
+
+    def ghi(self, ket_qua, ly_do=""):
+        super().ghi(ket_qua)                   # giữ nguyên kiểm tra hợp lệ của lớp cha
+        if ket_qua == "NG":
+            ly_do = ly_do or "không rõ"
+            self.ly_do_ng[ly_do] = self.ly_do_ng.get(ly_do, 0) + 1
+
+    def pareto(self):
+        return sorted(self.ly_do_ng.items(), key=lambda cap: cap[1], reverse=True)
+
+    def __repr__(self):
+        return f"BoDemCa2({self.ten_ca!r}, tổng {self.tong()}, NG {100 * self.ti_le_ng():.1f}%)"
+
+
+bd = BoDemCa2("Ca chiều")
+for kq, ld in [("OK", ""), ("NG", "xước"), ("NG", "móp"), ("NG", "xước"), ("OK", ""), ("NG", "")]:
+    bd.ghi(kq, ld)
+print(bd)
+print(bd.pareto())</code></pre>
+<pre><code class="language-text">BoDemCa2('Ca chiều', tổng 6, NG 66.7%)
+[('xước', 2), ('móp', 1), ('không rõ', 1)]</code></pre>
+<p><code>super()</code> gọi phương thức của lớp cha: lớp con chỉ viết phần thêm vào, phần kiểm tra hợp lệ không bị chép lại (chép lại thì sửa một chỗ sẽ quên chỗ kia).</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Cấu hình đọc từ JSON</h3>
+<p>Viết hàm <code>doc_cau_hinh(duong_dan) -&gt; CauHinhTram</code>: đọc file JSON (như bài trước), bỏ qua khóa lạ, đổi <code>roi</code> từ list sang tuple, và báo lỗi nếu <code>nguong</code> ngoài 0–255. Gợi ý: <code>CauHinhTram(**du_lieu)</code> truyền dict thành các tham số có tên; <code>dataclasses.fields(CauHinhTram)</code> cho danh sách tên trường.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">from dataclasses import fields
+
+
+def doc_cau_hinh(duong_dan):
+    du_lieu = json.loads(Path(duong_dan).read_text(encoding="utf-8"))
+    ten_truong = {f.name for f in fields(CauHinhTram)}
+    la = set(du_lieu) - ten_truong
+    if la:
+        print("Bỏ qua khóa lạ:", sorted(la))
+    du_lieu = {k: v for k, v in du_lieu.items() if k in ten_truong}
+    if "roi" in du_lieu:
+        du_lieu["roi"] = tuple(du_lieu["roi"])          # JSON chỉ có list
+    cfg = CauHinhTram(**du_lieu)
+    if not 0 &lt;= cfg.nguong &lt;= 255:
+        raise ValueError(f"nguong phải trong khoảng 0–255, nhận {cfg.nguong}")
+    return cfg
+
+
+Path("tram.json").write_text('{"nguong": 95, "roi": [10, 20, 300, 200], "mau_den": "do"}', encoding="utf-8")
+print(doc_cau_hinh("tram.json"))</code></pre>
+<pre><code class="language-text">Bỏ qua khóa lạ: ['mau_den']
+CauHinhTram(ma_tram='ST3', nguong=95, roi=(10, 20, 300, 200))</code></pre>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 3. Thêm một nguồn ảnh</h3>
+<p>Viết lớp <code>LapLai(NguonAnh)</code> nhận một nguồn khác và số lần <code>n</code>, trả về mỗi khung của nguồn đó <code>n</code> lần liên tiếp (hữu ích để đo độ lặp lại: đo cùng một ảnh nhiều lần). Chạy <code>chay_kiem_tra(LapLai(CameraGia(2), 2))</code>.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">class LapLai(NguonAnh):
+    def __init__(self, nguon, n):
+        self.nguon = nguon                     # chứa một nguồn khác, không kế thừa nó
+        self.n = n
+        self.khung = None
+        self.con_lai = 0
+
+    def doc(self):
+        if self.con_lai == 0:
+            self.khung = self.nguon.doc()
+            if self.khung is None:
+                return None
+            self.con_lai = self.n
+        self.con_lai -= 1
+        return self.khung
+
+    def dong(self):
+        self.nguon.dong()
+
+
+print("đã xử lý", chay_kiem_tra(LapLai(CameraGia(2), 2)), "khung")</code></pre>
+<pre><code class="language-text">  xử lý khung_001: [130, 130, 130, 130]
+  xử lý khung_001: [130, 130, 130, 130]
+  xử lý khung_002: [140, 140, 140, 140]
+  xử lý khung_002: [140, 140, 140, 140]
+đã xử lý 4 khung</code></pre>
+<p><code>LapLai</code> vừa <em>là</em> một nguồn ảnh (kế thừa <code>NguonAnh</code>) vừa <em>chứa</em> một nguồn ảnh khác: kiểu thiết kế này gọi là "bọc" (wrapper), rất hay gặp khi thêm chức năng cho camera như ghi lại ảnh, giới hạn tốc độ, hay chèn ảnh lỗi để kiểm thử.</p>
+</details>
+</div>
+<p>Bài tiếp theo: <a href="../kien-thuc/moi-truong-python-cho-ai-vision.html">Môi trường ảo, pip và thư viện cho AI Vision</a>, chuẩn bị cài NumPy và OpenCV.</p>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/tutorial/classes.html" rel="noopener" target="_blank">Python Tutorial: Classes</a>, <a href="https://docs.python.org/3/library/dataclasses.html" rel="noopener" target="_blank">Python: dataclasses</a>, <a href="https://docs.python.org/3/library/enum.html" rel="noopener" target="_blank">Python: enum</a>, <a href="https://docs.python.org/3/reference/expressions.html#assignment-expressions" rel="noopener" target="_blank">Python: assignment expressions (:=)</a>.</p>

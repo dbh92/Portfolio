@@ -1,4 +1,4 @@
-<p>Đây là dự án cuối chặng 12. Bài "Anomaly detection: học từ ảnh OK với PaDiM, PatchCore" đã giải thích vì sao học từ ảnh OK là khả thi, cách PatchCore xây memory bank, chọn coreset và chấm điểm bằng láng giềng gần nhất. Dự án này ghép tất cả thành một <strong>hệ thống hoàn chỉnh như sẽ giao cho nhà máy</strong>: đọc dữ liệu theo cấu trúc thư mục chuẩn của bộ MVTec AD, huấn luyện chỉ bằng ảnh OK, chọn ngưỡng OK/NG chỉ từ ảnh OK kiểm định, đánh giá bằng AUROC cấp ảnh và cấp pixel cùng escape/overkill theo từng loại lỗi, xuất bản đồ nhiệt cho người vận hành, đóng gói mô hình (memory bank + ngưỡng + cấu hình) thành một file, nạp lại và kiểm tra cho kết quả y hệt, đo thời gian mỗi ảnh. Lời giải chạy được ngay trên dữ liệu vải dệt tổng hợp; đổi một đường dẫn và bật backbone pretrained là chạy trên một lớp của MVTec AD thật. Sau dự án này, chặng 13 "Triển khai" bắt đầu với bài "Xuất ONNX và kiểm tra kết quả khớp PyTorch".</p>
+<p>Đây là dự án cuối chặng 13. Bài "Anomaly detection: học từ ảnh OK với PaDiM, PatchCore" đã giải thích vì sao học từ ảnh OK là khả thi, cách PatchCore xây memory bank, chọn coreset và chấm điểm bằng láng giềng gần nhất. Dự án này ghép tất cả thành một <strong>hệ thống hoàn chỉnh như sẽ giao cho nhà máy</strong>: đọc dữ liệu theo cấu trúc thư mục chuẩn của bộ MVTec AD, huấn luyện chỉ bằng ảnh OK, chọn ngưỡng OK/NG chỉ từ ảnh OK kiểm định, đánh giá bằng AUROC cấp ảnh và cấp pixel cùng escape/overkill theo từng loại lỗi, xuất bản đồ nhiệt cho người vận hành, đóng gói mô hình (memory bank + ngưỡng + cấu hình) thành một file, nạp lại và kiểm tra cho kết quả y hệt, đo thời gian mỗi ảnh. Lời giải chạy được ngay trên dữ liệu vải dệt tổng hợp; đổi một đường dẫn và bật backbone pretrained là chạy trên một lớp của MVTec AD thật. Sau dự án này, chặng 14 "Triển khai" bắt đầu với bài "Xuất ONNX và kiểm tra kết quả khớp PyTorch".</p>
 <div class="tip"><strong>Kết quả cần đạt</strong>Một script (hoặc notebook) nhận thư mục dữ liệu kiểu MVTec AD, huấn luyện PatchCore chỉ từ ảnh <code>train/good</code>, in bảng đánh giá (AUROC ảnh, AUROC pixel, escape/overkill theo loại lỗi ở ngưỡng chọn từ ảnh OK), lưu ảnh bản đồ nhiệt có viền vùng vượt ngưỡng, lưu file mô hình nạp lại được và một báo cáo JSON. Bài thực hành: chạy trên một lớp của MVTec AD, báo cáo AUROC và ví dụ bản đồ nhiệt.</div>
 
 <h2>1. Yêu cầu</h2>
@@ -17,8 +17,8 @@
 <h2>2. Kiến thức sử dụng</h2>
 <ul>
   <li>PatchCore, PaDiM, coreset, đặt ngưỡng từ ảnh OK, các trường hợp anomaly detection thất bại: bài "Anomaly detection: học từ ảnh OK với PaDiM, PatchCore".</li>
-  <li>AUROC, escape, overkill, chọn ngưỡng theo chi phí, đo cycle time: bài "Chọn ngưỡng và đánh giá theo escape, overkill, cycle time" (chặng 11).</li>
-  <li>Đặc trưng CNN, feature map, receptive field: bài "Mạng nơ-ron và CNN hoạt động thế nào"; tensor và <code>torch.no_grad</code>: bài "PyTorch cơ bản: tensor, autograd, vòng lặp huấn luyện" (chặng 10).</li>
+  <li>AUROC, escape, overkill, chọn ngưỡng theo chi phí, đo cycle time: bài "Chọn ngưỡng và đánh giá theo escape, overkill, cycle time" (chặng 12).</li>
+  <li>Đặc trưng CNN, feature map, receptive field: bài "Mạng nơ-ron và CNN hoạt động thế nào"; tensor và <code>torch.no_grad</code>: bài "PyTorch cơ bản: tensor, autograd, vòng lặp huấn luyện" (chặng 11).</li>
   <li>IoU, Dice trên mặt nạ, so sánh với phân đoạn có giám sát: các bài phân đoạn của chặng này.</li>
   <li>Đọc ghi ảnh, phóng to, làm mượt, colormap, contour bằng OpenCV.</li>
 </ul>
@@ -405,7 +405,7 @@ print("đã lưu patchcore_vai_det.pt và bao_cao_vai_det.json")</code></pre>
 <pre><code class="language-text">sai khác điểm số lớn nhất sau khi nạp lại: 6.6e-07 | quyết định OK/NG trùng: 100%
 thời gian / ảnh: p50 14.1 ms, p99 17.0 ms (phụ thuộc máy)
 đã lưu patchcore_vai_det.pt và bao_cao_vai_det.json</code></pre>
-<p>Sai khác chỉ cỡ một phần triệu (do chấm từng ảnh thay vì theo lô làm thứ tự cộng số thực khác đi) và mọi quyết định OK/NG trùng nhau: gói mô hình đầy đủ, không phụ thuộc biến nào còn nằm trong bộ nhớ của phiên huấn luyện. Nếu sai khác lớn (ví dụ 1e-2) là dấu hiệu thiếu một thành phần, thường là thống kê chuẩn hóa hoặc tiền xử lý. Thời gian mỗi ảnh nhỏ xa so với cycle time 200 ms giả định; với WideResNet-50 ở 224 px trên CPU, thời gian lớn hơn nhiều, phần trích đặc trưng chiếm phần lớn, nên phải đo trên phần cứng đích (chặng 13 tối ưu bằng ONNX Runtime, OpenVINO).</p>
+<p>Sai khác chỉ cỡ một phần triệu (do chấm từng ảnh thay vì theo lô làm thứ tự cộng số thực khác đi) và mọi quyết định OK/NG trùng nhau: gói mô hình đầy đủ, không phụ thuộc biến nào còn nằm trong bộ nhớ của phiên huấn luyện. Nếu sai khác lớn (ví dụ 1e-2) là dấu hiệu thiếu một thành phần, thường là thống kê chuẩn hóa hoặc tiền xử lý. Thời gian mỗi ảnh nhỏ xa so với cycle time 200 ms giả định; với WideResNet-50 ở 224 px trên CPU, thời gian lớn hơn nhiều, phần trích đặc trưng chiếm phần lớn, nên phải đo trên phần cứng đích (chặng 14 tối ưu bằng ONNX Runtime, OpenVINO).</p>
 
 <h3>Bước 9. Chạy trên MVTec AD thật (bài thực hành)</h3>
 <ol>
@@ -453,7 +453,7 @@ engine.test(model=model, datamodule=datamodule)   # in AUROC, F1 cấp ảnh và
   <li><strong>Quét tỉ lệ coreset</strong> 1%, 5%, 10%, 25%: vẽ bảng AUROC, escape/overkill và ms/ảnh; chọn tỉ lệ nhỏ nhất không làm xấu kết quả.</li>
   <li><strong>Ảnh lớn</strong>: chia ảnh camera thành ô có chồng lấn, chạy từng ô, ghép bản đồ; so với resize cả ảnh về 224 px đối với lỗi nhỏ.</li>
   <li><strong>Thử thách độ bền</strong>: tạo tập "đèn sáng hơn 10%", "mờ nhẹ do rung", "lệch pha vân", đo tỉ lệ báo NG; thêm bước chuẩn hóa độ sáng và đo lại.</li>
-  <li><strong>Xuất ONNX</strong> phần trích đặc trưng, giữ memory bank dạng mảng NumPy, viết hàm tìm láng giềng gần nhất bằng NumPy; so điểm số với bản PyTorch (bài đầu tiên của chặng 13).</li>
+  <li><strong>Xuất ONNX</strong> phần trích đặc trưng, giữ memory bank dạng mảng NumPy, viết hàm tìm láng giềng gần nhất bằng NumPy; so điểm số với bản PyTorch (bài đầu tiên của chặng 14).</li>
   <li><strong>Giám sát trôi dữ liệu</strong>: ghi điểm của mọi ảnh OK theo ca, cảnh báo khi trung vị tăng quá 20% so với lúc nghiệm thu.</li>
   <li><strong>Kết hợp có giám sát</strong>: khi đã thu được vài chục ảnh NG từ dây chuyền, huấn luyện U-Net hoặc YOLO26-seg cho các loại lỗi cần đo kích thước, giữ PatchCore làm lưới an toàn bắt lỗi lạ.</li>
 </ul>
@@ -467,3 +467,5 @@ engine.test(model=model, datamodule=datamodule)   # in AUROC, F1 cấp ảnh và
   <li>Với ảnh thật bắt buộc dùng backbone pretrained; anomalib là lựa chọn thực tế để đối chiếu và triển khai.</li>
 </ul>
 <p>Chặng tiếp theo: <strong>Triển khai</strong>, bắt đầu với bài "Xuất ONNX và kiểm tra kết quả khớp PyTorch".</p>
+
+<p class="note">Nguồn tham khảo: <a href="https://arxiv.org/abs/2106.08265" rel="noopener" target="_blank">K. Roth et al., "Towards Total Recall in Industrial Anomaly Detection" (PatchCore), <em>CVPR</em>, 2022</a>; P. Bergmann et al., "MVTec AD: A Comprehensive Real-World Dataset for Unsupervised Anomaly Detection", <em>CVPR</em>, 2019; <a href="https://github.com/open-edge-platform/anomalib" rel="noopener" target="_blank">anomalib (thư viện anomaly detection mã nguồn mở)</a>.</p>
