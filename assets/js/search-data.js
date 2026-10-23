@@ -65,6 +65,102 @@ window.HF_POSTS = [
   ]
  },
  {
+  "t": "Dự án: kiểm tra đường keo robot phun – đứt, mỏng, tràn, lệch",
+  "u": "projects/du-an-kiem-tra-duong-keo-robot.html",
+  "e": "Đo bề rộng và vị trí keo mỗi 0,5 mm dọc đường lập trình robot, báo từng đoạn lỗi theo tọa độ, đánh đổi lọc và bỏ sót, EWMA cảnh báo đầu phun tắc dần.",
+  "c": "projects",
+  "cn": "Projects",
+  "d": "23/10/2026",
+  "m": 23,
+  "img": "assets/images/posts/du-an-kiem-tra-duong-keo-robot.webp",
+  "tags": [
+   "Industrial Project",
+   "Industrial Vision",
+   "Đo lường",
+   "OpenCV"
+  ]
+ },
+ {
+  "t": "Dự án: kiểm tra cuộn màng bằng camera line-scan, bản đồ lỗi theo mét",
+  "u": "projects/du-an-kiem-tra-cuon-mang-line-scan.html",
+  "e": "Xử lý ảnh line-scan theo khối chồng lấn, khử đèn không đều, bắt vệt dọc dài nhiều mét mà chuẩn hóa thường làm biến mất, bản đồ lỗi và hạng cuộn.",
+  "c": "projects",
+  "cn": "Projects",
+  "d": "23/10/2026",
+  "m": 22,
+  "img": "assets/images/posts/du-an-kiem-tra-cuon-mang-line-scan.webp",
+  "tags": [
+   "Industrial Project",
+   "Industrial Vision",
+   "Camera",
+   "Machine Vision"
+  ]
+ },
+ {
+  "t": "Dự án: photometric stereo tìm vết xước, vết lõm trên kim loại",
+  "u": "projects/du-an-photometric-stereo-vet-xuoc-kim-loai.html",
+  "e": "Bốn đèn, bốn ảnh: tách pháp tuyến khỏi albedo để vết dầu không bị báo lỗi còn vết xước 15 µm hiện rõ; so đèn vòng, đèn xiên, hiệu chuẩn đèn bằng quả cầu.",
+  "c": "projects",
+  "cn": "Projects",
+  "d": "23/10/2026",
+  "m": 18,
+  "img": "assets/images/posts/du-an-photometric-stereo-vet-xuoc-kim-loai.webp",
+  "tags": [
+   "Industrial Project",
+   "Industrial Vision",
+   "Chiếu sáng",
+   "3D Vision"
+  ]
+ },
+ {
+  "t": "Dự án: robot gắp vật trên băng tải đang chạy, bù encoder và độ trễ",
+  "u": "projects/du-an-robot-gap-vat-bang-tai-encoder.html",
+  "e": "Đổi vị trí ảnh sang tọa độ băng tải đúng lúc phơi sáng, chống gắp trùng, tách vật chạm nhau khi chắc chắn, kiểm khoảng trống ngón kẹp: đo từng bước.",
+  "c": "projects",
+  "cn": "Projects",
+  "d": "23/10/2026",
+  "m": 20,
+  "img": "assets/images/posts/du-an-robot-gap-vat-bang-tai-encoder.webp",
+  "tags": [
+   "Industrial Project",
+   "Robot",
+   "PLC",
+   "Machine Vision"
+  ]
+ },
+ {
+  "t": "Dự án: lỗi logic khi đóng gói kit linh kiện – PatchCore hay đếm?",
+  "u": "projects/du-an-loi-logic-dong-goi-kit-linh-kien.html",
+  "e": "Khay kit đúng từng món nhưng sai tổ hợp: thiếu, thừa, sai loại, nhầm ngăn. So PatchCore với kiểm theo danh sách đóng gói trên 150 khay, và lỗi không ai lường trước.",
+  "c": "projects",
+  "cn": "Projects",
+  "d": "23/10/2026",
+  "m": 19,
+  "img": "assets/images/posts/du-an-loi-logic-dong-goi-kit-linh-kien.webp",
+  "tags": [
+   "Industrial Project",
+   "AI Vision",
+   "Industrial Vision",
+   "OpenCV"
+  ]
+ },
+ {
+  "t": "Dự án: đọc DataMatrix khắc chấm trên kim loại và cảnh báo mòn kim",
+  "u": "projects/du-an-doc-datamatrix-khac-cham-dpm.html",
+  "e": "Mã DPM khắc kim không đọc được bằng ảnh gốc: chiến lược bậc thang nối chấm, đo độ tương phản và cỡ chấm, cảnh báo thay kim trước khi mã hỏng hàng loạt.",
+  "c": "projects",
+  "cn": "Projects",
+  "d": "23/10/2026",
+  "m": 20,
+  "img": "assets/images/posts/du-an-doc-datamatrix-khac-cham-dpm.webp",
+  "tags": [
+   "Industrial Project",
+   "Industrial Vision",
+   "Machine Vision",
+   "OCR"
+  ]
+ },
+ {
   "t": "Class và dataclass: tổ chức code cho trạm kiểm tra",
   "u": "hoc/python-7-class-dataclass-to-chuc-code.html",
   "e": "Gói dữ liệu và hàm thành class: __init__, property, dataclass có kiểm tra hợp lệ, Enum cho OK/NG/LOI, kế thừa vừa đủ để đổi camera giả sang thật.",
@@ -4976,7 +5072,7 @@ window.HF_TOPICS = [
   "u": "hoc/opencv.html",
   "s": "Học AI & Lập trình",
   "g": "Computer Vision",
-  "n": 37
+  "n": 39
  },
  {
   "t": "Image Processing",
@@ -4997,7 +5093,7 @@ window.HF_TOPICS = [
   "u": "hoc/ocr.html",
   "s": "Học AI & Lập trình",
   "g": "Computer Vision",
-  "n": 7
+  "n": 8
  },
  {
   "t": "Object Detection",
@@ -5018,35 +5114,35 @@ window.HF_TOPICS = [
   "u": "hoc/machine-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 58
+  "n": 61
  },
  {
   "t": "AI Vision",
   "u": "hoc/ai-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 14
+  "n": 15
  },
  {
   "t": "Industrial Vision",
   "u": "hoc/industrial-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 38
+  "n": 43
  },
  {
   "t": "Camera & Lens",
   "u": "hoc/camera-lens.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 16
+  "n": 17
  },
  {
   "t": "Lighting",
   "u": "hoc/lighting.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 7
+  "n": 8
  },
  {
   "t": "Calibration",
@@ -5060,14 +5156,14 @@ window.HF_TOPICS = [
   "u": "hoc/3d-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 5
+  "n": 6
  },
  {
   "t": "PLC / Robot / MES",
   "u": "hoc/plc-robot-mes.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 16
+  "n": 17
  },
  {
   "t": "Vision Deployment",
@@ -5095,7 +5191,7 @@ window.HF_TOPICS = [
   "u": "projects/industrial-vision-projects.html",
   "s": "Projects",
   "g": "",
-  "n": 15
+  "n": 21
  },
  {
   "t": "Programming",
@@ -5130,21 +5226,21 @@ window.HF_TOPICS = [
   "u": "kien-thuc/machine-vision.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 58
+  "n": 61
  },
  {
   "t": "AI Vision",
   "u": "kien-thuc/ai-vision.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 14
+  "n": 15
  },
  {
   "t": "Industrial Automation",
   "u": "kien-thuc/industrial-automation.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 11
+  "n": 12
  },
  {
   "t": "Tools & Frameworks",

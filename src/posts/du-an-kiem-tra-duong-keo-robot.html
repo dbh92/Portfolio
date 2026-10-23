@@ -1,0 +1,375 @@
+<p class="note"><strong>Độ khó:</strong> ★★★☆ (khó) · <strong>Cần học trước:</strong> <a href="../lo-trinh/vision-engineer/measurement-matching-ocr.html">chặng 7: Measurement / Matching / OCR</a>, <a href="../lo-trinh/vision-engineer/calibration.html">chặng 8: Calibration</a> · <strong>Thời lượng:</strong> khoảng 2,5 giờ</p>
+<p>Robot phun keo làm kín vỏ hộp điều khiển, dán kính, dán gioăng: đường keo phải liên tục, đủ rộng, không tràn, nằm đúng chỗ dọc suốt chiều dài. Khác với các bài kiểm tra "có/không" hay "đếm", lỗi ở đây là lỗi <strong>dọc theo một đường</strong>: một khe hở 1 mm trên đường keo dài 160 mm làm hộp mất kín nước, trong khi tổng diện tích keo gần như không đổi. Dự án này đo bề rộng và vị trí keo liên tục dọc đường lập trình của robot, báo từng đoạn lỗi theo tọa độ, và theo dõi xu hướng để cảnh báo đầu phun sắp tắc trước khi ra hàng lỗi.</p>
+<div class="tip"><strong>Mục tiêu dự án</strong>(1) Đo bề rộng và độ lệch tâm keo tại các điểm cách nhau 0,5 mm dọc đường, chính xác tới vài phần trăm mm. (2) Bắt đứt, mỏng, tràn, lệch và báo đúng vị trí. (3) Hiểu đánh đổi giữa loại nhầm và bỏ sót khi đặc tả không nói lỗi phải dài bao nhiêu. (4) Cảnh báo xu hướng bằng biểu đồ EWMA, sớm hơn nhiều so với lúc có chi tiết NG.</div>
+
+<h2>1. Bài toán</h2>
+<blockquote>"Robot phun keo silicone làm kín nắp hộp ECU. Tuần trước kiểm tra kín nước phát hiện 3 hộp rò, mổ ra thấy khe hở keo khoảng 1 mm ở góc. Camera hiện tại chỉ so tổng diện tích keo nên không thấy. Ngoài ra đầu phun hay bị tắc dần vào cuối ca, keo mỏng đi mà không ai biết cho tới khi ra hàng lỗi."</blockquote>
+<table>
+  <tr><th>Đại lượng</th><th>Yêu cầu</th></tr>
+  <tr><td>Đường keo</td><td>hình chữ nhật bo góc 50 × 34 mm, bán kính góc 6 mm, dài khoảng 158 mm</td></tr>
+  <tr><td>Bề rộng keo</td><td>2,5 đến 3,5 mm (danh định 3,0 mm)</td></tr>
+  <tr><td>Vị trí</td><td>tâm keo lệch khỏi đường lập trình ≤ 1,0 mm</td></tr>
+  <tr><td>Liên tục</td><td>không có khe hở</td></tr>
+  <tr><td>Ảnh</td><td>10 pixel/mm; tấm lệch ±15 pixel, xoay ±2° trên đồ gá</td></tr>
+  <tr><td>Đầu ra</td><td>OK/NG, danh sách đoạn lỗi (loại, vị trí dọc đường, chiều dài), số liệu SPC</td></tr>
+</table>
+
+<h2>2. Yêu cầu</h2>
+<ul>
+  <li>Vị trí đo lấy từ đường lập trình của robot (cùng nguồn với chương trình phun), sau khi căn theo tấm.</li>
+  <li>Phát hiện tấm đặt ngược bằng lỗ định vị ở một góc; không thấy lỗ thì báo lỗi đo.</li>
+  <li>Đo mép keo dưới pixel; sai số bề rộng phải nhỏ hơn nhiều so với dung sai 0,5 mm.</li>
+  <li>Mỗi chi tiết ghi bề rộng trung vị để vẽ biểu đồ xu hướng.</li>
+</ul>
+
+<h2>3. Kiến thức sử dụng</h2>
+<ul>
+  <li><a href="../hoc/do-luong-1-do-canh-subpixel-fitting.html">Đo cạnh subpixel</a>: profile cường độ, nội suy điểm cắt ngưỡng.</li>
+  <li><a href="../hoc/bien-doi-hinh-hoc-affine-phoi-canh.html">Biến đổi hình học</a> và <code>cv2.remap</code> để lấy mẫu dọc pháp tuyến.</li>
+  <li><a href="../hoc/xu-ly-anh-5-dac-trung-contour-blob.html">Blob analysis</a>: <code>minAreaRect</code> căn tấm.</li>
+  <li><a href="../hoc/msa-gage-rr-anova-he-do-camera.html">MSA</a> và <a href="../kien-thuc/kiem-soat-anh-sang-moi-truong-nha-may.html">giám sát EWMA</a>.</li>
+</ul>
+
+<h2>4. Dữ liệu: robot phun keo mô phỏng</h2>
+<p>Bộ mô phỏng sinh đường lập trình (điểm, pháp tuyến hướng ra ngoài, tọa độ dọc đường <code>s</code>) rồi "phun" keo bằng các hình tròn nối tiếp, với bề rộng dao động chậm (áp suất bơm) và khác nhau giữa các chi tiết, tâm keo lệch nhẹ do robot. Lỗi: đứt (dừng phun 3,5 đến 8 mm), mỏng (1,8 đến 2,3 mm trên 6 đến 15 mm), tràn (4 đến 5 mm), lệch (tâm lệch 1,3 đến 2 mm trên 10 đến 20 mm).</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+PX_MM = 10.0
+H, W = 480, 640
+TAM_ANH = np.array([W / 2, H / 2])
+TAM_DUNG = (2.5, 3.5)                 # bề rộng keo cho phép (mm)
+LECH_TOI_DA = 1.0                     # tâm keo lệch khỏi đường lập trình tối đa (mm)
+
+
+def duong_dan(buoc_mm=0.2, rong=50.0, cao=34.0, r=6.0):
+    """Đường đi lập trình của đầu phun: hình chữ nhật bo góc, tâm ở gốc tọa độ tấm (mm).
+    Trả về điểm, pháp tuyến hướng ra ngoài, và tọa độ dọc đường s (mm)."""
+    diem, phap = [], []
+    a, b = rong / 2 - r, cao / 2 - r
+    doan = [((-a, -cao / 2), (a, -cao / 2), (0, -1)), ((rong / 2, -b), (rong / 2, b), (1, 0)),
+            ((a, cao / 2), (-a, cao / 2), (0, 1)), ((-rong / 2, b), (-rong / 2, -b), (-1, 0))]
+    goc_tam = [(a, -b, -90), (a, b, 0), (-a, b, 90), (-a, -b, 180)]
+    for (p0, p1, n), (cx, cy, g0) in zip(doan, goc_tam):
+        dai = np.hypot(p1[0] - p0[0], p1[1] - p0[1])
+        for t in np.arange(0, dai, buoc_mm):
+            diem.append((p0[0] + (p1[0] - p0[0]) * t / dai, p0[1] + (p1[1] - p0[1]) * t / dai))
+            phap.append(n)
+        for t in np.arange(0, np.pi / 2 * r, buoc_mm):
+            g = np.radians(g0) + t / r
+            diem.append((cx + r * np.cos(g), cy + r * np.sin(g)))
+            phap.append((np.cos(g), np.sin(g)))
+    diem, phap = np.array(diem), np.array(phap)
+    s = np.concatenate([[0], np.cumsum(np.hypot(*np.diff(diem, axis=0).T))])
+    return diem, phap, s
+
+
+DIEM, PHAP, S = duong_dan()
+CHU_VI = S[-1]
+
+
+def lam_muot_vong(x, k):
+    """Làm mượt trên đường khép kín: nối đuôi vào đầu để chỗ khép đường không bị gãy."""
+    return np.convolve(np.concatenate([x[-k:], x, x[:k]]), np.ones(k) / k, mode="same")[k:-k]
+
+
+def tao_chi_tiet(rng, ty_le_loi=0.4, tam_rong=3.0):
+    """Bề rộng và độ lệch keo dọc đường (theo s), cộng một lỗi nếu có. tam_rong: bề rộng trung bình (trôi theo thời gian)."""
+    n = len(S)
+    rong = tam_rong + rng.normal(0, 0.03) + lam_muot_vong(rng.normal(0, 0.25, n), 40) * np.sqrt(40) / 6   # khác giữa chi tiết + dao động bơm
+    lech = lam_muot_vong(rng.normal(0, 0.6, n), 60) * np.sqrt(60) / 6                # robot đi lệch nhẹ
+    loi = None
+    if rng.random() &lt; ty_le_loi:
+        kieu = ["đứt", "mỏng", "tràn", "lệch"][rng.integers(0, 4)]
+        bd = rng.uniform(0, CHU_VI - 25)
+        dai = {"đứt": rng.uniform(3.5, 8), "mỏng": rng.uniform(6, 15), "tràn": rng.uniform(5, 10), "lệch": rng.uniform(10, 20)}[kieu]
+        vung = (S &gt;= bd) &amp; (S &lt; bd + dai)
+        if kieu == "đứt":
+            rong[vung] = 0
+        elif kieu == "mỏng":
+            rong[vung] = rng.uniform(1.8, 2.3)
+        elif kieu == "tràn":
+            rong[vung] = rng.uniform(4.0, 5.0)
+        else:
+            lech[vung] += rng.uniform(1.3, 2.0) * rng.choice([-1, 1])
+        loi = (kieu, round(bd, 1), round(dai, 1))
+    return {"rong": rong, "lech": lech, "loi": loi}
+
+
+def chup(ct, rng, danh_dinh=False):
+    """Tấm kim loại sáng trên đồ gá tối, đường keo tối. Tấm lệch ±15 pixel, xoay ±2°."""
+    dich = np.zeros(2) if danh_dinh else rng.uniform(-15, 15, 2)
+    goc = 0.0 if danh_dinh else rng.uniform(-2, 2)
+    R = np.array([[np.cos(np.radians(goc)), -np.sin(np.radians(goc))], [np.sin(np.radians(goc)), np.cos(np.radians(goc))]])
+    sang_anh = lambda p_mm: (np.asarray(p_mm) @ R.T) * PX_MM + TAM_ANH + dich
+    anh = np.full((H, W), 0.08, np.float32)
+    tam = cv2.boxPoints(((float(TAM_ANH[0] + dich[0]), float(TAM_ANH[1] + dich[1])), (56 * PX_MM, 40 * PX_MM), goc))
+    cv2.fillPoly(anh, [np.round(tam).astype(np.int32)], 0.60, cv2.LINE_AA)
+    cv2.circle(anh, tuple(np.round(sang_anh((-26, -18.5))).astype(int)), 12, 0.08, -1, cv2.LINE_AA)   # lỗ định vị ở một góc
+    for k in range(0, len(S), 1):
+        if ct["rong"][k] &lt;= 0:
+            continue
+        p = sang_anh(DIEM[k] + PHAP[k] * ct["lech"][k])
+        r_px = ct["rong"][k] / 2 * PX_MM - 0.5                         # cv2.circle tô rộng hơn bán kính khoảng nửa pixel
+        cv2.circle(anh, (int(round(p[0] * 16)), int(round(p[1] * 16))), int(round(r_px * 16)), 0.18, -1, cv2.LINE_AA, shift=4)
+    anh *= 1.0 if danh_dinh else rng.uniform(0.9, 1.1)
+    return np.clip(anh + rng.normal(0, 0.015, anh.shape), 0, 1).astype(np.float32)
+
+
+rng = np.random.default_rng(0)
+ct = tao_chi_tiet(rng, ty_le_loi=0)
+ct["rong"][(S &gt; 40) &amp; (S &lt; 44)] = 0                                   # đứt keo 4 mm
+ct["rong"][(S &gt; 100) &amp; (S &lt; 110)] = 2.0                               # mỏng
+anh = chup(ct, rng)
+cv2.imwrite("keo.png", np.uint8(255 * anh))
+print(f"đường keo dài {CHU_VI:.1f} mm, {len(S)} điểm lập trình")</code></pre>
+<pre><code class="language-text">đường keo dài 157.7 mm, 792 điểm lập trình</code></pre>
+<p>Ảnh ví dụ (<code>keo.png</code>) có một đoạn dừng phun 4 mm và một đoạn mỏng 2 mm. Để ý: dừng phun 4 mm chỉ để lại khe <em>thấy được</em> khoảng 1 mm, vì hai đầu keo tròn lan vào khe mỗi bên khoảng nửa bề rộng. Lần dừng ngắn hơn bề rộng keo thì không để lại khe nào, chỉ là một chỗ thắt; vì vậy bộ sinh lỗi dùng lần dừng từ 3,5 mm.</p>
+<p>Một chi tiết của bộ mô phỏng đáng biết: <code>cv2.circle</code> tô rộng hơn bán kính khoảng nửa pixel mỗi bên. Bản đầu không bù điều này, và phép đo cho thiên lệch +0,1 mm "bí ẩn"; đo trên keo bề rộng không đổi ở vị trí danh định mới lộ ra lỗi nằm ở bộ mô phỏng chứ không ở phép đo. Khi kiểm chứng một thuật toán đo, luôn thử trên trường hợp đơn giản nhất biết trước đáp án.</p>
+
+<h2>5. Lời giải 1: tổng diện tích keo</h2>
+<p>Cách trạm cũ đang làm: tách keo trong vùng tấm, so tổng diện tích với diện tích dạy (±10%), thêm điều kiện chỉ có một đoạn keo liền (đứt thì thành hai đoạn).</p>
+<pre><code class="language-python"># Lời giải 1: tổng diện tích keo trên tấm so với diện tích dạy (±10%), cộng đếm số đoạn keo (đứt thì thành 2 đoạn)
+def dien_tich_keo(anh):
+    sang = (anh &gt; 0.35 * np.percentile(anh, 99)).astype(np.uint8)    # tấm sáng (keo tối nằm bên trong)
+    bien, _ = cv2.findContours(sang, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    tam = np.zeros_like(sang)
+    cv2.drawContours(tam, [max(bien, key=cv2.contourArea)], -1, 1, -1)   # lấp kín cả vùng keo
+    tam = cv2.erode(tam, np.ones((15, 15), np.uint8)) &gt; 0
+    keo = ((anh &lt; 0.5 * np.percentile(anh, 99)) &amp; tam).astype(np.uint8)
+    n, _, st, _ = cv2.connectedComponentsWithStats(keo)
+    lon = st[1:, cv2.CC_STAT_AREA]
+    return lon.max() if len(lon) else 0, int(np.sum(lon &gt; 2000))
+
+
+rng_day = np.random.default_rng(1)
+DT_DAY = np.mean([dien_tich_keo(chup(tao_chi_tiet(rng_day, 0), rng_day, danh_dinh=True))[0] for _ in range(5)])
+
+
+def kiem_1(anh):
+    dt, so_doan = dien_tich_keo(anh)
+    return "OK" if so_doan == 1 and abs(dt / DT_DAY - 1) &lt;= 0.10 else "NG"</code></pre>
+
+<h2>6. Lời giải 2: đo dọc pháp tuyến của đường lập trình</h2>
+<ol>
+  <li><strong>Căn tấm</strong> bằng <code>minAreaRect</code> của vùng sáng; kiểm lỗ định vị ở góc (chống đặt ngược).</li>
+  <li>Cứ 0,5 mm dọc đường, lấy <strong>profile cường độ dọc pháp tuyến</strong> dài ±3 mm bằng một lần <code>cv2.remap</code> cho cả 315 điểm.</li>
+  <li>Ngưỡng tại chỗ = 65% mức sáng tấm của chính profile đó (giữa mức keo và mức tấm, bền với đèn không đều). Chọn đoạn tối gần đường lập trình nhất, <strong>nội suy hai mép dưới pixel</strong>: bề rộng là khoảng cách hai mép, độ lệch là tâm hai mép.</li>
+  <li>Gom các điểm vi phạm liền nhau thành <strong>đoạn lỗi</strong>, báo loại, vị trí <code>s</code> và chiều dài.</li>
+</ol>
+<pre><code class="language-python">def can_tam(anh):
+    """Vị trí và góc của tấm từ minAreaRect của vùng sáng; kiểm tra lỗ định vị nằm đúng góc (chống đặt ngược)."""
+    sang = (anh &gt; 0.35 * np.percentile(anh, 99)).astype(np.uint8)
+    n, nhan, st, _ = cv2.connectedComponentsWithStats(sang)
+    k = 1 + np.argmax(st[1:, cv2.CC_STAT_AREA])
+    (cx, cy), (w, h), goc = cv2.minAreaRect(np.column_stack(np.nonzero(nhan == k))[:, ::-1].astype(np.float32))
+    if w &lt; h:
+        goc -= 90
+    goc = (goc + 45) % 90 - 45
+    R = np.array([[np.cos(np.radians(goc)), -np.sin(np.radians(goc))], [np.sin(np.radians(goc)), np.cos(np.radians(goc))]])
+    sang_anh = lambda p_mm: (np.asarray(p_mm) @ R.T) * PX_MM + np.array([cx, cy])
+    lo = sang_anh((-26, -18.5)).round().astype(int)
+    if anh[lo[1] - 3:lo[1] + 4, lo[0] - 3:lo[0] + 4].mean() &gt; 0.5 * np.percentile(anh, 99):
+        return None                                                    # không thấy lỗ định vị: tấm đặt ngược hoặc sai mã
+    return sang_anh, R
+
+
+def do_keo(anh, buoc_mm=0.5, nua_dai_mm=3.0):
+    """Đo bề rộng và độ lệch tâm keo tại các điểm cách nhau buoc_mm dọc đường lập trình.
+    Tại mỗi điểm lấy profile cường độ dọc pháp tuyến (±nua_dai_mm), tìm đoạn tối chứa điểm gần tâm nhất."""
+    kq = can_tam(anh)
+    if kq is None:
+        return None
+    sang_anh, R = kq
+    chon = np.arange(0, len(S), int(round(buoc_mm / 0.2)))
+    t = np.arange(-nua_dai_mm, nua_dai_mm + 1e-9, 0.1)               # bước 0,1 mm dọc pháp tuyến
+    p = DIEM[chon][:, None, :] + PHAP[chon][:, None, :] * t[None, :, None]
+    xy = sang_anh(p.reshape(-1, 2)).reshape(len(chon), len(t), 2).astype(np.float32)
+    profile = cv2.remap(anh, xy[..., 0], xy[..., 1], cv2.INTER_LINEAR)
+    rong, lech = np.zeros(len(chon)), np.zeros(len(chon))
+    for i in range(len(chon)):
+        pr = profile[i]
+        nguong = 0.65 * np.percentile(pr, 90)                         # giữa mức keo và mức tấm tại chỗ
+        toi = np.flatnonzero(pr &lt; nguong)
+        if len(toi) == 0:
+            continue
+        cat = np.split(toi, np.flatnonzero(np.diff(toi) &gt; 1) + 1)
+        d = min(cat, key=lambda c: abs(t[c].mean()))                 # đoạn tối gần đường lập trình nhất
+        a, b = d[0], d[-1]
+        trai = t[a] - 0.1 * (nguong - pr[a]) / (pr[a - 1] - pr[a]) if a &gt; 0 else t[a]           # mép dưới pixel
+        phai = t[b] + 0.1 * (nguong - pr[b]) / (pr[b + 1] - pr[b]) if b &lt; len(t) - 1 else t[b]
+        rong[i], lech[i] = phai - trai, (phai + trai) / 2
+    return S[chon], rong, lech
+
+
+def kiem_2(anh, loc=1, doan_toi_thieu=1):
+    """loc: cửa sổ trung vị (số điểm đo) trước khi so dung sai; doan_toi_thieu: số điểm liên tiếp tối thiểu để tính là lỗi."""
+    kq = do_keo(anh)
+    if kq is None:
+        return "LỖI ĐO", []
+    s, rong, lech = kq
+    if loc &gt; 1:
+        dem = loc // 2
+        cua_so = np.lib.stride_tricks.sliding_window_view(np.concatenate([rong[-dem:], rong, rong[:dem]]), loc)
+        rong = np.where(rong == 0, 0, np.median(cua_so, axis=1))      # giữ nguyên chỗ đứt
+    loi = []
+    for ten, sai in (("đứt", rong == 0), ("mỏng", (rong &gt; 0) &amp; (rong &lt; TAM_DUNG[0])),
+                     ("tràn", rong &gt; TAM_DUNG[1]), ("lệch", (rong &gt; 0) &amp; (np.abs(lech) &gt; LECH_TOI_DA))):
+        chi_so = np.flatnonzero(sai)
+        for doan in np.split(chi_so, np.flatnonzero(np.diff(chi_so) &gt; 1) + 1) if len(chi_so) else []:
+            if len(doan) &lt; doan_toi_thieu and ten != "đứt":
+                continue
+            loi.append((ten, round(float(s[doan[0]]), 1), round(len(doan) * 0.5, 1)))   # loại, vị trí s (mm), dài (mm)
+    return ("NG" if loi else "OK"), loi
+
+
+s, rong, lech = do_keo(anh)
+print("ảnh ví dụ:", kiem_2(anh))
+print(f"bề rộng đo được: trung vị {np.median(rong):.2f} mm (thật {np.median(ct['rong']):.2f} mm)")</code></pre>
+<pre><code class="language-text">ảnh ví dụ: ('NG', [('đứt', 41.6, 1.5), ('mỏng', 41.2, 0.5), ('mỏng', 42.8, 1.0), ('mỏng', 100.8, 10.5)])
+bề rộng đo được: trung vị 3.00 mm (thật 2.99 mm)</code></pre>
+<p>Chỗ dừng phun được báo là một đoạn "đứt" dài khoảng 1 mm kẹp giữa hai đoạn "mỏng" ngắn: đúng hình dạng thật của hai đầu keo thu nhỏ dần vào khe. Phần mềm trạm có thể gộp ba đoạn này thành một lỗi "đứt" khi hiển thị cho người vận hành.</p>
+
+<h2>7. Độ chính xác và đánh giá</h2>
+<p>Trước khi tin vào kết quả OK/NG, kiểm độ chính xác phép đo bề rộng so với giá trị thật của bộ mô phỏng, rồi chạy 300 chi tiết.</p>
+<pre><code class="language-python">from collections import Counter
+
+rng_cx = np.random.default_rng(5)
+sai = []
+for _ in range(20):                                                   # độ chính xác: so với bề rộng thật của bộ mô phỏng
+    ct = tao_chi_tiet(rng_cx, 0)
+    s_do, rong_do, _ = do_keo(chup(ct, rng_cx))
+    sai.append(rong_do - ct["rong"][(s_do / 0.2).round().astype(int)])
+sai = np.concatenate(sai)
+print(f"sai số bề rộng ({len(sai)} điểm đo): trung bình {sai.mean():+.3f} mm, độ lệch chuẩn {sai.std():.3f} mm, lớn nhất {np.abs(sai).max():.3f} mm")
+rng_dg = np.random.default_rng(2)
+bat = {"lời giải 1": Counter(), "lời giải 2": Counter()}
+nham, tong, so_tot = Counter(), Counter(), 0
+for _ in range(300):
+    ct = tao_chi_tiet(rng_dg)
+    anh = chup(ct, rng_dg)
+    kq1, (kq2, _) = kiem_1(anh), kiem_2(anh)
+    if ct["loi"] is None:
+        so_tot += 1
+        nham["lời giải 1"] += kq1 != "OK"
+        nham["lời giải 2"] += kq2 != "OK"
+    else:
+        tong[ct["loi"][0]] += 1
+        bat["lời giải 1"][ct["loi"][0]] += kq1 != "OK"
+        bat["lời giải 2"][ct["loi"][0]] += kq2 != "OK"
+print(f"300 chi tiết, {so_tot} tốt")
+for ten in bat:
+    print(f"{ten}: loại nhầm {nham[ten]}/{so_tot}; bắt " + ", ".join(f"{k} {bat[ten][k]}/{tong[k]}" for k in ("đứt", "mỏng", "tràn", "lệch")))</code></pre>
+<pre><code class="language-text">sai số bề rộng (7920 điểm đo): trung bình +0.008 mm, độ lệch chuẩn 0.042 mm, lớn nhất 0.154 mm
+300 chi tiết, 180 tốt
+lời giải 1: loại nhầm 0/180; bắt đứt 0/35, mỏng 0/27, tràn 0/23, lệch 15/35
+lời giải 2: loại nhầm 0/180; bắt đứt 35/35, mỏng 27/27, tràn 23/23, lệch 35/35</code></pre>
+<p>Lời giải 1 không loại nhầm chi tiết nào, nhưng cũng gần như không bắt được gì: không một khe đứt, đoạn mỏng hay đoạn tràn nào. Một khe 1 mm chỉ làm mất khoảng 0,6% diện tích keo, một đoạn mỏng hay tràn dài 10 mm đổi diện tích vài phần trăm, đều nằm gọn trong dung sai ±10%. Điều kiện "chỉ một đoạn keo liền" tưởng là bắt được khe, hóa ra vô dụng: đường keo là một <strong>vòng khép kín</strong>, cắt một chỗ thì vẫn là một đoạn liền (giống cắt một chiếc nhẫn). Đây đúng là lý do trạm cũ để lọt 3 hộp rò. Lời giải 2: 0 loại nhầm, bắt đủ bốn loại lỗi trong bộ thử.</p>
+
+<h2>8. Cảnh báo xu hướng: đầu phun tắc dần</h2>
+<p>Lỗi nguy hiểm nhất của trạm phun keo không phải một chi tiết lỗi đơn lẻ mà là quá trình trôi dần. Đoạn dưới mô phỏng 30 chi tiết lúc máy ổn định (dùng để lập đường tâm và giới hạn), sau đó đầu phun tắc dần làm bề rộng giảm từ 3,0 xuống 2,55 mm qua 200 chi tiết. Mỗi chi tiết đóng góp một số là bề rộng trung vị; biểu đồ EWMA (λ = 0,2) cảnh báo khi đường trung bình trượt vượt 3σ.</p>
+<pre><code class="language-python"># 30 chi tiết khi máy ổn định (lập giới hạn), sau đó đầu phun tắc dần: bề rộng giảm từ 3,0 xuống 2,55 mm qua 200 chi tiết
+rng_t = np.random.default_rng(6)
+tb_do, ket_qua = [], []
+for i in range(230):
+    ct = tao_chi_tiet(rng_t, ty_le_loi=0, tam_rong=3.0 - 0.45 * max(0, i - 30) / 199)
+    anh = chup(ct, rng_t)
+    _, rong, _ = do_keo(anh)
+    tb_do.append(np.median(rong[rong &gt; 0]))
+    ket_qua.append(kiem_2(anh)[0])
+tb_do = np.array(tb_do)
+goc = tb_do[:30]                                                      # 30 chi tiết đầu: giai đoạn ổn định để tính giới hạn
+lam = 0.2
+sigma_ewma = goc.std(ddof=1) * np.sqrt(lam / (2 - lam))
+ewma, canh_bao = goc.mean(), None
+for i, x in enumerate(tb_do):
+    ewma = lam * x + (1 - lam) * ewma
+    if canh_bao is None and abs(ewma - goc.mean()) &gt; 3 * sigma_ewma:
+        canh_bao = i
+dau_tien_ng = ket_qua.index("NG") if "NG" in ket_qua else None
+print(f"đường tâm {goc.mean():.3f} mm, giới hạn EWMA ±{3 * sigma_ewma:.3f} mm")
+print(f"bắt đầu tắc ở chi tiết thứ 30; EWMA cảnh báo ở chi tiết thứ {canh_bao} (bề rộng trung vị lúc đó {tb_do[canh_bao]:.2f} mm)")
+print(f"chi tiết NG đầu tiên: thứ {dau_tien_ng}; số NG trong 230 chi tiết: {ket_qua.count('NG')}")</code></pre>
+<pre><code class="language-text">đường tâm 3.010 mm, giới hạn EWMA ±0.036 mm
+bắt đầu tắc ở chi tiết thứ 30; EWMA cảnh báo ở chi tiết thứ 44 (bề rộng trung vị lúc đó 2.90 mm)
+chi tiết NG đầu tiên: thứ 127; số NG trong 230 chi tiết: 44</code></pre>
+<p>EWMA cảnh báo chỉ hơn mười chi tiết sau khi bắt đầu tắc, khi bề rộng mới giảm khoảng 0,1 mm và còn cách giới hạn dưới rất xa; chi tiết NG đầu tiên xuất hiện muộn hơn khoảng 80 chi tiết. Đó là 80 cơ hội để lau đầu phun thay vì 44 chi tiết phải loại. Trạm vision giỏi không chỉ phán OK/NG mà còn cung cấp dữ liệu để quá trình không sinh ra NG.</p>
+
+<h2>9. Bẫy thực tế</h2>
+<table>
+  <tr><th>Bẫy</th><th>Hậu quả</th><th>Cách tránh</th></tr>
+  <tr><td>Đường kiểm lấy từ ảnh mẫu thay vì chương trình robot</td><td>Sửa chương trình robot là vùng kiểm lệch theo</td><td>Xuất đường lập trình từ robot hoặc CAD, cùng gốc tọa độ</td></tr>
+  <tr><td>Keo trong suốt hoặc cùng màu nền</td><td>Không tách được bằng cường độ</td><td>Keo có chất huỳnh quang + đèn UV, hoặc đo 3D chiều cao keo (laser profile)</td></tr>
+  <tr><td>Bước lấy mẫu thưa</td><td>Bỏ sót khe ngắn (bài tập 2)</td><td>Bước nhỏ hơn một nửa khe nhỏ nhất cần bắt</td></tr>
+  <tr><td>Đặc tả không nói lỗi phải dài bao nhiêu</td><td>Loại nhầm chi tiết sát biên, tranh cãi với khách hàng</td><td>Đặc tả chiều dài lỗi tối thiểu (bài tập 1)</td></tr>
+  <tr><td>Kiểm sau khi đã ép nắp</td><td>Keo bị che, không sửa được</td><td>Kiểm ngay sau phun, trước khi ghép; robot có thể phun bù chỗ đứt</td></tr>
+  <tr><td>Chỉ phán OK/NG, không lưu số đo</td><td>Không thấy xu hướng, không cải tiến được</td><td>Lưu bề rộng trung vị, nhỏ nhất mỗi chi tiết; vẽ EWMA theo ca</td></tr>
+</table>
+
+<h2>10. Tự đánh giá</h2>
+<ul>
+  <li>Sai số bề rộng trung bình gần 0, độ lệch chuẩn vài phần trăm mm, nhỏ hơn 10 lần dung sai.</li>
+  <li>300 chi tiết: 0 loại nhầm, bắt đủ đứt, mỏng, tràn, lệch; báo đúng vị trí dọc đường.</li>
+  <li>Biểu đồ EWMA cảnh báo trôi bề rộng trước khi có chi tiết NG.</li>
+  <li>Biết giới hạn của trạm: khe nhỏ nhất bắt được theo bước lấy mẫu, đánh đổi lọc và bỏ sót.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Chi tiết đạt nhưng sát biên bị loại</h3>
+<p>Keo rộng trung bình 2,7 mm vẫn đạt (dung sai từ 2,5 mm), nhưng nhiễu đo cộng dao động keo trên 315 điểm đo có thể làm vài điểm rơi dưới 2,5 mm. So các cách: không lọc, yêu cầu lỗi dài ít nhất 1 mm, lọc trung vị 3 hoặc 5 điểm. Đồng thời đo xem mỗi cách có làm sót đoạn mỏng thật (2,3 mm, dài 2 đến 4 mm) không.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">rng_e1 = np.random.default_rng(8)
+sat_bien, that_vi_pham = [], 0
+for _ in range(60):                                                  # keo 2,7 mm: sát biên dưới 2,5 mm
+    ct = tao_chi_tiet(rng_e1, 0, tam_rong=2.7)
+    that_vi_pham += ct["rong"].min() &lt; TAM_DUNG[0]
+    sat_bien.append(chup(ct, rng_e1))
+print(f"keo 2,7 mm: {that_vi_pham}/60 chi tiết thật sự có điểm dưới 2,5 mm")
+mong_ngan = []
+for _ in range(60):                                                  # lỗi thật: đoạn mỏng 2,3 mm dài 2–4 mm
+    ct = tao_chi_tiet(rng_e1, 0)
+    bd = rng_e1.uniform(0, CHU_VI - 20)
+    ct["rong"][(S &gt;= bd) &amp; (S &lt; bd + rng_e1.uniform(2, 4))] = 2.3
+    mong_ngan.append(chup(ct, rng_e1))
+for loc, dt in ((1, 1), (1, 2), (3, 1), (5, 1)):
+    ln = sum(kiem_2(a, loc, dt)[0] != "OK" for a in sat_bien)
+    bat = sum(kiem_2(a, loc, dt)[0] != "OK" for a in mong_ngan)
+    print(f"lọc trung vị {loc} điểm, lỗi phải dài ≥ {dt * 0.5:.1f} mm: loại nhầm keo 2,7 mm {ln}/60; bắt đoạn mỏng ngắn {bat}/60")</code></pre>
+<pre><code class="language-text">keo 2,7 mm: 0/60 chi tiết thật sự có điểm dưới 2,5 mm
+lọc trung vị 1 điểm, lỗi phải dài ≥ 0.5 mm: loại nhầm keo 2,7 mm 10/60; bắt đoạn mỏng ngắn 60/60
+lọc trung vị 1 điểm, lỗi phải dài ≥ 1.0 mm: loại nhầm keo 2,7 mm 1/60; bắt đoạn mỏng ngắn 58/60
+lọc trung vị 3 điểm, lỗi phải dài ≥ 0.5 mm: loại nhầm keo 2,7 mm 2/60; bắt đoạn mỏng ngắn 58/60
+lọc trung vị 5 điểm, lỗi phải dài ≥ 0.5 mm: loại nhầm keo 2,7 mm 0/60; bắt đoạn mỏng ngắn 49/60</code></pre>
+<p>Không chi tiết 2,7 mm nào thật sự có điểm dưới 2,5 mm, vậy mọi lần loại đều là loại nhầm. Không lọc thì khoảng 1/6 số chi tiết sát biên bị loại: lấy giá trị nhỏ nhất trên 315 phép đo thì chắc chắn gặp vài điểm nhiễu xấu. Lọc mạnh (trung vị 5 điểm, tức 2,5 mm) hết loại nhầm nhưng sót khoảng 1/6 đoạn mỏng ngắn. Yêu cầu lỗi dài ít nhất 1 mm hoặc lọc 3 điểm cho cân bằng tốt nhất, nhưng không có lựa chọn nào miễn phí. Gốc của vấn đề là đặc tả "bề rộng 2,5 đến 3,5 mm" chưa nói đoạn hẹp bao nhiêu mm thì tính là lỗi. Hãy đưa câu hỏi đó cho khách hàng hoặc bộ phận thiết kế (ví dụ: "mỏng dưới 2,5 mm trên đoạn dài từ 1 mm"), rồi cấu hình trạm theo đúng câu trả lời.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Bước lấy mẫu bao nhiêu là đủ?</h3>
+<p>Đo 315 điểm mỗi chi tiết có vẻ nhiều. Với các khe thấy được 0,5 đến 1,5 mm, thử bước 0,5; 1; 2 và 4 mm.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">rng_e2 = np.random.default_rng(12)
+mau = []
+for _ in range(60):
+    ct = tao_chi_tiet(rng_e2, ty_le_loi=0)
+    bd = rng_e2.uniform(0, CHU_VI - 20)
+    ct["rong"][(S &gt;= bd) &amp; (S &lt; bd + rng_e2.uniform(3.5, 4.5))] = 0          # dừng phun 3,5–4,5 mm: khe thấy được 0,5–1,5 mm
+    mau.append(chup(ct, rng_e2))
+
+
+def co_dut(anh, buoc):
+    _, rong, _ = do_keo(anh, buoc_mm=buoc)
+    return bool((rong == 0).any())
+
+
+for buoc in (0.5, 1.0, 2.0, 4.0):
+    print(f"bước lấy mẫu {buoc} mm ({int(CHU_VI / buoc)} điểm đo): bắt khe {sum(co_dut(a, buoc) for a in mau)}/60")</code></pre>
+<pre><code class="language-text">bước lấy mẫu 0.5 mm (315 điểm đo): bắt khe 59/60
+bước lấy mẫu 1.0 mm (157 điểm đo): bắt khe 48/60
+bước lấy mẫu 2.0 mm (78 điểm đo): bắt khe 30/60
+bước lấy mẫu 4.0 mm (39 điểm đo): bắt khe 17/60</code></pre>
+<p>Bước 0,5 mm bắt gần hết (khe thấy được nhỏ nhất 0,5 mm bằng đúng bước đo nên đôi khi lọt giữa hai điểm); bước 4 mm chỉ bắt chưa tới một phần ba. Quy tắc giống định lý lấy mẫu: bước đo phải nhỏ hơn một nửa kích thước lỗi nhỏ nhất cần bắt, nếu không thì có những vị trí lỗi nằm gọn giữa hai điểm đo. Chi phí tính toán của bước nhỏ rất thấp (một lần <code>remap</code> cho mọi điểm), nên không có lý do tiết kiệm ở đây.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.opencv.org/4.x/da/d54/group__imgproc__transform.html" rel="noopener" target="_blank">OpenCV: Geometric Image Transformations (remap)</a>; <a href="https://docs.opencv.org/4.x/dd/d49/tutorial_py_contour_features.html" rel="noopener" target="_blank">OpenCV: Contour Features (minAreaRect)</a>; <a href="https://www.itl.nist.gov/div898/handbook/pmc/section3/pmc324.htm" rel="noopener" target="_blank">NIST/SEMATECH e-Handbook of Statistical Methods: EWMA Control Charts</a>; C. Steger, M. Ulrich, C. Wiedemann, <em>Machine Vision Algorithms and Applications</em>, 2nd ed., Wiley-VCH, 2018.</p>
