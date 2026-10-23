@@ -1,0 +1,311 @@
+<p class="note"><strong>Độ khó:</strong> ★★★★ (rất khó) · <strong>Cần học trước:</strong> <a href="../lo-trinh/vision-engineer/camera-lens-lighting.html">chặng 6: Camera / Lens / Lighting</a>, <a href="../lo-trinh/vision-engineer/image-processing.html">chặng 3: Image Processing</a>, <a href="../lo-trinh/vision-engineer/industrial-vision.html">chặng 5: Industrial Vision</a> · <strong>Thời lượng:</strong> khoảng 3 giờ</p>
+<p>Màng nhựa, giấy, vải, thép cuộn, tấm pin: những vật liệu sản xuất liên tục thành cuộn dài hàng nghìn mét được kiểm bằng camera <strong>line-scan</strong>, mỗi lần chụp một dòng, encoder kích dòng tiếp theo khi vật liệu chạy thêm một bước. Không có "ảnh" theo nghĩa thường: chỉ có một dải ảnh dài vô tận, phải xử lý theo luồng, giữ trạng thái giữa các khối, và báo lỗi theo vị trí mét trên cuộn. Lỗi tính theo mật độ trên diện tích chứ không theo từng sản phẩm, và có loại lỗi dài nhiều mét. Dự án này xây một bộ kiểm cuộn hoàn chỉnh trên dữ liệu mô phỏng 100 m (205 triệu pixel).</p>
+<div class="tip"><strong>Mục tiêu dự án</strong>(1) Xử lý ảnh line-scan theo khối có chồng lấn, không đếm trùng lỗi trên ranh giới. (2) Khử độ sáng không đều theo chiều ngang, sọc cố định và trôi sáng theo chiều dài. (3) Bắt vệt dọc dài nhiều mét, thứ mà cách chuẩn hóa thông thường làm biến mất. (4) Xuất bản đồ lỗi theo mét, xếp hạng cuộn, đoạn cần cắt bỏ, và đo tốc độ xử lý so với tốc độ dây chuyền.</div>
+
+<h2>1. Bài toán</h2>
+<blockquote>"Dây chuyền đùn màng khổ 512 mm chạy 300 m/phút. Khách hàng in bao bì phàn nàn về đốm gel và có lần một cuộn có vết xước dọc dài cả chục mét do con lăn. Cần hệ thống kiểm 100% bề mặt, cuối mỗi cuộn có bản đồ lỗi để máy chia cuộn cắt bỏ đoạn xấu, và xếp hạng cuộn A/B/C."</blockquote>
+<table>
+  <tr><th>Đại lượng</th><th>Giá trị</th></tr>
+  <tr><td>Khổ, độ phân giải</td><td>512 mm, camera line-scan 1 024 pixel → 0,5 mm/pixel; encoder kích một dòng mỗi 0,5 mm</td></tr>
+  <tr><td>Tốc độ</td><td>300 m/phút = 5 m/s = 10 000 dòng/giây</td></tr>
+  <tr><td>Lỗi</td><td>đốm tối (bẩn), đốm sáng (gel, lỗ) đường kính 2 đến 5 mm; vệt dọc dài nhiều mét</td></tr>
+  <tr><td>Xếp hạng</td><td>A: không vệt, ≤ 10 đốm/100 m²; B: ≤ 30 đốm/100 m²; còn lại C (quy ước của dự án)</td></tr>
+  <tr><td>Đầu ra</td><td>danh sách lỗi (mét, mm từ mép trái, loại, kích thước), hạng cuộn, các đoạn cần cắt bỏ</td></tr>
+</table>
+
+<h2>2. Yêu cầu</h2>
+<ul>
+  <li>Xử lý theo khối 512 dòng (25,6 cm), chồng lấn 32 dòng; mỗi lỗi chỉ báo một lần.</li>
+  <li>Độ sáng giảm ra hai mép tới 25% (đèn thanh), sọc dọc cố định ±3% theo khuôn đùn, độ sáng trôi chậm ±5% theo chiều dài: không được sinh báo động giả.</li>
+  <li>Vệt dọc phải được báo là <em>một</em> lỗi với vị trí bắt đầu và chiều dài, không phải hàng trăm lỗi.</li>
+  <li>Tốc độ xử lý vượt tốc độ dây chuyền với khoảng dư rõ ràng.</li>
+</ul>
+
+<h2>3. Kiến thức sử dụng</h2>
+<ul>
+  <li><a href="../kien-thuc/global-rolling-shutter-area-line-scan.html">Area scan và line scan</a>; <a href="../hoc/industrial-vision-1-trigger-encoder-cycle-time.html">trigger và encoder</a>.</li>
+  <li><a href="../kien-thuc/nhieu-snr-flat-field-chat-luong-anh.html">Flat-field</a>: chuẩn hóa độ sáng theo từng cột là flat-field cho camera line-scan.</li>
+  <li><a href="../hoc/xu-ly-anh-5-dac-trung-contour-blob.html">Blob analysis</a>; ước lượng độ lệch chuẩn bền bằng MAD.</li>
+  <li><a href="../hoc/luong-hang-doi-tach-chup-anh-xu-ly.html">Luồng và hàng đợi</a>: tách đọc camera khỏi xử lý khi chạy thật.</li>
+</ul>
+
+<h2>4. Dữ liệu: cuộn màng mô phỏng</h2>
+<p>Lớp <code>CuonGia</code> sinh ảnh line-scan của một cuộn theo từng khối, đúng như đọc từ camera: profile đèn giảm dần ra mép, sọc dọc cố định theo cột, trôi sáng chậm theo chiều dài, vân và nhiễu. Lỗi nằm ở tọa độ toàn cục (dòng, cột) nên một lỗi có thể nằm vắt qua hai khối, và vệt dọc kéo dài qua hàng chục nghìn dòng.</p>
+<pre><code class="language-python">import time
+
+import cv2
+import numpy as np
+
+MM_PX = 0.5                         # mỗi pixel 0,5 mm theo chiều ngang cuộn; encoder kích một dòng mỗi 0,5 mm chạy dọc
+RONG_PX = 1024                      # khổ 512 mm
+KHOI = 512                          # xử lý theo khối 512 dòng (25,6 cm cuộn)
+CHONG = 32                          # chồng lấn giữa hai khối liên tiếp
+
+
+class CuonGia:
+    """Sinh ảnh line-scan của một cuộn màng theo từng khối, như đọc từ camera. Lỗi nằm ở tọa độ toàn cục (dòng, cột)."""
+
+    def __init__(self, dai_m=100, seed=0):
+        self.rng = np.random.default_rng(seed)
+        self.so_dong = int(dai_m * 1000 / MM_PX)
+        x = np.arange(RONG_PX)
+        self.profile_ngang = 0.75 + 0.25 * np.cos((x - RONG_PX / 2) / RONG_PX * np.pi) ** 2   # đèn thanh yếu dần ra mép
+        self.soc = 1 + 0.03 * self.rng.standard_normal(RONG_PX)          # sọc dọc cố định theo cột (dấu vết khuôn đùn)
+        self.loi = []
+        for _ in range(25):                                               # đốm: tối (bẩn) hoặc sáng (gel, lỗ)
+            self.loi.append({"loai": "đốm tối" if self.rng.random() &lt; 0.6 else "đốm sáng",
+                             "dong": int(self.rng.integers(0, self.so_dong)), "cot": int(self.rng.integers(20, RONG_PX - 20)),
+                             "r": int(self.rng.integers(2, 6)), "do_tuong_phan": float(self.rng.uniform(0.25, 0.45))})
+        for _ in range(2):                                                # vệt dọc: xước do con lăn, dài nhiều mét
+            bd = int(self.rng.integers(0, self.so_dong - 40000 if self.so_dong &gt; 50000 else self.so_dong // 2))
+            self.loi.append({"loai": "vệt dọc", "dong": bd, "dong_cuoi": min(self.so_dong, bd + int(self.rng.integers(6000, 30000))),
+                             "cot": int(self.rng.integers(50, RONG_PX - 50)), "do_tuong_phan": 0.2})
+
+    def khoi(self, dong_dau, so_dong):
+        """Trả về các dòng [dong_dau, dong_dau + so_dong) của cuộn."""
+        dong = np.arange(dong_dau, dong_dau + so_dong)
+        troi = 1 + 0.05 * np.sin(dong / 60000 * 2 * np.pi)[:, None]       # độ sáng trôi chậm theo chiều dài cuộn
+        anh = 0.6 * self.profile_ngang * self.soc * troi
+        anh = anh * (1 + 0.02 * self.rng.standard_normal((so_dong, RONG_PX)))    # vân màng, nhiễu
+        for l in self.loi:
+            if l["loai"] == "vệt dọc":
+                a, b = max(l["dong"], dong_dau), min(l["dong_cuoi"], dong_dau + so_dong)
+                if a &lt; b:
+                    anh[a - dong_dau:b - dong_dau, l["cot"]] *= 1 - l["do_tuong_phan"]
+            elif dong_dau - 10 &lt;= l["dong"] &lt; dong_dau + so_dong + 10:
+                m = np.zeros((so_dong + 20, RONG_PX), np.uint8)
+                cv2.circle(m, (l["cot"], l["dong"] - dong_dau + 10), l["r"], 1, -1)
+                he_so = 1 - l["do_tuong_phan"] if l["loai"] == "đốm tối" else 1 + l["do_tuong_phan"]
+                anh[m[10:-10] &gt; 0] *= he_so
+        return anh.astype(np.float32)
+
+
+cuon = CuonGia()
+print(f"cuộn 100 m: {cuon.so_dong} dòng × {RONG_PX} pixel = {cuon.so_dong * RONG_PX / 1e6:.0f} triệu pixel; "
+      f"{len(cuon.loi)} lỗi thật ({sum(l['loai'] == 'vệt dọc' for l in cuon.loi)} vệt dọc)")
+cv2.imwrite("cuon.png", np.uint8(255 * np.clip(cuon.khoi(0, 1024), 0, 1)))</code></pre>
+<pre><code class="language-text">cuộn 100 m: 200000 dòng × 1024 pixel = 205 triệu pixel; 27 lỗi thật (2 vệt dọc)</code></pre>
+<p>File <code>cuon.png</code> là 1 024 dòng đầu tiên (51 cm cuộn): thấy rõ hai mép tối hơn giữa và các sọc dọc mảnh.</p>
+
+<h2>5. Lời giải 1: ngưỡng theo thống kê của khối</h2>
+<p>Mỗi khối: pixel nào lệch khỏi trung bình của khối quá 4 độ lệch chuẩn là lỗi.</p>
+<pre><code class="language-python"># Lời giải 1: mỗi khối, pixel lệch khỏi trung bình khối quá 4 độ lệch chuẩn là lỗi
+def xu_ly_1(cuon):
+    phat_hien = []
+    for dau in range(0, cuon.so_dong, KHOI):
+        a = cuon.khoi(dau, min(KHOI, cuon.so_dong - dau))
+        bat = (np.abs(a - a.mean()) &gt; 4 * a.std()).astype(np.uint8)
+        n, _, st, tam = cv2.connectedComponentsWithStats(bat)
+        phat_hien += [(dau + tam[k][1], tam[k][0]) for k in range(1, n) if st[k, cv2.CC_STAT_AREA] &gt;= 3]
+    return phat_hien</code></pre>
+
+<h2>6. Lời giải 2: bộ kiểm theo luồng</h2>
+<p>Bộ kiểm giữ trạng thái giữa các khối và làm hai việc độc lập:</p>
+<ul>
+  <li><strong>Đốm</strong>: chia ảnh khối cho trung vị từng cột của chính khối đó. Trung vị theo cột gói gọn cả profile đèn, sọc cố định và trôi sáng (vì 512 dòng chỉ là 25,6 cm, trôi sáng gần như không đổi trong khối), mà không bị đốm nhỏ ảnh hưởng. Phần dư có độ lệch chuẩn ước lượng bền bằng MAD; pixel vượt k·σ (k = 6) và blob ≥ 3 pixel là đốm. Blob hẹp mà dài dọc là một mẩu của vệt, không tính là đốm. Mỗi khối chỉ nhận đốm có tâm nằm ngoài nửa vùng chồng lấn, nên đốm trên ranh giới chỉ được tính một lần.</li>
+  <li><strong>Vệt dọc</strong>: so trung vị cột của khối với <em>profile cột học ở đầu cuộn</em>; cột nào tối hơn 10% là có vệt. Theo dõi các cột có vệt qua các khối liên tiếp và gộp thành một lỗi có điểm đầu, điểm cuối.</li>
+</ul>
+<pre><code class="language-python">class BoKiemCuon:
+    """Kiểm tra theo luồng: nhận từng khối, giữ trạng thái giữa các khối (profile cột chuẩn, vệt đang theo dõi)."""
+
+    def __init__(self, k_sigma=6.0, dien_tich_min=3):
+        self.k, self.dt_min = k_sigma, dien_tich_min
+        self.profile_chuan = None                # trung vị từng cột học ở đầu cuộn: đèn + sọc cố định của khuôn
+        self.vet_mo = {}                         # cột → [dòng bắt đầu, dòng cuối cùng thấy]
+        self.dom, self.vet = [], []
+
+    def nhan_khoi(self, a, dong_dau, la_khoi_dau, la_khoi_cuoi):
+        nen_cot = np.median(a, axis=0)                                    # nền theo cột của khối này (đèn, sọc, trôi sáng)
+        if self.profile_chuan is None:
+            self.profile_chuan = nen_cot.copy()
+        # 1. Đốm: chuẩn hóa theo nền cột của chính khối, ngưỡng k·σ (σ ước lượng bền bằng MAD)
+        du = a / nen_cot - 1
+        sigma = 1.4826 * np.median(np.abs(du))
+        bat = (np.abs(du) &gt; self.k * sigma).astype(np.uint8)
+        n, _, st, tam = cv2.connectedComponentsWithStats(bat)
+        chong = getattr(self, "chong", CHONG)
+        tu = 0 if la_khoi_dau else chong // 2                             # vùng chồng lấn: mỗi đốm chỉ tính ở một khối
+        den = len(a) if la_khoi_cuoi else len(a) - chong // 2
+        for k in range(1, n):
+            la_doan_vet = st[k, cv2.CC_STAT_WIDTH] &lt;= 3 and st[k, cv2.CC_STAT_HEIGHT] &gt;= 20   # hẹp, dài dọc: phần của vệt
+            if st[k, cv2.CC_STAT_AREA] &gt;= self.dt_min and tu &lt;= tam[k][1] &lt; den and not la_doan_vet:
+                y, x = int(round(tam[k][1])), int(round(tam[k][0]))
+                self.dom.append({"loai": "đốm tối" if du[y, x] &lt; 0 else "đốm sáng", "dong": dong_dau + tam[k][1],
+                                 "cot": tam[k][0], "dien_tich_mm2": st[k, cv2.CC_STAT_AREA] * MM_PX ** 2})
+        # 2. Vệt dọc: nền cột của khối tối hơn hẳn profile chuẩn (đã chia trôi sáng chung của cả khối)
+        ty_le = nen_cot / self.profile_chuan
+        ty_le /= np.median(ty_le)
+        cot_vet = set(np.flatnonzero(ty_le &lt; 0.9).tolist())
+        for c in cot_vet:
+            if c in self.vet_mo:
+                self.vet_mo[c][1] = dong_dau + len(a)
+            else:
+                self.vet_mo[c] = [dong_dau, dong_dau + len(a)]
+        for c in [c for c in self.vet_mo if c not in cot_vet or la_khoi_cuoi]:
+            bd, kt = self.vet_mo.pop(c)
+            self.vet.append({"loai": "vệt dọc", "dong": bd, "dong_cuoi": kt, "cot": c, "dai_m": (kt - bd) * MM_PX / 1000})
+
+
+def xu_ly_2(cuon, chong=CHONG, **kw):
+    bo = BoKiemCuon(**kw)
+    bo.chong = chong
+    buoc = KHOI - chong
+    for dau in range(0, cuon.so_dong, buoc):
+        so = min(KHOI, cuon.so_dong - dau)
+        bo.nhan_khoi(cuon.khoi(dau, so), dau, dau == 0, dau + so &gt;= cuon.so_dong)
+        if dau + so &gt;= cuon.so_dong:
+            break
+    return bo</code></pre>
+
+<h2>7. Kết quả trên cuộn 100 m</h2>
+<pre><code class="language-python">def cham_diem(phat_hien_dom, cuon, sai_px=4):
+    that = [l for l in cuon.loi if l["loai"] != "vệt dọc"]
+    dung = sum(any(abs(d[0] - l["dong"]) &lt;= sai_px and abs(d[1] - l["cot"]) &lt;= sai_px for d in phat_hien_dom) for l in that)
+    gia = sum(not any(abs(d[0] - l["dong"]) &lt;= sai_px and abs(d[1] - l["cot"]) &lt;= sai_px for l in that) for d in phat_hien_dom)
+    return dung, len(that), gia
+
+
+cuon = CuonGia(dai_m=100, seed=0)
+t0 = time.perf_counter()
+ph1 = xu_ly_1(cuon)
+t1 = time.perf_counter()
+bo = xu_ly_2(cuon)
+t2 = time.perf_counter()
+d1, tong, g1 = cham_diem(ph1, cuon)
+d2, _, g2 = cham_diem([(d["dong"], d["cot"]) for d in bo.dom], cuon)
+print(f"lời giải 1: bắt {d1}/{tong} đốm, báo động giả {g1}")
+print(f"lời giải 2: bắt {d2}/{tong} đốm, báo động giả {g2}; vệt dọc: {len(bo.vet)} vệt (thật {sum(l['loai'] == 'vệt dọc' for l in cuon.loi)})")
+for v, l in zip(sorted(bo.vet, key=lambda v: v["dong"]), sorted([l for l in cuon.loi if l["loai"] == "vệt dọc"], key=lambda l: l["dong"])):
+    print(f"   vệt ở cột {v['cot']} (thật {l['cot']}), từ mét {v['dong'] * MM_PX / 1000:.1f} dài {v['dai_m']:.1f} m "
+          f"(thật từ mét {l['dong'] * MM_PX / 1000:.1f} dài {(l['dong_cuoi'] - l['dong']) * MM_PX / 1000:.1f} m)")
+toc_do = cuon.so_dong / (t2 - t1)
+print(f"tốc độ lời giải 2 (cả sinh ảnh): {toc_do:,.0f} dòng/giây ≈ {toc_do * MM_PX / 1000 * 60:.0f} m/phút")</code></pre>
+<pre><code class="language-text">lời giải 1: bắt 8/25 đốm, báo động giả 0
+lời giải 2: bắt 25/25 đốm, báo động giả 0; vệt dọc: 2 vệt (thật 2)
+   vệt ở cột 148 (thật 148), từ mét 3.6 dài 10.1 m (thật từ mét 3.5 dài 10.2 m)
+   vệt ở cột 62 (thật 62), từ mét 56.2 dài 10.6 m (thật từ mét 56.1 dài 10.5 m)
+tốc độ lời giải 2 (cả sinh ảnh): 18,320 dòng/giây ≈ 550 m/phút</code></pre>
+<p>Lời giải 1 chỉ bắt được khoảng một phần ba số đốm: độ lệch chuẩn của cả khối bị phóng to bởi chênh lệch sáng giữa giữa cuộn và mép (25%), nên ngưỡng 4σ cao hơn độ tương phản của phần lớn đốm. Nó cũng không có khái niệm vệt. Lời giải 2 bắt đủ 25/25 đốm, không báo động giả, tìm đúng 2 vệt với vị trí và chiều dài lệch dưới 0,2 m. Tốc độ (gồm cả thời gian sinh ảnh mô phỏng) vượt yêu cầu 300 m/phút; trên trạm thật, cộng thêm thời gian đọc camera và dành khoảng dư cho các lúc hệ điều hành khựng.</p>
+
+<h2>8. Cái bẫy: chuẩn hóa theo cột nuốt mất vệt dọc</h2>
+<p>Chuẩn hóa theo trung vị cột là chìa khóa để khử đèn không đều, nhưng hãy xem nó làm gì với một vệt dọc:</p>
+<pre><code class="language-python"># Cái bẫy: chuẩn hóa theo trung vị cột của chính khối làm vệt dọc biến mất
+vet = next(l for l in cuon.loi if l["loai"] == "vệt dọc")
+a = cuon.khoi(vet["dong"] + 1000, KHOI)                                # một khối nằm giữa vệt
+du = a / np.median(a, axis=0) - 1
+c = vet["cot"]
+print(f"cột có vệt: độ tối so với cột bên cạnh trên ảnh gốc {a[:, c].mean() / a[:, c + 1].mean() - 1:+.0%}; "
+      f"sau chuẩn hóa theo cột: {du[:, c].mean():+.1%} (vệt biến mất)")
+bo_thu = BoKiemCuon()
+bo_thu.nhan_khoi(cuon.khoi(0, KHOI), 0, True, False)                  # học profile cột ở đầu cuộn (chưa có vệt)
+ty_le = np.median(a, axis=0) / bo_thu.profile_chuan
+print(f"so với profile cột học ở đầu cuộn: cột có vệt {ty_le[c] / np.median(ty_le) - 1:+.0%}, "
+      f"các cột khác dao động ±{np.percentile(np.abs(ty_le / np.median(ty_le) - 1), 99):.1%} (phân vị 99)")</code></pre>
+<pre><code class="language-text">cột có vệt: độ tối so với cột bên cạnh trên ảnh gốc -15%; sau chuẩn hóa theo cột: -0.0% (vệt biến mất)
+so với profile cột học ở đầu cuộn: cột có vệt -20%, các cột khác dao động ±0.4% (phân vị 99)</code></pre>
+<p>Vệt dọc nằm cố định ở một cột suốt khối, nên trung vị của cột đó chính là mức sáng của vệt: chuẩn hóa theo cột coi vệt là "nền" và xóa sạch nó. Đây là lý do bộ kiểm cần một tham chiếu khác thời gian: profile cột học ở đầu cuộn (lúc chưa có vệt). So với tham chiếu đó, cột có vệt tối hơn 20% trong khi các cột khác chỉ dao động vài phần nghìn. Ở nhà máy, profile tham chiếu được cập nhật có kiểm soát (sau khi thay đèn, đổi sản phẩm), không cập nhật liên tục, vì cập nhật liên tục sẽ lại "học" luôn vệt.</p>
+
+<h2>9. Bản đồ lỗi và xếp hạng cuộn</h2>
+<pre><code class="language-python">dien_tich_m2 = cuon.so_dong * MM_PX / 1000 * RONG_PX * MM_PX / 1000
+mat_do = len(bo.dom) / dien_tich_m2 * 100
+hang = "A" if not bo.vet and mat_do &lt;= 10 else "B" if mat_do &lt;= 30 else "C"
+print(f"cuộn {cuon.so_dong * MM_PX / 1000:.0f} m × {RONG_PX * MM_PX:.0f} mm = {dien_tich_m2:.1f} m²: "
+      f"{len(bo.dom)} đốm ({mat_do:.0f} đốm/100 m²), {len(bo.vet)} vệt dọc → hạng {hang}")
+print(" mét   | cách mép trái (mm) | loại       | kích thước")
+for l in sorted(bo.dom + bo.vet, key=lambda l: l["dong"])[:8]:
+    kt = f"dài {l['dai_m']:.1f} m" if l["loai"] == "vệt dọc" else f"{l['dien_tich_mm2']:.1f} mm²"
+    print(f"{l['dong'] * MM_PX / 1000:6.2f} | {l['cot'] * MM_PX:18.0f} | {l['loai']:10s} | {kt}")
+print("…")
+cat_bo = [(round(v["dong"] * MM_PX / 1000 - 0.5, 1), round(v["dong_cuoi"] * MM_PX / 1000 + 0.5, 1)) for v in bo.vet]
+print("đoạn cần cắt bỏ khi chia cuộn (mét, cộng 0,5 m mỗi đầu):", sorted(cat_bo))</code></pre>
+<pre><code class="language-text">cuộn 100 m × 512 mm = 51.2 m²: 25 đốm (49 đốm/100 m²), 2 vệt dọc → hạng C
+ mét   | cách mép trái (mm) | loại       | kích thước
+  3.60 |                 74 | vệt dọc    | dài 10.1 m
+ 12.62 |                114 | đốm sáng   | 3.2 mm²
+ 24.39 |                486 | đốm sáng   | 3.2 mm²
+ 26.55 |                215 | đốm tối    | 20.2 mm²
+ 26.82 |                142 | đốm sáng   | 12.2 mm²
+ 29.63 |                136 | đốm tối    | 3.2 mm²
+ 32.25 |                407 | đốm tối    | 12.2 mm²
+ 34.45 |                404 | đốm tối    | 12.2 mm²
+…
+đoạn cần cắt bỏ khi chia cuộn (mét, cộng 0,5 m mỗi đầu): [(3.1, 14.2), (55.7, 67.2)]</code></pre>
+<p>Bản đồ lỗi đi theo cuộn sang máy chia cuộn: máy cắt bỏ hai đoạn có vệt (cộng 0,5 m mỗi đầu cho an toàn), phần còn lại được xếp hạng lại sau khi cắt. Cuộn này bị hạng C vì có vệt và mật độ đốm cao; sau khi cắt bỏ hai đoạn vệt, nếu đốm phân bố đều thì các cuộn con sẽ được xếp hạng lại theo mật độ đốm của riêng chúng. Bản đồ lỗi cũng là dữ liệu quý cho phòng công nghệ: đốm tập trung ở một vị trí ngang cố định thường chỉ ra một điểm bẩn trên khuôn đùn.</p>
+
+<h2>10. Bẫy thực tế</h2>
+<table>
+  <tr><th>Bẫy</th><th>Hậu quả</th><th>Cách tránh</th></tr>
+  <tr><td>Encoder trượt, tốc độ đổi mà không có encoder</td><td>Ảnh bị kéo giãn hoặc nén theo chiều dài; vị trí mét sai</td><td>Encoder lăn trên chính vật liệu; kiểm bằng dấu đo chiều dài định kỳ</td></tr>
+  <tr><td>Xử lý theo khối không chồng lấn</td><td>Đốm trên ranh giới bị đếm hai lần hoặc bị cắt đôi thành hai đốm nhỏ (bài tập 1)</td><td>Chồng lấn ≥ kích thước lỗi lớn nhất, quy tắc "mỗi lỗi thuộc đúng một khối"</td></tr>
+  <tr><td>Cập nhật nền liên tục</td><td>Vệt dọc và lỗi lặp lại bị học thành nền</td><td>Tham chiếu học có kiểm soát, cập nhật khi có lệnh</td></tr>
+  <tr><td>Bỏ qua mép cuộn</td><td>Mép rách, mép gợn lọt</td><td>Phát hiện mép bằng ngưỡng nền, kiểm riêng vùng mép</td></tr>
+  <tr><td>Tốc độ xử lý đo trên máy phát triển</td><td>Mất dòng khi dây chuyền chạy nhanh</td><td>Đo trên máy trạm, có đệm, đếm số dòng mất và báo động</td></tr>
+  <tr><td>Ngưỡng chọn trên nhiễu mô phỏng độc lập</td><td>Vân vật liệu thật tương quan, báo động giả nhiều hơn dự kiến</td><td>Chọn k trên cuộn sạch thật (bài tập 2)</td></tr>
+</table>
+
+<h2>11. Tự đánh giá</h2>
+<ul>
+  <li>Cuộn 100 m: bắt đủ đốm, 0 báo động giả; vệt dọc là một lỗi với chiều dài đúng tới 0,2 m.</li>
+  <li>Không đếm trùng lỗi trên ranh giới khối.</li>
+  <li>Bản đồ lỗi theo mét, hạng cuộn, đoạn cắt bỏ.</li>
+  <li>Tốc độ xử lý vượt tốc độ dây chuyền, có số đo trên máy thật.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Vì sao cần chồng lấn?</h3>
+<p>Tạo một cuộn 20 m mà mọi đốm nằm ngay trên ranh giới giữa hai khối, chạy bộ kiểm không chồng lấn và có chồng lấn 32 dòng.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">class CuonDomTaiBien(CuonGia):
+    """Cuộn 20 m chỉ có đốm, đặt ngay trên đường ranh giữa hai khối (theo bước của bản không chồng lấn)."""
+
+    def __init__(self):
+        super().__init__(dai_m=20, seed=3)
+        self.loi = [{"loai": "đốm tối", "dong": k * KHOI + int(self.rng.integers(-2, 3)), "cot": int(self.rng.integers(50, 970)),
+                     "r": 4, "do_tuong_phan": 0.35} for k in range(1, 70)]
+
+
+cuon_bien = CuonDomTaiBien()
+for chong in (0, CHONG):
+    bo_e1 = xu_ly_2(cuon_bien, chong=chong)
+    dung, tong, gia = cham_diem([(d["dong"], d["cot"]) for d in bo_e1.dom], cuon_bien)
+    print(f"chồng lấn {chong:2d} dòng: {len(bo_e1.dom)} phát hiện cho {tong} đốm thật; bắt {dung}, phát hiện thừa {gia}, "
+          f"đếm trùng {len(bo_e1.dom) - dung - gia}")</code></pre>
+<pre><code class="language-text">chồng lấn  0 dòng: 138 phát hiện cho 69 đốm thật; bắt 69, phát hiện thừa 0, đếm trùng 69
+chồng lấn 32 dòng: 69 phát hiện cho 69 đốm thật; bắt 69, phát hiện thừa 0, đếm trùng 0</code></pre>
+<p>Không chồng lấn, mỗi đốm trên ranh giới bị cắt làm hai nửa, mỗi khối thấy một nửa và báo một đốm: số đốm đếm được gấp đôi, mật độ đốm sai, cuộn bị hạ hạng oan. Có chồng lấn, mỗi đốm nằm trọn trong ít nhất một khối, và quy tắc "chỉ nhận đốm có tâm ngoài nửa vùng chồng lấn" bảo đảm mỗi đốm thuộc đúng một khối. Vùng chồng lấn phải lớn hơn kích thước lỗi lớn nhất (ở đây đốm đường kính tối đa 11 pixel, chồng lấn 32 dòng là thoải mái).</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Chọn hệ số k của ngưỡng k·σ</h3>
+<p>Với đốm mờ tương phản 6%, 10%, 15%, thử k = 3 đến 8, đo tỉ lệ bắt được và báo động giả trên một cuộn 40 m sạch.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">class CuonDomMo(CuonGia):
+    """Cuộn 40 m, đốm có độ tương phản cho trước (do_tuong_phan=None: cuộn sạch, không lỗi)."""
+
+    def __init__(self, do_tuong_phan):
+        super().__init__(dai_m=40, seed=4)
+        self.loi = [] if do_tuong_phan is None else [{**l, "do_tuong_phan": do_tuong_phan}
+                                                    for l in self.loi if l["loai"] != "vệt dọc"]
+
+
+print("k·σ | bắt đốm tương phản 6% | 10% | 15% | báo động giả trên cuộn sạch 40 m")
+for k in (3, 4, 5, 6, 8):
+    bat = []
+    for tp in (0.06, 0.10, 0.15):
+        cu = CuonDomMo(tp)
+        dung, tong, _ = cham_diem([(d["dong"], d["cot"]) for d in xu_ly_2(cu, k_sigma=k).dom], cu)
+        bat.append(f"{dung}/{tong}")
+    gia = len(xu_ly_2(CuonDomMo(None), k_sigma=k).dom)
+    print(f"{k:3d} | {bat[0]:&gt;21s} | {bat[1]:&gt;3s} | {bat[2]:&gt;3s} | {gia}")</code></pre>
+<pre><code class="language-text">k·σ | bắt đốm tương phản 6% | 10% | 15% | báo động giả trên cuộn sạch 40 m
+  3 |                 25/25 | 25/25 | 25/25 | 31
+  4 |                 15/25 | 25/25 | 25/25 | 0
+  5 |                  0/25 | 25/25 | 25/25 | 0
+  6 |                  0/25 | 14/25 | 25/25 | 0
+  8 |                  0/25 | 0/25 | 22/25 | 0</code></pre>
+<p>k = 3 bắt cả đốm 6% nhưng sinh hàng chục báo động giả trên 40 m sạch, tức hàng nghìn báo động giả mỗi ngày: không dùng được. Từ k = 4, mô phỏng không còn báo động giả, và k = 4 đến 5 bắt đủ đốm 10%; k = 6 (giá trị đang dùng) an toàn hơn nhưng chỉ bắt khoảng một nửa đốm 10%. Lưu ý mô phỏng có nhiễu độc lập giữa các pixel; vân vật liệu thật có tương quan không gian, nên báo động giả xuất hiện ở k cao hơn. Quy trình đúng: chạy bộ kiểm trên vài cuộn sạch đã được kiểm bằng mắt, chọn k nhỏ nhất cho tỉ lệ báo động giả chấp nhận được (ví dụ dưới 1 lần trên 1 000 m), rồi mới công bố độ tương phản nhỏ nhất trạm bắt được.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://www.emva.org/standards-technology/genicam/" rel="noopener" target="_blank">EMVA: GenICam (line-scan, kích dòng theo encoder)</a>; <a href="https://docs.opencv.org/4.x/d3/dc0/group__imgproc__shape.html" rel="noopener" target="_blank">OpenCV: Structural Analysis and Shape Descriptors (connectedComponentsWithStats)</a>; <a href="https://www.itl.nist.gov/div898/handbook/eda/section3/eda356.htm" rel="noopener" target="_blank">NIST/SEMATECH e-Handbook: Measures of Scale (độ lệch tuyệt đối trung vị)</a>; C. Steger, M. Ulrich, C. Wiedemann, <em>Machine Vision Algorithms and Applications</em>, 2nd ed., Wiley-VCH, 2018.</p>
