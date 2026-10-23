@@ -1,0 +1,495 @@
+<p class="note"><strong>Độ khó:</strong> ★★★☆ (khó) · <strong>Cần học trước:</strong> <a href="../lo-trinh/vision-engineer/image-processing.html">chặng 3: Image Processing</a>, <a href="../lo-trinh/vision-engineer/measurement-matching-ocr.html">chặng 7: Measurement / Matching / OCR</a> · <strong>Thời lượng:</strong> khoảng 3 giờ</p>
+<p>Sau máy gắp đặt linh kiện (pick-and-place) và lò reflow, mỗi bo mạch điện tử (PCBA) phải qua kiểm tra quang học tự động (AOI): đủ linh kiện chưa, có cái nào lệch khỏi pad, gắn ngược cực, hay gắn nhầm loại không. Đây là bài toán vision phổ biến nhất trong các nhà máy điện tử ở Việt Nam. Dự án này xây một bộ kiểm tra AOI thu nhỏ: căn bo bằng fiducial, kiểm từng linh kiện theo dữ liệu CAD, báo đúng tên lỗi cho trạm sửa chữa, và chứng minh bằng số vì sao cách "so với ảnh bo mẫu" không dùng được ở dây chuyền thật.</p>
+<div class="tip"><strong>Mục tiêu dự án</strong>(1) Căn ảnh bo về hệ tọa độ CAD bằng 3 fiducial. (2) Kiểm 24 linh kiện theo 4 loại lỗi: thiếu, lệch quá 0,25 mm, ngược cực, sai linh kiện. (3) So sánh với phương pháp so ảnh mẫu, kể cả khi đã căn và chuẩn hóa sáng. (4) Xuất báo cáo cho trạm sửa chữa, xử lý linh kiện thay thế (nhiều lô) và fiducial bị che.</div>
+
+<h2>1. Bài toán</h2>
+<p>Yêu cầu của bộ phận kỹ thuật SMT:</p>
+<blockquote>"Bo điều khiển 32 × 24 mm có 24 linh kiện: 10 điện trở và 8 tụ 0603, 4 diode SOD-123, 2 IC SOIC-8. Máy AOI hiện tại báo nhầm quá nhiều, công nhân bấm bỏ qua theo thói quen và đã để lọt bo thiếu tụ. Cần một trạm kiểm tra mà báo NG thì phải đúng, và báo cụ thể linh kiện nào, lỗi gì. Tụ 0603 đang mua từ hai nhà cung cấp, màu thân khác nhau."</blockquote>
+<table>
+  <tr><th>Đại lượng</th><th>Yêu cầu</th></tr>
+  <tr><td>Độ phân giải</td><td>20 pixel/mm (ảnh 640 × 480 phủ cả bo)</td></tr>
+  <tr><td>Bo trên băng tải</td><td>lệch ±25 pixel, xoay ±2°; độ sáng đèn ±20%</td></tr>
+  <tr><td>Lỗi phải bắt</td><td>thiếu; lệch tâm &gt; 0,25 mm; ngược cực (diode, IC); sai linh kiện</td></tr>
+  <tr><td>Lọt lỗi</td><td>0 trên bộ thử</td></tr>
+  <tr><td>Loại nhầm</td><td>≤ 1% số bo tốt</td></tr>
+  <tr><td>Đầu ra</td><td>OK/NG, danh sách linh kiện lỗi kèm loại lỗi và độ lệch (mm)</td></tr>
+</table>
+
+<h2>2. Yêu cầu</h2>
+<ul>
+  <li>Căn bo bằng fiducial theo CAD; không tìm thấy đủ fiducial thì báo "LỖI ĐO", không phán OK/NG.</li>
+  <li>Mỗi linh kiện được kiểm trong đúng footprint của nó, theo loại của nó; vị trí và góc lấy từ file CAD (pick-and-place).</li>
+  <li>Kết quả không phụ thuộc độ sáng đèn và lô linh kiện đã được duyệt.</li>
+  <li>Báo cáo phải đủ cho thợ sửa: tên linh kiện (R4, D2…), loại lỗi, độ lệch.</li>
+</ul>
+
+<h2>3. Kiến thức sử dụng</h2>
+<ul>
+  <li><a href="../hoc/so-sanh-anh-mau-golden-template-opencv.html">So sánh ảnh mẫu (golden template)</a>: phương pháp ở lời giải 1, và vì sao nó nhạy với cạnh.</li>
+  <li><a href="../kien-thuc/homography-do-tren-mat-phang.html">Homography</a> và <a href="../hoc/bien-doi-hinh-hoc-affine-phoi-canh.html">biến đổi hình học</a>: <code>estimateAffinePartial2D</code>, <code>warpAffine</code> với <code>WARP_INVERSE_MAP</code>.</li>
+  <li><a href="../hoc/xu-ly-anh-5-dac-trung-contour-blob.html">Blob analysis</a>: diện tích, tâm, <code>minAreaRect</code>.</li>
+  <li><a href="../hoc/industrial-vision-3-tieu-chi-ok-ng-escape-overkill.html">Escape và overkill</a>.</li>
+</ul>
+
+<h2>4. Dữ liệu: bo mô phỏng</h2>
+<p>Bộ mô phỏng vẽ bo theo đúng danh sách CAD (tên, loại, tọa độ mm, góc), có ba fiducial thiếc tròn ở ba góc. Mỗi lần chụp, bo lệch và xoay trên băng tải, mỗi linh kiện được gắn lệch nhỏ ngẫu nhiên (σ = 0,04 mm, 1°) như máy gắp thật, đèn mạnh yếu ±20%, tụ đến từ lô A (thân nâu nhạt) hoặc lô B (thân xám). 40% số bo có đúng một lỗi.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+
+PX_MM = 20.0                                                     # 20 pixel/mm: ảnh 640×480 phủ bo 32×24 mm
+H, W = 480, 640
+FIDUCIAL = np.array([[3.0, 3.0], [29.0, 3.0], [3.0, 21.0]])      # tâm 3 fiducial theo CAD (mm)
+KICH_THUOC = {"R": (1.6, 0.8), "C": (1.6, 0.8), "D": (2.7, 1.6), "IC": (5.0, 4.0)}   # thân linh kiện (mm)
+
+
+def tao_cad():
+    """Danh sách linh kiện như file pick-and-place: tên, loại, x, y (mm), góc (độ)."""
+    cad = []
+    for i in range(10):
+        cad.append((f"R{i + 1}", "R", 5.0 + 2.6 * i, 5.0, 0))
+    for i in range(8):
+        cad.append((f"C{i + 1}", "C", 6.0 + 2.8 * i, 8.5, 90 if i % 2 else 0))
+    for i in range(4):
+        cad.append((f"D{i + 1}", "D", 6.0 + 4.0 * i, 12.5, 0 if i &lt; 2 else 180))
+    cad += [("U1", "IC", 9.0, 18.0, 0), ("U2", "IC", 20.0, 18.0, 90)]
+    return cad
+
+
+CAD = tao_cad()
+LO_TU = {"A": (0.25, 0.40, 0.55), "B": (0.33, 0.33, 0.32)}     # màu thân tụ (B, G, R) của hai nhà cung cấp
+
+
+def ve_hop(anh, tam_px, w, h, goc, mau):
+    hop = cv2.boxPoints(((float(tam_px[0]), float(tam_px[1])), (w, h), goc))
+    cv2.fillPoly(anh, [np.round(hop).astype(np.int32)], mau, lineType=cv2.LINE_AA)
+
+
+def ve_linh_kien(anh, loai, tam, goc, lo_tu, nguoc=False):
+    """Vẽ một linh kiện tại tam (pixel), góc (độ). nguoc=True: xoay 180° (sai cực tính)."""
+    if nguoc:
+        goc += 180
+    w, h = (np.array(KICH_THUOC[loai]) * PX_MM).tolist()
+    r = np.radians(goc)
+    truc = np.array([np.cos(r), np.sin(r)])                       # trục dọc linh kiện
+    if loai in ("R", "C"):
+        ve_hop(anh, tam, w, h, goc, (0.70, 0.70, 0.70))           # hai đầu điện cực thiếc
+        ve_hop(anh, tam, w * 0.6, h, goc, (0.03, 0.03, 0.03) if loai == "R" else LO_TU[lo_tu])
+    elif loai == "D":
+        ve_hop(anh, tam, w, h, goc, (0.04, 0.04, 0.04))
+        ve_hop(anh, tam + truc * w * 0.35, w * 0.12, h, goc, (0.80, 0.80, 0.80))   # vạch cathode ở đầu +trục
+    else:
+        for k in range(4):                                        # 2 × 4 chân cánh chim
+            for s in (-1, 1):
+                ben = np.array([-truc[1], truc[0]]) * s
+                p = tam + truc * (k - 1.5) * 1.27 * PX_MM + ben * (h / 2 + 8)
+                ve_hop(anh, p, 0.5 * PX_MM, 16, goc + 90, (0.70, 0.70, 0.70))
+        ve_hop(anh, tam, w, h, goc, (0.05, 0.05, 0.05))
+        cham = tam - truc * w * 0.33 + np.array([-truc[1], truc[0]]) * h * 0.28        # chấm chân 1
+        cv2.circle(anh, tuple(np.round(cham).astype(int)), 6, (0.30, 0.30, 0.30), -1, cv2.LINE_AA)
+
+
+def tao_bo(rng, ty_le_loi=0.4):
+    """Trả về (dict lỗi theo tên linh kiện, lô tụ). Mỗi bo có xác suất ty_le_loi chứa đúng một lỗi."""
+    loi = {}
+    if rng.random() &lt; ty_le_loi:
+        ten, loai, *_ = CAD[rng.integers(0, len(CAD))]
+        kieu = ["thiếu", "lệch", "sai linh kiện"] + (["ngược cực"] if loai in ("D", "IC") else [])
+        loi[ten] = kieu[rng.integers(0, len(kieu))]
+    return loi, "AB"[rng.integers(0, 2)]
+
+
+def chup_bo(loi, lo_tu, rng, danh_dinh=False):
+    """Ảnh BGR tuyến tính của bo: lệch, xoay trên băng tải; linh kiện đặt lệch nhỏ ngẫu nhiên; đèn thay đổi."""
+    lech = np.zeros(2) if danh_dinh else rng.uniform(-25, 25, 2)
+    goc_bo = 0.0 if danh_dinh else rng.uniform(-2, 2)
+    M = cv2.getRotationMatrix2D((W / 2, H / 2), goc_bo, 1.0)
+    M[:, 2] += lech
+    mm_sang_px = lambda p: M[:, :2] @ (np.asarray(p) * PX_MM) + M[:, 2]
+    anh = np.zeros((H, W, 3), np.float32)
+    anh[:] = (0.05, 0.20, 0.06)                                   # phủ xanh lá của bo
+    for f in FIDUCIAL:
+        c = tuple(np.round(mm_sang_px(f)).astype(int))
+        cv2.circle(anh, c, 24, (0.02, 0.08, 0.03), -1, cv2.LINE_AA)  # vùng hở phủ quanh fiducial
+        cv2.circle(anh, c, 15, (0.75, 0.75, 0.75), -1, cv2.LINE_AA)
+    for ten, loai, x, y, goc in CAD:
+        kieu = loi.get(ten)
+        if kieu == "thiếu":
+            continue
+        tam_mm = np.array([x, y]) + (0 if danh_dinh else rng.normal(0, 0.04, 2))
+        if kieu == "lệch":
+            huong = rng.uniform(0, 2 * np.pi)
+            tam_mm = tam_mm + rng.uniform(0.35, 0.5) * np.array([np.cos(huong), np.sin(huong)])
+        loai_ve = {"R": "C", "C": "R"}.get(loai, loai) if kieu == "sai linh kiện" and loai in ("R", "C") else loai
+        if kieu == "sai linh kiện" and loai in ("D", "IC"):
+            loai_ve = "R" if loai == "D" else "D"                 # gắn nhầm hẳn loại khác
+        g = goc + goc_bo + (0 if danh_dinh else rng.normal(0, 1.0))
+        ve_linh_kien(anh, loai_ve, mm_sang_px(tam_mm), g, lo_tu, nguoc=(kieu == "ngược cực"))
+    anh *= 1.0 if danh_dinh else rng.uniform(0.8, 1.2)
+    return np.clip(anh + rng.normal(0, 0.01, anh.shape), 0, 1).astype(np.float32)
+
+
+rng = np.random.default_rng(0)
+anh_mau = chup_bo({}, "A", rng, danh_dinh=True)
+cv2.imwrite("bo_mau.png", np.uint8(255 * anh_mau ** (1 / 2.2)))
+loi, lo = tao_bo(np.random.default_rng(3))
+print(len(CAD), "linh kiện; ví dụ lỗi:", loi, "lô tụ", lo)</code></pre>
+<pre><code class="language-text">24 linh kiện; ví dụ lỗi: {'R5': 'thiếu'} lô tụ A</code></pre>
+<p>Ảnh bo mẫu được lưu ra <code>bo_mau.png</code>. Quy ước hướng: trục dọc của diode chỉ về phía vạch cathode; chấm chân 1 của IC nằm ở góc dưới trái khi IC ở hướng chuẩn (góc 0). Ở nhà máy, quy ước này phải khớp với thư viện footprint của phần mềm thiết kế bo; sai quy ước là nguồn "ngược cực" giả phổ biến nhất khi đưa một mã bo mới lên AOI.</p>
+
+<h2>5. Lời giải 1: so với ảnh bo mẫu</h2>
+<p>Cách trực quan nhất: chụp vài bo tốt làm ảnh mẫu, so từng ảnh mới với ảnh mẫu, chỗ nào khác nhiều là lỗi.</p>
+<pre><code class="language-python"># Lời giải 1: so với ảnh bo mẫu (golden board), không căn chỉnh
+rng_day = np.random.default_rng(1)
+anh_vang = np.mean([chup_bo({}, "A", rng_day, danh_dinh=True) for _ in range(5)], axis=0)
+
+
+def so_anh_vang(anh, mau=anh_vang, nguong=0.12, dien_tich=40):
+    khac = (np.abs(anh - mau).max(axis=2) &gt; nguong).astype(np.uint8)
+    khac = cv2.morphologyEx(khac, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+    n, _, st, _ = cv2.connectedComponentsWithStats(khac)
+    return "NG" if (st[1:, cv2.CC_STAT_AREA] &gt;= dien_tich).any() else "OK"</code></pre>
+
+<h2>6. Lời giải 2: căn bo bằng fiducial</h2>
+<p>Fiducial là các điểm thiếc tròn được thiết kế riêng để máy gắp và máy AOI căn bo. Tìm 3 fiducial (blob sáng, tròn, diện tích gần π·15² pixel, nằm trong cửa sổ quanh vị trí danh định), ước lượng phép biến đổi đồng dạng (dịch, xoay, tỉ lệ) từ tọa độ CAD sang ảnh, rồi đưa cả ảnh về hệ tọa độ CAD. Sai số lớn nhất tại 3 điểm (<code>du</code>) là thước đo chất lượng phép căn.</p>
+<pre><code class="language-python">def tim_fiducial(anh):
+    """Tìm 3 fiducial: blob sáng, tròn, diện tích gần π·15², trong cửa sổ quanh vị trí danh định."""
+    sang = (anh.mean(axis=2) &gt; 0.5 * np.percentile(anh.mean(axis=2), 99.5)).astype(np.uint8)
+    n, _, st, tam = cv2.connectedComponentsWithStats(sang)
+    tim = []
+    for f in FIDUCIAL * PX_MM:
+        ung_vien = [k for k in range(1, n) if 500 &lt; st[k, cv2.CC_STAT_AREA] &lt; 900
+                    and abs(st[k, cv2.CC_STAT_WIDTH] - st[k, cv2.CC_STAT_HEIGHT]) &lt;= 3
+                    and np.linalg.norm(tam[k] - f) &lt; 80]
+        if len(ung_vien) != 1:
+            return None
+        tim.append(tam[ung_vien[0]])
+    return np.array(tim)
+
+
+def can_bo(anh):
+    """Ước lượng phép biến đổi CAD (pixel danh định) → ảnh từ 3 fiducial, rồi đưa ảnh về hệ tọa độ CAD."""
+    f = tim_fiducial(anh)
+    if f is None:
+        return None, None
+    A, _ = cv2.estimateAffinePartial2D(FIDUCIAL * PX_MM, f)      # dịch + xoay + tỉ lệ đều
+    du = np.linalg.norm((FIDUCIAL * PX_MM) @ A[:, :2].T + A[:, 2] - f, axis=1).max()
+    return cv2.warpAffine(anh, A, (W, H), flags=cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP), du
+
+
+def so_anh_vang_co_can(anh):
+    da_can, _ = can_bo(anh)
+    return "NG" if da_can is None else so_anh_vang(da_can)</code></pre>
+
+<h2>7. Lời giải 3: kiểm từng linh kiện theo CAD</h2>
+<p>Sau khi căn, vị trí và góc của mọi linh kiện đã biết từ CAD. Với mỗi linh kiện: cắt đúng footprint (cộng biên cho dung sai lệch), xoay về hướng chuẩn, tách phần "không phải phủ xanh", rồi kiểm theo thứ tự:</p>
+<ol>
+  <li><strong>Có mặt</strong>: diện tích blob lớn nhất ≥ 15% diện tích thân danh định.</li>
+  <li><strong>Đúng loại</strong>: kích thước (<code>minAreaRect</code>) lệch không quá 30% so với thân danh định; với R và C cùng kích thước 0603, phân biệt bằng độ sáng thân so với phủ xanh (thân tụ sáng, thân điện trở đen).</li>
+  <li><strong>Đúng vị trí</strong>: tâm blob lệch khỏi tâm CAD không quá 0,25 mm.</li>
+  <li><strong>Đúng cực</strong>: diode so độ sáng hai đầu (vạch cathode sáng); IC so độ sáng ô ở vị trí chấm chân 1 với ô đối xứng qua tâm.</li>
+</ol>
+<pre><code class="language-python">def cat_linh_kien(da_can, x, y, goc, loai, le=1.4):
+    """Cắt footprint linh kiện (cộng biên cho dung sai lệch) trên ảnh đã căn, xoay về hướng chuẩn.
+    Không cắt rộng hơn: vùng cắt lấn sang linh kiện bên cạnh thì linh kiện thiếu sẽ bị "thấy" là có."""
+    w, h = (np.array(KICH_THUOC[loai]) * PX_MM * le + 12).astype(int)
+    c = (x * PX_MM, y * PX_MM)
+    M = cv2.getRotationMatrix2D(c, goc, 1.0)
+    M[:, 2] += (w / 2 - c[0], h / 2 - c[1])
+    return cv2.warpAffine(da_can, M, (w, h), flags=cv2.INTER_LINEAR, borderValue=(0.05, 0.20, 0.06))
+
+
+def khong_phai_nen(vung):
+    """Pixel không thuộc phủ xanh lá: tỉ lệ G/(B+G+R) thấp, hoặc rất tối/rất sáng."""
+    tong = vung.sum(axis=2) + 1e-6
+    return (vung[..., 1] / tong &lt; 0.5).astype(np.uint8)
+
+
+DUNG_SAI_LECH_MM = 0.25
+
+
+def dung_loai_than(loai, do_sang):
+    """Thân tụ sáng, thân điện trở đen (độ sáng so với phủ xanh). Một luật cứng, sẽ được thay ở bài tập 1."""
+    return (do_sang &gt; 0.8) == (loai == "C")
+
+
+def kiem_linh_kien(da_can, ten, loai, x, y, goc, nen):
+    """nen: mức sáng kênh G của phủ xanh trên bo này (đèn mạnh yếu khác nhau giữa các lần chụp)."""
+    vung = cat_linh_kien(da_can, x, y, goc, loai)
+    hh, ww = vung.shape[:2]
+    mat_na = khong_phai_nen(vung)
+    if loai == "IC":                                              # IC: chỉ đo thân tối, bỏ chân sáng (lúc dính lúc tách thân)
+        mat_na &amp;= (vung.mean(axis=2) &lt; 0.45 * nen / 0.20).astype(np.uint8)
+    mat_na = cv2.morphologyEx(mat_na, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+    n, nhan, st, tam = cv2.connectedComponentsWithStats(mat_na)
+    if n &lt; 2:
+        return "thiếu", 0.0
+    k = 1 + np.argmax(st[1:, cv2.CC_STAT_AREA])
+    (_, _), (a, b), _ = cv2.minAreaRect(np.column_stack(np.nonzero(nhan == k))[:, ::-1].astype(np.float32))
+    dai_mm, rong_mm = max(a, b) / PX_MM, min(a, b) / PX_MM
+    dai_cad, rong_cad = KICH_THUOC[loai]
+    if st[k, cv2.CC_STAT_AREA] &lt; 0.15 * dai_cad * rong_cad * PX_MM ** 2:
+        return "thiếu", 0.0
+    lech_mm = np.linalg.norm(tam[k] - (ww / 2, hh / 2)) / PX_MM
+    if abs(dai_mm - dai_cad) &gt; 0.3 * dai_cad or abs(rong_mm - rong_cad) &gt; 0.3 * rong_cad:
+        return "sai linh kiện", lech_mm
+    x0, y0 = st[k, cv2.CC_STAT_LEFT], st[k, cv2.CC_STAT_TOP]
+    than = vung[y0:y0 + st[k, cv2.CC_STAT_HEIGHT], x0:x0 + st[k, cv2.CC_STAT_WIDTH]].mean(axis=2)
+    giua = than[:, int(0.3 * than.shape[1]):int(0.7 * than.shape[1])].mean() / nen
+    if loai in ("R", "C") and not dung_loai_than(loai, giua):
+        return "sai linh kiện", lech_mm
+    if lech_mm &gt; DUNG_SAI_LECH_MM:
+        return "lệch", lech_mm
+    if loai == "D":
+        q = than.shape[1] // 4
+        if than[:, :q].mean() &gt; than[:, -q:].mean():              # vạch cathode phải ở đầu bên phải (hướng chuẩn)
+            return "ngược cực", lech_mm
+    if loai == "IC":
+        hh_t, ww_t = than.shape
+        o = lambda r, c: than[int(r * hh_t) - 4:int(r * hh_t) + 5, int(c * ww_t) - 4:int(c * ww_t) + 5].mean()
+        if o(0.22, 0.83) &gt; o(0.78, 0.17):                         # chấm chân 1 phải ở góc dưới trái
+            return "ngược cực", lech_mm
+    return "OK", lech_mm
+
+
+def kiem_bo(anh):
+    da_can, du = can_bo(anh)
+    if da_can is None or du &gt; 2.0:
+        return "LỖI ĐO", {}
+    nen = np.median(da_can[..., 1])                               # phần lớn bo là phủ xanh
+    kq = {ten: kiem_linh_kien(da_can, ten, loai, x, y, goc, nen)[0] for ten, loai, x, y, goc in CAD}
+    return ("OK" if all(v == "OK" for v in kq.values()) else "NG"), kq
+
+
+_, kq_vang = kiem_bo(anh_mau)
+print("bo mẫu:", {k: v for k, v in kq_vang.items() if v != "OK"} or "mọi linh kiện OK")</code></pre>
+<pre><code class="language-text">bo mẫu: mọi linh kiện OK</code></pre>
+<p>Ba chi tiết nhỏ nhưng quyết định, mỗi cái là một lỗi mình đã gặp khi viết dự án này:</p>
+<ul>
+  <li><strong>Vùng cắt phải đúng footprint.</strong> Bản đầu tiên cắt rộng gấp 1,8 lần thân để "chắc ăn", và điện trở thiếu bị báo là "sai linh kiện" vì vùng cắt lấn sang điện trở bên cạnh (cách 2,6 mm).</li>
+  <li><strong>IC chỉ đo phần thân tối.</strong> Chân IC sáng, cách thân vài pixel, lúc dính lúc tách khỏi blob tùy nhiễu; hộp bao dao động 81 đến 101 pixel, kéo theo tâm IC và vị trí ô lấy mẫu chấm chân 1, sinh ra "lệch" và "ngược cực" giả.</li>
+  <li><strong>Đo kích thước bằng <code>minAreaRect</code></strong>, không bằng hộp bao thẳng: linh kiện xoay 1 đến 2 độ là hộp bao phình ra đủ để vượt dung sai 30% với linh kiện nhỏ.</li>
+</ul>
+<p>Ngoài ra, độ sáng thân được chia cho mức sáng phủ xanh của chính bo đó (trung vị kênh G), nên đèn mạnh yếu không làm sai phép phân biệt R và C.</p>
+
+<h2>8. So sánh trên 200 bo</h2>
+<pre><code class="language-python">from collections import Counter
+
+
+def danh_gia(so_bo=200, seed=9):
+    rng_dg = np.random.default_rng(seed)
+    ket = {k: Counter() for k in ("1. so ảnh mẫu, không căn", "2. so ảnh mẫu, căn fiducial", "3. kiểm từng linh kiện theo CAD")}
+    bat_theo_loai, dung_ten = Counter(), 0
+    for _ in range(so_bo):
+        loi, lo = tao_bo(rng_dg)
+        anh = chup_bo(loi, lo, rng_dg)
+        that = "NG" if loi else "OK"
+        tt3, chi_tiet = kiem_bo(anh)
+        for ten, tt in zip(ket, (so_anh_vang(anh), so_anh_vang_co_can(anh), tt3)):
+            ket[ten]["lọt" if that == "NG" and tt == "OK" else "loại nhầm" if that == "OK" and tt != "OK" else "đúng"] += 1
+        for ten_lk, kieu in loi.items():
+            bat_theo_loai[(kieu, chi_tiet.get(ten_lk) == kieu)] += 1
+    print(f"{'lời giải':32s} | lọt | loại nhầm | đúng")
+    for ten, c in ket.items():
+        print(f"{ten:32s} | {c['lọt']:3d} | {c['loại nhầm']:9d} | {c['đúng']}")
+    print("lời giải 3, gọi đúng tên lỗi:", {k: f"{bat_theo_loai[(k, True)]}/{bat_theo_loai[(k, True)] + bat_theo_loai[(k, False)]}"
+                                       for k in ("thiếu", "lệch", "sai linh kiện", "ngược cực")})
+
+
+danh_gia()</code></pre>
+<pre><code class="language-text">lời giải                         | lọt | loại nhầm | đúng
+1. so ảnh mẫu, không căn         |   0 |       127 | 73
+2. so ảnh mẫu, căn fiducial      |   0 |       127 | 73
+3. kiểm từng linh kiện theo CAD  |   0 |         0 | 200
+lời giải 3, gọi đúng tên lỗi: {'thiếu': '25/25', 'lệch': '14/14', 'sai linh kiện': '30/30', 'ngược cực': '4/4'}</code></pre>
+<p>Kiểm theo CAD: 0 lọt, 0 loại nhầm, và gọi đúng tên mọi lỗi. So ảnh mẫu loại nhầm toàn bộ bo tốt, kể cả khi đã căn bo. Có thể nghĩ là do ngưỡng chưa hợp lý; đoạn dưới cho phương pháp này mọi lợi thế (căn fiducial, chuẩn hóa độ sáng theo phủ xanh) và quét ngưỡng:</p>
+<pre><code class="language-python"># Cho cách so ảnh mẫu thêm một cơ hội: căn fiducial, chuẩn hóa độ sáng, quét ngưỡng
+vang_chuan = anh_vang / np.median(anh_vang[..., 1])
+
+
+def so_anh_vang_tot_nhat(anh, nguong):
+    da_can, _ = can_bo(anh)
+    return so_anh_vang(da_can / np.median(da_can[..., 1]), vang_chuan, nguong=nguong)
+
+
+rng_q = np.random.default_rng(10)
+mau_thu = []
+for _ in range(120):
+    loi, lo = tao_bo(rng_q)
+    mau_thu.append((loi, lo, chup_bo(loi, lo, rng_q)))
+print("ngưỡng | loại nhầm lô A | loại nhầm lô B | lọt (thiếu / lệch / sai linh kiện / ngược cực)")
+for nguong in (0.6, 1.2, 2.0, 3.0):
+    ln, lot = Counter(), Counter()
+    for loi, lo, anh in mau_thu:
+        tt = so_anh_vang_tot_nhat(anh, nguong)
+        if not loi and tt != "OK":
+            ln[lo] += 1
+        for kieu in loi.values():
+            lot[kieu] += tt == "OK"
+    so_ok = Counter(lo for loi, lo, _ in mau_thu if not loi)
+    print(f"{nguong:6.1f} | {ln['A']:5d}/{so_ok['A']:&lt;8d} | {ln['B']:5d}/{so_ok['B']:&lt;8d} | "
+          f"{lot['thiếu']} / {lot['lệch']} / {lot['sai linh kiện']} / {lot['ngược cực']}")</code></pre>
+<pre><code class="language-text">ngưỡng | loại nhầm lô A | loại nhầm lô B | lọt (thiếu / lệch / sai linh kiện / ngược cực)
+   0.6 |    51/51       |    28/28       | 0 / 0 / 0 / 0
+   1.2 |    42/51       |    22/28       | 0 / 0 / 0 / 0
+   2.0 |    32/51       |    20/28       | 0 / 0 / 1 / 0
+   3.0 |    27/51       |    13/28       | 0 / 0 / 3 / 0</code></pre>
+<p>Không có ngưỡng nào dùng được: ở ngưỡng cao nhất vẫn loại nhầm khoảng một nửa số bo tốt, và đã bắt đầu để lọt lỗi "sai linh kiện". Nguyên nhân là mỗi linh kiện được gắn lệch thật vài phần mười pixel và xoay vài phần mười độ, nên ở mọi cạnh có tương phản cao (điện cực thiếc sáng trên nền xanh), ảnh mới khác ảnh mẫu rất nhiều dù linh kiện hoàn toàn đạt. Lô tụ B khác màu làm tình hình tệ hơn. So ảnh mẫu chỉ hợp với vật được định vị cực kỳ chính xác và có bề mặt đồng đều; với PCBA, máy AOI thương mại đều kiểm theo từng linh kiện, dựa trên dữ liệu CAD và thư viện linh kiện.</p>
+
+<h2>9. Tích hợp: báo cáo cho trạm sửa chữa</h2>
+<p>Bo NG đi tới bàn sửa chữa; thợ cần biết sửa linh kiện nào, ở đâu. Bản ghi JSON dưới đây chỉ liệt kê linh kiện lỗi, kèm tọa độ CAD và độ lệch đo được.</p>
+<pre><code class="language-python">import json
+
+
+def bao_cao_bo(anh, so_seri):
+    """Bản ghi cho trạm sửa chữa: chỉ liệt kê linh kiện lỗi, kèm độ lệch (mm) để thợ biết sửa gì."""
+    da_can, du = can_bo(anh)
+    if da_can is None or du &gt; 2.0:
+        return {"seri": so_seri, "ket_qua": "LỖI ĐO", "ly_do": "không tìm đủ 3 fiducial hoặc sai số căn lớn"}
+    nen = np.median(da_can[..., 1])
+    loi = {}
+    for ten, loai, x, y, goc in CAD:
+        tt, lech = kiem_linh_kien(da_can, ten, loai, x, y, goc, nen)
+        if tt != "OK":
+            loi[ten] = {"loi": tt, "lech_mm": round(float(lech), 2), "x_mm": x, "y_mm": y}
+    return {"seri": so_seri, "ket_qua": "NG" if loi else "OK", "sai_so_can_px": round(float(du), 2), "linh_kien_loi": loi}
+
+
+rng_bc = np.random.default_rng(4)
+for i in range(6):
+    loi, lo = tao_bo(rng_bc, ty_le_loi=1.0)
+    print(f"(mô phỏng: {loi})", json.dumps(bao_cao_bo(chup_bo(loi, lo, rng_bc), f"PCB{i:04d}"), ensure_ascii=False))</code></pre>
+<pre><code class="language-text">(mô phỏng: {'D4': 'sai linh kiện'}) {"seri": "PCB0000", "ket_qua": "NG", "sai_so_can_px": 0.22, "linh_kien_loi": {"D4": {"loi": "sai linh kiện", "lech_mm": 0.09, "x_mm": 18.0, "y_mm": 12.5}}}
+(mô phỏng: {'U2': 'sai linh kiện'}) {"seri": "PCB0001", "ket_qua": "NG", "sai_so_can_px": 0.03, "linh_kien_loi": {"U2": {"loi": "sai linh kiện", "lech_mm": 0.36, "x_mm": 20.0, "y_mm": 18.0}}}
+(mô phỏng: {'R4': 'lệch'}) {"seri": "PCB0002", "ket_qua": "NG", "sai_so_can_px": 0.0, "linh_kien_loi": {"R4": {"loi": "lệch", "lech_mm": 0.48, "x_mm": 12.8, "y_mm": 5.0}}}
+(mô phỏng: {'D3': 'sai linh kiện'}) {"seri": "PCB0003", "ket_qua": "NG", "sai_so_can_px": 0.25, "linh_kien_loi": {"D3": {"loi": "sai linh kiện", "lech_mm": 0.05, "x_mm": 14.0, "y_mm": 12.5}}}
+(mô phỏng: {'C3': 'thiếu'}) {"seri": "PCB0004", "ket_qua": "NG", "sai_so_can_px": 0.48, "linh_kien_loi": {"C3": {"loi": "thiếu", "lech_mm": 0.0, "x_mm": 11.6, "y_mm": 8.5}}}
+(mô phỏng: {'C3': 'lệch'}) {"seri": "PCB0005", "ket_qua": "NG", "sai_so_can_px": 0.16, "linh_kien_loi": {"C3": {"loi": "lệch", "lech_mm": 0.47, "x_mm": 11.6, "y_mm": 8.5}}}</code></pre>
+<p>Để ý <code>sai_so_can_px</code>: nếu con số này tăng dần theo thời gian (fiducial mòn, bo cong vênh, camera lỏng), cần xử lý trước khi nó làm sai các phép đo lệch. Trường <code>x_mm</code>, <code>y_mm</code> cho phép phần mềm trạm sửa chữa vẽ khung đỏ đúng chỗ trên ảnh bo, hoặc gửi lại cho máy gắp để thống kê vị trí hay lỗi.</p>
+
+<h2>10. Bẫy thực tế</h2>
+<table>
+  <tr><th>Bẫy</th><th>Hậu quả</th><th>Cách tránh</th></tr>
+  <tr><td>Quy ước góc và chân 1 trong CAD khác thư viện của trạm</td><td>Mọi IC xoay 90° bị báo ngược cực</td><td>Kiểm tra mã bo mới trên vài bo mẫu, đối chiếu từng loại footprint trước khi chạy hàng</td></tr>
+  <tr><td>Tọa độ CAD tính từ gốc khác (góc bo, tâm bo, mặt dưới bị lật)</td><td>Toàn bộ vùng kiểm lệch một khoảng</td><td>Căn bằng fiducial lấy từ cùng file CAD, không căn bằng mép bo</td></tr>
+  <tr><td>Linh kiện thay thế từ nhà cung cấp khác</td><td>Loại nhầm cả lô (bài tập 1)</td><td>Thư viện ngoại hình nhiều dạng cho mỗi mã linh kiện, dạy khi duyệt lô mới</td></tr>
+  <tr><td>Bo cong vênh sau reflow</td><td>Ảnh lệch không đều, linh kiện xa fiducial bị báo lệch</td><td>Fiducial cục bộ gần linh kiện bước nhỏ, hoặc căn từng vùng</td></tr>
+  <tr><td>Thiếc chói, mối hàn bóng</td><td>Mặt nạ "không phải phủ" bị nhiễu</td><td>Đèn nhiều góc (vòng nhiều màu), xem bài <a href="../kien-thuc/7-kieu-chieu-sang-machine-vision.html">7 kiểu chiếu sáng</a></td></tr>
+  <tr><td>Kiểm tra 2D không thấy linh kiện dựng đứng một đầu (tombstone), thiếu thiếc</td><td>Lọt lỗi hàn</td><td>AOI 3D hoặc kiểm thiếc (SPI) trước khi gắp đặt; xem chặng <a href="../lo-trinh/vision-engineer/3d-vision.html">3D Vision</a></td></tr>
+</table>
+
+<h2>11. Tự đánh giá</h2>
+<ul>
+  <li>Trên bộ thử: 0 lọt, loại nhầm ≤ 1% số bo tốt; mỗi loại lỗi được gọi đúng tên.</li>
+  <li>Không đủ fiducial thì "LỖI ĐO", không phán.</li>
+  <li>Đổi lô tụ đã duyệt không làm tăng loại nhầm (bài tập 1); che một fiducial vẫn đo được nhưng có kiểm tra tỉ lệ (bài tập 2).</li>
+  <li>Mã nguồn tách rõ: căn bo, kiểm linh kiện, báo cáo; thêm loại linh kiện mới chỉ cần thêm kích thước và phép kiểm cực tính.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Lô tụ từ nhà cung cấp thứ ba</h3>
+<p>Phòng mua hàng duyệt thêm tụ lô C, thân xám đậm. Đo xem trạm xử lý thế nào, rồi thay luật cứng "thân tụ sáng hơn 0,8 lần phủ xanh" bằng khoảng độ sáng học từ bo mẫu của mọi lô đã duyệt.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">LO_TU["C"] = (0.10, 0.10, 0.11)                                  # lô tụ mới từ nhà cung cấp thứ ba: thân xám đậm
+rng_e1 = np.random.default_rng(13)
+nham = Counter(kiem_bo(chup_bo({}, "C", rng_e1))[0] for _ in range(30))
+print("30 bo tốt dùng tụ lô C:", dict(nham))</code></pre>
+<pre><code class="language-text">30 bo tốt dùng tụ lô C: {'NG': 30}</code></pre>
+<pre><code class="language-python"># Thư viện ngoại hình: mỗi loại linh kiện có nhiều dạng được duyệt (AVL), học từ bo mẫu của từng lô
+def do_sang_than(da_can, loai, x, y, goc, nen):
+    vung = cat_linh_kien(da_can, x, y, goc, loai)
+    mat_na = cv2.morphologyEx(khong_phai_nen(vung), cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+    n, nhan, st, _ = cv2.connectedComponentsWithStats(mat_na)
+    k = 1 + np.argmax(st[1:, cv2.CC_STAT_AREA])
+    x0, y0, w0, h0 = st[k, :4]
+    than = vung[y0:y0 + h0, x0:x0 + w0].mean(axis=2)
+    return than[:, int(0.3 * w0):int(0.7 * w0)].mean() / nen
+
+
+THU_VIEN = {"R": [], "C": []}
+rng_tv = np.random.default_rng(14)
+for lo in "ABC":                                                 # dạy: 3 bo mẫu cho mỗi lô tụ đã được duyệt
+    for _ in range(3):
+        da_can, _ = can_bo(chup_bo({}, lo, rng_tv))
+        nen = np.median(da_can[..., 1])
+        for ten, loai, x, y, goc in CAD:
+            if loai in THU_VIEN:
+                THU_VIEN[loai].append(do_sang_than(da_can, loai, x, y, goc, nen))
+KHOANG = {}
+for loai, gt in THU_VIEN.items():
+    gt = np.array(gt)
+    KHOANG[loai] = (gt.min() * 0.8, gt.max() * 1.25)             # khoảng được duyệt, nới 20–25%
+print({k: tuple(round(float(v), 2) for v in kh) for k, kh in KHOANG.items()})
+
+
+def dung_loai_than(loai, do_sang):                               # thay luật cứng bằng khoảng đã học
+    lo, hi = KHOANG[loai]
+    return lo &lt;= do_sang &lt;= hi
+
+
+rng_kt = np.random.default_rng(16)
+tot = Counter(kiem_bo(chup_bo({}, "C", rng_kt))[0] for _ in range(30))
+nham = Counter()
+for _ in range(30):
+    ten = ["R3", "C5", "R8", "C2"][rng_kt.integers(0, 4)]
+    nham[kiem_bo(chup_bo({ten: "sai linh kiện"}, "C", rng_kt))[1][ten]] += 1
+print("bo tốt lô C:", dict(tot), "| gắn nhầm R↔C với lô C:", dict(nham))</code></pre>
+<pre><code class="language-text">{'R': (0.12, 0.37), 'C': (0.41, 2.53)}
+bo tốt lô C: {'OK': 30} | gắn nhầm R↔C với lô C: {'sai linh kiện': 30}</code></pre>
+<p>Luật cứng loại nhầm toàn bộ 30 bo tốt dùng lô C. Thư viện ngoại hình học từ 3 bo mẫu mỗi lô sửa được: bo tốt lô C đều OK, và vẫn bắt đủ các ca gắn nhầm điện trở vào chỗ tụ hay ngược lại. Nhưng hãy nhìn khoảng đã học: khoảng của R lên tới 0,37 và của C bắt đầu từ 0,41, khe hở chỉ 0,04. Một lô tụ đậm hơn chút nữa sẽ chồng lên khoảng của điện trở, và lúc đó độ sáng không còn đủ để phân biệt. Khi khe hở nhỏ như vậy, cần thêm đặc trưng thứ hai: điện trở 0603 thường có chữ in trên thân, tụ thì không; hoặc dùng màu (sắc độ) thay vì chỉ độ sáng. Ở nhà máy, mỗi lần duyệt lô linh kiện mới phải có bước "dạy ngoại hình" trên trạm AOI, giống như bước kiểm tra mẫu đầu (first article).</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Fiducial bị che</h3>
+<p>Một nhãn dán mã vạch che mất fiducial thứ hai. Trạm hiện tại báo "LỖI ĐO" cho mọi bo. Sửa để trạm vẫn đo được với 2 fiducial, nhưng có kiểm tra an toàn.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">def chup_bo_che_fiducial(loi, lo, rng):
+    anh = chup_bo(loi, lo, rng)
+    da_can, _ = can_bo(anh)
+    f = tim_fiducial(anh)
+    cv2.circle(anh, tuple(np.round(f[1]).astype(int)), 26, (0.05, 0.20, 0.06), -1)   # nhãn dán che fiducial thứ 2
+    return anh
+
+
+def can_bo_2_diem(anh, sai_so_ty_le=0.01):
+    """Chấp nhận 2 fiducial nếu thiếu 1; kiểm tra tỉ lệ khoảng cách (bo không co giãn, camera không đổi)."""
+    sang = (anh.mean(axis=2) &gt; 0.5 * np.percentile(anh.mean(axis=2), 99.5)).astype(np.uint8)
+    n, _, st, tam = cv2.connectedComponentsWithStats(sang)
+    cad, anh_pt = [], []
+    for f in FIDUCIAL * PX_MM:
+        uv = [k for k in range(1, n) if 500 &lt; st[k, cv2.CC_STAT_AREA] &lt; 900
+              and abs(st[k, cv2.CC_STAT_WIDTH] - st[k, cv2.CC_STAT_HEIGHT]) &lt;= 3 and np.linalg.norm(tam[k] - f) &lt; 80]
+        if len(uv) == 1:
+            cad.append(f)
+            anh_pt.append(tam[uv[0]])
+    if len(cad) &lt; 2:
+        return None, "thiếu fiducial"
+    A, _ = cv2.estimateAffinePartial2D(np.array(cad), np.array(anh_pt))
+    ty_le = np.sqrt(abs(np.linalg.det(A[:, :2])))
+    if abs(ty_le - 1) &gt; sai_so_ty_le:
+        return None, f"tỉ lệ {ty_le:.3f}"
+    return cv2.warpAffine(anh, A, (W, H), flags=cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP), f"{len(cad)} fiducial"
+
+
+rng_e2 = np.random.default_rng(15)
+dem = Counter()
+for _ in range(40):
+    loi, lo = tao_bo(rng_e2)
+    anh = chup_bo_che_fiducial(loi, lo, rng_e2)
+    da_can, ghi_chu = can_bo_2_diem(anh)
+    if da_can is None:
+        dem["LỖI ĐO"] += 1
+        continue
+    nen = np.median(da_can[..., 1])
+    kq = {ten: kiem_linh_kien(da_can, ten, loai, x, y, goc, nen)[0] for ten, loai, x, y, goc in CAD}
+    doan = "OK" if all(v == "OK" for v in kq.values()) else "NG"
+    dem[("đúng" if doan == ("NG" if loi else "OK") else "sai") + f" ({ghi_chu})"] += 1
+print("bản cũ (bắt buộc 3 fiducial):", Counter(kiem_bo(chup_bo_che_fiducial({}, "A", rng_e2))[0] for _ in range(10)))
+print("bản 2 fiducial:", dict(dem))</code></pre>
+<pre><code class="language-text">bản cũ (bắt buộc 3 fiducial): Counter({'LỖI ĐO': 10})
+bản 2 fiducial: {'đúng (2 fiducial)': 40}</code></pre>
+<p>Phép biến đổi đồng dạng có 4 bậc tự do (dịch x, y, xoay, tỉ lệ), nên 2 điểm là đủ để tính. Cái mất đi là khả năng tự kiểm: với 3 điểm, sai số dư (<code>du</code>) cho biết có fiducial nào bị nhận sai; với 2 điểm thì nghiệm luôn khớp hoàn hảo. Vì vậy thêm một kiểm tra khác: tỉ lệ của phép biến đổi phải gần 1 (camera cố định, bo không co giãn), lệch quá 1% thì có điểm bị nhận sai. Trên 40 bo, bản 2 fiducial đo đúng tất cả. Ghi trường hợp "chỉ 2 fiducial" vào log để kỹ thuật biết mà dời nhãn dán, đừng để nó thành trạng thái bình thường.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.opencv.org/4.x/d9/d0c/group__calib3d.html" rel="noopener" target="_blank">OpenCV: estimateAffinePartial2D (Camera Calibration and 3D Reconstruction)</a>; <a href="https://docs.opencv.org/4.x/da/d6e/tutorial_py_geometric_transformations.html" rel="noopener" target="_blank">OpenCV: Geometric Transformations of Images</a>; <a href="https://docs.opencv.org/4.x/dd/d49/tutorial_py_contour_features.html" rel="noopener" target="_blank">OpenCV: Contour Features</a>; IPC-7351 (thiết kế footprint linh kiện dán bề mặt) và IPC-A-610 (tiêu chí chấp nhận lắp ráp điện tử); C. Steger, M. Ulrich, C. Wiedemann, <em>Machine Vision Algorithms and Applications</em>, 2nd ed., Wiley-VCH, 2018.</p>

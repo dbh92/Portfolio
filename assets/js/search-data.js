@@ -1,6 +1,70 @@
 /* Tự động sinh bởi tools/build.py – không sửa tay */
 window.HF_POSTS = [
  {
+  "t": "Dự án: kiểm tra thứ tự màu dây trong connector của bó dây điện",
+  "u": "projects/du-an-kiem-tra-thu-tu-mau-day-connector.html",
+  "e": "Trạm camera đọc màu 8 dây khi connector lệch, đèn đổi màu: đo đóng góp từng bước, bỏ vệt bóng, ΔE00 chặn màu lạ, mã lỗi cho PLC.",
+  "c": "projects",
+  "cn": "Projects",
+  "d": "23/10/2026",
+  "m": 28,
+  "img": "assets/images/posts/du-an-kiem-tra-thu-tu-mau-day-connector.webp",
+  "tags": [
+   "Industrial Project",
+   "Machine Vision",
+   "Industrial Vision",
+   "OpenCV"
+  ]
+ },
+ {
+  "t": "Dự án: kiểm tra lắp ráp PCBA (AOI) theo CAD và fiducial",
+  "u": "projects/du-an-kiem-tra-lap-rap-pcba-aoi.html",
+  "e": "Căn bo bằng fiducial, kiểm 24 linh kiện theo CAD: thiếu, lệch, ngược cực, sai linh kiện. So với cách so ảnh mẫu, xử lý lô linh kiện thay thế.",
+  "c": "projects",
+  "cn": "Projects",
+  "d": "23/10/2026",
+  "m": 28,
+  "img": "assets/images/posts/du-an-kiem-tra-lap-rap-pcba-aoi.webp",
+  "tags": [
+   "Industrial Project",
+   "Machine Vision",
+   "Industrial Vision",
+   "OpenCV"
+  ]
+ },
+ {
+  "t": "Dự án: kiểm tra chai 36 000 chai/giờ, loại đúng chai theo encoder",
+  "u": "projects/du-an-kiem-tra-chai-toc-do-cao-encoder.html",
+  "e": "Đo mức nước bền với bọt, kiểm nắp lệch, rồi phần khó nhất: thổi bỏ đúng chai khi băng tải đổi tốc độ, ngân sách thời gian và hành vi khi kết quả muộn.",
+  "c": "projects",
+  "cn": "Projects",
+  "d": "23/10/2026",
+  "m": 24,
+  "img": "assets/images/posts/du-an-kiem-tra-chai-toc-do-cao-encoder.webp",
+  "tags": [
+   "Industrial Project",
+   "Industrial Vision",
+   "PLC",
+   "Machine Vision"
+  ]
+ },
+ {
+  "t": "Dự án: kiểm tra vỉ thuốc (blister) và nhật ký chống sửa theo GMP",
+  "u": "projects/du-an-kiem-tra-vi-thuoc-blister-gmp.html",
+  "e": "Kiểm 10 hốc vỉ thuốc: thiếu viên, mẻ, viên lạ màu, đốm bẩn, bền với vệt chói PVC; nhật ký chuỗi băm, phân quyền đổi ngưỡng, HMAC chống sửa log.",
+  "c": "projects",
+  "cn": "Projects",
+  "d": "23/10/2026",
+  "m": 27,
+  "img": "assets/images/posts/du-an-kiem-tra-vi-thuoc-blister-gmp.webp",
+  "tags": [
+   "Industrial Project",
+   "Industrial Vision",
+   "Machine Vision",
+   "OpenCV"
+  ]
+ },
+ {
   "t": "Class và dataclass: tổ chức code cho trạm kiểm tra",
   "u": "hoc/python-7-class-dataclass-to-chuc-code.html",
   "e": "Gói dữ liệu và hàm thành class: __init__, property, dataclass có kiểm tra hợp lệ, Enum cho OK/NG/LOI, kế thừa vừa đủ để đổi camera giả sang thật.",
@@ -2847,7 +2911,8 @@ window.HF_POSTS = [
   "tags": [
    "PLC",
    "Python",
-   "Industrial Vision"
+   "Industrial Vision",
+   "Industrial Project"
   ]
  },
  {
@@ -3100,7 +3165,8 @@ window.HF_POSTS = [
   "tags": [
    "Đo lường",
    "Calibration",
-   "PLC"
+   "PLC",
+   "Industrial Project"
   ]
  },
  {
@@ -3115,7 +3181,8 @@ window.HF_POSTS = [
   "tags": [
    "OCR",
    "Industrial Vision",
-   "Python"
+   "Python",
+   "Industrial Project"
   ]
  },
  {
@@ -3125,12 +3192,13 @@ window.HF_POSTS = [
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "09/10/2026",
-  "m": 43,
+  "m": 44,
   "img": "assets/images/posts/capstone-3-kiem-tra-loi-be-mat-ai-plc.webp",
   "tags": [
    "AI Vision",
    "PLC",
-   "Industrial Vision"
+   "Industrial Vision",
+   "Industrial Project"
   ]
  },
  {
@@ -3927,7 +3995,8 @@ window.HF_POSTS = [
   "tags": [
    "Calibration",
    "Đo lường",
-   "Machine Vision"
+   "Machine Vision",
+   "Industrial Project"
   ]
  },
  {
@@ -4119,7 +4188,8 @@ window.HF_POSTS = [
   "tags": [
    "OCR",
    "Machine Vision",
-   "Python"
+   "Python",
+   "Industrial Project"
   ]
  },
  {
@@ -4266,7 +4336,8 @@ window.HF_POSTS = [
   "tags": [
    "PyTorch",
    "Deep Learning",
-   "AI Vision"
+   "AI Vision",
+   "Industrial Project"
   ]
  },
  {
@@ -4368,7 +4439,8 @@ window.HF_POSTS = [
   "tags": [
    "Machine Vision",
    "OpenCV",
-   "OCR"
+   "OCR",
+   "Industrial Project"
   ]
  },
  {
@@ -4904,7 +4976,7 @@ window.HF_TOPICS = [
   "u": "hoc/opencv.html",
   "s": "Học AI & Lập trình",
   "g": "Computer Vision",
-  "n": 34
+  "n": 37
  },
  {
   "t": "Image Processing",
@@ -4946,7 +5018,7 @@ window.HF_TOPICS = [
   "u": "hoc/machine-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 54
+  "n": 58
  },
  {
   "t": "AI Vision",
@@ -4960,7 +5032,7 @@ window.HF_TOPICS = [
   "u": "hoc/industrial-vision.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 34
+  "n": 38
  },
  {
   "t": "Camera & Lens",
@@ -4995,7 +5067,7 @@ window.HF_TOPICS = [
   "u": "hoc/plc-robot-mes.html",
   "s": "Học AI & Lập trình",
   "g": "Vision Engineering",
-  "n": 15
+  "n": 16
  },
  {
   "t": "Vision Deployment",
@@ -5023,7 +5095,7 @@ window.HF_TOPICS = [
   "u": "projects/industrial-vision-projects.html",
   "s": "Projects",
   "g": "",
-  "n": 3
+  "n": 15
  },
  {
   "t": "Programming",
@@ -5058,7 +5130,7 @@ window.HF_TOPICS = [
   "u": "kien-thuc/machine-vision.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 54
+  "n": 58
  },
  {
   "t": "AI Vision",
@@ -5072,7 +5144,7 @@ window.HF_TOPICS = [
   "u": "kien-thuc/industrial-automation.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 10
+  "n": 11
  },
  {
   "t": "Tools & Frameworks",

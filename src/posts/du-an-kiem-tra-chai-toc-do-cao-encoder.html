@@ -1,0 +1,361 @@
+<p class="note"><strong>Độ khó:</strong> ★★★★ (rất khó) · <strong>Cần học trước:</strong> <a href="../lo-trinh/vision-engineer/industrial-vision.html">chặng 5: Industrial Vision</a>, <a href="../lo-trinh/vision-engineer/plc-robot-mes.html">chặng 10: PLC / Robot / MES</a> · <strong>Thời lượng:</strong> khoảng 3 giờ</p>
+<p>Một dây chuyền chiết rót nước giải khát chạy 36 000 chai mỗi giờ, tức 10 chai mỗi giây. Trạm vision sau máy đóng nắp phải kiểm mức nước và nắp của từng chai, rồi <strong>thổi bỏ đúng chai lỗi</strong> bằng một vòi khí đặt cách camera hơn một mét. Phần xử lý ảnh của bài toán này không khó; cái khó nằm ở hai chỗ ít được dạy: bọt trên mặt nước làm sai phép đo mức, và việc "nhớ" chai nào lỗi trong lúc băng tải chạy nhanh, chạy chậm, dừng rồi chạy lại. Dự án này giải cả hai và đo bằng số hậu quả của từng cách làm sai.</p>
+<div class="tip"><strong>Mục tiêu dự án</strong>(1) Đo mức nước bền với bọt, mặt khum và chai lệch vị trí; kiểm thiếu nắp, nắp lệch. (2) So cách loại chai theo thời gian trễ với cách theo encoder trên băng tải có tốc độ thay đổi. (3) Tính ngân sách thời gian và chọn hành vi an toàn khi kết quả tới muộn. (4) Hiểu vì sao thanh ghi dịch theo số đếm chai hỏng khi có người nhấc chai ra.</div>
+
+<h2>1. Bài toán</h2>
+<blockquote>"Khách hàng siêu thị phản ánh chai thiếu nước, có chai nắp vặn chưa chặt bị rò. Trạm kiểm cũ chỉ đo mức nước, hay báo nhầm khi nước có ga sủi bọt nên ca đêm tắt đi. Ngoài ra vòi thổi thỉnh thoảng thổi nhầm chai tốt bên cạnh, nhất là lúc băng tải vừa dừng chờ máy dán nhãn rồi chạy lại."</blockquote>
+<table>
+  <tr><th>Đại lượng</th><th>Giá trị</th></tr>
+  <tr><td>Tốc độ</td><td>36 000 chai/giờ, băng tải danh định 1 m/s, khoảng cách chai 100 ± 15 mm</td></tr>
+  <tr><td>Ảnh</td><td>đèn nền (backlight), 5 pixel/mm, nhìn phần cổ và vai chai</td></tr>
+  <tr><td>Mức nước</td><td>danh định ± 2 mm; bọt dày tới 8 mm vẫn là chai đạt</td></tr>
+  <tr><td>Nắp</td><td>phải có; nghiêng ≤ 3°, đỉnh nắp lệch ≤ 1 mm so với danh định</td></tr>
+  <tr><td>Loại bỏ</td><td>vòi khí cách cảm biến kích camera 1 200 mm; encoder 0,5 mm/xung</td></tr>
+  <tr><td>Mục tiêu</td><td>0 chai lỗi lọt, 0 chai tốt bị thổi nhầm trên bộ thử</td></tr>
+</table>
+
+<h2>2. Yêu cầu</h2>
+<ul>
+  <li>Chai tới camera lệch ngang ±20 pixel do trễ kích camera: tìm tâm chai trên từng ảnh.</li>
+  <li>Đo mức nước là mặt chất lỏng, không phải mặt bọt; bọt không được làm chai đạt thành NG và không được che chai thiếu nước.</li>
+  <li>Loại bỏ đúng chai khi băng tải đổi tốc độ, dừng, chạy lại.</li>
+  <li>Biết rõ ngân sách thời gian; kết quả tới muộn thì có hành vi mặc định đã được chọn có chủ đích.</li>
+</ul>
+
+<h2>3. Kiến thức sử dụng</h2>
+<ul>
+  <li><a href="../hoc/industrial-vision-1-trigger-encoder-cycle-time.html">Trigger, encoder và cycle time</a>: nền tảng của phần loại bỏ.</li>
+  <li><a href="../kien-thuc/7-kieu-chieu-sang-machine-vision.html">Chiếu sáng</a>: vì sao đo mức nước bằng đèn nền.</li>
+  <li><a href="../hoc/do-luong-1-do-canh-subpixel-fitting.html">Đo cạnh và fitting</a>: profile cột, fit đường thẳng đỉnh nắp.</li>
+  <li><a href="../hoc/tich-hop-1-io-so-va-handshake-plc.html">I/O số và handshake với PLC</a>, <a href="../hoc/tich-hop-3-modbus-tcp-python.html">Modbus TCP</a>.</li>
+</ul>
+
+<h2>4. Dữ liệu: chai mô phỏng</h2>
+<p>Ảnh đèn nền: nền sáng, thành chai tối, chất lỏng tối, khoảng không khí trong cổ chai sáng. 30% số chai có lớp bọt 2 đến 8 mm với các viền bong bóng tối lấm tấm, và mép mặt nước khum lên ở thành chai. Khoảng 12% số chai có lỗi: thiếu nước 3,5 đến 8 mm, thừa nước, thiếu nắp, hoặc nắp vặn chưa hết (nhô lên 1,6 đến 3 mm và nghiêng 8 đến 15°).</p>
+<pre><code class="language-python">import time
+
+import cv2
+import numpy as np
+
+PX_MM = 5.0                               # 5 pixel/mm; ảnh 300 × 400 (rộng × cao) nhìn phần cổ và vai chai
+H, W = 400, 300
+MUC_DANH_DINH = 230                       # hàng ảnh của mặt chất lỏng khi chai đầy đúng (chai nằm giữa ảnh)
+DUNG_SAI_MUC_MM = 2.0
+DINH_CO = 70                              # hàng của miệng chai (đỉnh cổ) khi nắp vặn đúng
+
+
+def tao_chai(rng):
+    """Thông số một chai. Lỗi: thiếu nước, thừa nước, thiếu nắp, nắp lệch (vặn chưa hết, nghiêng)."""
+    c = {"lech_x": rng.uniform(-20, 20), "muc_mm": rng.normal(0, 0.5), "bot_mm": 0.0, "nap": "đúng", "loi": "OK"}
+    if rng.random() &lt; 0.3:
+        c["bot_mm"] = rng.uniform(2, 8)                                   # bọt trên mặt nước: chai vẫn đạt
+    r = rng.random()
+    if r &lt; 0.05:
+        c["muc_mm"], c["loi"] = -rng.uniform(3.5, 8), "thiếu nước"
+    elif r &lt; 0.07:
+        c["muc_mm"], c["loi"] = rng.uniform(3.5, 6), "thừa nước"
+    elif r &lt; 0.09:
+        c["nap"], c["loi"] = "thiếu", "thiếu nắp"
+    elif r &lt; 0.12:
+        c["nap"], c["loi"] = "lệch", "nắp lệch"
+    return c
+
+
+def chup_chai(c, rng):
+    """Ảnh đèn nền (backlight): nền sáng, thành chai tối, chất lỏng tối, không khí sáng, bọt là lớp lấm tấm."""
+    anh = np.full((H, W), 0.90, np.float32)
+    x0 = W / 2 + c["lech_x"]
+    ban_kinh = lambda y: 45 if y &lt; 160 else 45 + min(55, (y - 160) * 0.9)  # cổ thẳng rồi loe ra vai
+    muc = MUC_DANH_DINH - c["muc_mm"] * PX_MM
+    bot = c["bot_mm"] * PX_MM
+    for y in range(DINH_CO, H):
+        r = ban_kinh(y)
+        xa, xb = int(x0 - r), int(x0 + r)
+        anh[y, xa:xa + 5] = 0.15                                          # thành chai (thủy tinh nhìn ngược sáng)
+        anh[y, xb - 5:xb] = 0.15
+        if y &gt;= muc:
+            anh[y, xa + 5:xb - 5] = 0.28                                   # chất lỏng
+        elif y &gt;= muc - bot:
+            anh[y, xa + 5:xb - 5] = 0.75                                   # nền lớp bọt, chấm tối thêm ở dưới
+    if bot &gt; 0:
+        for _ in range(int(bot * 6)):
+            by = rng.uniform(muc - bot, muc)
+            bx = x0 + rng.uniform(-38, 38)
+            cv2.circle(anh, (int(bx), int(by)), int(rng.integers(2, 5)), 0.2, 1)   # viền bong bóng tối
+    for dx in (-1, 1):                                                     # mặt khum (meniscus) bám thành chai
+        for k in range(8):
+            yk = int(muc - 8 + k)
+            xk = int(x0 + dx * (40 - k))
+            cv2.line(anh, (xk, yk), (int(x0 + dx * 40), yk), 0.28, 1)
+    if c["nap"] != "thiếu":
+        goc = 0.0 if c["nap"] == "đúng" else rng.uniform(8, 15) * rng.choice([-1, 1])
+        nang = 0.0 if c["nap"] == "đúng" else rng.uniform(8, 15)           # nắp nhô lên 1,6–3 mm
+        hop = cv2.boxPoints(((x0, DINH_CO - 22 - nang), (104, 48), goc))
+        cv2.fillPoly(anh, [np.round(hop).astype(np.int32)], 0.10)
+    return np.clip(anh + rng.normal(0, 0.02, anh.shape), 0, 1).astype(np.float32)
+
+
+rng = np.random.default_rng(0)
+mau = [tao_chai(rng) for _ in range(6)]
+mau[1].update(bot_mm=6.0, muc_mm=-5.0, loi="thiếu nước")                  # chai thiếu nước có bọt dày
+mau[2].update(nap="lệch", loi="nắp lệch", muc_mm=0.0, bot_mm=0.0)
+anh_mau = [chup_chai(c, rng) for c in mau[:3]]
+cv2.imwrite("chai.png", np.uint8(255 * np.hstack(anh_mau)))
+print([c["loi"] for c in mau[:3]])</code></pre>
+<pre><code class="language-text">['OK', 'thiếu nước', 'nắp lệch']</code></pre>
+<p>File <code>chai.png</code> ghép ba ảnh: chai đạt có bọt mỏng, chai thiếu nước 5 mm nhưng có bọt dày 6 mm, và chai nắp lệch.</p>
+
+<h2>5. Lời giải 1: một cột pixel</h2>
+<p>Cách đơn giản và rất nhanh: quét cột pixel giữa ảnh từ trên xuống, điểm tối đầu tiên dưới cổ chai là mặt nước; nắp thì kiểm có vùng tối ở chỗ nắp hay không.</p>
+<pre><code class="language-python"># Lời giải 1: một cột pixel ở giữa ảnh, quét từ trên xuống, điểm tối đầu tiên là mặt nước
+def muc_nuoc_1(anh):
+    cot = anh[165:, W // 2]
+    toi = np.nonzero(cot &lt; 0.5)[0]
+    return 165 + toi[0] if len(toi) else H
+
+
+def kiem_chai_1(anh):
+    muc_mm = (MUC_DANH_DINH - muc_nuoc_1(anh)) / PX_MM
+    nap = anh[30:60, W // 2 - 30:W // 2 + 30].mean() &lt; 0.5             # có vùng tối ở chỗ nắp
+    if not nap:
+        return "thiếu nắp"
+    if muc_mm &lt; -DUNG_SAI_MUC_MM:
+        return "thiếu nước"
+    if muc_mm &gt; DUNG_SAI_MUC_MM:
+        return "thừa nước"
+    return "OK"</code></pre>
+
+<h2>6. Lời giải 2: tìm tâm chai, dải giữa, độ đồng đều</h2>
+<ul>
+  <li><strong>Tâm chai</strong> lấy từ hai thành cổ chai (hai cực tiểu của profile cột trên vùng cổ), không giả định chai nằm giữa ảnh.</li>
+  <li><strong>Mặt nước</strong>: xét dải rộng 60 pixel quanh tâm (tránh mặt khum ở thành chai). Mỗi hàng tính trung bình và độ lệch chuẩn. Chất lỏng là vùng <em>tối và đều</em>; bọt có thể tối nhưng <em>lấm tấm</em> (độ lệch chuẩn lớn). Mặt nước là hàng đầu tiên mà từ đó 5 hàng liền thỏa cả hai điều kiện.</li>
+  <li><strong>Nắp</strong>: lấy hàng tối đầu tiên của từng cột trên nắp (bỏ hai mép bo tròn), fit đường thẳng: hệ số góc cho độ nghiêng, trung vị cho độ cao đỉnh nắp.</li>
+</ul>
+<pre><code class="language-python">def tim_tam_chai(anh):
+    """Tâm chai theo hai thành cổ chai (hai cực tiểu của profile cột trên vùng cổ)."""
+    profile = anh[100:150].mean(axis=0)
+    trai = np.argmin(profile[:W // 2])
+    phai = W // 2 + np.argmin(profile[W // 2:])
+    return (trai + phai) / 2
+
+
+def muc_nuoc_2(anh, tam):
+    """Mặt nước là hàng đầu tiên mà từ đó trở xuống 5 hàng liền đều TỐI và ĐỀU (độ lệch chuẩn nhỏ).
+    Bọt có thể tối nhưng lấm tấm (độ lệch chuẩn lớn) nên bị bỏ qua. Chỉ lấy dải giữa để tránh mặt khum ở thành."""
+    dai = anh[165:, int(tam) - 30:int(tam) + 30]
+    tb, dl = dai.mean(axis=1), dai.std(axis=1)
+    long = (tb &lt; 0.45) &amp; (dl &lt; 0.06)
+    for y in range(len(long) - 5):
+        if long[y:y + 5].all():
+            return 165 + y
+    return H
+
+
+def kiem_nap(anh, tam):
+    """Trả về (có nắp, góc nghiêng độ, độ cao đỉnh nắp so với danh định mm)."""
+    vung = anh[:DINH_CO + 5, int(tam) - 60:int(tam) + 60] &lt; 0.5
+    cot = np.nonzero(vung.any(axis=0))[0]
+    if vung.sum() &lt; 0.5 * 104 * 48:
+        return False, 0.0, 0.0
+    cot = cot[(cot &gt; cot.min() + 10) &amp; (cot &lt; cot.max() - 10)]           # bỏ hai mép bo tròn của nắp
+    dinh = np.array([np.argmax(vung[:, c]) for c in cot])                 # hàng tối đầu tiên của mỗi cột
+    he_so = np.polyfit(cot, dinh, 1)
+    goc = np.degrees(np.arctan(he_so[0]))
+    cao_mm = ((DINH_CO - 22 - 24) - np.median(dinh)) / PX_MM
+    return True, goc, cao_mm
+
+
+def kiem_chai_2(anh, dung_sai_goc=3.0, dung_sai_cao_mm=1.0):
+    tam = tim_tam_chai(anh)
+    co_nap, goc, cao = kiem_nap(anh, tam)
+    if not co_nap:
+        return "thiếu nắp"
+    if abs(goc) &gt; dung_sai_goc or abs(cao) &gt; dung_sai_cao_mm:
+        return "nắp lệch"
+    muc_mm = (MUC_DANH_DINH - muc_nuoc_2(anh, tam)) / PX_MM
+    if muc_mm &lt; -DUNG_SAI_MUC_MM:
+        return "thiếu nước"
+    if muc_mm &gt; DUNG_SAI_MUC_MM:
+        return "thừa nước"
+    return "OK"
+
+
+for c, a in zip(mau[:3], anh_mau):
+    tam = tim_tam_chai(a)
+    print(f"{c['loi']:10s} bọt {c['bot_mm']:.1f} mm | lời giải 1: {kiem_chai_1(a):10s} | lời giải 2: {kiem_chai_2(a):10s} "
+          f"(mức {(MUC_DANH_DINH - muc_nuoc_2(a, tam)) / PX_MM:+.1f} mm, thật {c['muc_mm']:+.1f} mm)")</code></pre>
+<pre><code class="language-text">OK         bọt 2.1 mm | lời giải 1: OK         | lời giải 2: OK         (mức -0.2 mm, thật -0.1 mm)
+thiếu nước bọt 6.0 mm | lời giải 1: OK         | lời giải 2: thiếu nước (mức -5.0 mm, thật -5.0 mm)
+nắp lệch   bọt 0.0 mm | lời giải 1: OK         | lời giải 2: nắp lệch   (mức +0.0 mm, thật +0.0 mm)</code></pre>
+<p>Chai thiếu nước 5 mm có bọt dày 6 mm: lời giải 1 thấy viền bong bóng tối ở cột giữa, tưởng đó là mặt nước, đo ra mức gần đúng danh định và cho qua. Chai nắp lệch: nắp vẫn che vùng kiểm "có nắp" nên lời giải 1 cũng cho qua.</p>
+
+<h2>7. Đánh giá trên 2 000 chai</h2>
+<pre><code class="language-python">from collections import Counter
+
+rng_dg = np.random.default_rng(1)
+chai_thu = [tao_chai(rng_dg) for _ in range(2000)]
+anh_thu = [chup_chai(c, rng_dg) for c in chai_thu]
+for ten, ham in (("lời giải 1", kiem_chai_1), ("lời giải 2", kiem_chai_2)):
+    bat, tong, loai_nham, thoi_gian = Counter(), Counter(), 0, []
+    for c, a in zip(chai_thu, anh_thu):
+        t0 = time.perf_counter()
+        kq = ham(a)
+        thoi_gian.append(1000 * (time.perf_counter() - t0))
+        if c["loi"] == "OK":
+            loai_nham += kq != "OK"
+        else:
+            tong[c["loi"]] += 1
+            bat[c["loi"]] += kq != "OK"
+    so_ok = sum(c["loi"] == "OK" for c in chai_thu)
+    print(f"{ten}: loại nhầm {loai_nham}/{so_ok} chai tốt; bắt được " +
+          ", ".join(f"{k} {bat[k]}/{tong[k]}" for k in ("thiếu nước", "thừa nước", "thiếu nắp", "nắp lệch")) +
+          f"; thời gian trung vị {np.median(thoi_gian):.2f} ms, lớn nhất {max(thoi_gian):.2f} ms")</code></pre>
+<pre><code class="language-text">lời giải 1: loại nhầm 484/1750 chai tốt; bắt được thiếu nước 91/108, thừa nước 42/42, thiếu nắp 40/40, nắp lệch 16/60; thời gian trung vị 0.03 ms, lớn nhất 0.45 ms
+lời giải 2: loại nhầm 0/1750 chai tốt; bắt được thiếu nước 108/108, thừa nước 42/42, thiếu nắp 40/40, nắp lệch 60/60; thời gian trung vị 0.63 ms, lớn nhất 42.64 ms</code></pre>
+<p>Lời giải 1 vừa loại nhầm khoảng 28% số chai tốt (bọt bị coi là mặt nước, thành "thừa nước"), vừa để lọt chai thiếu nước có bọt và phần lớn chai nắp lệch. Đây đúng là trạm "hay báo nhầm khi nước có ga" mà ca đêm đã tắt đi, và một trạm bị tắt thì tệ hơn không có trạm. Lời giải 2: 0 loại nhầm, bắt đủ mọi lỗi. Cả hai đều rất nhanh, nhưng để ý thời gian lớn nhất lớn hơn trung vị hàng chục lần: hệ điều hành thỉnh thoảng "khựng". Ngân sách thời gian phải tính theo trường hợp xấu nhất, không theo trung bình.</p>
+
+<h2>8. Loại đúng chai: thời gian trễ hay encoder</h2>
+<p>Chai lỗi được phát hiện ở camera nhưng bị thổi bỏ ở vòi cách đó 1,2 m. Cách đơn giản là thổi sau 1,2 giây (đúng nếu băng tải luôn chạy 1 m/s). Cách đúng là dùng encoder: lúc chụp, PLC ghi lại số xung của encoder; khi encoder đếm thêm đủ 1 200 mm (2 400 xung) thì thổi. Mô phỏng dưới đây cho băng tải có lúc chạy 1 m/s, có lúc chậm còn 0,5 đến 0,7 m/s, có lúc dừng hẳn, với giai đoạn tăng giảm tốc khoảng 0,3 s, và chai không cách đều nhau.</p>
+<pre><code class="language-python">VOI_THOI_MM = 1200.0          # vòi thổi loại chai đặt sau cảm biến kích camera 1,2 m
+CUA_SO_MM = 25.0              # luồng khí trúng chai nếu tâm chai cách vòi dưới 25 mm lúc thổi
+XUNG_MM = 0.5                 # encoder: mỗi xung 0,5 mm băng tải
+
+
+def mo_phong_bang_tai(so_chai=600, seed=2):
+    """Băng tải chạy 1 m/s danh định nhưng có lúc chậm lại, có lúc dừng hẳn rồi chạy tiếp.
+    Trả về: thời điểm (s) và vị trí băng tải (mm) mỗi ms, vị trí ban đầu của các chai, chai nào lỗi."""
+    rng_bt = np.random.default_rng(seed)
+    dt = 0.001
+    toc_do = []
+    while len(toc_do) * dt &lt; so_chai * 0.1 + 10:
+        doan = rng_bt.choice([1.0, 1.0, 1.0, 0.7, 0.5, 0.0])               # m/s, mỗi đoạn 1–3 giây
+        toc_do += [doan] * int(rng_bt.uniform(1, 3) / dt)
+    toc_do = np.convolve(toc_do, np.ones(300) / 300, mode="same")          # tăng tốc, giảm tốc mất khoảng 0,3 s
+    vi_tri = np.cumsum(toc_do) * dt * 1000                                 # mm băng tải đã chạy
+    khoang = np.clip(rng_bt.normal(100, 15, so_chai), 70, None)           # chai không cách đều
+    chai_x0 = -np.cumsum(khoang)                                           # vị trí chai lúc t = 0 (âm: chưa tới camera)
+    loi = rng_bt.random(so_chai) &lt; 0.12
+    return np.arange(len(vi_tri)) * dt, vi_tri, chai_x0, loi
+
+
+def chay_loai_chai(cach, so_chai=600, seed=2):
+    """cach='thời gian': thổi sau 1,2 s kể từ lúc chụp (giả định 1 m/s). cach='encoder': thổi khi băng tải chạy thêm 1200 mm."""
+    t, vi_tri, x0, loi = mo_phong_bang_tai(so_chai, seed)
+    lenh_thoi = []                                                         # thời điểm (chỉ số ms) phát lệnh thổi
+    for i in range(so_chai):
+        k_chup = np.searchsorted(vi_tri, -x0[i])                           # lúc chai i chạm cảm biến ở vị trí 0
+        if k_chup &gt;= len(t) or not loi[i]:
+            continue
+        if cach == "thời gian":
+            k = k_chup + int(VOI_THOI_MM / 1000 / 0.001)
+        else:
+            xung_chup = int(vi_tri[k_chup] / XUNG_MM)                      # PLC ghi lại số xung lúc chụp
+            k = np.searchsorted(vi_tri, (xung_chup + VOI_THOI_MM / XUNG_MM) * XUNG_MM)
+        if k &lt; len(t):
+            lenh_thoi.append(k)
+    trung = set()
+    for k in lenh_thoi:
+        vt_chai = x0 + vi_tri[k]                                           # vị trí mọi chai lúc thổi
+        trung |= set(np.nonzero(np.abs(vt_chai - VOI_THOI_MM) &lt; CUA_SO_MM)[0].tolist())
+    da_qua = x0 + vi_tri[-1] &gt; VOI_THOI_MM + CUA_SO_MM                     # chỉ tính chai đã đi qua vòi
+    loi_bi_loai = sum(1 for i in trung if loi[i])
+    tot_bi_loai = sum(1 for i in trung if not loi[i])
+    loi_lot = int(np.sum(loi &amp; da_qua)) - loi_bi_loai
+    return int(np.sum(da_qua)), int(np.sum(loi &amp; da_qua)), loi_lot, tot_bi_loai
+
+
+for cach in ("thời gian", "encoder"):
+    qua, so_loi, lot, nham = chay_loai_chai(cach)
+    print(f"loại theo {cach:9s}: {qua} chai qua vòi, {so_loi} chai lỗi; lỗi lọt {lot}, chai tốt bị thổi nhầm {nham}")</code></pre>
+<pre><code class="language-text">loại theo thời gian: 515 chai qua vòi, 46 chai lỗi; lỗi lọt 14, chai tốt bị thổi nhầm 5
+loại theo encoder  : 515 chai qua vòi, 46 chai lỗi; lỗi lọt 0, chai tốt bị thổi nhầm 0</code></pre>
+<p>Thổi theo thời gian để lọt khoảng 30% số chai lỗi và thổi nhầm chai tốt: mỗi lần băng tải chậm hay dừng, chai lỗi chưa tới vòi khi lệnh thổi đã phát. Đó chính là hiện tượng "thổi nhầm chai bên cạnh lúc băng tải vừa chạy lại" trong email. Theo encoder: 0 lọt, 0 nhầm, vì khoảng cách tính bằng quãng đường băng tải đã chạy chứ không bằng thời gian. Trong PLC, mỗi chai lỗi là một phần tử trong hàng đợi FIFO mang số xung lúc chụp; vòng quét PLC so số xung hiện tại với phần tử đầu hàng, đủ thì xuất lệnh thổi và bỏ phần tử đó ra.</p>
+<div class="warn"><strong>Encoder phải gắn vào cái mang chai đi</strong>Encoder gắn trên trục động cơ đo đúng khi băng tải không trượt. Chai trượt trên băng tải (băng tải ướt, chai dồn ứ ở cuối chuyền) thì vị trí thật của chai lệch khỏi vị trí tính từ encoder. Khoảng cách camera tới vòi càng dài, sai lệch tích lũy càng lớn: giữ khoảng cách này ngắn vừa đủ cho ngân sách thời gian, và thêm một cảm biến quang ngay trước vòi để xác nhận có chai đúng chỗ trước khi thổi.</div>
+
+<h2>9. Ngân sách thời gian và hành vi khi kết quả tới muộn</h2>
+<p>Kết quả phải tới PLC trước khi chai tới vòi, tính ở tốc độ băng tải lớn nhất. Độ trễ gồm thời gian truyền ảnh, xử lý, và gửi kết quả. Đoạn dưới đo phần xử lý trên máy bạn và cộng thêm 8 ms truyền ảnh GigE và 3 ms gửi Modbus (giả định; hãy đo trên hệ thật).</p>
+<pre><code class="language-python"># Ngân sách thời gian: kết quả phải tới PLC trước khi chai tới vòi thổi, ở tốc độ băng tải lớn nhất
+def ngan_sach_ms(khoang_cach_mm, toc_do_max_m_s=1.0):
+    return khoang_cach_mm / toc_do_max_m_s
+
+
+rng_tg = np.random.default_rng(3)
+tre = []
+for a in anh_thu[:500]:
+    t0 = time.perf_counter()
+    kiem_chai_2(a)
+    tre.append(1000 * (time.perf_counter() - t0))
+tre = np.array(tre) + 8.0 + 3.0                    # + truyền ảnh GigE (~8 ms) + gửi kết quả qua Modbus (~3 ms), giả định
+print(f"độ trễ từ lúc chụp tới lúc PLC có kết quả: trung vị {np.median(tre):.1f} ms, p99.9 {np.percentile(tre, 99.9):.1f} ms, "
+      f"lớn nhất {tre.max():.1f} ms")
+for d in (1200, 300, 50):
+    print(f"vòi thổi cách camera {d:4d} mm → ngân sách {ngan_sach_ms(d):6.0f} ms, dư {ngan_sach_ms(d) - tre.max():7.1f} ms")</code></pre>
+<pre><code class="language-text">độ trễ từ lúc chụp tới lúc PLC có kết quả: trung vị 11.6 ms, p99.9 17.0 ms, lớn nhất 17.8 ms
+vòi thổi cách camera 1200 mm → ngân sách   1200 ms, dư  1182.2 ms
+vòi thổi cách camera  300 mm → ngân sách    300 ms, dư   282.2 ms
+vòi thổi cách camera   50 mm → ngân sách     50 ms, dư    32.2 ms</code></pre>
+<p>Với vòi cách 1,2 m thì dư hơn một giây; đặt vòi sát camera (50 mm) để tiết kiệm chỗ thì chỉ còn dư vài chục mili giây, một lần hệ điều hành khựng là kết quả tới muộn. Khi kết quả tới muộn, PLC phải có một hành vi mặc định được chọn trước, và với ngành thực phẩm thì gần như luôn là <strong>thổi bỏ</strong> (fail-safe): mất một chai tốt rẻ hơn nhiều so với để lọt một chai rò nắp. Bài tập 1 tính cái giá của từng lựa chọn.</p>
+
+<h2>10. Bẫy thực tế</h2>
+<table>
+  <tr><th>Bẫy</th><th>Hậu quả</th><th>Cách tránh</th></tr>
+  <tr><td>Loại theo thời gian trễ</td><td>Thổi nhầm, lọt lỗi mỗi khi băng tải đổi tốc độ</td><td>Theo encoder, FIFO mang số xung</td></tr>
+  <tr><td>Thanh ghi dịch theo số đếm chai</td><td>Nhấc một chai ra là mọi chai sau bị xử lý sai (bài tập 2)</td><td>Theo vị trí (số xung), không theo thứ tự</td></tr>
+  <tr><td>Không kiểm vòi đã thổi trúng</td><td>Vòi tắc, áp khí yếu: lọt lỗi mà không ai biết</td><td>Cảm biến xác nhận ở máng loại, đếm số chai vào máng so với số lệnh thổi</td></tr>
+  <tr><td>Ngân sách tính theo thời gian trung bình</td><td>Kết quả muộn ngẫu nhiên, không tái hiện được</td><td>Đo p99,9 và lớn nhất trong ca dài; hành vi mặc định khi muộn</td></tr>
+  <tr><td>Đo mức nước ở một cột</td><td>Bọt, giọt nước bám thành chai, nhãn in làm sai</td><td>Dải giữa, điều kiện tối và đều, nhiều hàng liên tiếp</td></tr>
+  <tr><td>Chai thủy tinh khác lô (màu, độ dày)</td><td>Mức xám chất lỏng và thành chai thay đổi</td><td>Ngưỡng tương đối theo nền sáng của từng ảnh, kiểm tra lại khi đổi lô chai</td></tr>
+</table>
+
+<h2>11. Tự đánh giá</h2>
+<ul>
+  <li>2 000 chai: 0 loại nhầm, bắt đủ bốn loại lỗi, kể cả thiếu nước có bọt dày.</li>
+  <li>Loại bỏ theo encoder: 0 lọt, 0 thổi nhầm trên băng tải đổi tốc độ và dừng.</li>
+  <li>Biết ngân sách thời gian của trạm và đã chọn hành vi khi kết quả muộn.</li>
+  <li>Có cơ chế xác nhận thổi bỏ, có số đếm đối chiếu cuối ca.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Kết quả tới muộn: cho qua hay thổi bỏ?</h3>
+<p>Một ca 100 000 chai, 3% lỗi; 0,1% số lần hệ điều hành khựng làm kết quả trễ thêm 150 đến 600 ms. Với vòi cách 1 200 mm và 300 mm, mỗi lựa chọn mặc định mất bao nhiêu?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python"># 100 000 chai; 0,1% số lần hệ điều hành "khựng" làm kết quả trễ 150–600 ms
+rng_e1 = np.random.default_rng(4)
+n = 100_000
+tre_ca = rng_e1.normal(15, 3, n)
+khung = rng_e1.random(n) &lt; 0.001
+tre_ca[khung] += rng_e1.uniform(150, 600, khung.sum())
+loi_ca = rng_e1.random(n) &lt; 0.03
+for d in (1200, 300):
+    muon = tre_ca &gt; ngan_sach_ms(d)
+    print(f"vòi cách {d} mm: {muon.sum()} kết quả tới muộn; "
+          f"mặc định CHO QUA → lọt {np.sum(muon &amp; loi_ca)} chai lỗi; mặc định THỔI BỎ → mất {np.sum(muon &amp; ~loi_ca)} chai tốt")</code></pre>
+<pre><code class="language-text">vòi cách 1200 mm: 0 kết quả tới muộn; mặc định CHO QUA → lọt 0 chai lỗi; mặc định THỔI BỎ → mất 0 chai tốt
+vòi cách 300 mm: 57 kết quả tới muộn; mặc định CHO QUA → lọt 1 chai lỗi; mặc định THỔI BỎ → mất 56 chai tốt</code></pre>
+<p>Vòi cách 1,2 m thì không có kết quả nào muộn: khoảng cách là cách rẻ nhất để có ngân sách thời gian. Vòi cách 300 mm thì vài chục kết quả muộn mỗi ca. Mặc định cho qua chỉ để lọt khoảng 1 chai lỗi (vì 97% chai là tốt), nghe có vẻ hấp dẫn; mặc định thổi bỏ mất vài chục chai tốt. Với thực phẩm, một chai rò lọt tới khách hàng có thể dẫn tới thu hồi cả lô, nên chọn thổi bỏ, và ghi log mỗi lần muộn để sửa tận gốc (đẩy vòi ra xa, dùng máy công nghiệp có hệ điều hành thời gian thực, tách xử lý khỏi giao diện như bài <a href="../hoc/luong-hang-doi-tach-chup-anh-xu-ly.html">luồng và hàng đợi</a>).</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Có người nhấc chai ra</h3>
+<p>Một số trạm cũ dùng thanh ghi dịch theo số đếm: chai thứ k đi qua cảm biến ở vòi thì xét kết quả của chai thứ k lúc chụp. Mô phỏng một công nhân nhấc 1 chai ra khỏi băng tải giữa camera và vòi.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">def thu_nhat_chai_ra(so_chai=300, seed=5, rut_chai=120):
+    """Công nhân nhấc chai thứ rut_chai ra khỏi băng tải sau camera, trước vòi thổi.
+    Cách 'đếm chai': vòi thổi chai thứ k đi tới vòi nếu chai thứ k lúc chụp là lỗi (thanh ghi dịch theo số đếm).
+    Cách 'encoder': mỗi chai lỗi có số xung riêng, thổi đúng vị trí đó."""
+    rng_e2 = np.random.default_rng(seed)
+    loi = rng_e2.random(so_chai) &lt; 0.12
+    con_lai = [i for i in range(so_chai) if i != rut_chai]                # thứ tự chai thực sự đi tới vòi
+    sai_dem = sum(1 for k, i in enumerate(con_lai) if loi[k] != loi[i])    # vòi thổi theo loi[k], chai thật là i
+    return int(loi.sum()), sai_dem
+
+
+so_loi, sai = thu_nhat_chai_ra()
+print(f"{so_loi} chai lỗi; cách đếm chai: {sai} chai bị xử lý sai sau khi nhấc 1 chai ra; cách encoder: 0")</code></pre>
+<pre><code class="language-text">38 chai lỗi; cách đếm chai: 36 chai bị xử lý sai sau khi nhấc 1 chai ra; cách encoder: 0</code></pre>
+<p>Chỉ một chai bị nhấc ra, mọi chai phía sau lệch một vị trí trong thanh ghi: chai lỗi đi qua, chai tốt bên cạnh bị thổi, cho tới khi máy được reset. Trường hợp chai đổ nằm trên băng tải cũng gây lỗi tương tự (cảm biến đếm sai). Theo vị trí encoder thì mỗi lệnh thổi gắn với một vị trí trên băng tải, không phụ thuộc thứ tự: chai bị nhấc ra chỉ làm một lần thổi trúng chỗ trống. Đây là lý do các hệ thống loại bỏ hiện đại theo dõi vị trí (position tracking) chứ không đếm.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://www.emva.org/standards-technology/genicam/" rel="noopener" target="_blank">EMVA: GenICam (Standard Features Naming Convention cho trigger, encoder)</a>; <a href="https://docs.python.org/3/library/time.html#time.perf_counter" rel="noopener" target="_blank">Python: time.perf_counter</a>; B. G. Batchelor (ed.), <em>Machine Vision Handbook</em>, Springer, 2012; C. Steger, M. Ulrich, C. Wiedemann, <em>Machine Vision Algorithms and Applications</em>, 2nd ed., Wiley-VCH, 2018.</p>
