@@ -1,0 +1,203 @@
+<p>Thread giải quyết tốt việc chờ I/O với vài chục tác vụ. Nhưng một máy chủ web phải giữ hàng nghìn kết nối cùng lúc, mỗi kết nối phần lớn thời gian chỉ ngồi chờ; một luồng cho mỗi kết nối thì quá tốn tài nguyên. <strong>asyncio</strong> chạy hàng nghìn tác vụ chờ đồng thời trong <em>một</em> luồng duy nhất bằng cú pháp <code>async</code>/<code>await</code>. Đây là nền tảng của FastAPI, httpx, và phần lớn thư viện mạng hiện đại.</p>
+
+<h2>1. Coroutine, await và event loop</h2>
+<pre><code class="language-python">import asyncio
+import time
+
+
+async def nau(mon: str, phut: float) -&gt; str:      # async def: định nghĩa coroutine
+    print(f"Bắt đầu {mon}")
+    await asyncio.sleep(phut)                     # await: "chờ ở đây, trong lúc đó làm việc khác"
+    print(f"Xong {mon}")
+    return mon
+
+
+async def main() -&gt; None:
+    t = time.perf_counter()
+    ket_qua = await asyncio.gather(nau("cơm", 0.3), nau("canh", 0.2), nau("cá", 0.1))
+    print(ket_qua, f"{time.perf_counter() - t:.1f} s")
+
+
+asyncio.run(main())                               # tạo event loop và chạy coroutine chính</code></pre>
+<pre><code class="language-text">Bắt đầu cơm
+Bắt đầu canh
+Bắt đầu cá
+Xong cá
+Xong canh
+Xong cơm
+['cơm', 'canh', 'cá'] 0.3 s</code></pre>
+<ul>
+  <li><code>async def</code> định nghĩa một <strong>coroutine</strong>: gọi <code>nau("cơm", 0.3)</code> chưa chạy gì, chỉ tạo đối tượng coroutine.</li>
+  <li><code>await</code> chạy coroutine và tạm dừng hàm hiện tại cho đến khi có kết quả. Trong lúc tạm dừng, <strong>event loop</strong> (vòng lặp sự kiện) chuyển sang chạy coroutine khác đang sẵn sàng.</li>
+  <li><code>asyncio.gather</code> chạy nhiều coroutine đồng thời và trả kết quả theo đúng thứ tự truyền vào. Ba món nấu cùng lúc: tổng 0,3 giây (món lâu nhất) thay vì 0,6 giây.</li>
+  <li><code>asyncio.run(main())</code> là điểm vào duy nhất, gọi một lần ở cấp cao nhất của chương trình.</li>
+</ul>
+<p>Hình dung một đầu bếp (một luồng) nấu ba món: đặt nồi cơm lên bếp (<code>await</code>) rồi quay sang nấu canh, không đứng nhìn nồi cơm. Chỉ khi ba món đều đang chờ chín, đầu bếp mới rảnh.</p>
+
+<h2>2. Quy tắc quan trọng nhất: đừng chặn event loop</h2>
+<pre><code class="language-python">import asyncio
+import time
+
+
+async def sai() -&gt; None:
+    time.sleep(0.2)            # hàm đồng bộ: CHẶN cả event loop, không ai chạy được
+
+
+async def dung() -&gt; None:
+    await asyncio.sleep(0.2)   # nhường event loop trong lúc chờ
+
+
+async def do(ham) -&gt; float:
+    t = time.perf_counter()
+    await asyncio.gather(*(ham() for _ in range(5)))
+    return time.perf_counter() - t
+
+
+print(f"time.sleep:    {asyncio.run(do(sai)):.1f} s")
+print(f"asyncio.sleep: {asyncio.run(do(dung)):.1f} s")</code></pre>
+<pre><code class="language-text">time.sleep:    1.0 s
+asyncio.sleep: 0.2 s</code></pre>
+<p>asyncio là <strong>hợp tác</strong>: coroutine chỉ nhường quyền tại các điểm <code>await</code>. Gọi hàm đồng bộ chậm (<code>time.sleep</code>, <code>requests.get</code>, truy vấn CSDL đồng bộ, tính toán nặng) bên trong <code>async def</code> sẽ đóng băng mọi tác vụ khác. Vì vậy trong code bất đồng bộ phải dùng thư viện bất đồng bộ: <code>httpx.AsyncClient</code> thay cho requests, <code>asyncio.sleep</code> thay cho <code>time.sleep</code>. Bắt buộc phải gọi hàm đồng bộ thì đẩy nó sang luồng: <code>await asyncio.to_thread(ham_dong_bo, ...)</code>.</p>
+<p>Đây cũng là lý do ở chặng 9 các endpoint dùng <code>def</code> thường: SQLAlchemy đồng bộ, và FastAPI tự chạy endpoint <code>def</code> trong nhóm luồng riêng. Viết <code>async def</code> mà gọi Session đồng bộ bên trong sẽ chặn cả máy chủ.</p>
+
+<h2>3. TaskGroup, timeout và Semaphore</h2>
+<pre><code class="language-python">import asyncio
+
+
+async def lay(i: int, gioi_han: asyncio.Semaphore) -&gt; str:
+    async with gioi_han:                           # tối đa N tác vụ cùng lúc vào đây
+        await asyncio.sleep(0.1 if i != 3 else 5)  # tác vụ số 3 treo lâu
+        return f"việc {i}"
+
+
+async def lay_co_han(i: int, gioi_han: asyncio.Semaphore) -&gt; str:
+    try:
+        async with asyncio.timeout(0.5):           # quá 0,5 s thì hủy (Python 3.11+)
+            return await lay(i, gioi_han)
+    except TimeoutError:
+        return f"việc {i}: quá thời gian"
+
+
+async def main() -&gt; None:
+    gioi_han = asyncio.Semaphore(2)
+    async with asyncio.TaskGroup() as tg:          # Python 3.11+
+        cac_viec = [tg.create_task(lay_co_han(i, gioi_han)) for i in range(5)]
+    print([v.result() for v in cac_viec])
+
+
+asyncio.run(main())</code></pre>
+<pre><code class="language-text">['việc 0', 'việc 1', 'việc 2', 'việc 3: quá thời gian', 'việc 4']</code></pre>
+<ul>
+  <li><code>asyncio.TaskGroup</code> (Python 3.11+) là cách hiện đại để chạy nhiều tác vụ: ra khỏi khối <code>async with</code> thì mọi tác vụ đã xong; nếu một tác vụ ném lỗi, các tác vụ còn lại bị hủy và lỗi được báo ra (dạng <code>ExceptionGroup</code>). <code>gather</code> vẫn dùng tốt cho trường hợp đơn giản.</li>
+  <li><code>asyncio.timeout(giay)</code> hủy khối lệnh nếu quá hạn và ném <code>TimeoutError</code>. Luôn đặt giới hạn thời gian khi gọi mạng.</li>
+  <li><code>asyncio.Semaphore(2)</code> giới hạn số tác vụ chạy đồng thời trong khối <code>async with</code>: tránh mở 10.000 kết nối cùng lúc tới một máy chủ.</li>
+</ul>
+
+<h2>4. Gọi HTTP bất đồng bộ với httpx</h2>
+<p>Kiểm tra 10 URL, tối đa 3 kết nối cùng lúc, mỗi URL tối đa 3 giây, URL lỗi không làm hỏng URL khác. <code>httpx</code> đã được cài kèm <code>fastapi[standard]</code>, hoặc <code>uv add httpx</code>.</p>
+<pre><code class="language-python"># (minh họa) cần mạng; thời gian phụ thuộc đường truyền
+import asyncio
+import time
+
+import httpx
+
+URLS = ["https://www.python.org", "https://docs.python.org/3/", "https://pypi.org",
+        "https://fastapi.tiangolo.com", "https://docs.astral.sh/uv/", "https://httpbin.org/status/404",
+        "https://khong-ton-tai.vi-du.invalid", "https://httpbin.org/delay/5", "https://github.com",
+        "https://www.wikipedia.org"]
+
+
+async def kiem_tra(client: httpx.AsyncClient, gioi_han: asyncio.Semaphore, url: str) -&gt; tuple[str, str]:
+    async with gioi_han:
+        try:
+            async with asyncio.timeout(3):
+                r = await client.get(url, follow_redirects=True)
+            return url, str(r.status_code)
+        except TimeoutError:
+            return url, "quá thời gian"
+        except httpx.HTTPError as e:
+            return url, f"lỗi {type(e).__name__}"
+
+
+async def main() -&gt; None:
+    gioi_han = asyncio.Semaphore(3)
+    async with httpx.AsyncClient(headers={"User-Agent": "hoc-python/1.0"}) as client:
+        async with asyncio.TaskGroup() as tg:
+            viec = [tg.create_task(kiem_tra(client, gioi_han, u)) for u in URLS]
+    for v in viec:
+        url, kq = v.result()
+        print(f"{kq:&lt;16} {url}")
+
+
+t = time.perf_counter()
+asyncio.run(main())
+print(f"{time.perf_counter() - t:.1f} s")</code></pre>
+<pre><code class="language-text">200              https://www.python.org
+200              https://docs.python.org/3/
+200              https://pypi.org
+200              https://fastapi.tiangolo.com
+200              https://docs.astral.sh/uv/
+404              https://httpbin.org/status/404
+lỗi ConnectError https://khong-ton-tai.vi-du.invalid
+quá thời gian    https://httpbin.org/delay/5
+200              https://github.com
+200              https://www.wikipedia.org
+3.4 s</code></pre>
+<p>Một <code>AsyncClient</code> dùng chung cho mọi request (giữ và tái sử dụng kết nối, như <code>Session</code> của requests). Lỗi được bắt bên trong từng tác vụ nên <code>TaskGroup</code> không bị hủy giữa chừng. <code>httpbin.org/delay/5</code> trả lời sau 5 giây, bị cắt ở giây thứ 3. Tổng thời gian khoảng 3,4 giây cho 10 URL, chủ yếu do URL chậm nhất.</p>
+<div class="tip"><strong>Chọn thread hay asyncio?</strong>Script tự động hóa gọi vài chục API bằng requests: <code>ThreadPoolExecutor</code> đơn giản hơn, không phải đổi thư viện. Ứng dụng mạng có hàng trăm, hàng nghìn kết nối đồng thời, hoặc đã dùng framework bất đồng bộ (FastAPI với thư viện async, bot chat, websocket): asyncio. Đừng trộn lẫn tùy tiện; nhất quán trong một chương trình sẽ dễ bảo trì hơn.</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li><code>async def</code> tạo coroutine; <code>await</code> chờ và nhường event loop; <code>asyncio.run(main())</code> là điểm vào.</li>
+  <li>Không gọi hàm đồng bộ chậm trong <code>async def</code>; dùng thư viện async hoặc <code>asyncio.to_thread</code>.</li>
+  <li><code>gather</code>, <code>TaskGroup</code> chạy đồng thời; <code>asyncio.timeout</code> giới hạn thời gian; <code>Semaphore</code> giới hạn số tác vụ.</li>
+  <li><code>httpx.AsyncClient</code> dùng chung cho các request bất đồng bộ.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Kiểm tra URL còn sống</h3>
+<p>Dùng chương trình ở mục 4 với danh sách 10 URL của riêng bạn, giới hạn 3 kết nối. Đo thời gian khi đổi giới hạn thành 1 và 10, giải thích kết quả.</p>
+<details><summary>Xem gợi ý</summary>
+<p>Với <code>Semaphore(1)</code>, mọi request chạy lần lượt: thời gian xấp xỉ tổng thời gian các URL (giống chạy tuần tự). Với <code>Semaphore(10)</code>, cả 10 chạy cùng lúc: thời gian xấp xỉ URL chậm nhất (bị chặn ở 3 giây bởi timeout). Giá trị 3 nằm giữa: đủ nhanh mà không dồn quá nhiều kết nối vào cùng một máy chủ.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Timeout từng tác vụ</h3>
+<p>Viết chương trình chạy 6 tác vụ giả lập với thời gian chờ <code>[0.1, 0.4, 2.0, 0.2, 3.0, 0.3]</code> giây, mỗi tác vụ tối đa 1 giây; tác vụ quá hạn ghi là "quá thời gian". Tổng thời gian phải khoảng 1 giây.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import asyncio
+import time
+
+
+async def tac_vu(i: int, giay: float) -&gt; str:
+    try:
+        async with asyncio.timeout(1):
+            await asyncio.sleep(giay)
+            return f"#{i} xong sau {giay}s"
+    except TimeoutError:
+        return f"#{i} quá thời gian"
+
+
+async def main() -&gt; None:
+    t = time.perf_counter()
+    async with asyncio.TaskGroup() as tg:
+        viec = [tg.create_task(tac_vu(i, g)) for i, g in enumerate([0.1, 0.4, 2.0, 0.2, 3.0, 0.3])]
+    for v in viec:
+        print(v.result())
+    print(f"Tổng: {time.perf_counter() - t:.1f} s")
+
+
+asyncio.run(main())</code></pre>
+<pre><code class="language-text">#0 xong sau 0.1s
+#1 xong sau 0.4s
+#2 quá thời gian
+#3 xong sau 0.2s
+#4 quá thời gian
+#5 xong sau 0.3s
+Tổng: 1.0 s</code></pre>
+<p>Tác vụ 2 và 4 bị hủy ở giây thứ nhất thay vì chờ 2 và 3 giây. Không có timeout, tổng thời gian sẽ là 3 giây; trong hệ thống thật, một dịch vụ chậm không được phép kéo chậm cả chương trình.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/library/asyncio.html" rel="noopener" target="_blank">asyncio</a>; <a href="https://docs.python.org/3/library/asyncio-task.html" rel="noopener" target="_blank">Coroutines and Tasks (TaskGroup, timeout)</a>; <a href="https://www.python-httpx.org/async/" rel="noopener" target="_blank">HTTPX: Async Support</a>; <a href="https://fastapi.tiangolo.com/async/" rel="noopener" target="_blank">FastAPI: Concurrency and async / await</a>.</p>

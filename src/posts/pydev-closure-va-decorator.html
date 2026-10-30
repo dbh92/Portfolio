@@ -1,0 +1,243 @@
+<p>Bạn đã thấy <code>@property</code>, <code>@dataclass</code>, <code>@abstractmethod</code>. Ở chặng 9 bạn sẽ viết <code>@app.get("/")</code> trong FastAPI, ở chặng 6 là <code>@pytest.fixture</code>. Dấu <code>@</code> đó là <strong>decorator</strong>: một hàm "bọc" hàm khác để thêm hành vi (đo thời gian, ghi log, thử lại, kiểm tra quyền) mà không sửa code bên trong. Để hiểu decorator, trước hết cần hiểu hàm là đối tượng và closure.</p>
+
+<h2>1. Hàm là đối tượng</h2>
+<pre><code class="language-python">def chao(ten):
+    return f"Chào {ten}"
+
+
+noi = chao                         # gán hàm cho biến khác (không có ngoặc: không gọi)
+print(noi("An"), noi.__name__)
+
+
+def ap_dung(ham, ds):              # hàm nhận hàm làm tham số
+    return [ham(x) for x in ds]
+
+
+print(ap_dung(str.upper, ["a", "b"]), ap_dung(len, ["xin", "chào"]))</code></pre>
+<pre><code class="language-text">Chào An chao
+['A', 'B'] [3, 4]</code></pre>
+<p>Trong Python, hàm giống mọi giá trị khác: gán cho biến, truyền vào hàm, trả về từ hàm, đặt trong list hay dict. Bạn đã dùng điều này với <code>sorted(key=...)</code>.</p>
+
+<h2>2. Closure: hàm nhớ biến của nơi sinh ra nó</h2>
+<pre><code class="language-python">def tao_bo_tinh_thue(ty_le):
+    def tinh(gia):
+        return round(gia * (1 + ty_le))     # dùng ty_le của hàm bên ngoài
+    return tinh                             # trả về hàm bên trong
+
+
+vat_8 = tao_bo_tinh_thue(0.08)
+vat_10 = tao_bo_tinh_thue(0.10)
+print(vat_8(100_000), vat_10(100_000))
+
+
+def tao_bo_dem():
+    dem = 0
+    def tang():
+        nonlocal dem                        # sửa biến của hàm bên ngoài
+        dem += 1
+        return dem
+    return tang
+
+
+dem_khach = tao_bo_dem()
+dem_khach(); dem_khach()
+print(dem_khach())</code></pre>
+<pre><code class="language-text">108000 110000
+3</code></pre>
+<p><code>tao_bo_tinh_thue</code> đã chạy xong, nhưng hàm <code>tinh</code> vẫn "nhớ" <code>ty_le</code> của lần gọi đã tạo ra nó. Hàm bên trong cùng các biến nó nhớ gọi là <strong>closure</strong>. Muốn gán lại biến bên ngoài, dùng <code>nonlocal</code>.</p>
+
+<h2>3. Decorator đầu tiên</h2>
+<pre><code class="language-python">import functools
+import time
+
+
+def do_thoi_gian(ham):
+    @functools.wraps(ham)                      # giữ tên, docstring của hàm gốc
+    def bao_boc(*args, **kwargs):
+        bat_dau = time.perf_counter()
+        ket_qua = ham(*args, **kwargs)         # gọi hàm gốc với đúng tham số
+        tg = time.perf_counter() - bat_dau
+        print(f"{ham.__name__} chạy {tg * 1000:.0f} ms")
+        return ket_qua
+    return bao_boc
+
+
+@do_thoi_gian                                  # tương đương: tong_binh_phuong = do_thoi_gian(tong_binh_phuong)
+def tong_binh_phuong(n):
+    """Tổng bình phương 0..n-1."""
+    return sum(i * i for i in range(n))
+
+
+kq = tong_binh_phuong(2_000_000)               # kết quả thay đổi mỗi lần chạy
+print(kq, tong_binh_phuong.__name__, tong_binh_phuong.__doc__)</code></pre>
+<pre><code class="language-text">tong_binh_phuong chạy 98 ms
+2666664666667000000 tong_binh_phuong Tổng bình phương 0..n-1.</code></pre>
+<p>Decorator là hàm nhận một hàm và trả về một hàm (thường là closure bọc hàm gốc). Cú pháp <code>@do_thoi_gian</code> chỉ là cách viết gọn của phép gán lại tên. Ba điểm luôn phải có:</p>
+<ul>
+  <li><code>*args, **kwargs</code> để bọc được hàm có bất kỳ tham số nào.</li>
+  <li><code>return ket_qua</code>: quên dòng này thì mọi hàm được trang trí đều trả <code>None</code>.</li>
+  <li><code>@functools.wraps(ham)</code>: không có nó, <code>tong_binh_phuong.__name__</code> thành <code>"bao_boc"</code>, debugger, log và tài liệu đều hiện sai tên.</li>
+</ul>
+
+<h2>4. Decorator có tham số</h2>
+<p>Decorator thử lại khi gặp lỗi tạm thời (mạng chập chờn) rất hay dùng. Nó cần tham số: thử mấy lần, chờ bao lâu, với loại lỗi nào. Khi đó cần thêm một tầng hàm:</p>
+<pre><code class="language-python">import functools
+import time
+
+
+def thu_lai(so_lan=3, cho=0.1, loi=(ConnectionError,)):
+    def decorator(ham):
+        @functools.wraps(ham)
+        def bao_boc(*args, **kwargs):
+            for lan in range(1, so_lan + 1):
+                try:
+                    return ham(*args, **kwargs)
+                except loi as e:
+                    if lan == so_lan:
+                        raise                       # hết lượt: ném lại lỗi gốc
+                    print(f"  lần {lan} lỗi: {e}; thử lại sau {cho}s")
+                    time.sleep(cho)
+        return bao_boc
+    return decorator
+
+
+so_lan_goi = 0
+
+@thu_lai(so_lan=4, cho=0.01)
+def lay_ty_gia():
+    global so_lan_goi
+    so_lan_goi += 1
+    if so_lan_goi &lt; 3:
+        raise ConnectionError("máy chủ không phản hồi")
+    return 25_350
+
+
+print(lay_ty_gia())</code></pre>
+<pre><code class="language-text">  lần 1 lỗi: máy chủ không phản hồi; thử lại sau 0.01s
+  lần 2 lỗi: máy chủ không phản hồi; thử lại sau 0.01s
+25350</code></pre>
+<p>Đọc từ ngoài vào: <code>thu_lai(so_lan=4, cho=0.01)</code> chạy trước và trả về <code>decorator</code>; sau đó <code>decorator(lay_ty_gia)</code> trả về <code>bao_boc</code>. Ba tầng nghe phức tạp, nhưng đây là khuôn mẫu cố định, bạn chỉ thay phần thân của <code>bao_boc</code>. Ở chặng 7 bạn sẽ gắn decorator này vào hàm gọi Web API thật. (Biến <code>global</code> ở đây chỉ để giả lập lỗi; code thật không nên dùng.)</p>
+
+<h2>5. Decorator có sẵn nên biết</h2>
+<pre><code class="language-python">import functools
+
+
+@functools.cache                     # ghi nhớ kết quả theo tham số (Python 3.9+)
+def fib(n):
+    return n if n &lt; 2 else fib(n - 1) + fib(n - 2)
+
+
+print(fib(90))                       # không cache: hàng nghìn năm; có cache: tức thì
+print(fib.cache_info().hits)
+
+
+class NhietKe:
+    def __init__(self, do_c):
+        self.do_c = do_c
+
+    @staticmethod                    # không cần self: hàm tiện ích đặt trong lớp
+    def c_sang_f(c):
+        return c * 9 / 5 + 32
+
+    @classmethod                     # nhận lớp (cls) thay vì đối tượng: hàm tạo thay thế
+    def tu_do_f(cls, f):
+        return cls((f - 32) * 5 / 9)
+
+
+print(NhietKe.c_sang_f(100), NhietKe.tu_do_f(212).do_c)</code></pre>
+<pre><code class="language-text">2880067194370816120
+88
+212.0 100.0</code></pre>
+<p><code>functools.cache</code> (hoặc <code>lru_cache(maxsize=128)</code> để giới hạn bộ nhớ) chỉ dùng cho hàm thuần: cùng tham số luôn cho cùng kết quả, và tham số phải hash được. Đừng cache hàm đọc CSDL hay gọi API mà dữ liệu thay đổi.</p>
+<div class="tip"><strong>Thứ tự nhiều decorator</strong>Viết <code>@a</code> rồi <code>@b</code> trên một hàm thì tương đương <code>ham = a(b(ham))</code>: decorator gần hàm nhất bọc trước. Khi kết hợp đo thời gian với thử lại, đặt <code>@do_thoi_gian</code> ở trên nếu muốn đo tổng thời gian kể cả các lần thử.</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Hàm là đối tượng; closure là hàm bên trong nhớ biến của hàm bên ngoài; <code>nonlocal</code> để gán lại.</li>
+  <li>Decorator: hàm nhận hàm, trả hàm; <code>@deco</code> = <code>ham = deco(ham)</code>.</li>
+  <li>Luôn có <code>*args, **kwargs</code>, <code>return</code> kết quả và <code>@functools.wraps</code>.</li>
+  <li>Decorator có tham số cần thêm một tầng; <code>functools.cache</code>, <code>staticmethod</code>, <code>classmethod</code> có sẵn.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Decorator ghi log lời gọi</h3>
+<p>Viết decorator <code>ghi_log</code> in tên hàm, tham số và kết quả của mỗi lần gọi, giữ nguyên tên và docstring.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import functools
+
+
+def ghi_log(ham):
+    @functools.wraps(ham)
+    def bao_boc(*args, **kwargs):
+        cac_ts = [repr(a) for a in args] + [f"{k}={v!r}" for k, v in kwargs.items()]
+        ket_qua = ham(*args, **kwargs)
+        print(f"{ham.__name__}({', '.join(cac_ts)}) → {ket_qua!r}")
+        return ket_qua
+    return bao_boc
+
+
+@ghi_log
+def chia_deu(tong, so_nguoi, lam_tron=1000):
+    """Chia tiền đều, làm tròn lên đến lam_tron đồng."""
+    return -(-tong // (so_nguoi * lam_tron)) * lam_tron
+
+
+chia_deu(1_250_000, 3)
+chia_deu(500_000, so_nguoi=4, lam_tron=500)
+print(chia_deu.__name__, "|", chia_deu.__doc__)</code></pre>
+<pre><code class="language-text">chia_deu(1250000, 3) → 417000
+chia_deu(500000, so_nguoi=4, lam_tron=500) → 125000
+chia_deu | Chia tiền đều, làm tròn lên đến lam_tron đồng.</code></pre>
+<p><code>-(-a // b)</code> là mẹo chia làm tròn lên bằng số nguyên, không cần <code>math.ceil</code> và không dính sai số số thực.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Thử lại có điều kiện</h3>
+<p>Dùng <code>thu_lai</code> ở mục 4 cho một hàm luôn ném <code>ConnectionError</code>, với <code>so_lan=2</code>. Xác nhận lỗi cuối cùng được ném ra ngoài, và một hàm ném <code>ValueError</code> thì <strong>không</strong> được thử lại.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import functools
+import time
+
+
+def thu_lai(so_lan=3, cho=0.1, loi=(ConnectionError,)):
+    def decorator(ham):
+        @functools.wraps(ham)
+        def bao_boc(*args, **kwargs):
+            for lan in range(1, so_lan + 1):
+                try:
+                    return ham(*args, **kwargs)
+                except loi:
+                    if lan == so_lan:
+                        raise
+                    time.sleep(cho)
+        return bao_boc
+    return decorator
+
+
+dem = {"mang": 0, "du_lieu": 0}
+
+@thu_lai(so_lan=2, cho=0)
+def luon_mat_mang():
+    dem["mang"] += 1
+    raise ConnectionError("mất mạng")
+
+@thu_lai(so_lan=5, cho=0)
+def du_lieu_sai():
+    dem["du_lieu"] += 1
+    raise ValueError("dữ liệu sai")
+
+for ham in (luon_mat_mang, du_lieu_sai):
+    try:
+        ham()
+    except (ConnectionError, ValueError) as e:
+        print(type(e).__name__, e)
+print(dem)</code></pre>
+<pre><code class="language-text">ConnectionError mất mạng
+ValueError dữ liệu sai
+{'mang': 2, 'du_lieu': 1}</code></pre>
+<p>Chỉ thử lại lỗi <strong>tạm thời</strong> (mạng, máy chủ quá tải). Lỗi dữ liệu thử lại bao nhiêu lần cũng vẫn sai, nên phải ném ra ngay: đó là lý do tham số <code>loi</code> giới hạn loại ngoại lệ.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/glossary.html#term-decorator" rel="noopener" target="_blank">Glossary: decorator</a>; <a href="https://docs.python.org/3/library/functools.html" rel="noopener" target="_blank">functools</a>; <a href="https://peps.python.org/pep-0318/" rel="noopener" target="_blank">PEP 318: Decorators for Functions and Methods</a>.</p>

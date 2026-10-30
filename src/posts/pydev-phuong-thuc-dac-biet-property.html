@@ -1,0 +1,242 @@
+<p>In một đối tượng tự viết ra thì được <code>&lt;__main__.PhanSo object at 0x7f...&gt;</code>, so sánh hai đối tượng giống hệt nhau thì <code>==</code> trả <code>False</code>, không sắp xếp được, không dùng được <code>len()</code>. Bài này dạy cách làm đối tượng của bạn "hòa nhập" với Python bằng các <strong>phương thức đặc biệt</strong> (tên có hai dấu gạch dưới hai bên, gọi tắt là <em>dunder</em>), và cách kiểm soát thuộc tính bằng <code>@property</code>.</p>
+
+<h2>1. __repr__ và __str__: in ra cho dễ đọc</h2>
+<pre><code class="language-python">class Diem:
+    def __init__(self, x: float, y: float):
+        self.x = x
+        self.y = y
+
+    def __repr__(self) -&gt; str:          # cho lập trình viên: rõ ràng, không mơ hồ
+        return f"Diem(x={self.x}, y={self.y})"
+
+    def __str__(self) -&gt; str:           # cho người dùng: thân thiện
+        return f"({self.x}, {self.y})"
+
+
+p = Diem(3, 4)
+print(p)              # print gọi __str__
+print(repr(p))        # repr gọi __repr__
+print([p, Diem(0, 1)])  # list hiển thị các phần tử bằng __repr__</code></pre>
+<pre><code class="language-text">(3, 4)
+Diem(x=3, y=4)
+[Diem(x=3, y=4), Diem(x=0, y=1)]</code></pre>
+<p>Luôn viết <code>__repr__</code> cho mọi class: nó hiện trong debugger, trong log, trong REPL. Quy ước tốt: <code>__repr__</code> trông giống câu lệnh tạo lại đối tượng. Nếu chỉ có <code>__repr__</code>, <code>print</code> cũng dùng nó.</p>
+
+<h2>2. So sánh: __eq__ và __lt__</h2>
+<pre><code class="language-python">class Diem:
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+
+    def __repr__(self):
+        return f"Diem({self.x}, {self.y})"
+
+    def __eq__(self, khac):
+        if not isinstance(khac, Diem):
+            return NotImplemented        # để Python thử cách khác, cuối cùng trả False
+        return (self.x, self.y) == (khac.x, khac.y)
+
+    def __hash__(self):                  # định nghĩa __eq__ thì phải định nghĩa lại __hash__
+        return hash((self.x, self.y))    # nếu muốn dùng làm khóa dict, phần tử set
+
+    def __lt__(self, khac):              # "nhỏ hơn": theo khoảng cách tới gốc tọa độ
+        return self.x ** 2 + self.y ** 2 &lt; khac.x ** 2 + khac.y ** 2
+
+
+print(Diem(1, 2) == Diem(1, 2), Diem(1, 2) == "abc")
+print(sorted([Diem(3, 4), Diem(1, 1), Diem(0, 2)]))
+print(len({Diem(1, 2), Diem(1, 2)}))</code></pre>
+<pre><code class="language-text">True False
+[Diem(1, 1), Diem(0, 2), Diem(3, 4)]
+1</code></pre>
+<p>Không có <code>__eq__</code>, <code>==</code> so sánh <strong>danh tính</strong> (có phải cùng một đối tượng trong bộ nhớ không), giống <code>is</code>. <code>sorted</code> và <code>min</code>, <code>max</code> chỉ cần <code>__lt__</code>. Cần đủ cả <code>&lt;=</code>, <code>&gt;</code>, <code>&gt;=</code> thì dùng decorator <code>functools.total_ordering</code>, hoặc đơn giản hơn: <code>dataclass(order=True)</code> ở bài 4.</p>
+
+<h2>3. Toán tử số học: __add__, __mul__</h2>
+<pre><code class="language-python">from math import gcd
+
+
+class PhanSo:
+    def __init__(self, tu: int, mau: int = 1):
+        if mau == 0:
+            raise ZeroDivisionError("Mẫu số bằng 0")
+        if mau &lt; 0:
+            tu, mau = -tu, -mau
+        g = gcd(tu, mau)
+        self.tu, self.mau = tu // g, mau // g
+
+    def __repr__(self):
+        return f"PhanSo({self.tu}, {self.mau})"
+
+    def __str__(self):
+        return f"{self.tu}/{self.mau}" if self.mau != 1 else str(self.tu)
+
+    def __add__(self, khac):
+        if isinstance(khac, int):
+            khac = PhanSo(khac)
+        return PhanSo(self.tu * khac.mau + khac.tu * self.mau, self.mau * khac.mau)
+
+    __radd__ = __add__                   # cho phép 1 + PhanSo(...)
+
+    def __mul__(self, khac):
+        return PhanSo(self.tu * khac.tu, self.mau * khac.mau)
+
+    def __eq__(self, khac):
+        return isinstance(khac, PhanSo) and (self.tu, self.mau) == (khac.tu, khac.mau)
+
+
+a, b = PhanSo(1, 2), PhanSo(1, 3)
+print(a + b, a * b, PhanSo(2, -4), 1 + a, PhanSo(6, 3))
+print(sum([PhanSo(1, 2), PhanSo(1, 3), PhanSo(1, 6)]))</code></pre>
+<pre><code class="language-text">5/6 1/6 -1/2 3/2 2
+1</code></pre>
+<p><code>sum()</code> bắt đầu từ số 0 rồi cộng dần, tức là gọi <code>0 + PhanSo(1, 2)</code>: int không biết cộng với PhanSo nên Python thử <code>PhanSo.__radd__</code>. Đó là lý do cần <code>__radd__</code>. (Thư viện chuẩn đã có <code>fractions.Fraction</code> làm việc này đầy đủ; tự viết ở đây để hiểu cơ chế.)</p>
+
+<h2>4. Dùng như một dãy: __len__, __iter__, __getitem__, __contains__</h2>
+<pre><code class="language-python">class DanhSachPhat:
+    def __init__(self, ten: str, bai_hat: list[str]):
+        self.ten = ten
+        self._bai = list(bai_hat)
+
+    def __len__(self):
+        return len(self._bai)
+
+    def __iter__(self):
+        return iter(self._bai)
+
+    def __getitem__(self, i):
+        return self._bai[i]
+
+    def __contains__(self, bai):
+        return bai.casefold() in (b.casefold() for b in self._bai)
+
+
+ds = DanhSachPhat("Chill", ["Lạc trôi", "Nơi này có anh", "Có chàng trai viết lên cây"])
+print(len(ds), ds[0], ds[-1])
+print("NƠI NÀY CÓ ANH" in ds)
+for stt, bai in enumerate(ds, 1):
+    print(stt, bai)</code></pre>
+<pre><code class="language-text">3 Lạc trôi Có chàng trai viết lên cây
+True
+1 Lạc trôi
+2 Nơi này có anh
+3 Có chàng trai viết lên cây</code></pre>
+<p>Đây là sức mạnh của "duck typing" trong Python: đối tượng có <code>__len__</code> thì dùng được <code>len()</code>, có <code>__iter__</code> thì dùng được trong <code>for</code>, không cần kế thừa từ list.</p>
+
+<h2>5. @property: thuộc tính có kiểm soát</h2>
+<pre><code class="language-python">class NhietDo:
+    def __init__(self, do_c: float):
+        self.do_c = do_c                     # đi qua setter ngay từ đầu
+
+    @property
+    def do_c(self) -&gt; float:                 # getter: đọc nhiet.do_c
+        return self._do_c
+
+    @do_c.setter
+    def do_c(self, gia_tri: float) -&gt; None:  # setter: gán nhiet.do_c = ...
+        if gia_tri &lt; -273.15:
+            raise ValueError("Thấp hơn độ không tuyệt đối")
+        self._do_c = gia_tri
+
+    @property
+    def do_f(self) -&gt; float:                 # thuộc tính tính toán, chỉ đọc
+        return self._do_c * 9 / 5 + 32
+
+
+t = NhietDo(36.6)
+print(t.do_c, round(t.do_f, 2))
+t.do_c = 100
+print(t.do_f)
+try:
+    t.do_c = -300
+except ValueError as loi:
+    print("Từ chối:", loi)
+# t.do_f = 50 → AttributeError: không có setter nên chỉ đọc</code></pre>
+<pre><code class="language-text">36.6 97.88
+212.0
+Từ chối: Thấp hơn độ không tuyệt đối</code></pre>
+<p>Người dùng lớp viết <code>t.do_c</code> như thuộc tính thường, nhưng mỗi lần đọc, gán đều đi qua hàm của bạn. Lời khuyên kiểu Python: cứ bắt đầu bằng thuộc tính công khai thông thường; khi cần kiểm tra hay tính toán thì đổi sang <code>@property</code>, code bên ngoài không phải sửa gì. Không cần viết <code>get_x()</code>, <code>set_x()</code> như Java.</p>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li><code>__repr__</code> cho mọi class; <code>__str__</code> khi cần dạng thân thiện.</li>
+  <li><code>__eq__</code> (kèm <code>__hash__</code>), <code>__lt__</code> cho so sánh, sắp xếp; trả <code>NotImplemented</code> khi khác kiểu.</li>
+  <li><code>__add__</code>, <code>__radd__</code>, <code>__mul__</code> cho toán tử; <code>__len__</code>, <code>__iter__</code>, <code>__getitem__</code>, <code>__contains__</code> cho dãy.</li>
+  <li><code>@property</code> + <code>@x.setter</code> để kiểm soát đọc, gán; property không setter là chỉ đọc.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Phân số so sánh được</h3>
+<p>Thêm vào lớp <code>PhanSo</code> phép trừ và phép so sánh <code>&lt;</code>, rồi sắp xếp <code>[3/4, 1/2, 5/6, 2/3]</code>.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">from math import gcd
+
+
+class PhanSo:
+    def __init__(self, tu: int, mau: int = 1):
+        if mau == 0:
+            raise ZeroDivisionError("Mẫu số bằng 0")
+        if mau &lt; 0:
+            tu, mau = -tu, -mau
+        g = gcd(tu, mau)
+        self.tu, self.mau = tu // g, mau // g
+
+    def __repr__(self):
+        return f"{self.tu}/{self.mau}"
+
+    def __sub__(self, khac):
+        return PhanSo(self.tu * khac.mau - khac.tu * self.mau, self.mau * khac.mau)
+
+    def __lt__(self, khac):
+        return self.tu * khac.mau &lt; khac.tu * self.mau   # nhân chéo, không dùng số thực
+
+
+ds = [PhanSo(3, 4), PhanSo(1, 2), PhanSo(5, 6), PhanSo(2, 3)]
+print(sorted(ds), PhanSo(3, 4) - PhanSo(1, 2))</code></pre>
+<pre><code class="language-text">[1/2, 2/3, 3/4, 5/6] 1/4</code></pre>
+<p>So sánh bằng nhân chéo (mẫu luôn dương nhờ <code>__init__</code>) cho kết quả chính xác tuyệt đối, không dính sai số làm tròn của số thực.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Sản phẩm có giá kiểm soát</h3>
+<p>Viết lớp <code>SanPham</code> với property <code>gia</code> (setter từ chối giá âm) và property chỉ đọc <code>gia_sau_thue</code> (VAT 8%, làm tròn).</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">class SanPham:
+    VAT = 0.08
+
+    def __init__(self, ten: str, gia: int):
+        self.ten = ten
+        self.gia = gia
+
+    @property
+    def gia(self) -&gt; int:
+        return self._gia
+
+    @gia.setter
+    def gia(self, gia_moi: int) -&gt; None:
+        if gia_moi &lt; 0:
+            raise ValueError(f"Giá không được âm: {gia_moi}")
+        self._gia = gia_moi
+
+    @property
+    def gia_sau_thue(self) -&gt; int:
+        return round(self._gia * (1 + self.VAT))
+
+    def __repr__(self):
+        return f"SanPham({self.ten!r}, {self._gia})"
+
+
+sp = SanPham("Tai nghe", 590_000)
+print(sp, sp.gia_sau_thue)
+sp.gia = 490_000
+print(sp.gia_sau_thue)
+try:
+    SanPham("Lỗi", -1)
+except ValueError as loi:
+    print(loi)</code></pre>
+<pre><code class="language-text">SanPham('Tai nghe', 590000) 637200
+529200
+Giá không được âm: -1</code></pre>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/reference/datamodel.html#special-method-names" rel="noopener" target="_blank">Data model: Special method names</a>; <a href="https://docs.python.org/3/library/functions.html#property" rel="noopener" target="_blank">Built-in Functions: property</a>; <a href="https://docs.python.org/3/library/fractions.html" rel="noopener" target="_blank">fractions</a>.</p>

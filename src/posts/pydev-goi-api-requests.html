@@ -1,0 +1,193 @@
+<p>Tỷ giá, thời tiết, đơn hàng trên sàn thương mại điện tử, tin nhắn Telegram, dữ liệu từ hệ thống nội bộ của công ty: gần như mọi dữ liệu ngày nay đều lấy được qua <strong>Web API</strong>. Gọi API là kỹ năng hằng ngày của Python Developer, dù bạn làm tự động hóa hay backend. Bài này dùng thư viện <code>requests</code>, cách gọi HTTP phổ biến nhất trong Python, với các API công khai miễn phí không cần đăng ký.</p>
+
+<h2>1. Request và response</h2>
+<p>Chương trình của bạn gửi một <strong>request</strong> (yêu cầu) tới máy chủ gồm: phương thức (<code>GET</code> để lấy dữ liệu, <code>POST</code> để gửi dữ liệu...), URL, header và có thể có body. Máy chủ trả về <strong>response</strong>: mã trạng thái, header và body, thường là JSON. Chặng 9 sẽ đi sâu vào HTTP khi bạn tự viết API; ở đây chỉ cần biết các mã trạng thái chính:</p>
+<table>
+  <thead><tr><th>Mã</th><th>Ý nghĩa</th></tr></thead>
+  <tbody>
+    <tr><td>200, 201</td><td>Thành công, đã tạo mới</td></tr>
+    <tr><td>400, 422</td><td>Request sai (thiếu tham số, dữ liệu không hợp lệ)</td></tr>
+    <tr><td>401, 403</td><td>Chưa đăng nhập, không có quyền</td></tr>
+    <tr><td>404</td><td>Không tìm thấy</td></tr>
+    <tr><td>429</td><td>Gọi quá nhiều, bị giới hạn tần suất</td></tr>
+    <tr><td>500, 502, 503</td><td>Lỗi phía máy chủ</td></tr>
+  </tbody>
+</table>
+
+<h2>2. GET đầu tiên</h2>
+<p>Cài: <code>uv add requests</code>. Lấy dự báo nhiệt độ Hà Nội từ <a href="https://open-meteo.com/" rel="noopener" target="_blank">Open-Meteo</a> (miễn phí cho mục đích phi thương mại, không cần key):</p>
+<pre><code class="language-python">import requests
+
+URL = "https://api.open-meteo.com/v1/forecast"
+tham_so = {
+    "latitude": 21.03,
+    "longitude": 105.85,
+    "daily": "temperature_2m_max,temperature_2m_min",
+    "timezone": "Asia/Ho_Chi_Minh",
+    "forecast_days": 3,
+}
+r = requests.get(URL, params=tham_so, timeout=10)    # kết quả thay đổi theo ngày
+print(r.status_code, r.headers["Content-Type"])
+du_lieu = r.json()                                   # JSON → dict
+ngay = du_lieu["daily"]
+for d, cao, thap in zip(ngay["time"], ngay["temperature_2m_max"], ngay["temperature_2m_min"]):
+    print(f"{d}: {thap:.0f}–{cao:.0f}°C")</code></pre>
+<pre><code class="language-text">200 application/json; charset=utf-8
+2026-10-29: 24–31°C
+2026-10-30: 24–30°C
+2026-10-31: 25–30°C</code></pre>
+<ul>
+  <li><code>params=</code> nhận dict và tự ghép thành chuỗi truy vấn <code>?latitude=21.03&amp;...</code>, tự mã hóa ký tự đặc biệt. Đừng tự nối chuỗi URL.</li>
+  <li><code>r.json()</code> chuyển body JSON thành dict, list. <code>r.text</code> là body dạng chuỗi.</li>
+  <li><strong><code>timeout=10</code> là bắt buộc</strong>. Mặc định requests chờ vô hạn; máy chủ treo là chương trình của bạn treo theo.</li>
+</ul>
+<p>Mẹo khi làm việc với API lạ: in <code>du_lieu</code> ra (hoặc mở URL trong trình duyệt) để xem cấu trúc JSON trước, rồi mới viết code lấy trường cần dùng.</p>
+
+<h2>3. Kiểm tra lỗi</h2>
+<pre><code class="language-python">import requests
+
+r = requests.get("https://api.open-meteo.com/v1/forecast", params={"latitude": 999, "longitude": 105.85}, timeout=10)
+print(r.status_code, r.json())
+try:
+    r.raise_for_status()                 # ném HTTPError nếu mã 4xx, 5xx
+except requests.HTTPError as loi:
+    print("Lỗi:", loi)</code></pre>
+<pre><code class="language-text">400 {'error': True, 'reason': 'Latitude must be in range of -90 to 90°. Given: 999.0.'}
+Lỗi: 400 Client Error: Bad Request for url: https://api.open-meteo.com/v1/forecast?latitude=999&amp;longitude=105.85</code></pre>
+<p>requests <strong>không</strong> tự ném lỗi khi máy chủ trả 4xx, 5xx: <code>r.json()</code> vẫn chạy và bạn có thể vô tình xử lý một thông báo lỗi như dữ liệu thật. Luôn gọi <code>r.raise_for_status()</code> (hoặc kiểm tra <code>r.ok</code>) trước khi dùng dữ liệu. Nhiều API giải thích lỗi trong body như ví dụ trên: hãy ghi nó vào log.</p>
+<p>Ngoài lỗi HTTP còn có lỗi mạng: mất kết nối (<code>requests.ConnectionError</code>), hết thời gian chờ (<code>requests.Timeout</code>). Mọi lỗi của requests đều kế thừa <code>requests.RequestException</code>.</p>
+
+<h2>4. POST, header và JSON body</h2>
+<p><a href="https://httpbin.org/" rel="noopener" target="_blank">httpbin.org</a> là dịch vụ trả lại đúng những gì bạn gửi, tiện để thử:</p>
+<pre><code class="language-python">import requests
+
+don_hang = {"khach": "An", "mat_hang": [{"ma": "SP1", "so_luong": 2}]}
+r = requests.post(
+    "https://httpbin.org/post",
+    json=don_hang,                                   # tự chuyển dict → JSON, đặt Content-Type
+    headers={"User-Agent": "hoc-python/1.0", "X-Ma-Yeu-Cau": "abc123"},
+    timeout=10,
+)
+r.raise_for_status()
+nhan = r.json()
+print(nhan["json"] == don_hang, nhan["headers"]["Content-Type"], nhan["headers"]["X-Ma-Yeu-Cau"])</code></pre>
+<pre><code class="language-text">True application/json abc123</code></pre>
+<p><code>json=</code> dùng khi API nhận JSON (đa số API hiện đại); <code>data=</code> dùng cho form truyền thống. Header là cặp khóa – giá trị đi kèm request: loại nội dung, ngôn ngữ, và quan trọng nhất là <strong>thông tin xác thực</strong>.</p>
+
+<h2>5. API key và bí mật</h2>
+<p>Đa số API thật yêu cầu key, thường gửi qua header:</p>
+<pre><code class="language-python"># (minh họa) đọc key từ biến môi trường, không viết thẳng vào code
+import os
+
+import requests
+
+api_key = os.environ["TEN_DICH_VU_API_KEY"]            # thiếu thì KeyError ngay: dễ phát hiện
+r = requests.get("https://api.vi-du.vn/v1/don-hang",
+                 headers={"Authorization": f"Bearer {api_key}"}, timeout=10)</code></pre>
+<p>Đặt key trong file <code>.env</code> (đã có trong <code>.gitignore</code>) và nạp vào biến môi trường, hoặc dùng thư viện <code>python-dotenv</code>. Không bao giờ viết key trong code, không in key ra log.</p>
+
+<h2>6. Session, thử lại và giới hạn tần suất</h2>
+<pre><code class="language-python">import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+
+def tao_session() -&gt; requests.Session:
+    s = requests.Session()
+    thu_lai = Retry(
+        total=3,                                # tối đa 3 lần thử lại
+        backoff_factor=0.5,                     # chờ tăng dần giữa các lần
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["GET"],                # chỉ tự thử lại request an toàn
+    )
+    s.mount("https://", HTTPAdapter(max_retries=thu_lai))
+    s.headers["User-Agent"] = "hoc-python/1.0"
+    return s
+
+
+with tao_session() as s:                        # kết quả thay đổi theo ngày
+    for tp, (lat, lon) in {"Hà Nội": (21.03, 105.85), "TP.HCM": (10.82, 106.63)}.items():
+        r = s.get("https://api.open-meteo.com/v1/forecast",
+                  params={"latitude": lat, "longitude": lon, "current": "temperature_2m"}, timeout=10)
+        r.raise_for_status()
+        print(tp, r.json()["current"]["temperature_2m"], "°C")</code></pre>
+<pre><code class="language-text">Hà Nội 27.4 °C
+TP.HCM 29.8 °C</code></pre>
+<ul>
+  <li><strong>Session</strong> giữ kết nối TCP để dùng lại giữa các request (nhanh hơn nhiều khi gọi liên tục tới cùng máy chủ), và giữ header, cookie chung.</li>
+  <li><strong>Retry</strong> tự thử lại khi gặp lỗi tạm thời, chờ tăng dần (0,5 s, 1 s, 2 s...) để không dội thêm tải vào máy chủ đang quá tải. Chỉ tự thử lại <code>GET</code>; <code>POST</code> tạo đơn hàng mà thử lại có thể tạo đơn trùng.</li>
+  <li>Tôn trọng giới hạn tần suất của API (thường ghi trong tài liệu): thêm <code>time.sleep()</code> giữa các lần gọi khi duyệt nhiều trang.</li>
+</ul>
+<div class="tip"><strong>httpx: lựa chọn hiện đại</strong>Thư viện <code>httpx</code> có giao diện gần như giống hệt requests (<code>httpx.get(url, params=..., timeout=...)</code>) và hỗ trợ thêm gọi bất đồng bộ với <code>async</code>/<code>await</code>, HTTP/2. Bạn sẽ dùng httpx ở bài asyncio (chặng 10) và trong test FastAPI (chặng 9).</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li><code>requests.get(url, params=..., timeout=...)</code>, <code>requests.post(url, json=..., headers=...)</code>.</li>
+  <li>Luôn có <code>timeout</code>; luôn <code>raise_for_status()</code> trước khi dùng <code>r.json()</code>.</li>
+  <li>Bắt <code>requests.RequestException</code> cho lỗi mạng; key đọc từ biến môi trường.</li>
+  <li><code>Session</code> + <code>Retry</code> cho gọi nhiều lần, thử lại lỗi tạm thời (chỉ với GET).</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Dự báo 7 ngày</h3>
+<p>Gọi Open-Meteo lấy nhiệt độ cao nhất, thấp nhất và tổng lượng mưa (<code>precipitation_sum</code>) 7 ngày tới ở Hà Nội, in bảng ngày (dd/mm) – thấp – cao – mưa.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">from datetime import date
+
+import requests
+
+r = requests.get(
+    "https://api.open-meteo.com/v1/forecast",
+    params={"latitude": 21.03, "longitude": 105.85, "timezone": "Asia/Ho_Chi_Minh",
+            "daily": "temperature_2m_max,temperature_2m_min,precipitation_sum", "forecast_days": 7},
+    timeout=10,
+)
+r.raise_for_status()
+d = r.json()["daily"]
+print(f"{'Ngày':&lt;7}{'Thấp':&gt;6}{'Cao':&gt;6}{'Mưa':&gt;8}")
+for ngay, thap, cao, mua in zip(d["time"], d["temperature_2m_min"], d["temperature_2m_max"],
+                                d["precipitation_sum"]):
+    print(f"{date.fromisoformat(ngay):%d/%m}{thap:&gt;7.0f}{cao:&gt;6.0f}{mua:&gt;6.1f}mm")   # kết quả thay đổi theo ngày</code></pre>
+<pre><code class="language-text">Ngày     Thấp   Cao     Mưa
+29/10     24    31   0.0mm
+30/10     24    30   1.2mm
+...</code></pre>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Hàm lấy JSON chịu lỗi</h3>
+<p>Viết <code>lay_json(url, params=None, so_lan_thu=3)</code>: có timeout, thử lại khi lỗi mạng hoặc mã 5xx (chờ 1 s, 2 s...), không thử lại với 4xx, hết lượt thì ném lỗi cuối.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import time
+
+import requests
+
+
+def lay_json(url: str, params: dict | None = None, so_lan_thu: int = 3, cho: float = 1.0):
+    for lan in range(1, so_lan_thu + 1):
+        try:
+            r = requests.get(url, params=params, timeout=10)
+            if r.status_code &lt; 500:
+                r.raise_for_status()           # 4xx: lỗi của mình, ném ngay
+                return r.json()
+            loi = requests.HTTPError(f"{r.status_code} từ máy chủ")
+        except (requests.ConnectionError, requests.Timeout) as e:
+            loi = e
+        if lan == so_lan_thu:
+            raise loi
+        time.sleep(cho * 2 ** (lan - 1))       # 1 s, 2 s, 4 s...
+
+
+print(lay_json("https://httpbin.org/json")["slideshow"]["title"])
+try:
+    lay_json("https://httpbin.org/status/503", so_lan_thu=2, cho=0.1)
+except requests.HTTPError as e:
+    print("Bỏ cuộc:", e)</code></pre>
+<pre><code class="language-text">Sample Slide Show
+Bỏ cuộc: 503 từ máy chủ</code></pre>
+<p>Đây chính là decorator <code>thu_lai</code> ở chặng 5 được viết thẳng vào hàm. Trong dự án thật, dùng <code>Session</code> + <code>Retry</code> như mục 6 hoặc thư viện chuyên dụng như <code>tenacity</code> thay vì tự viết.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://requests.readthedocs.io/en/latest/user/quickstart/" rel="noopener" target="_blank">Requests: Quickstart</a>; <a href="https://requests.readthedocs.io/en/latest/user/advanced/" rel="noopener" target="_blank">Requests: Advanced Usage</a>; <a href="https://open-meteo.com/en/docs" rel="noopener" target="_blank">Open-Meteo API docs</a>; <a href="https://urllib3.readthedocs.io/en/stable/reference/urllib3.util.html#urllib3.util.Retry" rel="noopener" target="_blank">urllib3 Retry</a>.</p>

@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="vi" data-root="../">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CI cho dự án Python với GitHub Actions: Ruff, mypy, pytest | HọcFree</title>
+<meta name="description" content="Tự động kiểm tra mỗi lần đẩy code: workflow GitHub Actions cài uv, chạy Ruff, mypy, pytest trên nhiều phiên bản Python bằng matrix.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://hocfree.vn/hoc/pydev-ci-github-actions.html">
+<meta property="og:site_name" content="HọcFree">
+<meta property="og:type" content="article">
+<meta property="og:title" content="CI cho dự án Python với GitHub Actions: Ruff, mypy, pytest">
+<meta property="og:description" content="Tự động kiểm tra mỗi lần đẩy code: workflow GitHub Actions cài uv, chạy Ruff, mypy, pytest trên nhiều phiên bản Python bằng matrix.">
+<meta property="og:url" content="https://hocfree.vn/hoc/pydev-ci-github-actions.html">
+<meta property="og:image" content="https://hocfree.vn/assets/images/posts/pydev-ci-github-actions.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="CI cho dự án Python với GitHub Actions: Ruff, mypy, pytest">
+<meta property="og:locale" content="vi_VN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="CI cho dự án Python với GitHub Actions: Ruff, mypy, pytest">
+<meta name="twitter:description" content="Tự động kiểm tra mỗi lần đẩy code: workflow GitHub Actions cài uv, chạy Ruff, mypy, pytest trên nhiều phiên bản Python bằng matrix.">
+<meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/pydev-ci-github-actions.jpg">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/fonts.css?v=20261029">
+<link rel="stylesheet" href="../assets/css/style.css?v=20261029">
+<script>try{var t=localStorage.getItem('hf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
+<meta property="article:published_time" content="2026-10-29">
+<meta property="article:section" content="Học AI &amp; Lập trình">
+<meta property="article:tag" content="Python">
+<meta property="article:tag" content="Lập trình">
+<meta property="article:tag" content="Công cụ">
+<meta property="article:tag" content="GitHub">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "CI cho dự án Python với GitHub Actions: Ruff, mypy, pytest", "description": "Tự động kiểm tra mỗi lần đẩy code: workflow GitHub Actions cài uv, chạy Ruff, mypy, pytest trên nhiều phiên bản Python bằng matrix.", "image": ["https://hocfree.vn/assets/images/posts/pydev-ci-github-actions.jpg"], "datePublished": "2026-10-29", "dateModified": "2026-10-29", "inLanguage": "vi", "articleSection": "Học AI & Lập trình", "keywords": "Python, Lập trình, Công cụ, GitHub", "wordCount": 1100, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/hoc/pydev-ci-github-actions.html"}, "isPartOf": {"@type": "Course", "name": "Python Developer", "url": "https://hocfree.vn/lo-trinh/python-developer.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Learning Paths", "item": "https://hocfree.vn/lo-trinh/"}, {"@type": "ListItem", "position": 3, "name": "Python Developer", "item": "https://hocfree.vn/lo-trinh/python-developer.html"}, {"@type": "ListItem", "position": 4, "name": "Chặng 10: Hiệu năng, đồng thời và triển khai", "item": "https://hocfree.vn/lo-trinh/python-developer/hieu-nang-va-trien-khai.html"}, {"@type": "ListItem", "position": 5, "name": "CI cho dự án Python với GitHub Actions: Ruff, mypy, pytest"}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div class="progress" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="container wide header-top">
+    <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="nav-scrim" hidden></div>
+    <a class="logo" href="../" aria-label="HọcFree – Trang chủ"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+    <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
+    <div class="header-actions">
+      <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="login-link" href="../dang-nhap.html">Đăng nhập</a>
+      <a class="btn start-btn" href="../lo-trinh/">Bắt đầu học</a>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="container wide">
+      <nav class="site-nav" id="site-nav" aria-label="Menu chính">
+        <div class="drawer-head">
+          <a class="logo" href="../" tabindex="-1"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+          <button class="icon-btn nav-close" aria-label="Đóng menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <button type="button" class="drawer-search search-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Tìm bài học, chủ đề…</span></button>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="../">Trang chủ</a></li><li class="nav-item has-panel is-mega"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-hoc">Học AI &amp; Lập trình<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel mega" id="nav-panel-hoc">
+  <div class="container wide mega-inner">
+    <div class="mega-groups"><div class="mega-group"><a class="mega-group-title" href="../hoc/#programming">Programming</a><ul><li><a href="../hoc/python.html">Python</a></li><li><a href="../hoc/csharp.html">C#</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#ai-machine-learning">AI &amp; Machine Learning</a><ul><li><a href="../hoc/machine-learning.html">Machine Learning</a></li><li><a href="../hoc/deep-learning.html">Deep Learning</a></li><li><a href="../hoc/pytorch.html">PyTorch</a></li><li><a href="../hoc/generative-ai.html">Generative AI</a></li><li><a href="../hoc/llm-ai-agents.html">LLM / AI Agents</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#computer-vision">Computer Vision</a><ul><li><a href="../hoc/opencv.html">OpenCV</a></li><li><a href="../hoc/image-processing.html">Image Processing</a></li><li><a href="../hoc/computer-vision.html">Computer Vision</a></li><li><a href="../hoc/ocr.html">OCR</a></li><li><a href="../hoc/object-detection.html">Object Detection</a></li><li><a href="../hoc/segmentation.html">Segmentation</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#vision-engineering">Vision Engineering</a><ul><li><a href="../hoc/machine-vision.html">Machine Vision</a></li><li><a href="../hoc/ai-vision.html">AI Vision</a></li><li><a href="../hoc/industrial-vision.html">Industrial Vision</a></li><li><a href="../hoc/camera-lens.html">Camera &amp; Lens</a></li><li><a href="../hoc/lighting.html">Lighting</a></li><li><a href="../hoc/calibration.html">Calibration</a></li><li><a href="../hoc/3d-vision.html">3D Vision</a></li><li><a href="../hoc/plc-robot-mes.html">PLC / Robot / MES</a></li><li><a href="../hoc/vision-deployment.html">Vision Deployment</a></li></ul></div></div>
+    <a class="feature-card" href="../lo-trinh/vision-engineer.html">
+  <span class="feature-eyebrow">⭐ Learning Path nổi bật</span>
+  <span class="feature-title">Trở thành Vision Engineer</span>
+  <span class="feature-sub">Machine Vision + AI Vision + Industrial Automation</span>
+  <span class="feature-desc">Lộ trình thực chiến từ Python, OpenCV và Machine Vision đến 3D Vision, Deep Learning, AI Vision, Camera, PLC, Robot và triển khai hệ thống Vision trong nhà máy.</span>
+  <span class="feature-chain" aria-label="Các chặng chính"><span>Python</span><i aria-hidden="true">→</i><span>OpenCV</span><i aria-hidden="true">→</i><span>Machine Vision</span><i aria-hidden="true">→</i><span>AI Vision</span><i aria-hidden="true">→</i><span class="chain-goal">🎯 Vision Engineer</span></span>
+  <span class="feature-meta">15 chặng · 5 giai đoạn · ~13 tháng</span>
+  <span class="feature-cta">Xem lộ trình →</span>
+</a>
+  </div>
+  <div class="mega-foot"><div class="container wide mega-foot-inner"><ol class="journey compact" aria-label="Học, thực hành, trở thành kỹ sư"><li><a href="../hoc/" aria-current="step"><span class="journey-n">1</span><span class="journey-t"><b>Học</b><small>Học AI &amp; Lập trình</small></span></a></li><li><a href="../projects/"><span class="journey-n">2</span><span class="journey-t"><b>Thực hành</b><small>Projects</small></span></a></li><li><a href="../lo-trinh/"><span class="journey-n">3</span><span class="journey-t"><b>Trở thành kỹ sư</b><small>Learning Paths</small></span></a></li></ol><a class="panel-all" href="../hoc/">Xem tất cả Học AI &amp; Lập trình →</a></div></div>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-projects">Projects<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-projects">
+  <p class="panel-kicker"><span>Bước 2 · Thực hành</span>Áp dụng vào dự án thật</p>
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../projects/ai-projects.html"><span class="drop-label">AI Projects</span><span class="drop-desc">Ứng dụng ML và LLM, từ ý tưởng đến bản demo</span></a></li><li><a class="drop-link" href="../projects/computer-vision-projects.html"><span class="drop-label">Computer Vision Projects</span><span class="drop-desc">Phát hiện, nhận dạng và theo dõi đối tượng</span></a></li><li><a class="drop-link" href="../projects/industrial-vision-projects.html"><span class="drop-label">Industrial Vision Projects</span><span class="drop-desc">Đo kích thước, kiểm tra lỗi, đọc mã trên dây chuyền</span></a></li></ul></div></div>
+  <a class="panel-all" href="../projects/">Xem tất cả Projects →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger is-active" aria-expanded="false" aria-controls="nav-panel-lo-trinh" aria-current="true">Learning Paths<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-lo-trinh">
+  <p class="panel-kicker"><span>Bước 3 · Trở thành kỹ sư</span>Định hướng nghề nghiệp</p>
+  <ul class="drop-list"><li><a class="drop-link is-flagship" href="../lo-trinh/vision-engineer.html"><span class="drop-label">⭐ Trở thành Vision Engineer</span><span class="drop-desc">Machine Vision + AI Vision + Industrial Automation · 15 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/toeic-700.html"><span class="drop-label">700+ TOEIC trong 5 tháng</span><span class="drop-desc">TOEIC Listening &amp; Reading + giao tiếp công sở cho người đi làm · 11 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/hsk3.html"><span class="drop-label">Tiếng Trung từ 0 đến HSK 3 trong 6 tháng</span><span class="drop-desc">Pinyin, chữ Hán, ngữ pháp, giao tiếp và luyện thi HSK 3.0 cho người Việt · 10 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/python-developer.html"><span class="drop-label">Python Developer</span><span class="drop-desc">Python, tự động hóa, dữ liệu và Web API · 10 chặng</span></a></li></ul>
+  <a class="panel-all" href="../lo-trinh/">Xem tất cả lộ trình →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-kien-thuc">Kiến thức<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-kien-thuc">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Lĩnh vực</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/programming.html"><span class="drop-label">Programming</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-machine-learning.html"><span class="drop-label">AI / Machine Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/deep-learning.html"><span class="drop-label">Deep Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/machine-vision.html"><span class="drop-label">Machine Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-vision.html"><span class="drop-label">AI Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/industrial-automation.html"><span class="drop-label">Industrial Automation</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Công cụ &amp; mẹo</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/tools-frameworks.html"><span class="drop-label">Tools &amp; Frameworks</span></a></li><li><a class="drop-link" href="../kien-thuc/tips-tricks.html"><span class="drop-label">Tips &amp; Tricks</span></a></li></ul></div></div>
+  <a class="panel-all" href="../kien-thuc/">Xem tất cả Kiến thức →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tin-tuc-ai">Tin tức AI<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tin-tuc-ai">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tin-tuc-ai/ai-news.html"><span class="drop-label">AI News</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-models.html"><span class="drop-label">AI Models</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/technology.html"><span class="drop-label">Technology</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/robotics.html"><span class="drop-label">Robotics</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-industry.html"><span class="drop-label">AI Industry</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tin-tuc-ai/">Xem tất cả Tin tức AI →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-ngoai-ngu">Ngoại ngữ<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-ngoai-ngu">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Ngôn ngữ</p><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/english.html"><span class="drop-label">English</span><span class="drop-desc">Lộ trình 700 TOEIC, phương pháp học, giáo trình HF-700TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chinese.html"><span class="drop-label">Chinese</span><span class="drop-desc">Lộ trình 0 đến HSK 3 trong 6 tháng, phương pháp học, giáo trình HF-HSK3</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Tiếng Anh theo kỹ năng</p><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/toeic-listening.html"><span class="drop-label">TOEIC Listening</span><span class="drop-desc">Part 1–4: mô tả tranh, hỏi – đáp, hội thoại, bài nói</span></a></li><li><a class="drop-link" href="../ngoai-ngu/toeic-reading.html"><span class="drop-label">TOEIC Reading</span><span class="drop-desc">Part 5–7: điền từ, điền câu, đọc hiểu</span></a></li><li><a class="drop-link" href="../ngoai-ngu/ngu-phap-tieng-anh.html"><span class="drop-label">Ngữ pháp tiếng Anh</span><span class="drop-desc">Từ loại, thì, mệnh đề, liên từ cho TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/tu-vung-tieng-anh.html"><span class="drop-label">Từ vựng tiếng Anh</span><span class="drop-desc">Từ vựng công sở theo chủ đề, collocation</span></a></li><li><a class="drop-link" href="../ngoai-ngu/giao-tiep-tieng-anh.html"><span class="drop-label">Giao tiếp công sở</span><span class="drop-desc">Điện thoại, họp, thuyết trình, email</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Tiếng Trung theo kỹ năng</p><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/pinyin-phat-am.html"><span class="drop-label">Pinyin &amp; phát âm</span><span class="drop-desc">Thanh mẫu, vận mẫu, thanh điệu, biến điệu</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chu-han.html"><span class="drop-label">Chữ Hán</span><span class="drop-desc">Nét, thứ tự nét, bộ thủ, âm Hán Việt</span></a></li><li><a class="drop-link" href="../ngoai-ngu/ngu-phap-tieng-trung.html"><span class="drop-label">Ngữ pháp tiếng Trung</span><span class="drop-desc">Từ 是, 吗, 了 đến bổ ngữ, câu 把, câu 被</span></a></li><li><a class="drop-link" href="../ngoai-ngu/tu-vung-tieng-trung.html"><span class="drop-label">Từ vựng tiếng Trung</span><span class="drop-desc">Từ vựng HSK 1–3 theo chủ đề, Anki</span></a></li><li><a class="drop-link" href="../ngoai-ngu/giao-tiep-tieng-trung.html"><span class="drop-label">Giao tiếp tiếng Trung</span><span class="drop-desc">Chào hỏi, mua sắm, đi lại, công sở</span></a></li><li><a class="drop-link" href="../ngoai-ngu/luyen-thi-hsk.html"><span class="drop-label">Luyện thi HSK</span><span class="drop-desc">Đề HSK 3.0, nghe, đọc, viết, nói, đề thi thử</span></a></li></ul></div></div>
+  <a class="panel-all" href="../ngoai-ngu/">Xem tất cả Ngoại ngữ →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tai-nguyen">Tài nguyên<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tai-nguyen">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tai-nguyen/source-code.html"><span class="drop-label">Source Code</span><span class="drop-desc">Mã nguồn mẫu đi kèm bài học</span></a></li><li><a class="drop-link" href="../tai-nguyen/dataset.html"><span class="drop-label">Dataset</span><span class="drop-desc">Bộ dữ liệu ảnh để luyện tập</span></a></li><li><a class="drop-link" href="../tai-nguyen/cheat-sheets.html"><span class="drop-label">Cheat Sheets</span><span class="drop-desc">Tóm tắt nhanh trong một trang</span></a></li><li><a class="drop-link" href="../tai-nguyen/documentation.html"><span class="drop-label">Documentation</span><span class="drop-desc">Tài liệu tra cứu thư viện, API</span></a></li><li><a class="drop-link" href="../tai-nguyen/ebook.html"><span class="drop-label">Ebook / Tài liệu</span><span class="drop-desc">Sách và tài liệu tham khảo</span></a></li><li><a class="drop-link" href="../tai-nguyen/ai-tools.html"><span class="drop-label">AI Tools</span><span class="drop-desc">Công cụ AI hữu ích cho việc học</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tai-nguyen/">Xem tất cả Tài nguyên →</a>
+</div></li></ul>
+        <div class="drawer-foot">
+          <a class="btn ghost" href="../dang-nhap.html">Đăng nhập</a>
+          <a class="btn" href="../lo-trinh/">Bắt đầu học</a>
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+<div class="search-dialog" hidden>
+  <div class="search-scrim"></div>
+  <div class="search-box" role="dialog" aria-modal="true" aria-label="Tìm kiếm">
+    <form class="search-form" action="../search.html" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" placeholder="Tìm bài học, chủ đề, bài viết…" autocomplete="off" aria-label="Từ khóa tìm kiếm" aria-controls="search-suggest">
+      <button type="button" class="icon-btn search-close" aria-label="Đóng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </form>
+    <div class="search-suggest" id="search-suggest" aria-live="polite">
+      <div class="search-empty">
+        <p class="search-group-title">Chủ đề phổ biến</p>
+        <div class="chips"><a class="chip" href="../hoc/python.html">Python</a><a class="chip" href="../hoc/opencv.html">OpenCV</a><a class="chip" href="../hoc/machine-vision.html">Machine Vision</a><a class="chip" href="../hoc/deep-learning.html">Deep Learning</a><a class="chip" href="../hoc/ai-vision.html">AI Vision</a><a class="chip" href="../hoc/object-detection.html">Object Detection</a><a class="chip" href="../hoc/pytorch.html">PyTorch</a><a class="chip" href="../ngoai-ngu/english.html">English</a></div>
+        <p class="search-group-title">Lộ trình nổi bật</p>
+        <a class="search-item" href="../lo-trinh/vision-engineer.html"><span class="search-ico" aria-hidden="true">⭐</span><span>Trở thành Vision Engineer<small>Learning Path · Machine Vision + AI Vision + Industrial Automation</small></span></a>
+      </div>
+    </div>
+    <div class="search-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> chọn</span><span><kbd>Enter</kbd> mở</span><span><kbd>Esc</kbd> đóng</span></div>
+  </div>
+</div>
+<main id="main">
+  <div class="container layout article-layout">
+    <article class="article">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../lo-trinh/">Learning Paths</a><span>/</span><a href="../lo-trinh/python-developer.html">Python Developer</a><span>/</span><a href="../lo-trinh/python-developer/hieu-nang-va-trien-khai.html">Chặng 10: Hiệu năng, đồng thời và triển khai</a></nav>
+      <header class="article-head">
+        <div class="course-bar" data-course="python-developer"><a class="course-chip" href="../lo-trinh/python-developer/hieu-nang-va-trien-khai.html">⭐ Python Developer · Chặng 10</a><span class="lesson-no">Bài 5/6</span><span class="kind kind-lesson">Bài học</span><span class="lesson-min"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></svg>~45 phút</span></div>
+        <h1>CI cho dự án Python với GitHub Actions: Ruff, mypy, pytest</h1>
+        <p class="lead">Tự động kiểm tra mỗi lần đẩy code: workflow GitHub Actions cài uv, chạy Ruff, mypy, pytest trên nhiều phiên bản Python bằng matrix.</p>
+        <div class="article-meta">
+          <span class="avatar" aria-hidden="true">HF</span>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-29">29/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>7 phút đọc</span></div>
+        </div>
+      </header>
+      <figure class="article-cover">
+        <img src="../assets/images/posts/pydev-ci-github-actions.webp" alt="CI cho dự án Python với GitHub Actions: Ruff, mypy, pytest" width="1200" height="675" fetchpriority="high" decoding="async">
+      </figure>
+      <section class="lesson-goals" aria-label="Mục tiêu bài học"><h2>Học xong bài này, bạn sẽ</h2><ul><li>Hiểu CI và vì sao mọi dự án cần nó</li><li>Viết workflow chạy Ruff, mypy, pytest mỗi lần push</li><li>Chạy test trên nhiều phiên bản Python bằng matrix</li></ul><p class="goals-before">Nên học trước: <a href="../hoc/pydev-docker-cho-python.html">Đóng gói ứng dụng Python bằng Docker</a></p></section>
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol class="toc-plain"><li><a href="#1-workflow-dau-tien">1. Workflow đầu tiên</a></li><li><a href="#2-doc-ket-qua-sua-khi-do">2. Đọc kết quả, sửa khi đỏ</a></li><li><a href="#3-ma-tran-chay-tren-nhieu-phien-ban-python">3. Ma trận: chạy trên nhiều phiên bản Python</a></li><li><a href="#4-them-buoc-build-docker-va-badge">4. Thêm bước build Docker và badge</a></li><li><a href="#tom-tat">Tóm tắt</a></li><li><a href="#bai-tap">Bài tập</a></li></ol></details>
+      <div class="prose">
+<p>Bạn có test, có Ruff, có mypy. Nhưng nếu phải nhớ tự chạy chúng trước mỗi lần đẩy code, sớm muộn sẽ có lúc quên, và đồng nghiệp kéo về một nhánh hỏng. <strong>CI</strong> (Continuous Integration, tích hợp liên tục) là máy chủ tự động chạy toàn bộ kiểm tra mỗi khi có code mới được đẩy lên hoặc có pull request. <strong>GitHub Actions</strong> có sẵn trong mọi kho GitHub, miễn phí cho kho công khai.</p>
+
+<h2 id="1-workflow-dau-tien">1. Workflow đầu tiên</h2>
+<p>Tạo file <code>.github/workflows/ci.yml</code> trong dự án (dấu chấm ở đầu tên thư mục):</p>
+<pre><code class="language-text">name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  kiem-tra:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Cài uv và Python
+        uses: astral-sh/setup-uv@v9
+        with:
+          python-version: "3.14"
+          enable-cache: true
+
+      - name: Cài thư viện
+        run: uv sync --locked
+
+      - name: Ruff (lint + format)
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: mypy
+        run: uv run mypy app
+
+      - name: pytest
+        run: uv run pytest -q</code></pre>
+<p>Commit và push file này lên GitHub, mở tab <strong>Actions</strong> của kho để xem workflow chạy.</p>
+<ul>
+  <li><code>on</code>: khi nào chạy. Ở đây: mỗi lần push lên <code>main</code> và mỗi pull request.</li>
+  <li><code>jobs</code> → <code>kiem-tra</code>: một công việc chạy trên máy ảo Ubuntu sạch (<code>runs-on</code>) do GitHub cấp, xóa sau khi xong.</li>
+  <li><code>steps</code>: các bước tuần tự. <code>uses</code> dùng một action có sẵn: <code>actions/checkout</code> lấy code về, <code>astral-sh/setup-uv</code> cài uv và Python. <code>run</code> chạy lệnh shell.</li>
+  <li><code>enable-cache: true</code> lưu cache thư viện giữa các lần chạy, lần sau nhanh hơn.</li>
+  <li><code>uv sync --locked</code>: lockfile không khớp thì dừng, đúng như máy bạn và Docker. Nhóm dev (pytest, ruff, mypy) được cài vì mặc định <code>uv sync</code> có kèm.</li>
+  <li>Bất kỳ lệnh nào trả mã thoát khác 0 (chặng 7), job dừng và báo đỏ.</li>
+</ul>
+<div class="tip"><strong>Ghim phiên bản action</strong><code>@v7</code>, <code>@v9</code> là phiên bản chính của action tại thời điểm viết bài. Dự án cần bảo mật cao thường ghim theo mã commit đầy đủ (<code>uses: actions/checkout@&lt;mã SHA&gt; # v7.0.1</code>) như tài liệu của uv, để chắc chắn mã chạy trong CI không bị thay đổi ngầm.</div>
+
+<h2 id="2-doc-ket-qua-sua-khi-do">2. Đọc kết quả, sửa khi đỏ</h2>
+<p>Thử đẩy một thay đổi làm hỏng test (ví dụ đổi mã trạng thái tạo công việc thành 200). Tab Actions hiện dấu ✗ đỏ; bấm vào job, mở bước <strong>pytest</strong> để xem đúng output như khi chạy trên máy:</p>
+<pre><code class="language-text">FAILED tests/test_cong_viec.py::test_tao_va_giao_viec - AssertionError: {"id":1,"tieu_de":"Viết b...
+FAILED tests/test_cong_viec.py::test_ai_thay_viec_nao - AssertionError: {"id":1,"tieu_de":"Việc",...
+...
+6 failed, 5 passed in 2.37s
+Error: Process completed with exit code 1.</code></pre>
+<p>Một thay đổi nhỏ làm hỏng 6 test, vì hàm trợ giúp <code>tao()</code> trong test kiểm tra mã 201 và được dùng ở nhiều nơi. Trên pull request, GitHub hiện trạng thái kiểm tra ngay dưới phần mô tả. Vào <strong>Settings › Branches</strong>, thêm quy tắc bảo vệ nhánh <code>main</code> và bật "Require status checks to pass": không ai gộp được pull request khi CI còn đỏ.</p>
+
+<h2 id="3-ma-tran-chay-tren-nhieu-phien-ban-python">3. Ma trận: chạy trên nhiều phiên bản Python</h2>
+<p>Thư viện hoặc công cụ cần hỗ trợ nhiều phiên bản Python thì nên test trên tất cả:</p>
+<pre><code class="language-text">jobs:
+  kiem-tra:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v9
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run pytest -q</code></pre>
+<p>Ma trận 2 hệ điều hành × 2 phiên bản tạo 4 job chạy song song. <code>fail-fast: false</code> để một job lỗi không hủy các job khác, bạn thấy đủ bức tranh. Muốn chạy nhiều phiên bản Python, <code>requires-python</code> trong <code>pyproject.toml</code> phải cho phép các phiên bản đó (ví dụ <code>"&gt;=3.13"</code>). Với ứng dụng web chạy trong Docker, chỉ cần test đúng phiên bản Python của image.</p>
+
+<h2 id="4-them-buoc-build-docker-va-badge">4. Thêm bước build Docker và badge</h2>
+<pre><code class="language-text">  docker:
+    needs: kiem-tra                  # chỉ chạy khi job kiem-tra đã xanh
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build image
+        run: docker build -t quan-ly-cong-viec:${{ github.sha }} .</code></pre>
+<p>Job <code>docker</code> bảo đảm Dockerfile luôn build được. Bước tiếp theo trong thực tế (CD, triển khai liên tục) là đẩy image lên kho image và triển khai lên máy chủ; mỗi nền tảng có cách riêng nên ngoài phạm vi bài này.</p>
+<p>Gắn huy hiệu trạng thái vào đầu <code>README.md</code> để ai mở kho cũng thấy dự án đang xanh:</p>
+<pre><code class="language-text">![CI](https://github.com/ten-ban/quan-ly-cong-viec/actions/workflows/ci.yml/badge.svg)</code></pre>
+<div class="warn"><strong>Bí mật trong CI</strong>Không bao giờ ghi khóa, mật khẩu vào file workflow. Đặt chúng trong <strong>Settings › Secrets and variables › Actions</strong> và dùng qua <code>${{ secrets.TEN_BI_MAT }}</code>; GitHub tự che giá trị trong log. Test của chặng 9 không cần bí mật thật vì <code>SECRET_KEY</code> có giá trị mặc định cho môi trường phát triển.</div>
+
+<h2 id="tom-tat">Tóm tắt</h2>
+<ul>
+  <li>Workflow là file YAML trong <code>.github/workflows/</code>; <code>on</code> chọn sự kiện, <code>jobs</code> → <code>steps</code> với <code>uses</code> và <code>run</code>.</li>
+  <li>Dự án uv: <code>actions/checkout</code> → <code>astral-sh/setup-uv</code> (cache) → <code>uv sync --locked</code> → Ruff, mypy, pytest.</li>
+  <li>Lệnh trả mã khác 0 làm job đỏ; bảo vệ nhánh <code>main</code> bằng status check bắt buộc.</li>
+  <li><code>strategy.matrix</code> chạy trên nhiều hệ điều hành, phiên bản Python; <code>needs</code> nối các job; bí mật đặt trong Secrets.</li>
+</ul>
+
+<h2 id="bai-tap">Bài tập</h2>
+<div class="ex">
+<h3 id="bai-1-ci-cho-du-an-api">Bài 1. CI cho dự án API</h3>
+<p>Thêm workflow ở mục 1 vào dự án quản lý công việc trên GitHub. Cố tình đẩy một commit làm hỏng test để thấy CI báo đỏ, đọc log tìm test lỗi, sửa và đẩy lại cho xanh.</p>
+<details><summary>Xem gợi ý</summary>
+<p>Làm trên một nhánh riêng và mở pull request: bạn sẽ thấy dấu ✗ ngay trong pull request, đúng như khi làm việc nhóm. Nếu job hỏng ở bước <code>uv sync --locked</code>, bạn quên commit <code>uv.lock</code> hoặc đã sửa <code>pyproject.toml</code> mà chưa chạy <code>uv lock</code>. Nếu Ruff format báo lỗi, chạy <code>uv run ruff format .</code> trên máy rồi commit.</p>
+</details>
+</div>
+<div class="ex">
+<h3 id="bai-2-ma-tran-va-badge">Bài 2. Ma trận và badge</h3>
+<p>Thêm ma trận chạy test trên Python 3.13 và 3.14, gắn badge trạng thái CI vào README. Kiểm tra trong tab Actions có đủ các job song song.</p>
+<details><summary>Xem gợi ý</summary>
+<p>Dự án dùng <code>enum.StrEnum</code> và <code>datetime.UTC</code> (có từ Python 3.11), nên chạy được cả 3.13 lẫn 3.14; nhớ đặt <code>requires-python = "&gt;=3.13"</code>. Thử thêm <code>"3.10"</code> vào ma trận: job đó sẽ đỏ ở bước cài đặt hoặc import. Đó chính là giá trị của ma trận: phát hiện bạn đã vô tình dùng tính năng mới hơn phiên bản tối thiểu đã cam kết.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.github.com/en/actions/get-started/quickstart" rel="noopener" target="_blank">GitHub Actions: Quickstart</a>; <a href="https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax" rel="noopener" target="_blank">Workflow syntax for GitHub Actions</a>; <a href="https://docs.astral.sh/uv/guides/integration/github/" rel="noopener" target="_blank">uv: Using uv in GitHub Actions</a>; <a href="https://github.com/astral-sh/setup-uv" rel="noopener" target="_blank">astral-sh/setup-uv</a>.</p>
+
+      </div>
+      <section class="practice"><h2><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <circle cx="12" cy="12" r="6" /> <circle cx="12" cy="12" r="2" /></svg>Bài tập thực hành</h2><ol><li>Thêm workflow CI cho dự án API, cố tình đẩy một test sai để thấy CI báo đỏ, rồi sửa.</li><li>Thêm matrix chạy trên Python 3.13 và 3.14, gắn badge trạng thái vào README.</li></ol><p>Làm xong bài tập mới chuyển sang bài tiếp theo: tự viết code là cách duy nhất để nhớ lâu.</p></section><div class="lesson-done" data-course="python-developer"><button type="button" class="lesson-done-btn" data-lesson-done="pydev-ci-github-actions" aria-pressed="false"><span class="box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></span><span class="off">Đánh dấu đã học xong</span><span class="on">Đã học xong bài này</span></button><a class="btn lg" href="../hoc/pydev-du-an-cuoi-khoa-va-portfolio.html">Bài tiếp theo<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a></div>
+      <footer class="article-foot">
+        <div class="tags"><a class="tag" href="../search.html?q=Python">#Python</a><a class="tag" href="../search.html?q=Lập trình">#Lập trình</a><a class="tag" href="../search.html?q=Công cụ">#Công cụ</a><a class="tag" href="../search.html?q=GitHub">#GitHub</a></div>
+        <div class="share">
+      <span>Chia sẻ:</span>
+      <a class="share-btn fb" href="https://www.facebook.com/sharer/sharer.php?u=https://hocfree.vn/hoc/pydev-ci-github-actions.html" target="_blank" rel="noopener" aria-label="Chia sẻ Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8z"/></svg></a>
+      <a class="share-btn x" href="https://twitter.com/intent/tweet?url=https://hocfree.vn/hoc/pydev-ci-github-actions.html" target="_blank" rel="noopener" aria-label="Chia sẻ X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+      <button class="share-btn copy-link" data-url="https://hocfree.vn/hoc/pydev-ci-github-actions.html" aria-label="Sao chép liên kết"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+    </div>
+      </footer>
+      <div class="author-box">
+        <span class="avatar lg" aria-hidden="true">HF</span>
+        <div>
+          <strong>Ban biên tập HọcFree</strong>
+          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và ngoại ngữ, hoàn toàn miễn phí.</p>
+        </div>
+      </div>
+      <nav class="pager lesson-pager" aria-label="Bài học trước/sau"><a class="prev" href="../hoc/pydev-docker-cho-python.html"><span>← Bài trước · Bài 4</span>Đóng gói ứng dụng Python bằng Docker</a><a class="next" href="../hoc/pydev-du-an-cuoi-khoa-va-portfolio.html"><span>Bài tiếp → · Bài 6</span>Dự án cuối khóa và portfolio xin việc</a></nav>
+    </article>
+    <aside class="sidebar course-side" data-course="python-developer">
+      <section class="widget course-toc">
+        <p class="widget-title">Chặng 10/10 · Python Developer</p>
+        <a class="course-toc-title" href="../lo-trinh/python-developer/hieu-nang-va-trien-khai.html">Hiệu năng, đồng thời và triển khai</a>
+        <div class="lc" data-lesson-count="pydev-do-va-toi-uu-hieu-nang pydev-thread-process-gil pydev-asyncio-co-ban pydev-docker-cho-python pydev-ci-github-actions pydev-du-an-cuoi-khoa-va-portfolio"><div class="lc-bar"><span data-lc-bar></span></div><span data-lc-text>0/6 bài</span></div>
+        <ol class="toc-lessons"><li data-lesson="pydev-do-va-toi-uu-hieu-nang"><a href="../hoc/pydev-do-va-toi-uu-hieu-nang.html"><span class="tn">1</span><span class="tt">Đo và tối ưu hiệu năng</span></a></li><li data-lesson="pydev-thread-process-gil"><a href="../hoc/pydev-thread-process-gil.html"><span class="tn">2</span><span class="tt">Đồng thời với thread, process và GIL</span></a></li><li data-lesson="pydev-asyncio-co-ban"><a href="../hoc/pydev-asyncio-co-ban.html"><span class="tn">3</span><span class="tt">asyncio: async và await</span></a></li><li data-lesson="pydev-docker-cho-python"><a href="../hoc/pydev-docker-cho-python.html"><span class="tn">4</span><span class="tt">Đóng gói ứng dụng Python bằng Docker</span></a></li><li data-lesson="pydev-ci-github-actions" class="is-current"><a href="../hoc/pydev-ci-github-actions.html" aria-current="page"><span class="tn">5</span><span class="tt">CI với GitHub Actions: tự chạy lint và test</span></a></li><li data-lesson="pydev-du-an-cuoi-khoa-va-portfolio"><a href="../hoc/pydev-du-an-cuoi-khoa-va-portfolio.html"><span class="tn">6</span><span class="tt">Dự án cuối khóa và portfolio xin việc</span></a></li></ol>
+        <a class="more" href="../lo-trinh/python-developer.html">Xem toàn bộ lộ trình<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a>
+      </section>
+    </aside>
+  </div>
+  <section class="band">
+    <div class="container">
+      <div class="section-title"><h2>Có thể bạn quan tâm</h2></div>
+      <div class="card-grid"><article class="card">
+  <a class="thumb" href="../hoc/pydev-cai-dat-python-va-vs-code.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/pydev-cai-dat-python-va-vs-code.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/pydev-cai-dat-python-va-vs-code.html">Cài Python, VS Code và chạy chương trình Python đầu tiên</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-29">29/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>7 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/pydev-bien-kieu-du-lieu-toan-tu.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/pydev-bien-kieu-du-lieu-toan-tu.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/pydev-bien-kieu-du-lieu-toan-tu.html">Biến, kiểu dữ liệu, toán tử và input() trong Python</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-29">29/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>7 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/pydev-chuoi-va-f-string.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/pydev-chuoi-va-f-string.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/pydev-chuoi-va-f-string.html">Chuỗi trong Python: slicing, phương thức và f-string</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-29">29/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>6 phút đọc</span></div>
+</article></div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <a class="logo" href="../"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+      <p>HọcFree.vn – nền tảng học miễn phí về AI, lập trình, Computer Vision, Machine Vision, tin tức AI và ngoại ngữ dành cho người Việt.</p>
+    </div>
+    <div><h3>Học &amp; thực hành</h3><ul><li><a href="../hoc/">Học AI &amp; Lập trình</a></li><li><a href="../projects/">Projects</a></li><li><a href="../lo-trinh/">Learning Paths</a></li></ul></div>
+    <div><h3>Khám phá</h3><ul><li><a href="../kien-thuc/">Kiến thức</a></li><li><a href="../tin-tuc-ai/">Tin tức AI</a></li><li><a href="../ngoai-ngu/">Ngoại ngữ</a></li><li><a href="../tai-nguyen/">Tài nguyên</a></li></ul></div>
+    <div><h3>Bài mới</h3><ul><li><a href="../hoc/pydev-cai-dat-python-va-vs-code.html">Cài Python, VS Code và chạy chương trình Python đầu tiên</a></li><li><a href="../hoc/pydev-bien-kieu-du-lieu-toan-tu.html">Biến, kiểu dữ liệu, toán tử và input() trong Python</a></li><li><a href="../hoc/pydev-chuoi-va-f-string.html">Chuỗi trong Python: slicing, phương thức và f-string</a></li><li><a href="../hoc/pydev-re-nhanh-va-vong-lap.html">Rẽ nhánh và vòng lặp trong Python: if, match, for, while</a></li></ul></div>
+    <div>
+      <h3>HọcFree</h3>
+      <ul>
+        <li><a href="../gioi-thieu.html">Giới thiệu</a></li>
+        <li><a href="../search.html">Tìm kiếm</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">© 2026 HọcFree.vn · Kiến thức là để chia sẻ.</div>
+  </div>
+</footer>
+<button class="to-top" aria-label="Lên đầu trang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<script src="../assets/js/search-data.js?v=20261029" defer></script>
+<script src="../assets/js/main.js?v=20261029" defer></script>
+</body>
+</html>

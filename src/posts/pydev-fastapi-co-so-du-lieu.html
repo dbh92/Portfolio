@@ -1,0 +1,243 @@
+<p>API ở bài trước mất sạch dữ liệu mỗi lần khởi động lại. Bài này nối FastAPI với cơ sở dữ liệu qua SQLAlchemy (chặng 8), tổ chức dự án thành các module rõ ràng, và dùng một trong những tính năng mạnh nhất của FastAPI: <strong>dependency injection</strong> với <code>Depends</code>.</p>
+
+<h2>1. Cấu trúc dự án</h2>
+<pre><code class="language-text">so-ghi-chu/
+├── pyproject.toml
+└── app/
+    ├── __init__.py      (để trống)
+    ├── database.py      ← engine, Base, dependency cấp Session
+    ├── models.py        ← bảng CSDL (SQLAlchemy)
+    ├── schemas.py       ← dữ liệu vào/ra API (Pydantic)
+    └── main.py          ← ứng dụng FastAPI và các endpoint</code></pre>
+<pre><code class="language-text">$ uv add "fastapi[standard]" sqlalchemy
+$ uv run fastapi dev app/main.py</code></pre>
+<p>Tách <strong>model</strong> (cấu trúc lưu trữ) khỏi <strong>schema</strong> (hợp đồng với client) là nguyên tắc quan trọng nhất của bài: bảng CSDL có thể có cột nội bộ (mật khẩu đã băm, cờ đã xóa) mà client không bao giờ được thấy; còn API có thể cần dữ liệu không nằm trong bảng. Đổi cấu trúc CSDL không bắt buộc đổi API, và ngược lại.</p>
+
+<h2>2. database.py: engine và dependency</h2>
+<pre><code class="language-python"># (minh họa) app/database.py
+"""Kết nối CSDL và dependency cấp Session cho từng request."""
+
+import os
+from collections.abc import Iterator
+from typing import Annotated
+
+from fastapi import Depends
+from sqlalchemy import create_engine
+from sqlalchemy.orm import DeclarativeBase, Session
+
+DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./so_ghi_chu.db")
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+def get_session() -&gt; Iterator[Session]:
+    with Session(engine) as session:
+        yield session
+
+
+SessionDep = Annotated[Session, Depends(get_session)]</code></pre>
+<ul>
+  <li>Chuỗi kết nối đọc từ biến môi trường <code>DATABASE_URL</code>, mặc định là file SQLite. Khi triển khai, chỉ cần đặt biến môi trường để chuyển sang PostgreSQL mà không sửa code.</li>
+  <li><code>check_same_thread=False</code>: FastAPI chạy endpoint thường (<code>def</code>) trong nhiều luồng, SQLite mặc định chỉ cho dùng kết nối ở luồng đã tạo nó. Tùy chọn này chỉ cần cho SQLite.</li>
+  <li><code>get_session</code> là một <strong>dependency</strong>: generator mở Session, <code>yield</code> cho endpoint dùng, rồi đóng khi request xong (cơ chế giống context manager ở chặng 5). Mỗi request một Session riêng.</li>
+  <li><code>SessionDep = Annotated[Session, Depends(get_session)]</code>: đặt tên cho dependency để dùng lại ngắn gọn ở mọi endpoint.</li>
+</ul>
+
+<h2>3. models.py và schemas.py</h2>
+<pre><code class="language-python"># (minh họa) app/models.py
+"""Model SQLAlchemy: cấu trúc bảng trong CSDL."""
+
+from datetime import datetime
+
+from sqlalchemy import JSON, String, func
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.database import Base
+
+
+class GhiChu(Base):
+    __tablename__ = "ghi_chu"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tieu_de: Mapped[str] = mapped_column(String(100))
+    noi_dung: Mapped[str] = mapped_column(default="")
+    the: Mapped[list[str]] = mapped_column(JSON, default=list)
+    tao_luc: Mapped[datetime] = mapped_column(server_default=func.now())</code></pre>
+<p>Cột <code>the</code> dùng kiểu <code>JSON</code> để lưu list chuỗi (SQLite và PostgreSQL đều hỗ trợ). <code>server_default=func.now()</code> để CSDL tự điền thời điểm tạo. Lưu ý: <code>CURRENT_TIMESTAMP</code> của SQLite là giờ <strong>UTC</strong>, nên kết quả sẽ chậm 7 tiếng so với giờ Việt Nam. Lưu UTC trong CSDL và chỉ đổi sang giờ địa phương khi hiển thị là cách làm chuẩn.</p>
+<pre><code class="language-python"># (minh họa) app/schemas.py
+"""Schema Pydantic: dữ liệu đi vào và đi ra qua API."""
+
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+class GhiChuTao(BaseModel):
+    tieu_de: str = Field(min_length=1, max_length=100)
+    noi_dung: str = ""
+    the: list[str] = []
+
+
+class GhiChuCapNhat(BaseModel):
+    """Mọi trường đều tùy chọn: PATCH chỉ gửi trường cần đổi."""
+
+    tieu_de: str | None = Field(default=None, min_length=1, max_length=100)
+    noi_dung: str | None = None
+    the: list[str] | None = None
+
+    @field_validator("tieu_de", "noi_dung", "the")
+    @classmethod
+    def khong_nhan_null(cls, gia_tri: object) -&gt; object:
+        # Chỉ chạy khi client GỬI trường đó; bỏ trống thì vẫn là None mặc định
+        if gia_tri is None:
+            raise ValueError("không được gửi null, hãy bỏ trường này nếu không muốn đổi")
+        return gia_tri
+
+
+class GhiChuDoc(GhiChuTao):
+    model_config = ConfigDict(from_attributes=True)  # cho phép tạo từ đối tượng SQLAlchemy
+
+    id: int
+    tao_luc: datetime</code></pre>
+<ul>
+  <li><strong>Ba schema cho ba mục đích</strong>: <code>GhiChuTao</code> (POST, các trường bắt buộc), <code>GhiChuCapNhat</code> (PATCH, mọi trường tùy chọn), <code>GhiChuDoc</code> (dữ liệu trả về, có <code>id</code>, <code>tao_luc</code>).</li>
+  <li><code>from_attributes=True</code> cho phép <code>GhiChuDoc.model_validate(doi_tuong_sqlalchemy)</code> đọc dữ liệu từ thuộc tính của đối tượng thay vì từ dict.</li>
+  <li>Validator <code>khong_nhan_null</code> giải quyết một lỗi rất hay gặp với PATCH: không có nó, client gửi <code>{"tieu_de": null}</code> vượt qua kiểm tra (vì kiểu là <code>str | None</code>) rồi gây lỗi 500 <code>NOT NULL constraint failed</code> ở CSDL. Validator chỉ chạy khi client thật sự gửi trường đó, nên bỏ trống trường vẫn hợp lệ.</li>
+</ul>
+
+<h2>4. main.py: các endpoint</h2>
+<pre><code class="language-python"># (minh họa) app/main.py
+"""API sổ ghi chú lưu trong SQLite."""
+
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from typing import Annotated
+
+from fastapi import FastAPI, HTTPException, Query, status
+from sqlalchemy import or_, select
+
+from app.database import Base, SessionDep, engine
+from app.models import GhiChu
+from app.schemas import GhiChuCapNhat, GhiChuDoc, GhiChuTao
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -&gt; AsyncIterator[None]:
+    Base.metadata.create_all(engine)  # chạy một lần khi khởi động
+    yield
+
+
+app = FastAPI(title="Sổ ghi chú", version="0.2.0", lifespan=lifespan)
+
+
+def lay_hoac_404(session: SessionDep, ghi_chu_id: int) -&gt; GhiChu:
+    gc = session.get(GhiChu, ghi_chu_id)
+    if gc is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy ghi chú")
+    return gc
+
+
+@app.post("/ghi-chu", status_code=status.HTTP_201_CREATED)
+def tao(du_lieu: GhiChuTao, session: SessionDep) -&gt; GhiChuDoc:
+    gc = GhiChu(**du_lieu.model_dump())
+    session.add(gc)
+    session.commit()
+    session.refresh(gc)  # nạp id, tao_luc do CSDL sinh
+    return GhiChuDoc.model_validate(gc)
+
+
+@app.get("/ghi-chu")
+def liet_ke(
+    session: SessionDep,
+    tu_khoa: str | None = None,
+    skip: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -&gt; list[GhiChuDoc]:
+    q = select(GhiChu).order_by(GhiChu.id)
+    if tu_khoa:
+        q = q.where(
+            or_(GhiChu.tieu_de.ilike(f"%{tu_khoa}%"), GhiChu.noi_dung.ilike(f"%{tu_khoa}%"))
+        )
+    ket_qua = session.scalars(q.offset(skip).limit(limit))
+    return [GhiChuDoc.model_validate(gc) for gc in ket_qua]
+
+
+@app.get("/ghi-chu/{ghi_chu_id}")
+def xem(ghi_chu_id: int, session: SessionDep) -&gt; GhiChuDoc:
+    return GhiChuDoc.model_validate(lay_hoac_404(session, ghi_chu_id))
+
+
+@app.patch("/ghi-chu/{ghi_chu_id}")
+def cap_nhat(ghi_chu_id: int, du_lieu: GhiChuCapNhat, session: SessionDep) -&gt; GhiChuDoc:
+    gc = lay_hoac_404(session, ghi_chu_id)
+    for truong, gia_tri in du_lieu.model_dump(exclude_unset=True).items():
+        setattr(gc, truong, gia_tri)
+    session.commit()
+    session.refresh(gc)
+    return GhiChuDoc.model_validate(gc)
+
+
+@app.delete("/ghi-chu/{ghi_chu_id}", status_code=status.HTTP_204_NO_CONTENT)
+def xoa(ghi_chu_id: int, session: SessionDep) -&gt; None:
+    session.delete(lay_hoac_404(session, ghi_chu_id))
+    session.commit()</code></pre>
+<ul>
+  <li><strong>lifespan</strong>: hàm chạy khi ứng dụng khởi động (trước <code>yield</code>) và khi tắt (sau <code>yield</code>). Ở đây tạo bảng nếu chưa có. Dự án thật dùng Alembic thay cho <code>create_all</code> (chặng 8).</li>
+  <li>Endpoint khai báo <code>session: SessionDep</code>: FastAPI tự gọi <code>get_session</code>, truyền Session vào, và đóng sau khi trả response. Hàm endpoint không cần biết Session đến từ đâu, nên khi test có thể thay bằng CSDL khác (bài kiểm thử API).</li>
+  <li><code>session.refresh(gc)</code> sau <code>commit</code> nạp lại giá trị do CSDL sinh (<code>id</code>, <code>tao_luc</code>).</li>
+  <li><strong>PATCH</strong>: <code>model_dump(exclude_unset=True)</code> chỉ lấy những trường client <em>thực sự gửi</em>, rồi gán từng trường vào đối tượng. Không có <code>exclude_unset</code>, mọi trường không gửi sẽ bị ghi đè thành <code>None</code>.</li>
+  <li>Lọc và phân trang giờ do câu SQL đảm nhận (<code>where</code>, <code>offset</code>, <code>limit</code>), không phải nạp hết rồi lọc trong Python. <code>ilike</code> với tham số <code>f"%{tu_khoa}%"</code> vẫn an toàn vì SQLAlchemy truyền giá trị dưới dạng tham số.</li>
+  <li><code>lay_hoac_404</code> gom đoạn "tìm, không thấy thì 404" dùng ở ba endpoint.</li>
+</ul>
+
+<h2>5. Chạy thử</h2>
+<pre><code class="language-text">POST   /ghi-chu    {"tieu_de":"Mua sữa","noi_dung":"2 hộp","the":["việc nhà"]}
+201 {"tieu_de":"Mua sữa","noi_dung":"2 hộp","the":["việc nhà"],"id":1,"tao_luc":"2026-10-29T09:39:03"}
+PATCH  /ghi-chu/1  {"noi_dung":"3 hộp, loại không đường"}
+200 {"tieu_de":"Mua sữa","noi_dung":"3 hộp, loại không đường","the":["việc nhà"],"id":1,"tao_luc":"2026-10-29T09:39:03"}
+PATCH  /ghi-chu/1  {"tieu_de":null}
+422 {"detail":[{"type":"value_error","loc":["body","tieu_de"],"msg":"Value error, không được gửi null, hãy bỏ trường này nếu không muốn đổi","input":null,"ctx":{"error":{}}}]}
+GET    /ghi-chu?tu_khoa=sql
+200 [{"tieu_de":"Học SQLAlchemy","noi_dung":"","the":[],"id":2,"tao_luc":"2026-10-29T09:39:03"}]
+DELETE /ghi-chu/2
+204
+GET    /ghi-chu/2
+404 {"detail":"Không tìm thấy ghi chú"}</code></pre>
+<p>Tắt máy chủ, chạy lại: ghi chú số 1 vẫn còn, vì giờ nó nằm trong file <code>so_ghi_chu.db</code>. Trường <code>noi_dung</code> đã đổi còn <code>tieu_de</code>, <code>the</code> giữ nguyên: PATCH chỉ sửa đúng trường được gửi.</p>
+<div class="tip"><strong>def hay async def?</strong>Bài dùng <code>def</code> thường cho endpoint vì SQLAlchemy ở chế độ đồng bộ. FastAPI tự chạy endpoint <code>def</code> trong một nhóm luồng, nên không chặn các request khác. Chỉ dùng <code>async def</code> khi mọi thao tác chờ bên trong đều là <code>await</code> (thư viện bất đồng bộ); gọi hàm đồng bộ chậm trong <code>async def</code> sẽ chặn cả máy chủ. Bạn sẽ học asyncio ở chặng 10.</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Tách <code>database.py</code>, <code>models.py</code> (SQLAlchemy), <code>schemas.py</code> (Pydantic), <code>main.py</code>.</li>
+  <li>Dependency <code>get_session</code> dùng <code>yield</code>; <code>SessionDep = Annotated[Session, Depends(get_session)]</code>.</li>
+  <li>Schema riêng cho tạo, cập nhật, đọc; <code>from_attributes=True</code>; chặn <code>null</code> trong PATCH.</li>
+  <li>PATCH với <code>model_dump(exclude_unset=True)</code>; lọc, phân trang bằng SQL; <code>lifespan</code> cho việc khởi động.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Dựng lại dự án</h3>
+<p>Dựng dự án theo cấu trúc ở mục 1, chạy thử đủ kịch bản ở mục 5 qua <code>/docs</code>, khởi động lại máy chủ và xác nhận dữ liệu vẫn còn. Mở file <code>so_ghi_chu.db</code> bằng extension SQLite Viewer của VS Code để xem bảng.</p>
+<details><summary>Xem gợi ý</summary>
+<p>Lỗi <code>ModuleNotFoundError: No module named 'app'</code> nghĩa là bạn đang chạy lệnh từ sai thư mục: chạy <code>uv run fastapi dev app/main.py</code> từ thư mục gốc <code>so-ghi-chu</code>, nơi chứa thư mục <code>app</code>. Thêm <code>echo=True</code> vào <code>create_engine</code> để xem từng câu SQL được sinh ra cho mỗi request.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Thời điểm cập nhật</h3>
+<p>Thêm cột <code>cap_nhat_luc</code> tự điền khi ghi chú bị sửa (để trống khi mới tạo), trả về trong <code>GhiChuDoc</code>.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python"># (minh họa) thêm vào lớp GhiChu trong app/models.py
+    cap_nhat_luc: Mapped[datetime | None] = mapped_column(onupdate=func.now())
+
+# (minh họa) thêm vào lớp GhiChuDoc trong app/schemas.py
+    cap_nhat_luc: datetime | None = None</code></pre>
+<pre><code class="language-text">POST  /ghi-chu    → "cap_nhat_luc": null
+PATCH /ghi-chu/1  → "cap_nhat_luc": "2026-10-29T09:41:17"</code></pre>
+<p><code>onupdate</code> để SQLAlchemy tự đặt giá trị mỗi khi sinh câu <code>UPDATE</code> cho dòng đó. Vì <code>create_all</code> không thêm cột vào bảng đã có, bạn phải xóa file <code>so_ghi_chu.db</code> để bảng được tạo lại (mất dữ liệu cũ). Đây chính là vấn đề mà Alembic giải quyết khi dự án đã chạy thật.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://fastapi.tiangolo.com/tutorial/dependencies/" rel="noopener" target="_blank">FastAPI: Dependencies</a>; <a href="https://fastapi.tiangolo.com/tutorial/sql-databases/" rel="noopener" target="_blank">FastAPI: SQL (Relational) Databases</a>; <a href="https://fastapi.tiangolo.com/advanced/events/" rel="noopener" target="_blank">FastAPI: Lifespan Events</a>; <a href="https://fastapi.tiangolo.com/tutorial/body-updates/" rel="noopener" target="_blank">FastAPI: Body - Updates</a>; <a href="https://docs.pydantic.dev/latest/concepts/validators/" rel="noopener" target="_blank">Pydantic: Validators</a>.</p>

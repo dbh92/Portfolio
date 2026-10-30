@@ -1,0 +1,187 @@
+<p>File văn bản tự do khó đọc lại bằng máy. Khi lưu dữ liệu có cấu trúc, lập trình viên dùng hai định dạng phổ biến nhất: <strong>JSON</strong> cho dữ liệu lồng nhau (cấu hình, dữ liệu ứng dụng, Web API) và <strong>CSV</strong> cho dữ liệu dạng bảng (mở được bằng Excel). Python có sẵn module <code>json</code> và <code>csv</code> cho cả hai.</p>
+
+<h2>1. JSON: dict và list ra file</h2>
+<pre><code class="language-python">import json
+from pathlib import Path
+
+danh_ba = [
+    {"ten": "Nguyễn An", "sdt": "0912345678", "nhom": ["bạn", "công ty"]},
+    {"ten": "Trần Bình", "sdt": "0987654321", "nhom": [], "ghi_chu": None},
+]
+
+p = Path("danh_ba.json")
+with open(p, "w", encoding="utf-8") as f:
+    json.dump(danh_ba, f, ensure_ascii=False, indent=2)
+
+with open(p, encoding="utf-8") as f:
+    doc_lai = json.load(f)
+print(doc_lai == danh_ba, doc_lai[1]["ghi_chu"])
+for dong in p.read_text(encoding="utf-8").splitlines()[:4]:   # 4 dòng đầu của file
+    print(dong)</code></pre>
+<pre><code class="language-text">True None
+[
+  {
+    "ten": "Nguyễn An",
+    "sdt": "0912345678",
+</code></pre>
+<ul>
+  <li><code>json.dump(obj, f)</code> ghi ra file, <code>json.load(f)</code> đọc từ file. Phiên bản có chữ <code>s</code> làm việc với chuỗi: <code>json.dumps(obj)</code>, <code>json.loads(chuoi)</code>.</li>
+  <li><code>ensure_ascii=False</code> giữ nguyên chữ tiếng Việt; không có nó, "Nguyễn" thành <code>"Nguyễn"</code> (vẫn đúng nhưng khó đọc).</li>
+  <li><code>indent=2</code> xuống dòng, thụt lề cho người đọc được.</li>
+  <li>Số điện thoại lưu dạng <strong>chuỗi</strong>: lưu số thì mất số 0 đầu.</li>
+</ul>
+<p>Bảng chuyển đổi kiểu:</p>
+<table>
+  <thead><tr><th>Python</th><th>JSON</th></tr></thead>
+  <tbody>
+    <tr><td><code>dict</code></td><td>object <code>{}</code> (khóa luôn là chuỗi)</td></tr>
+    <tr><td><code>list</code>, <code>tuple</code></td><td>array <code>[]</code> (đọc lại luôn là list)</td></tr>
+    <tr><td><code>str</code>, <code>int</code>, <code>float</code></td><td>string, number</td></tr>
+    <tr><td><code>True</code>, <code>False</code>, <code>None</code></td><td><code>true</code>, <code>false</code>, <code>null</code></td></tr>
+  </tbody>
+</table>
+
+<h2>2. Kiểu không chuyển được: ngày tháng, set</h2>
+<pre><code class="language-python">import json
+from datetime import date
+
+chi_tieu = {"ngay": date(2026, 10, 29), "so_tien": 45000}
+# json.dumps(chi_tieu) → TypeError: Object of type date is not JSON serializable
+
+chuoi = json.dumps(chi_tieu, default=str)          # cách nhanh: chuyển mọi thứ lạ thành chuỗi
+print(chuoi)
+
+du_lieu = json.loads(chuoi)
+du_lieu["ngay"] = date.fromisoformat(du_lieu["ngay"])   # tự chuyển ngược khi đọc
+print(du_lieu)</code></pre>
+<pre><code class="language-text">{"ngay": "2026-10-29", "so_tien": 45000}
+{'ngay': datetime.date(2026, 10, 29), 'so_tien': 45000}</code></pre>
+<p>Quy ước tốt: lưu ngày theo chuẩn ISO <code>YYYY-MM-DD</code> (đúng là thứ <code>str(date)</code> tạo ra), đọc lại bằng <code>date.fromisoformat</code>. Ở chặng 9, Pydantic sẽ tự làm việc này cho bạn.</p>
+
+<h2>3. CSV: dữ liệu dạng bảng</h2>
+<pre><code class="language-python">import csv
+
+nhan_vien = [
+    {"ma": "NV01", "ho_ten": "Lê Thị Hoa", "phong": "Kế toán", "luong": 15000000},
+    {"ma": "NV02", "ho_ten": "Phạm Văn Đức, Jr.", "phong": "IT", "luong": 22000000},
+]
+
+with open("nhan_vien.csv", "w", encoding="utf-8-sig", newline="") as f:
+    w = csv.DictWriter(f, fieldnames=["ma", "ho_ten", "phong", "luong"])
+    w.writeheader()
+    w.writerows(nhan_vien)
+
+with open("nhan_vien.csv", encoding="utf-8-sig", newline="") as f:
+    for dong in csv.DictReader(f):
+        print(dong["ho_ten"], "|", int(dong["luong"]) // 1_000_000, "triệu")</code></pre>
+<pre><code class="language-text">Lê Thị Hoa | 15 triệu
+Phạm Văn Đức, Jr. | 22 triệu</code></pre>
+<p>Ba chi tiết quyết định file CSV có dùng được hay không:</p>
+<ul>
+  <li><code>newline=""</code>: bắt buộc khi mở file cho module <code>csv</code>, nếu không trên Windows sẽ xuất hiện dòng trống xen kẽ.</li>
+  <li><code>encoding="utf-8-sig"</code>: ghi thêm dấu BOM ở đầu file để <strong>Excel nhận đúng tiếng Việt</strong> khi mở bằng cách nhấp đúp. Ghi <code>utf-8</code> thường thì Excel thường hiển thị "LÃª Thá»‹". Khi đọc, <code>utf-8-sig</code> tự bỏ BOM nếu có.</li>
+  <li>Đừng tự nối chuỗi bằng <code>",".join(...)</code>: tên "Phạm Văn Đức, Jr." có dấu phẩy sẽ làm lệch cột. Module <code>csv</code> tự bọc giá trị như vậy trong dấu nháy kép.</li>
+</ul>
+<div class="warn"><strong>CSV chỉ có chuỗi</strong>Mọi giá trị đọc từ CSV đều là <code>str</code>, kể cả <code>"22000000"</code>. Nhớ ép kiểu trước khi tính toán. Đây cũng là lý do ở chặng 8 bạn sẽ dùng pandas, công cụ tự đoán kiểu cột.</div>
+
+<h2>4. Excel ở Việt Nam và dấu chấm phẩy</h2>
+<p>Excel trên máy cài định dạng vùng Việt Nam (dấu phẩy thập phân) thường dùng <strong>dấu chấm phẩy</strong> làm dấu phân cách khi xuất CSV. Đọc file đó bằng <code>csv.DictReader(f, delimiter=";")</code>. Nếu không chắc, <code>csv.Sniffer</code> có thể đoán:</p>
+<pre><code class="language-python">import csv
+
+mau = "ma;ten;gia\nSP1;Bút bi;5000\n"
+kieu = csv.Sniffer().sniff(mau)
+print(repr(kieu.delimiter))</code></pre>
+<pre><code class="language-text">';'</code></pre>
+
+<h2>5. Chọn JSON hay CSV?</h2>
+<table>
+  <thead><tr><th>Tình huống</th><th>Chọn</th></tr></thead>
+  <tbody>
+    <tr><td>Dữ liệu dạng bảng phẳng, người dùng mở bằng Excel</td><td>CSV</td></tr>
+    <tr><td>Dữ liệu lồng nhau (list trong dict), cấu hình ứng dụng</td><td>JSON</td></tr>
+    <tr><td>Trao đổi với Web API</td><td>JSON</td></tr>
+    <tr><td>Hàng triệu dòng, truy vấn, cập nhật thường xuyên</td><td>Cơ sở dữ liệu (chặng 8)</td></tr>
+  </tbody>
+</table>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li><code>json.dump/load</code> với file, <code>dumps/loads</code> với chuỗi; <code>ensure_ascii=False, indent=2</code>.</li>
+  <li>Ngày lưu dạng ISO, đọc lại bằng <code>date.fromisoformat</code>.</li>
+  <li>CSV: <code>DictReader</code>, <code>DictWriter</code>, <code>newline=""</code>, <code>utf-8-sig</code> cho Excel.</li>
+  <li>Giá trị CSV luôn là chuỗi; Excel Việt Nam có thể dùng <code>;</code>.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Danh bạ JSON</h3>
+<p>Viết hàm <code>luu(danh_ba, p)</code>, <code>nap(p)</code> (file chưa có thì trả list rỗng) và <code>tim(danh_ba, tu_khoa)</code> tìm theo tên, không phân biệt hoa thường.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import json
+from pathlib import Path
+
+
+def luu(danh_ba: list[dict], p: Path) -&gt; None:
+    p.write_text(json.dumps(danh_ba, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def nap(p: Path) -&gt; list[dict]:
+    if not p.exists():
+        return []
+    return json.loads(p.read_text(encoding="utf-8"))
+
+
+def tim(danh_ba: list[dict], tu_khoa: str) -&gt; list[dict]:
+    k = tu_khoa.casefold()
+    return [ng for ng in danh_ba if k in ng["ten"].casefold()]
+
+
+p = Path("danh_ba.json")
+db = nap(p)
+db += [{"ten": "Nguyễn An", "sdt": "0912345678"}, {"ten": "An Khang", "sdt": "0909000111"},
+       {"ten": "Trần Bình", "sdt": "0987654321"}]
+luu(db, p)
+print([ng["ten"] for ng in tim(nap(p), "an")])</code></pre>
+<pre><code class="language-text">['Nguyễn An', 'An Khang']</code></pre>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Thêm cột xếp loại</h3>
+<p>Đọc <code>bang_diem.csv</code> (cột <code>ho_ten</code>, <code>diem</code>), thêm cột <code>xep_loai</code> (Giỏi ≥ 8, Khá ≥ 6,5, Trung bình ≥ 5, còn lại Yếu), ghi ra <code>bang_diem_xep_loai.csv</code> mở được bằng Excel.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import csv
+from pathlib import Path
+
+Path("bang_diem.csv").write_text("ho_ten,diem\nAn,8.5\nBình,6.5\nChi,4.75\nDũng,5\n", encoding="utf-8")
+
+
+def xep_loai(diem: float) -&gt; str:
+    if diem &gt;= 8:
+        return "Giỏi"
+    if diem &gt;= 6.5:
+        return "Khá"
+    if diem &gt;= 5:
+        return "Trung bình"
+    return "Yếu"
+
+
+with open("bang_diem.csv", encoding="utf-8-sig", newline="") as f_vao, \
+     open("bang_diem_xep_loai.csv", "w", encoding="utf-8-sig", newline="") as f_ra:
+    doc = csv.DictReader(f_vao)
+    ghi = csv.DictWriter(f_ra, fieldnames=doc.fieldnames + ["xep_loai"])
+    ghi.writeheader()
+    for dong in doc:
+        dong["xep_loai"] = xep_loai(float(dong["diem"]))
+        ghi.writerow(dong)
+
+print(Path("bang_diem_xep_loai.csv").read_text(encoding="utf-8-sig"))</code></pre>
+<pre><code class="language-text">ho_ten,diem,xep_loai
+An,8.5,Giỏi
+Bình,6.5,Khá
+Chi,4.75,Yếu
+Dũng,5,Trung bình</code></pre>
+<p>Mở hai file trong cùng một <code>with</code> và xử lý từng dòng: dù file có hàng triệu dòng, chương trình vẫn chỉ giữ một dòng trong bộ nhớ.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/library/json.html" rel="noopener" target="_blank">json: JSON encoder and decoder</a>; <a href="https://docs.python.org/3/library/csv.html" rel="noopener" target="_blank">csv: CSV File Reading and Writing</a>; <a href="https://docs.python.org/3/library/codecs.html#encodings-and-unicode" rel="noopener" target="_blank">codecs: utf-8-sig</a>.</p>

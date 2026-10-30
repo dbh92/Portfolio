@@ -1,0 +1,196 @@
+<p>Dự án cuối chặng 2: một ứng dụng quản lý chi tiêu chạy trên dòng lệnh. Bạn sẽ dùng list và dict để lưu dữ liệu, chia chương trình thành hàm nhỏ, kiểm tra đầu vào và làm báo cáo theo danh mục, theo tháng. Ở chặng 3, ứng dụng sẽ được nâng cấp để lưu dữ liệu ra file JSON; ở chặng 6, nó trở thành một package có test và cài được như một lệnh.</p>
+
+<h2>1. Đặc tả</h2>
+<p>Viết đặc tả trước khi viết code, như khi nhận việc từ khách hàng:</p>
+<ul>
+  <li><strong>Thêm</strong> khoản chi: ngày (dd/mm/yyyy, bỏ trống là hôm nay), số tiền (số nguyên dương, cho phép gõ <code>45.000</code>), danh mục, ghi chú.</li>
+  <li><strong>Liệt kê</strong> các khoản chi có số thứ tự, sắp theo ngày.</li>
+  <li><strong>Báo cáo</strong> tổng theo danh mục (kèm tỉ lệ %) và tổng theo tháng.</li>
+  <li><strong>Thoát</strong>. Nhập sai không làm chương trình dừng.</li>
+</ul>
+
+<h2>2. Thiết kế dữ liệu</h2>
+<p>Mỗi khoản chi là một dict; cả ứng dụng là một list các dict:</p>
+<pre><code class="language-python">from datetime import date
+
+khoan_chi = {"ngay": date(2026, 10, 3), "so_tien": 45000, "danh_muc": "ăn uống", "ghi_chu": "phở"}
+danh_sach = [khoan_chi]
+print(danh_sach[0]["so_tien"], danh_sach[0]["ngay"].month)</code></pre>
+<pre><code class="language-text">45000 10</code></pre>
+<p>Lưu ngày bằng <code>date</code> chứ không lưu chuỗi: so sánh, sắp xếp, lấy tháng đều dễ. Lưu tiền bằng số nguyên (đồng), không dùng float.</p>
+
+<h2>3. Phần xử lý: các hàm không phụ thuộc bàn phím</h2>
+<p>Quy tắc thiết kế quan trọng nhất của bài: <strong>tách phần xử lý khỏi phần nhập xuất</strong>. Các hàm dưới đây nhận dữ liệu qua tham số và trả kết quả, không gọi <code>input()</code>, không <code>print()</code>. Nhờ vậy chúng chạy được với dữ liệu mẫu và sau này viết test dễ dàng.</p>
+<pre><code class="language-python">from collections import defaultdict
+from datetime import date, datetime
+
+
+def doc_ngay(chuoi: str, hom_nay: date) -&gt; date:
+    """'' → hom_nay; '3/10/2026' → date(2026, 10, 3). Sai định dạng: ValueError."""
+    chuoi = chuoi.strip()
+    if not chuoi:
+        return hom_nay
+    return datetime.strptime(chuoi, "%d/%m/%Y").date()
+
+
+def doc_so_tien(chuoi: str) -&gt; int:
+    """'45.000' hoặc '45000' → 45000. Không phải số dương: ValueError."""
+    so = int(chuoi.replace(".", "").replace(",", "").strip())
+    if so &lt;= 0:
+        raise ValueError("Số tiền phải lớn hơn 0")
+    return so
+
+
+def vnd(so: int) -&gt; str:
+    return f"{so:,}".replace(",", ".") + "đ"
+
+
+def tong_theo(danh_sach: list[dict], khoa) -&gt; dict:
+    """Cộng số tiền theo nhóm; khoa là hàm lấy tên nhóm từ một khoản chi."""
+    tong = defaultdict(int)
+    for kc in danh_sach:
+        tong[khoa(kc)] += kc["so_tien"]
+    return dict(sorted(tong.items(), key=lambda cap: cap[1], reverse=True))
+
+
+def bao_cao(danh_sach: list[dict]) -&gt; str:
+    if not danh_sach:
+        return "Chưa có khoản chi nào."
+    tong = sum(kc["so_tien"] for kc in danh_sach)
+    dong = [f"Tổng chi: {vnd(tong)}", "Theo danh mục:"]
+    for dm, tien in tong_theo(danh_sach, lambda kc: kc["danh_muc"]).items():
+        dong.append(f"  {dm:&lt;12}{vnd(tien):&gt;12}  {tien / tong:6.1%}")
+    dong.append("Theo tháng:")
+    theo_thang = tong_theo(danh_sach, lambda kc: kc["ngay"].strftime("%Y-%m"))
+    for thang in sorted(theo_thang):
+        dong.append(f"  {thang:&lt;12}{vnd(theo_thang[thang]):&gt;12}")
+    return "\n".join(dong)
+
+
+# Chạy thử với dữ liệu mẫu
+hom_nay = date(2026, 10, 29)
+mau = [
+    ("3/10/2026", "45.000", "ăn uống"), ("5/10/2026", "1.200.000", "nhà ở"),
+    ("12/10/2026", "350000", "đi lại"), ("28/9/2026", "60.000", "ăn uống"),
+    ("", "150.000", "giải trí"),
+]
+danh_sach = [{"ngay": doc_ngay(n, hom_nay), "so_tien": doc_so_tien(t), "danh_muc": d, "ghi_chu": ""}
+             for n, t, d in mau]
+print(bao_cao(danh_sach))</code></pre>
+<pre><code class="language-text">Tổng chi: 1.805.000đ
+Theo danh mục:
+  nhà ở         1.200.000đ   66.5%
+  đi lại          350.000đ   19.4%
+  giải trí        150.000đ    8.3%
+  ăn uống         105.000đ    5.8%
+Theo tháng:
+  2026-09          60.000đ
+  2026-10       1.745.000đ</code></pre>
+<p>Hàm <code>tong_theo</code> nhận <strong>một hàm</strong> làm tham số (<code>khoa</code>) để quyết định nhóm theo gì. Một hàm phục vụ cả báo cáo theo danh mục lẫn theo tháng: không cần viết hai vòng lặp gần giống nhau.</p>
+
+<h2>4. Phần giao diện dòng lệnh</h2>
+<p>Thêm vào cuối file (sau các hàm ở mục 3, bỏ phần dữ liệu mẫu) phần nhập xuất. Phần này mỏng, chỉ hỏi, gọi hàm xử lý và in:</p>
+<pre><code class="language-python"># (minh họa) dùng các hàm doc_ngay, doc_so_tien, vnd, bao_cao ở mục 3
+def nhap_khoan_chi(hom_nay: date) -&gt; dict:
+    while True:
+        try:
+            ngay = doc_ngay(input("Ngày (dd/mm/yyyy, Enter = hôm nay): "), hom_nay)
+            break
+        except ValueError:
+            print("  Ngày không hợp lệ, ví dụ: 25/10/2026")
+    while True:
+        try:
+            so_tien = doc_so_tien(input("Số tiền: "))
+            break
+        except ValueError:
+            print("  Nhập số nguyên dương, ví dụ: 45.000")
+    danh_muc = input("Danh mục: ").strip().lower() or "khác"
+    ghi_chu = input("Ghi chú: ").strip()
+    return {"ngay": ngay, "so_tien": so_tien, "danh_muc": danh_muc, "ghi_chu": ghi_chu}
+
+
+def liet_ke(danh_sach: list[dict]) -&gt; None:
+    for i, kc in enumerate(sorted(danh_sach, key=lambda k: k["ngay"]), start=1):
+        print(f"{i:&gt;3}. {kc['ngay']:%d/%m/%Y}  {vnd(kc['so_tien']):&gt;12}  {kc['danh_muc']:&lt;10} {kc['ghi_chu']}")
+
+
+def main() -&gt; None:
+    danh_sach: list[dict] = []
+    while True:
+        print("\n[1] Thêm  [2] Liệt kê  [3] Báo cáo  [0] Thoát")
+        match input("Chọn: ").strip():
+            case "1":
+                danh_sach.append(nhap_khoan_chi(date.today()))
+                print("  Đã thêm.")
+            case "2":
+                liet_ke(danh_sach)
+            case "3":
+                print(bao_cao(danh_sach))
+            case "0":
+                break
+            case _:
+                print("  Lựa chọn không hợp lệ.")
+
+
+if __name__ == "__main__":
+    main()</code></pre>
+<p>Vài chi tiết đáng học:</p>
+<ul>
+  <li><code>try/except ValueError</code> bọc lời gọi hàm đọc dữ liệu: nhập sai thì hỏi lại. Bài sau của chặng 3 dạy kỹ cơ chế này; ở đây chỉ cần hiểu "thử, nếu lỗi ValueError thì làm khối except".</li>
+  <li><code>input(...).strip().lower() or "khác"</code>: chuỗi rỗng là "sai", nên <code>or</code> trả giá trị mặc định.</li>
+  <li><code>f"{kc['ngay']:%d/%m/%Y}"</code>: f-string định dạng thẳng đối tượng ngày bằng mã <code>strftime</code>.</li>
+  <li>Hàm <code>main()</code> và khối <code>__main__</code>: import file này từ nơi khác (ví dụ file test) sẽ không tự chạy menu.</li>
+</ul>
+
+<h2>5. Kiểm tra trước khi coi là xong</h2>
+<table>
+  <thead><tr><th>Thử</th><th>Kết quả mong đợi</th></tr></thead>
+  <tbody>
+    <tr><td>Số tiền <code>abc</code>, <code>-5</code>, <code>0</code></td><td>Báo lỗi, hỏi lại</td></tr>
+    <tr><td>Ngày <code>31/02/2026</code></td><td>Báo lỗi, hỏi lại</td></tr>
+    <tr><td>Báo cáo khi chưa có dữ liệu</td><td>"Chưa có khoản chi nào."</td></tr>
+    <tr><td>Danh mục bỏ trống</td><td>Lưu là "khác"</td></tr>
+    <tr><td>Chọn menu <code>9</code></td><td>"Lựa chọn không hợp lệ."</td></tr>
+  </tbody>
+</table>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Chạy kịch bản kiểm tra</h3>
+<p>Chạy chương trình, thêm 10 khoản chi thuộc 3 danh mục trong 2 tháng. Tính tay tổng từng danh mục rồi đối chiếu với báo cáo. Thử đủ các dòng của bảng ở mục 5.</p>
+<details><summary>Xem gợi ý</summary>
+<p>Nếu báo cáo lệch với số tính tay, kiểm tra hai chỗ hay sai: danh mục nhập lẫn hoa thường hoặc thừa khoảng trắng (đã được <code>strip().lower()</code> xử lý chưa?), và số tiền có dấu chấm phân cách (đã bỏ dấu chấm trước khi <code>int()</code> chưa?).</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Lệnh xóa</h3>
+<p>Thêm lệnh <code>[4] Xóa</code>: hỏi số thứ tự (theo danh sách đã sắp theo ngày ở lệnh Liệt kê), xóa khoản chi đó; số không hợp lệ thì báo lỗi.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">from datetime import date
+
+
+def xoa_theo_stt(danh_sach: list[dict], stt: int) -&gt; dict:
+    """Xóa khoản chi thứ stt (1-based) theo thứ tự ngày; trả về khoản đã xóa."""
+    da_sap = sorted(danh_sach, key=lambda k: k["ngay"])
+    if not 1 &lt;= stt &lt;= len(da_sap):
+        raise ValueError(f"Số thứ tự phải từ 1 đến {len(da_sap)}")
+    muc_tieu = da_sap[stt - 1]
+    danh_sach.remove(muc_tieu)
+    return muc_tieu
+
+
+ds = [{"ngay": date(2026, 10, 5), "so_tien": 30000, "danh_muc": "a", "ghi_chu": ""},
+      {"ngay": date(2026, 10, 1), "so_tien": 50000, "danh_muc": "b", "ghi_chu": ""}]
+da_xoa = xoa_theo_stt(ds, 1)
+print(da_xoa["so_tien"], len(ds))
+try:
+    xoa_theo_stt(ds, 5)
+except ValueError as loi:
+    print("Lỗi:", loi)</code></pre>
+<pre><code class="language-text">50000 1
+Lỗi: Số thứ tự phải từ 1 đến 1</code></pre>
+<p>Trong <code>main()</code>, thêm nhánh <code>case "4":</code> gọi <code>liet_ke</code>, hỏi số thứ tự, ép <code>int</code> và gọi <code>xoa_theo_stt</code> trong <code>try/except ValueError</code>. Số thứ tự người dùng nhìn thấy bắt đầu từ 1, chỉ số list bắt đầu từ 0: nhớ trừ 1.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/library/datetime.html#strftime-and-strptime-behavior" rel="noopener" target="_blank">datetime: strftime() and strptime() Format Codes</a>; <a href="https://docs.python.org/3/library/collections.html#collections.defaultdict" rel="noopener" target="_blank">collections.defaultdict</a>.</p>

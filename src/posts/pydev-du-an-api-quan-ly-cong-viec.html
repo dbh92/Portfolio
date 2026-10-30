@@ -1,0 +1,411 @@
+<p>Dự án cuối chặng 9 là một backend hoàn chỉnh đủ để đưa vào portfolio: API quản lý công việc cho nhóm nhỏ, có tài khoản, giao việc, phân quyền theo vai trò, lọc, sắp xếp, thống kê và bộ test tự động. Bạn đã có mọi viên gạch từ các bài trước; bài này tập trung vào việc <strong>ghép chúng theo một đặc tả</strong> và tổ chức code khi ứng dụng lớn dần, với <code>APIRouter</code>.</p>
+
+<h2>1. Đặc tả</h2>
+<p>Bảng endpoint đã thiết kế ở bài tập của bài HTTP và REST. Các quy tắc nghiệp vụ:</p>
+<ul>
+  <li>Công việc có tiêu đề, mô tả, trạng thái (<code>moi</code>, <code>dang_lam</code>, <code>xong</code>), ưu tiên 1–3 (1 là cao nhất), hạn (tùy chọn), người tạo, người nhận (tùy chọn).</li>
+  <li>Một người chỉ <strong>thấy</strong> công việc mình tạo hoặc được giao cho mình; công việc khác trả 404.</li>
+  <li><strong>Người tạo</strong> sửa được mọi trường, giao hoặc bỏ giao việc, xóa. <strong>Người nhận</strong> chỉ đổi được trạng thái; sửa trường khác hay xóa trả 403.</li>
+  <li>Danh sách lọc theo trạng thái, "việc giao cho tôi", "quá hạn" (hạn đã qua và chưa xong); sắp theo hạn gần nhất trước, việc không có hạn xếp cuối, rồi theo ưu tiên.</li>
+  <li>Thống kê số công việc theo từng trạng thái, kể cả trạng thái có 0 việc.</li>
+</ul>
+
+<h2>2. Cấu trúc dự án</h2>
+<pre><code class="language-text">quan-ly-cong-viec/
+├── pyproject.toml
+├── app/
+│   ├── database.py       giữ nguyên bài FastAPI + CSDL (đổi tên file CSDL)
+│   ├── security.py       giữ nguyên bài xác thực
+│   ├── auth.py           giữ nguyên bài xác thực
+│   ├── models.py         NguoiDung, CongViec, TrangThai
+│   ├── schemas.py
+│   ├── main.py           tạo app, gắn router
+│   └── routers/
+│       ├── __init__.py
+│       ├── tai_khoan.py  /auth/..., /nguoi-dung/toi
+│       └── cong_viec.py  /cong-viec/...
+└── tests/
+    ├── conftest.py       như bài kiểm thử API, thêm người dùng thứ ba "chi"
+    └── test_cong_viec.py</code></pre>
+<p>Ba file <code>database.py</code>, <code>security.py</code>, <code>auth.py</code> dùng lại nguyên vẹn: đó là phần thưởng của việc tách module ngay từ đầu. Router <code>tai_khoan.py</code> chứa đúng ba endpoint tài khoản của bài xác thực, chỉ đổi <code>@app</code> thành <code>@router</code>.</p>
+
+<h2>3. Model và schema</h2>
+<pre><code class="language-python"># (minh họa) app/models.py
+"""Bảng người dùng và công việc."""
+
+import enum
+from datetime import date, datetime
+
+from sqlalchemy import ForeignKey, String, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.database import Base
+
+
+class TrangThai(enum.StrEnum):
+    MOI = "moi"
+    DANG_LAM = "dang_lam"
+    XONG = "xong"
+
+
+class NguoiDung(Base):
+    __tablename__ = "nguoi_dung"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ten_dang_nhap: Mapped[str] = mapped_column(String(50), unique=True)
+    mat_khau_bam: Mapped[str]
+
+
+class CongViec(Base):
+    __tablename__ = "cong_viec"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tieu_de: Mapped[str] = mapped_column(String(200))
+    mo_ta: Mapped[str] = mapped_column(default="")
+    trang_thai: Mapped[TrangThai] = mapped_column(default=TrangThai.MOI, index=True)
+    uu_tien: Mapped[int] = mapped_column(default=2)  # 1 cao, 2 vừa, 3 thấp
+    han: Mapped[date | None]
+    nguoi_tao_id: Mapped[int] = mapped_column(ForeignKey("nguoi_dung.id"), index=True)
+    nguoi_nhan_id: Mapped[int | None] = mapped_column(ForeignKey("nguoi_dung.id"), index=True)
+    tao_luc: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    nguoi_tao: Mapped[NguoiDung] = relationship(foreign_keys=[nguoi_tao_id], lazy="joined")
+    nguoi_nhan: Mapped[NguoiDung | None] = relationship(foreign_keys=[nguoi_nhan_id], lazy="joined")</code></pre>
+<ul>
+  <li><code>TrangThai</code> là <code>StrEnum</code> (Python 3.11+): SQLAlchemy lưu nó thành cột chuỗi chỉ nhận đúng các giá trị khai báo, Pydantic kiểm tra giá trị vào, và <code>/docs</code> hiện danh sách lựa chọn.</li>
+  <li>Bảng <code>cong_viec</code> có <strong>hai</strong> khóa ngoại tới <code>nguoi_dung</code>, nên mỗi <code>relationship</code> phải chỉ rõ <code>foreign_keys</code>, nếu không SQLAlchemy không biết nối theo cột nào.</li>
+  <li><code>lazy="joined"</code> nạp sẵn người tạo, người nhận bằng JOIN trong cùng câu truy vấn: tránh bài toán N+1 (chặng 8) khi liệt kê 100 công việc.</li>
+</ul>
+<pre><code class="language-python"># (minh họa) app/schemas.py
+"""Dữ liệu vào và ra của API."""
+
+from datetime import date, datetime
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.models import TrangThai
+
+
+class NguoiDungTao(BaseModel):
+    ten_dang_nhap: str = Field(min_length=3, max_length=50, pattern=r"^[a-z0-9_]+$")
+    mat_khau: str = Field(min_length=8, max_length=128)
+
+
+class NguoiDungDoc(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    ten_dang_nhap: str
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+class CongViecTao(BaseModel):
+    tieu_de: str = Field(min_length=1, max_length=200)
+    mo_ta: str = ""
+    uu_tien: int = Field(default=2, ge=1, le=3)
+    han: date | None = None
+    nguoi_nhan: str | None = None  # tên đăng nhập người được giao
+
+
+class CongViecCapNhat(BaseModel):
+    tieu_de: str | None = Field(default=None, min_length=1, max_length=200)
+    mo_ta: str | None = None
+    trang_thai: TrangThai | None = None
+    uu_tien: int | None = Field(default=None, ge=1, le=3)
+    han: date | None = None  # gửi null để bỏ hạn
+    nguoi_nhan: str | None = None  # gửi null để bỏ giao việc
+
+    @field_validator("tieu_de", "mo_ta", "trang_thai", "uu_tien")
+    @classmethod
+    def khong_nhan_null(cls, gia_tri: object) -&gt; object:
+        if gia_tri is None:
+            raise ValueError("trường này không được là null")
+        return gia_tri
+
+
+class CongViecDoc(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    tieu_de: str
+    mo_ta: str
+    trang_thai: TrangThai
+    uu_tien: int
+    han: date | None
+    nguoi_tao: NguoiDungDoc
+    nguoi_nhan: NguoiDungDoc | None
+    tao_luc: datetime</code></pre>
+<p>Client giao việc bằng <strong>tên đăng nhập</strong> (<code>nguoi_nhan: "binh"</code>), không phải id nội bộ; API trả về đối tượng lồng <code>NguoiDungDoc</code>. Trong <code>CongViecCapNhat</code>, <code>han</code> và <code>nguoi_nhan</code> được phép là <code>null</code> (nghĩa là "bỏ hạn", "bỏ giao việc") nên không nằm trong validator chặn null; các trường còn lại thì không.</p>
+
+<h2>4. Router công việc</h2>
+<pre><code class="language-python"># (minh họa) app/routers/cong_viec.py
+"""Công việc: người tạo toàn quyền; người nhận chỉ đổi trạng thái; người khác không thấy."""
+
+from datetime import date
+from typing import Annotated
+
+from fastapi import APIRouter, HTTPException, Query, status
+from sqlalchemy import func, or_, select
+
+from app.auth import NguoiDungHienTai
+from app.database import SessionDep
+from app.models import CongViec, NguoiDung, TrangThai
+from app.schemas import CongViecCapNhat, CongViecDoc, CongViecTao
+
+router = APIRouter(prefix="/cong-viec", tags=["Công việc"])
+
+
+def cua_toi(nguoi_dung: NguoiDung):
+    """Điều kiện SQL: công việc tôi tạo hoặc được giao cho tôi."""
+    return or_(CongViec.nguoi_tao_id == nguoi_dung.id, CongViec.nguoi_nhan_id == nguoi_dung.id)
+
+
+def tim_nguoi_nhan(session: SessionDep, ten: str | None) -&gt; NguoiDung | None:
+    if ten is None:
+        return None
+    nd = session.scalar(select(NguoiDung).where(NguoiDung.ten_dang_nhap == ten))
+    if nd is None:
+        raise HTTPException(status_code=422, detail=f"Không có người dùng '{ten}'")
+    return nd
+
+
+def lay_hoac_404(session: SessionDep, cv_id: int, nguoi_dung: NguoiDung) -&gt; CongViec:
+    cv = session.scalar(select(CongViec).where(CongViec.id == cv_id, cua_toi(nguoi_dung)))
+    if cv is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy công việc")
+    return cv
+
+
+@router.post("", status_code=status.HTTP_201_CREATED)
+def tao(du_lieu: CongViecTao, session: SessionDep, nguoi_dung: NguoiDungHienTai) -&gt; CongViecDoc:
+    cv = CongViec(
+        **du_lieu.model_dump(exclude={"nguoi_nhan"}),
+        nguoi_tao=nguoi_dung,
+        nguoi_nhan=tim_nguoi_nhan(session, du_lieu.nguoi_nhan),
+    )
+    session.add(cv)
+    session.commit()
+    session.refresh(cv)
+    return CongViecDoc.model_validate(cv)
+
+
+@router.get("")
+def liet_ke(
+    session: SessionDep,
+    nguoi_dung: NguoiDungHienTai,
+    trang_thai: TrangThai | None = None,
+    toi_nhan: bool = False,
+    qua_han: bool = False,
+    skip: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -&gt; list[CongViecDoc]:
+    q = select(CongViec).where(cua_toi(nguoi_dung))
+    if trang_thai is not None:
+        q = q.where(CongViec.trang_thai == trang_thai)
+    if toi_nhan:
+        q = q.where(CongViec.nguoi_nhan_id == nguoi_dung.id)
+    if qua_han:
+        q = q.where(CongViec.han &lt; date.today(), CongViec.trang_thai != TrangThai.XONG)
+    q = q.order_by(CongViec.han.is_(None), CongViec.han, CongViec.uu_tien, CongViec.id)
+    return [CongViecDoc.model_validate(cv) for cv in session.scalars(q.offset(skip).limit(limit))]
+
+
+@router.get("/thong-ke")
+def thong_ke(session: SessionDep, nguoi_dung: NguoiDungHienTai) -&gt; dict[str, int]:
+    dem = {tt.value: 0 for tt in TrangThai}
+    q = (
+        select(CongViec.trang_thai, func.count())
+        .where(cua_toi(nguoi_dung))
+        .group_by(CongViec.trang_thai)
+    )
+    for tt, so in session.execute(q):
+        dem[tt.value] = so
+    return dem
+
+
+@router.get("/{cv_id}")
+def xem(cv_id: int, session: SessionDep, nguoi_dung: NguoiDungHienTai) -&gt; CongViecDoc:
+    return CongViecDoc.model_validate(lay_hoac_404(session, cv_id, nguoi_dung))
+
+
+@router.patch("/{cv_id}")
+def cap_nhat(
+    cv_id: int, du_lieu: CongViecCapNhat, session: SessionDep, nguoi_dung: NguoiDungHienTai
+) -&gt; CongViecDoc:
+    cv = lay_hoac_404(session, cv_id, nguoi_dung)
+    thay_doi = du_lieu.model_dump(exclude_unset=True)
+    if cv.nguoi_tao_id != nguoi_dung.id and set(thay_doi) - {"trang_thai"}:
+        raise HTTPException(status_code=403, detail="Người được giao chỉ được đổi trạng thái")
+    if "nguoi_nhan" in thay_doi:
+        cv.nguoi_nhan = tim_nguoi_nhan(session, thay_doi.pop("nguoi_nhan"))
+    for truong, gia_tri in thay_doi.items():
+        setattr(cv, truong, gia_tri)
+    session.commit()
+    session.refresh(cv)
+    return CongViecDoc.model_validate(cv)
+
+
+@router.delete("/{cv_id}", status_code=status.HTTP_204_NO_CONTENT)
+def xoa(cv_id: int, session: SessionDep, nguoi_dung: NguoiDungHienTai) -&gt; None:
+    cv = lay_hoac_404(session, cv_id, nguoi_dung)
+    if cv.nguoi_tao_id != nguoi_dung.id:
+        raise HTTPException(status_code=403, detail="Chỉ người tạo được xóa công việc")
+    session.delete(cv)
+    session.commit()</code></pre>
+<pre><code class="language-python"># (minh họa) app/main.py
+"""API quản lý công việc nhóm."""
+
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+
+from app.database import Base, engine
+from app.routers import cong_viec, tai_khoan
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -&gt; AsyncIterator[None]:
+    Base.metadata.create_all(engine)
+    yield
+
+
+app = FastAPI(title="Quản lý công việc", version="1.0.0", lifespan=lifespan)
+app.include_router(tai_khoan.router)
+app.include_router(cong_viec.router)
+
+
+@app.get("/suc-khoe", tags=["Hệ thống"])
+def suc_khoe() -&gt; dict[str, str]:
+    """Dùng cho công cụ giám sát và Docker kiểm tra ứng dụng còn sống."""
+    return {"trang_thai": "ok"}</code></pre>
+<ul>
+  <li><code>APIRouter(prefix="/cong-viec", tags=[...])</code> gom các endpoint cùng nhóm; <code>app.include_router</code> gắn vào ứng dụng. <code>tags</code> chia nhóm trên <code>/docs</code>.</li>
+  <li><code>cua_toi()</code> trả về một <strong>điều kiện SQL</strong> dùng lại ở mọi truy vấn: quy tắc "chỉ thấy việc của mình" nằm ở đúng một chỗ, không thể quên ở endpoint nào.</li>
+  <li>Phân quyền trong <code>cap_nhat</code>: <code>set(thay_doi) - {"trang_thai"}</code> là tập các trường khác trạng thái mà client muốn đổi; người nhận gửi bất kỳ trường nào trong đó là 403.</li>
+  <li>Phân biệt 404 và 403: người không liên quan nhận 404 (không lộ công việc tồn tại); người nhận thấy công việc nhưng không đủ quyền thì 403.</li>
+  <li><code>/thong-ke</code> khai báo <strong>trước</strong> <code>/{cv_id}</code>: FastAPI so khớp đường dẫn theo thứ tự khai báo, đặt sau thì <code>"thong-ke"</code> bị hiểu là <code>cv_id</code> và trả 422.</li>
+  <li>Sắp xếp <code>CongViec.han.is_(None)</code> trước: giá trị <code>False</code> (có hạn) đứng trước <code>True</code> (không hạn), cách viết chạy được trên cả SQLite lẫn PostgreSQL.</li>
+  <li><code>/suc-khoe</code> là endpoint "health check" mà Docker, máy chủ cân bằng tải và công cụ giám sát gọi định kỳ (chặng 10).</li>
+</ul>
+
+<h2>5. Bộ test nghiệm thu</h2>
+<pre><code class="language-python"># (minh họa) tests/test_cong_viec.py
+from datetime import date, timedelta
+
+import pytest
+
+
+def tao(client, headers, **du_lieu):
+    r = client.post("/cong-viec", json={"tieu_de": "Việc", **du_lieu}, headers=headers)
+    assert r.status_code == 201, r.text
+    return r.json()
+
+
+def test_tao_va_giao_viec(client, an, binh):
+    cv = tao(client, an, tieu_de="Viết báo cáo", nguoi_nhan="binh", han="2026-11-05")
+    assert cv["trang_thai"] == "moi" and cv["uu_tien"] == 2
+    assert cv["nguoi_tao"]["ten_dang_nhap"] == "an_nguyen"
+    assert cv["nguoi_nhan"]["ten_dang_nhap"] == "binh"
+
+
+def test_giao_cho_nguoi_khong_ton_tai(client, an):
+    r = client.post("/cong-viec", json={"tieu_de": "X", "nguoi_nhan": "ma"}, headers=an)
+    assert r.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "body", [{"tieu_de": ""}, {"tieu_de": "A", "uu_tien": 5}, {"tieu_de": "A", "han": "31/12/2026"}]
+)
+def test_du_lieu_sai(client, an, body):
+    assert client.post("/cong-viec", json=body, headers=an).status_code == 422
+
+
+def test_ai_thay_viec_nao(client, an, binh, chi):
+    cv = tao(client, an, nguoi_nhan="binh")
+    assert client.get(f"/cong-viec/{cv['id']}", headers=binh).status_code == 200
+    assert client.get(f"/cong-viec/{cv['id']}", headers=chi).status_code == 404
+    assert client.get("/cong-viec", headers=chi).json() == []
+
+
+def test_nguoi_nhan_chi_doi_trang_thai(client, an, binh):
+    cv = tao(client, an, nguoi_nhan="binh")
+    url = f"/cong-viec/{cv['id']}"
+    r = client.patch(url, json={"trang_thai": "dang_lam"}, headers=binh)
+    assert r.status_code == 200 and r.json()["trang_thai"] == "dang_lam"
+    assert client.patch(url, json={"tieu_de": "Đổi tên"}, headers=binh).status_code == 403
+    assert client.delete(url, headers=binh).status_code == 403
+    assert client.delete(url, headers=an).status_code == 204
+
+
+def test_nguoi_tao_sua_va_bo_giao(client, an, binh):
+    cv = tao(client, an, nguoi_nhan="binh", han="2026-11-05")
+    r = client.patch(
+        f"/cong-viec/{cv['id']}", json={"nguoi_nhan": None, "han": None, "uu_tien": 1}, headers=an
+    )
+    assert r.status_code == 200
+    assert (r.json()["nguoi_nhan"], r.json()["han"], r.json()["uu_tien"]) == (None, None, 1)
+    assert client.get(f"/cong-viec/{cv['id']}", headers=binh).status_code == 404  # hết được giao
+
+
+def test_khong_cho_null_trang_thai(client, an):
+    cv = tao(client, an)
+    r = client.patch(f"/cong-viec/{cv['id']}", json={"trang_thai": None}, headers=an)
+    assert r.status_code == 422
+
+
+def ds_id(client, headers, **params):
+    return [cv["id"] for cv in client.get("/cong-viec", params=params, headers=headers).json()]
+
+
+def test_loc_sap_xep_va_thong_ke(client, an, binh):
+    hom_qua = (date.today() - timedelta(days=1)).isoformat()
+    tuan_sau = (date.today() + timedelta(days=7)).isoformat()
+    a = tao(client, an, tieu_de="Không hạn")
+    b = tao(client, an, tieu_de="Tuần sau", han=tuan_sau, nguoi_nhan="binh")
+    c = tao(client, an, tieu_de="Trễ hạn", han=hom_qua)
+    tao(client, binh, tieu_de="Việc riêng của Bình")
+    client.patch(f"/cong-viec/{b['id']}", json={"trang_thai": "xong"}, headers=an)
+
+    assert ds_id(client, an) == [c["id"], b["id"], a["id"]]  # hạn gần trước, không hạn cuối
+    assert ds_id(client, an, qua_han=True) == [c["id"]]
+    assert ds_id(client, an, trang_thai="xong") == [b["id"]]
+    assert len(ds_id(client, binh, toi_nhan=True)) == 1
+    thong_ke = client.get("/cong-viec/thong-ke", headers=an).json()
+    assert thong_ke == {"moi": 2, "dang_lam": 0, "xong": 1}
+    assert client.get("/cong-viec/thong-ke", headers=binh).json()["moi"] == 1
+
+
+def test_suc_khoe(client):
+    assert client.get("/suc-khoe").json() == {"trang_thai": "ok"}</code></pre>
+<pre><code class="language-text">$ uv run pytest -q --cov=app.routers.cong_viec --cov-report=term-missing
+Name                       Stmts   Miss  Cover   Missing
+--------------------------------------------------------
+app\routers\cong_viec.py      71      0   100%
+--------------------------------------------------------
+TOTAL                         71      0   100%
+11 passed in 2.40s</code></pre>
+<p>Test chính là đặc tả viết bằng code: mỗi quy tắc ở mục 1 có ít nhất một test tương ứng. Test lọc dùng ngày tính từ <code>date.today()</code> chứ không viết cứng, để chạy đúng vào bất kỳ ngày nào. Chạy thêm <code>uv run ruff check .</code> và <code>uv run mypy app</code>: cả hai sạch là điều kiện "xong" của dự án.</p>
+<div class="tip"><strong>Đưa vào portfolio</strong>Đẩy dự án lên GitHub với README gồm: mô tả ngắn, bảng endpoint, cách chạy (<code>uv sync</code>, <code>uv run fastapi dev app/main.py</code>), cách chạy test, và ảnh chụp trang <code>/docs</code>. Ở chặng 10 bạn sẽ thêm Dockerfile và CI để mỗi lần đẩy code đều tự chạy test.</div>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Dựng và nghiệm thu</h3>
+<p>Dựng dự án theo cấu trúc ở mục 2, chạy toàn bộ test (11 test phải đạt), rồi dùng <code>/docs</code> với ba tài khoản để tự đi một vòng: An giao việc cho Bình, Bình chuyển sang <code>dang_lam</code> rồi <code>xong</code>, Chi không thấy gì.</p>
+<details><summary>Xem gợi ý</summary>
+<p>Nếu <code>GET /cong-viec/thong-ke</code> trả 422 với lỗi <code>int_parsing</code> ở <code>cv_id</code>, bạn đã khai báo <code>/thong-ke</code> sau <code>/{cv_id}</code>. Nếu SQLAlchemy báo <code>AmbiguousForeignKeysError</code>, kiểm tra tham số <code>foreign_keys</code> của hai <code>relationship</code>.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Bình luận cho công việc</h3>
+<p>Thêm bảng <code>binh_luan</code> (id, cong_viec_id, nguoi_viet_id, noi_dung, tao_luc) và hai endpoint <code>POST</code>, <code>GET /cong-viec/{cv_id}/binh-luan</code>. Chỉ người thấy được công việc mới đọc, viết bình luận. Viết test trước.</p>
+<details><summary>Xem gợi ý</summary>
+<p>Dùng lại <code>lay_hoac_404(session, cv_id, nguoi_dung)</code> ở đầu cả hai endpoint: nó vừa kiểm tra công việc tồn tại vừa kiểm tra quyền xem, nên quy tắc phân quyền tự động đúng. Trong model <code>CongViec</code> thêm <code>binh_luan: Mapped[list["BinhLuan"]] = relationship(cascade="all, delete-orphan")</code> để xóa công việc thì bình luận bị xóa theo. Test tối thiểu: người nhận bình luận được (201), Chi nhận 404, nội dung rỗng nhận 422, danh sách trả theo thứ tự thời gian.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://fastapi.tiangolo.com/tutorial/bigger-applications/" rel="noopener" target="_blank">FastAPI: Bigger Applications - Multiple Files</a>; <a href="https://docs.sqlalchemy.org/en/20/orm/join_conditions.html#handling-multiple-join-paths" rel="noopener" target="_blank">SQLAlchemy: Handling Multiple Join Paths</a>; <a href="https://docs.python.org/3/library/enum.html#enum.StrEnum" rel="noopener" target="_blank">enum.StrEnum</a>.</p>

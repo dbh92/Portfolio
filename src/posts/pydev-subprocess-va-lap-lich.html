@@ -1,0 +1,177 @@
+<p>Tự động hóa thật sự nghĩa là script chạy <strong>khi bạn không có mặt</strong>: sao lưu dữ liệu lúc 18 giờ, gửi báo cáo lúc 7 giờ sáng, dọn file tạm mỗi Chủ nhật. Bài này dạy hai việc: gọi chương trình khác từ Python bằng <code>subprocess</code>, và lên lịch chạy script trên Windows (Task Scheduler) và Linux (cron), cùng những nguyên tắc để script chạy không giám sát mà không gặp sự cố.</p>
+
+<h2>1. subprocess.run: chạy chương trình khác</h2>
+<pre><code class="language-python">import subprocess
+import sys
+
+kq = subprocess.run(
+    [sys.executable, "-c", "import sys; print('Python', sys.version_info[:2]); sys.exit(3)"],
+    capture_output=True,   # bắt stdout, stderr thay vì in ra màn hình
+    text=True,             # nhận chuỗi thay vì bytes
+    timeout=30,
+)
+print(kq.returncode, kq.stdout.strip())</code></pre>
+<pre><code class="language-text">3 Python (3, 14)</code></pre>
+<ul>
+  <li>Truyền lệnh dưới dạng <strong>list</strong> các phần (chương trình, tham số), không ghép thành một chuỗi. Python tự xử lý dấu cách và ký tự đặc biệt trong tham số.</li>
+  <li><code>sys.executable</code> là đường dẫn đến chính trình thông dịch Python đang chạy: dùng nó thay vì gõ <code>"python"</code> để chắc chắn gọi đúng môi trường ảo.</li>
+  <li><code>returncode</code> là mã thoát (0 là thành công); <code>stdout</code>, <code>stderr</code> là output đã bắt.</li>
+  <li><code>timeout</code> tránh treo vô hạn nếu chương trình con không kết thúc.</li>
+</ul>
+<pre><code class="language-python">import subprocess
+import sys
+
+try:
+    subprocess.run([sys.executable, "-c", "raise SystemExit(1)"], check=True, timeout=30)
+except subprocess.CalledProcessError as e:
+    print("Lệnh thất bại, mã thoát", e.returncode)
+
+kq = subprocess.run(["git", "--version"], capture_output=True, text=True)
+print(kq.stdout.split()[0])</code></pre>
+<pre><code class="language-text">Lệnh thất bại, mã thoát 1
+git</code></pre>
+<p><code>check=True</code> ném <code>CalledProcessError</code> khi mã thoát khác 0: dùng khi lỗi của chương trình con phải dừng script của bạn.</p>
+<div class="warn"><strong>Tránh shell=True với dữ liệu từ ngoài</strong><code>subprocess.run(f"ping {dia_chi}", shell=True)</code> cho phép chuỗi lệnh đi qua shell. Nếu <code>dia_chi</code> đến từ người dùng và chứa <code>; rm -rf ~</code> hay <code>&amp; del ...</code>, lệnh đó sẽ được thực thi. Đây là lỗ hổng "command injection". Luôn dùng dạng list; chỉ dùng <code>shell=True</code> với chuỗi cố định bạn tự viết.</div>
+<p>Trước khi gọi chương trình ngoài, hãy xem Python có sẵn cách làm không: sao chép, nén file dùng <code>shutil</code>; tải web dùng <code>requests</code>. Code thuần Python chạy giống nhau trên mọi hệ điều hành, còn lệnh ngoài thì không (<code>dir</code> chỉ có trên Windows, <code>ls</code> chỉ có trên Linux, macOS).</p>
+
+<h2>2. Script chạy không giám sát: 5 nguyên tắc</h2>
+<ol>
+  <li><strong>Đường dẫn tuyệt đối.</strong> Lịch chạy thường khởi động script ở một thư mục khác (ví dụ <code>C:\Windows\System32</code>). Mọi file của script tính từ <code>Path(__file__).resolve().parent</code>.</li>
+  <li><strong>Ghi log ra file</strong>, có thời gian. Không ai thấy <code>print</code>.</li>
+  <li><strong>Trả mã thoát đúng</strong>: 0 khi thành công, khác 0 khi lỗi, để lịch chạy ghi nhận và báo động.</li>
+  <li><strong>Chạy lại được</strong> (idempotent): chạy hai lần không tạo dữ liệu trùng, không hỏng gì. Máy tắt giữa chừng thì lần sau chạy lại là đủ.</li>
+  <li><strong>Không hỏi</strong>: không <code>input()</code>, mọi cấu hình qua tham số dòng lệnh, file cấu hình hoặc biến môi trường.</li>
+</ol>
+
+<h2>3. Ví dụ: script sao lưu thư mục</h2>
+<pre><code class="language-python">"""sao_luu.py: nén một thư mục thành file zip có ngày giờ, giữ N bản mới nhất."""
+import argparse
+import logging
+import shutil
+import sys
+from datetime import datetime
+from pathlib import Path
+
+GOC = Path(__file__).resolve().parent
+log = logging.getLogger("sao_luu")
+
+
+def sao_luu(nguon: Path, dich: Path, giu: int, bay_gio: datetime) -&gt; Path:
+    dich.mkdir(parents=True, exist_ok=True)
+    ten = f"{nguon.name}_{bay_gio:%Y%m%d_%H%M%S}"
+    file_zip = Path(shutil.make_archive(str(dich / ten), "zip", root_dir=nguon))
+    log.info("Đã tạo %s (%.1f KB)", file_zip.name, file_zip.stat().st_size / 1024)
+    cac_ban = sorted(dich.glob(f"{nguon.name}_*.zip"))       # tên có ngày giờ nên sắp theo tên = theo thời gian
+    for cu in cac_ban[:-giu]:
+        cu.unlink()
+        log.info("Xóa bản cũ %s", cu.name)
+    return file_zip
+
+
+def main(argv: list[str] | None = None) -&gt; int:
+    p = argparse.ArgumentParser()
+    p.add_argument("nguon", type=Path)
+    p.add_argument("--dich", type=Path, default=GOC / "ban_sao")
+    p.add_argument("--giu", type=int, default=7)
+    args = p.parse_args(argv)
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
+        handlers=[logging.FileHandler(GOC / "sao_luu.log", encoding="utf-8"), logging.StreamHandler()],
+    )
+    try:
+        sao_luu(args.nguon.resolve(), args.dich, args.giu, datetime.now())
+    except Exception:
+        log.exception("Sao lưu thất bại")
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())</code></pre>
+<p>Thử nhanh trước khi lên lịch, kể cả trường hợp lỗi:</p>
+<pre><code class="language-text">$ python sao_luu.py D:\tai_lieu --giu 3
+2026-10-29 18:00:01,204 INFO Đã tạo tai_lieu_20261029_180001.zip (842.3 KB)
+$ python sao_luu.py D:\khong_co ; echo $LASTEXITCODE
+2026-10-29 18:00:09,551 ERROR Sao lưu thất bại
+Traceback (most recent call last):
+  ...
+FileNotFoundError: [WinError 2] The system cannot find the file specified: 'D:\\khong_co'
+1</code></pre>
+<p><code>except Exception</code> ở tầng ngoài cùng là chấp nhận được (chặng 3) vì nó ghi đủ traceback vào log và trả mã lỗi; không có nó, lỗi chỉ hiện ra màn hình mà lúc chạy theo lịch không ai nhìn thấy.</p>
+
+<h2>4. Lên lịch trên Windows: Task Scheduler</h2>
+<p>Cách nhanh bằng lệnh (PowerShell hoặc cmd), chạy 18:00 hằng ngày:</p>
+<pre><code class="language-text">schtasks /Create /SC DAILY /ST 18:00 /TN "HocPython\SaoLuu" ^
+  /TR "\"D:\du-an\sao-luu\.venv\Scripts\python.exe\" \"D:\du-an\sao-luu\sao_luu.py\" D:\tai_lieu"
+
+schtasks /Run /TN "HocPython\SaoLuu"      &lt;- chạy thử ngay
+schtasks /Query /TN "HocPython\SaoLuu" /V /FO LIST</code></pre>
+<p>Hoặc dùng giao diện: mở <strong>Task Scheduler</strong> › <strong>Create Basic Task</strong>, chọn lịch, ở bước <em>Start a program</em> điền <strong>Program</strong> là đường dẫn <code>python.exe</code> trong <code>.venv</code> của dự án, <strong>Arguments</strong> là đường dẫn script và tham số, <strong>Start in</strong> là thư mục dự án. Trong tab Settings, bật "Run task as soon as possible after a scheduled start is missed" để máy tắt lúc 18:00 thì lần mở sau vẫn chạy bù.</p>
+<p>Dùng <code>python.exe</code> trong <code>.venv</code> của dự án (đường dẫn tuyệt đối) để có đủ thư viện. Script không cần cửa sổ console thì dùng <code>pythonw.exe</code>.</p>
+
+<h2>5. Lên lịch trên Linux: cron</h2>
+<p>Mở bảng lịch bằng <code>crontab -e</code> và thêm một dòng:</p>
+<pre><code class="language-text"># phút giờ ngày-trong-tháng tháng thứ   lệnh
+0 18 * * * /home/an/sao-luu/.venv/bin/python /home/an/sao-luu/sao_luu.py /home/an/tai_lieu &gt;&gt; /home/an/sao-luu/cron.log 2&gt;&amp;1
+30 7 * * 1-5  /home/an/.local/bin/uv run --project /home/an/bao-cao bao-cao   # 7:30 thứ Hai đến thứ Sáu</code></pre>
+<table>
+  <thead><tr><th>Biểu thức</th><th>Ý nghĩa</th></tr></thead>
+  <tbody>
+    <tr><td><code>0 18 * * *</code></td><td>18:00 mỗi ngày</td></tr>
+    <tr><td><code>*/15 * * * *</code></td><td>Mỗi 15 phút</td></tr>
+    <tr><td><code>0 2 * * 0</code></td><td>2:00 sáng Chủ nhật</td></tr>
+    <tr><td><code>0 8 1 * *</code></td><td>8:00 ngày đầu mỗi tháng</td></tr>
+  </tbody>
+</table>
+<p>cron chạy với biến môi trường tối thiểu (PATH rất ngắn, không có các biến bạn đặt trong <code>.bashrc</code>), nên luôn dùng đường dẫn tuyệt đối cho cả chương trình lẫn file. <code>&gt;&gt; cron.log 2&gt;&amp;1</code> ghi cả output lẫn lỗi vào file để điều tra. Kiểm tra biểu thức lịch tại crontab.guru trước khi lưu.</p>
+<div class="tip"><strong>Còn cách nào khác?</strong>Thư viện <code>schedule</code> hay <code>APScheduler</code> cho phép lên lịch ngay trong một chương trình Python chạy liên tục; hợp khi ứng dụng vốn đã chạy 24/7. Với script chạy rồi thoát, dùng lịch của hệ điều hành đơn giản và bền hơn: máy khởi động lại vẫn chạy, script lỗi lần này không ảnh hưởng lần sau. Trên máy chủ đám mây, GitHub Actions cũng có thể chạy theo lịch (chặng 10).</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li><code>subprocess.run([...], capture_output=True, text=True, timeout=..., check=...)</code>; lệnh dạng list; tránh <code>shell=True</code>.</li>
+  <li>Script không giám sát: đường dẫn tuyệt đối từ <code>__file__</code>, log ra file, mã thoát đúng, chạy lại được, không hỏi.</li>
+  <li>Windows: <code>schtasks /Create</code> hoặc Task Scheduler; Linux: <code>crontab -e</code>; luôn dùng Python trong <code>.venv</code> bằng đường dẫn tuyệt đối.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Sao lưu giữ 7 bản</h3>
+<p>Chạy hàm <code>sao_luu</code> 9 lần liên tiếp trên một thư mục mẫu (truyền thời điểm khác nhau mỗi lần) và xác nhận chỉ còn 7 file zip mới nhất.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import logging
+import shutil
+from datetime import datetime, timedelta
+from pathlib import Path
+
+log = logging.getLogger("sao_luu")
+
+
+def sao_luu(nguon: Path, dich: Path, giu: int, bay_gio: datetime) -&gt; Path:
+    dich.mkdir(parents=True, exist_ok=True)
+    file_zip = Path(shutil.make_archive(str(dich / f"{nguon.name}_{bay_gio:%Y%m%d_%H%M%S}"), "zip", root_dir=nguon))
+    for cu in sorted(dich.glob(f"{nguon.name}_*.zip"))[:-giu]:
+        cu.unlink()
+    return file_zip
+
+
+nguon = Path("tai_lieu")
+nguon.mkdir(exist_ok=True)
+(nguon / "ghi_chu.txt").write_text("dữ liệu quan trọng", encoding="utf-8")
+t0 = datetime(2026, 10, 20, 18, 0)
+for i in range(9):
+    sao_luu(nguon, Path("ban_sao"), 7, t0 + timedelta(days=i))
+cac_file = sorted(p.name for p in Path("ban_sao").iterdir())
+print(len(cac_file), cac_file[0], cac_file[-1])</code></pre>
+<pre><code class="language-text">7 tai_lieu_20261022_180000.zip tai_lieu_20261028_180000.zip</code></pre>
+<p>Truyền <code>bay_gio</code> làm tham số (thay vì gọi <code>datetime.now()</code> bên trong) giúp mô phỏng 9 ngày trong một giây. Đây là lần thứ ba bạn gặp kỹ thuật này: nó chính là điều làm code dễ test.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Lên lịch thật</h3>
+<p>Lên lịch chạy <code>sao_luu.py</code> lúc 18:00 hằng ngày trên máy của bạn (Task Scheduler hoặc cron), chạy thử ngay một lần bằng lệnh, rồi kiểm tra file log và file zip.</p>
+<details><summary>Xem gợi ý</summary>
+<p>Nếu chạy tay được mà chạy theo lịch không ra gì, 90% là do đường dẫn: kiểm tra <code>sao_luu.log</code> có được tạo cạnh script không (nhờ <code>GOC</code>), và đường dẫn tới <code>python.exe</code> trong lệnh lịch có đúng là của <code>.venv</code> không. Trên Windows, cột "Last Run Result" trong Task Scheduler hiện mã thoát (<code>0x0</code> là thành công, <code>0x1</code> là script trả 1).</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/library/subprocess.html" rel="noopener" target="_blank">subprocess</a>; <a href="https://docs.python.org/3/library/shutil.html#archiving-operations" rel="noopener" target="_blank">shutil: Archiving operations</a>; <a href="https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/schtasks-create" rel="noopener" target="_blank">Microsoft Learn: schtasks create</a>; <a href="https://man7.org/linux/man-pages/man5/crontab.5.html" rel="noopener" target="_blank">crontab(5)</a>.</p>

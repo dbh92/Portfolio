@@ -1,0 +1,172 @@
+<p>Một file 2.000 dòng rất khó đọc, khó sửa và không ai dám đụng vào. Người đi làm chia code thành nhiều file nhỏ, mỗi file một nhiệm vụ: đó là <strong>module</strong>. Nhiều module gom thành thư mục là <strong>package</strong>. Python còn kèm sẵn hàng trăm module chuẩn, gọi là "pin có sẵn" (batteries included). Bài này dạy cả hai: tự tổ chức code và dùng thư viện chuẩn.</p>
+
+<h2>1. Module là một file .py</h2>
+<p>Tạo thư mục dự án:</p>
+<pre><code class="language-text">chi_tieu/
+├── tien_te.py     ← hàm xử lý tiền
+└── main.py        ← chương trình chính</code></pre>
+<p>File <code>tien_te.py</code>:</p>
+<pre><code class="language-python">"""Hàm tiện ích định dạng và đọc số tiền."""
+
+
+def vnd(so: float) -&gt; str:
+    """1234567 → '1.234.567đ'"""
+    return f"{so:,.0f}".replace(",", ".") + "đ"
+
+
+def doc_so_tien(chuoi: str) -&gt; int:
+    """'1.234.567' hoặc '1,234,567đ' → 1234567"""
+    sach = chuoi.replace(".", "").replace(",", "").replace("đ", "").strip()
+    return int(sach)
+
+
+if __name__ == "__main__":
+    assert vnd(1234567) == "1.234.567đ"
+    assert doc_so_tien("1.234.567đ") == 1234567
+    print("tien_te.py: kiểm tra đạt")</code></pre>
+<pre><code class="language-text">tien_te.py: kiểm tra đạt</code></pre>
+<p>File <code>main.py</code> cùng thư mục:</p>
+<pre><code class="language-python"># (minh họa) cần file tien_te.py ở cùng thư mục
+import tien_te
+from tien_te import vnd
+
+so = tien_te.doc_so_tien("2.500.000")
+print(vnd(so * 3))</code></pre>
+<pre><code class="language-text">PS D:\chi_tieu&gt; python main.py
+7.500.000đ</code></pre>
+
+<h2>2. Các cách import</h2>
+<pre><code class="language-python">import math                          # dùng: math.sqrt(16)
+from math import sqrt, pi            # dùng thẳng: sqrt(16)
+import datetime as dt                # đặt bí danh: dt.date.today()
+from collections import Counter as C # bí danh cho tên được import
+
+print(math.sqrt(16), sqrt(25), round(pi, 4))</code></pre>
+<pre><code class="language-text">4.0 5.0 3.1416</code></pre>
+<ul>
+  <li><code>import module</code> giữ tên module khi gọi: đọc code biết ngay hàm từ đâu.</li>
+  <li><code>from module import ten</code> gọn hơn khi dùng nhiều lần.</li>
+  <li><strong>Tránh</strong> <code>from module import *</code>: không biết tên nào từ đâu và dễ ghi đè tên của bạn.</li>
+  <li>Theo PEP 8, đặt import ở đầu file, theo thứ tự: thư viện chuẩn, thư viện bên ngoài, module của dự án; mỗi nhóm cách một dòng trống.</li>
+</ul>
+
+<h2>3. if __name__ == "__main__"</h2>
+<p>Mỗi module có biến đặc biệt <code>__name__</code>. Khi bạn chạy trực tiếp <code>python tien_te.py</code>, <code>__name__</code> là <code>"__main__"</code>; khi file được <code>import</code>, <code>__name__</code> là tên module (<code>"tien_te"</code>). Nhờ vậy khối <code>if __name__ == "__main__":</code> chỉ chạy khi chạy trực tiếp: hợp để đặt phần tự kiểm tra hoặc chương trình chính, mà không bị chạy khi module khác import.</p>
+<div class="warn"><strong>Đừng đặt tên file trùng module chuẩn</strong>Tạo file <code>random.py</code> hay <code>math.py</code> trong dự án thì <code>import random</code> sẽ nạp file của bạn thay vì module chuẩn, và lỗi rất khó hiểu kiểu <code>AttributeError: module 'random' has no attribute 'randint'</code>. Python tìm module trong thư mục của script trước tiên.</div>
+
+<h2>4. Package: thư mục chứa module</h2>
+<pre><code class="language-text">chi_tieu/
+├── main.py
+└── tien_ich/
+    ├── __init__.py    ← đánh dấu đây là package (có thể để trống)
+    ├── tien_te.py
+    └── ngay_thang.py</code></pre>
+<pre><code class="language-python"># (minh họa) trong main.py
+from tien_ich.tien_te import vnd
+from tien_ich import ngay_thang
+
+print(vnd(150000), ngay_thang.ten_thu_hom_nay())</code></pre>
+<p>Dấu chấm trong <code>tien_ich.tien_te</code> đi từ package vào module. File <code>__init__.py</code> chạy khi package được import lần đầu; có thể để trống. Ở chặng 6 bạn sẽ học cấu trúc dự án chuẩn với thư mục <code>src/</code> và cài package để import từ bất kỳ đâu.</p>
+
+<h2>5. Dạo quanh thư viện chuẩn</h2>
+<h3>datetime: ngày giờ</h3>
+<pre><code class="language-python">from datetime import date, datetime, timedelta
+
+ngay = date(2026, 10, 29)
+print(ngay.strftime("%d/%m/%Y"), ngay.isoformat(), ngay.weekday())  # thứ Hai = 0
+print(ngay + timedelta(days=45))
+print((date(2027, 1, 1) - ngay).days, "ngày đến năm mới")
+mo = datetime.strptime("29/10/2026 08:30", "%d/%m/%Y %H:%M")
+print(mo.hour, mo.minute)</code></pre>
+<pre><code class="language-text">29/10/2026 2026-10-29 3
+2026-12-13
+64 ngày đến năm mới
+8 30</code></pre>
+<p><code>strftime</code> chuyển ngày thành chuỗi theo mẫu, <code>strptime</code> làm ngược lại. Mã hay dùng: <code>%d</code> ngày, <code>%m</code> tháng, <code>%Y</code> năm 4 chữ số, <code>%H:%M:%S</code> giờ phút giây. Lấy thời điểm hiện tại: <code>date.today()</code>, <code>datetime.now()</code>.</p>
+<h3>random, math, statistics</h3>
+<pre><code class="language-python">import math
+import random
+import statistics
+
+random.seed(7)                         # cố định để kết quả lặp lại được
+print(random.randint(1, 6), random.choice(["kéo", "búa", "bao"]))
+print(random.sample(range(1, 46), 6))  # 6 số khác nhau từ 1 đến 45
+print(math.ceil(4.1), math.floor(4.9), math.gcd(12, 18), math.dist((0, 0), (3, 4)))
+
+luong = [12, 15, 15, 18, 22, 95]       # triệu đồng
+print(statistics.mean(luong), statistics.median(luong))</code></pre>
+<pre><code class="language-text">3 kéo
+[26, 42, 4, 5, 35, 7]
+5 4 6 5.0
+29.5 16.5</code></pre>
+<p>Ví dụ lương cho thấy vì sao cần trung vị: một người lương 95 kéo trung bình lên 29,5 trong khi đa số chỉ khoảng 15–18. <code>random</code> phù hợp cho trò chơi và mô phỏng; sinh mật khẩu hay mã bảo mật thì phải dùng module <code>secrets</code>.</p>
+<div class="tip"><strong>Tra cứu nhanh</strong>Trong REPL, <code>help(math.gcd)</code> in tài liệu của hàm, <code>dir(math)</code> liệt kê mọi tên trong module. Danh sách đầy đủ module chuẩn nằm ở docs.python.org/3/library.</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Module = file <code>.py</code>; package = thư mục có <code>__init__.py</code>.</li>
+  <li><code>import x</code>, <code>from x import y</code>, <code>import x as z</code>; tránh <code>import *</code>.</li>
+  <li><code>if __name__ == "__main__":</code> cho phần chỉ chạy khi chạy trực tiếp.</li>
+  <li>Không đặt tên file trùng module chuẩn.</li>
+  <li><code>datetime</code>, <code>random</code>, <code>math</code>, <code>statistics</code>, <code>collections</code> có sẵn, không cần cài.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Đếm ngày đến sinh nhật</h3>
+<p>Viết module <code>ngay_thang.py</code> có hàm <code>so_ngay_den_sinh_nhat(ngay_sinh, hom_nay)</code> trả số ngày đến sinh nhật kế tiếp (0 nếu là hôm nay), kèm khối tự kiểm tra.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">"""ngay_thang.py: hàm xử lý ngày tháng."""
+from datetime import date
+
+
+def so_ngay_den_sinh_nhat(ngay_sinh: date, hom_nay: date) -&gt; int:
+    """Số ngày từ hom_nay đến sinh nhật kế tiếp (0 nếu đúng hôm nay)."""
+    try:
+        sn = ngay_sinh.replace(year=hom_nay.year)
+    except ValueError:                       # sinh 29/2, năm nay không nhuận
+        sn = date(hom_nay.year, 3, 1)
+    if sn &lt; hom_nay:
+        try:
+            sn = ngay_sinh.replace(year=hom_nay.year + 1)
+        except ValueError:
+            sn = date(hom_nay.year + 1, 3, 1)
+    return (sn - hom_nay).days
+
+
+if __name__ == "__main__":
+    hom_nay = date(2026, 10, 29)
+    assert so_ngay_den_sinh_nhat(date(2000, 10, 29), hom_nay) == 0
+    assert so_ngay_den_sinh_nhat(date(2000, 10, 30), hom_nay) == 1
+    assert so_ngay_den_sinh_nhat(date(2000, 10, 28), hom_nay) == 364
+    print("Đến sinh nhật 15/01:", so_ngay_den_sinh_nhat(date(1999, 1, 15), hom_nay), "ngày")</code></pre>
+<pre><code class="language-text">Đến sinh nhật 15/01: 78 ngày</code></pre>
+<p>Truyền <code>hom_nay</code> vào làm tham số thay vì gọi <code>date.today()</code> bên trong giúp hàm cho kết quả cố định, nên kiểm tra được. Đây là thói quen thiết kế bạn sẽ thấy lại ở bài pytest. <code>try/except</code> xử lý người sinh 29/2; bạn sẽ học kỹ ở chặng 3.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Package tiện ích</h3>
+<p>Tạo package <code>tien_ich</code> chứa <code>tien_te.py</code> (hàm <code>vnd</code>) và <code>ngay_thang.py</code> (bài 1). Trong <code>main.py</code>, import theo hai cách khác nhau và gọi cả hai hàm.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-text">bai2/
+├── main.py
+└── tien_ich/
+    ├── __init__.py      (để trống)
+    ├── tien_te.py
+    └── ngay_thang.py</code></pre>
+<pre><code class="language-python"># (minh họa) bai2/main.py
+from datetime import date
+
+import tien_ich.ngay_thang
+from tien_ich.tien_te import vnd
+
+print(vnd(1_500_000))
+print(tien_ich.ngay_thang.so_ngay_den_sinh_nhat(date(1999, 1, 15), date(2026, 10, 29)))</code></pre>
+<pre><code class="language-text">PS D:\bai2&gt; python main.py
+1.500.000đ
+78</code></pre>
+<p>Chạy <code>python main.py</code> từ thư mục <code>bai2</code> để Python tìm thấy package <code>tien_ich</code>.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/tutorial/modules.html" rel="noopener" target="_blank">Python Tutorial: Modules</a>; <a href="https://docs.python.org/3/library/datetime.html" rel="noopener" target="_blank">datetime</a>; <a href="https://docs.python.org/3/library/statistics.html" rel="noopener" target="_blank">statistics</a>; <a href="https://docs.python.org/3/library/secrets.html" rel="noopener" target="_blank">secrets</a>.</p>

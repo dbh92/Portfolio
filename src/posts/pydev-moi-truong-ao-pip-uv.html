@@ -1,0 +1,138 @@
+<p>Dự án A cần <code>requests</code> 2.28, dự án B cần bản 2.34. Cài chung vào Python của máy thì một trong hai sẽ hỏng. Đồng nghiệp clone code của bạn về, chạy báo thiếu thư viện. Máy chủ cài bản khác máy bạn nên kết quả khác. Ba vấn đề này đều được giải bằng <strong>môi trường ảo</strong> và <strong>khóa phiên bản thư viện</strong>. Bài này dạy cách làm truyền thống với <code>venv</code> + <code>pip</code>, rồi cách hiện đại với <code>uv</code>.</p>
+
+<h2>1. Môi trường ảo là gì</h2>
+<p>Môi trường ảo là một thư mục (thường tên <code>.venv</code>) chứa một bản Python riêng và thư viện riêng của dự án. Mỗi dự án một môi trường, không ảnh hưởng nhau, không ảnh hưởng Python của hệ thống. Xóa thư mục <code>.venv</code> là xóa sạch, tạo lại lúc nào cũng được.</p>
+
+<h2>2. Cách truyền thống: venv và pip</h2>
+<pre><code class="language-text">PS D:\du-an&gt; python -m venv .venv               # tạo môi trường
+PS D:\du-an&gt; .venv\Scripts\Activate.ps1         # kích hoạt (Windows PowerShell)
+(.venv) PS D:\du-an&gt; python -m pip install requests
+(.venv) PS D:\du-an&gt; python -m pip freeze &gt; requirements.txt
+(.venv) PS D:\du-an&gt; deactivate                 # thoát môi trường
+
+$ source .venv/bin/activate                     # kích hoạt trên macOS, Linux</code></pre>
+<ul>
+  <li>Sau khi kích hoạt, dấu nhắc có <code>(.venv)</code> và lệnh <code>python</code>, <code>pip</code> trỏ vào môi trường của dự án.</li>
+  <li>Dùng <code>python -m pip</code> thay vì <code>pip</code> để chắc chắn cài vào đúng Python đang dùng.</li>
+  <li><code>pip freeze &gt; requirements.txt</code> ghi lại mọi thư viện kèm phiên bản chính xác. Người khác tái tạo bằng <code>pip install -r requirements.txt</code>.</li>
+  <li>Trên Windows, nếu PowerShell báo không được chạy script, chạy một lần: <code>Set-ExecutionPolicy -Scope CurrentUser RemoteSigned</code>.</li>
+</ul>
+<p>VS Code tự nhận <code>.venv</code> trong thư mục dự án; nếu không, chọn bằng <strong>Python: Select Interpreter</strong>. Cách này vẫn rất phổ biến và bạn cần biết, nhưng nó có nhược điểm: <code>requirements.txt</code> trộn thư viện bạn chọn với thư viện kéo theo, không tách thư viện cho dev (pytest) với thư viện chạy thật, và pip cài khá chậm.</p>
+
+<h2>3. Cách hiện đại: uv</h2>
+<p><a href="https://docs.astral.sh/uv/" rel="noopener" target="_blank">uv</a> (của Astral, cùng nhóm làm Ruff) là công cụ viết bằng Rust thay thế pip, venv, pip-tools và cả việc cài Python, nhanh hơn pip nhiều lần. Cài một lần:</p>
+<pre><code class="language-text">PS&gt; powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+$ curl -LsSf https://astral.sh/uv/install.sh | sh          # macOS, Linux
+$ uv --version
+uv 0.13.6</code></pre>
+<h3>Tạo dự án</h3>
+<pre><code class="language-text">$ uv init chi-tieu
+Initialized project `chi-tieu`
+$ cd chi-tieu
+$ tree /f              (Windows; macOS, Linux dùng: tree -a)
+chi-tieu
+├── .gitignore
+├── .python-version     ← phiên bản Python của dự án
+├── README.md
+├── pyproject.toml      ← khai báo dự án và thư viện
+└── src
+    └── chi_tieu
+        └── __init__.py</code></pre>
+<p>Bản uv hiện tại mặc định tạo dự án dạng <strong>package</strong> với thư mục <code>src/</code> (bài cuối của chặng sẽ giải thích vì sao đây là cấu trúc tốt). Muốn một dự án phẳng gồm file <code>main.py</code> cho script nhỏ, dùng <code>uv init --no-package ten-du-an</code>. Lệnh <code>uv init</code> còn tạo sẵn kho Git.</p>
+<h3>Thêm thư viện</h3>
+<pre><code class="language-text">$ uv add requests
+Installed 6 packages in 32ms
+ + certifi==2026.10.23
+ + charset-normalizer==3.5.2
+ + chi-tieu==0.1.0 (from file:///.../chi-tieu)
+ + idna==3.20
+ + requests==2.34.2
+ + urllib3==2.8.0
+$ uv add --dev pytest</code></pre>
+<p>Lần đầu, uv tự tạo <code>.venv</code> (và tự tải Python nếu máy chưa có bản phù hợp), cài thư viện, rồi cập nhật hai file:</p>
+<pre><code class="language-text"># pyproject.toml
+[project]
+name = "chi-tieu"
+version = "0.1.0"
+requires-python = "&gt;=3.14"
+dependencies = [
+    "requests&gt;=2.34.2",        ← chỉ thư viện BẠN chọn
+]
+
+[project.scripts]
+chi-tieu = "chi_tieu:main"     ← lệnh chạy được từ terminal
+
+[dependency-groups]
+dev = [
+    "pytest&gt;=9.2.0",           ← chỉ dùng khi phát triển
+]</code></pre>
+<p>và <code>uv.lock</code>: ghi phiên bản chính xác của <strong>mọi</strong> thư viện kể cả thư viện kéo theo (certifi, idna...), cho mọi hệ điều hành. Commit cả <code>pyproject.toml</code> lẫn <code>uv.lock</code> vào Git; <strong>không</strong> commit <code>.venv</code>.</p>
+<h3>Chạy và đồng bộ</h3>
+<pre><code class="language-text">$ uv run chi-tieu                  # chạy lệnh khai báo trong [project.scripts]
+Hello from chi-tieu!
+$ uv run python -c "import requests; print(requests.__version__)"
+2.34.2
+$ uv run pytest                    # chạy công cụ trong môi trường dự án
+$ uv sync                          # máy mới, vừa clone: cài đúng y như uv.lock
+$ uv tree                          # xem cây phụ thuộc
+$ uv remove requests               # gỡ thư viện</code></pre>
+<p><code>uv run</code> tự kiểm tra môi trường khớp với <code>uv.lock</code> rồi chạy lệnh trong đó: không cần kích hoạt môi trường, không lo quên cài.</p>
+<h3>Quản lý phiên bản Python</h3>
+<pre><code class="language-text">$ uv python install 3.15           # tải và cài Python 3.15
+$ uv python pin 3.14               # ghi 3.14 vào .python-version của dự án
+$ uv run --python 3.13 pytest      # chạy thử với phiên bản khác</code></pre>
+
+<h2>4. Quy trình làm việc hằng ngày</h2>
+<table>
+  <thead><tr><th>Việc</th><th>pip + venv</th><th>uv</th></tr></thead>
+  <tbody>
+    <tr><td>Tạo dự án</td><td><code>python -m venv .venv</code></td><td><code>uv init</code></td></tr>
+    <tr><td>Thêm thư viện</td><td><code>pip install x</code> rồi <code>pip freeze</code></td><td><code>uv add x</code></td></tr>
+    <tr><td>Thư viện cho dev</td><td>File requirements riêng</td><td><code>uv add --dev x</code></td></tr>
+    <tr><td>Máy mới</td><td><code>pip install -r requirements.txt</code></td><td><code>uv sync</code></td></tr>
+    <tr><td>Chạy</td><td>Kích hoạt rồi <code>python main.py</code></td><td><code>uv run main.py</code></td></tr>
+  </tbody>
+</table>
+<div class="warn"><strong>Đừng cài thư viện vào Python hệ thống</strong>Gõ <code>pip install</code> khi chưa kích hoạt môi trường nào sẽ cài vào Python chung của máy. Lâu dần các dự án xung đột phiên bản và rất khó dọn. Trên nhiều bản Linux mới, pip còn từ chối cài với lỗi <code>externally-managed-environment</code>. Muốn cài một công cụ dòng lệnh dùng chung (ví dụ ruff), dùng <code>uv tool install ruff</code>: mỗi công cụ một môi trường riêng.</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Mỗi dự án một môi trường ảo <code>.venv</code>; không commit <code>.venv</code>.</li>
+  <li>Truyền thống: <code>python -m venv .venv</code>, kích hoạt, <code>python -m pip install</code>, <code>requirements.txt</code>.</li>
+  <li>uv: <code>uv init</code>, <code>uv add</code>, <code>uv add --dev</code>, <code>uv run</code>, <code>uv sync</code>; commit <code>pyproject.toml</code> + <code>uv.lock</code>.</li>
+  <li><code>uv python install/pin</code> quản lý phiên bản Python; <code>uv tool install</code> cho công cụ dùng chung.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Dự án đầu tiên với uv</h3>
+<p>Tạo dự án bằng <code>uv init</code>, thêm <code>requests</code> và <code>pytest</code> (nhóm dev), sửa hàm <code>main</code> in phiên bản requests, chạy bằng <code>uv run</code>.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-text">$ uv init thu-uv &amp;&amp; cd thu-uv
+$ uv add requests
+$ uv add --dev pytest</code></pre>
+<p>Sửa <code>src/thu_uv/__init__.py</code>:</p>
+<pre><code class="language-python">import requests
+
+
+def main() -&gt; None:
+    print(f"requests {requests.__version__}")</code></pre>
+<pre><code class="language-text">$ uv run thu-uv
+requests 2.34.2</code></pre>
+<p>Mở <code>pyproject.toml</code>: <code>requests</code> nằm trong <code>dependencies</code>, <code>pytest</code> nằm trong <code>[dependency-groups] dev</code>. Khi đóng gói triển khai, có thể cài không kèm nhóm dev bằng <code>uv sync --no-dev</code>.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Tái tạo môi trường</h3>
+<p>Chép dự án bài 1 sang thư mục khác <strong>không kèm</strong> <code>.venv</code>, tái tạo môi trường và chạy lại.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-text">$ git clone thu-uv thu-uv-ban-sao     # uv init đã tạo kho git; cần commit trước
+$ cd thu-uv-ban-sao
+$ uv sync
+$ uv run thu-uv
+requests 2.34.2</code></pre>
+<p>Hoặc chép tay mọi file trừ <code>.venv</code>. <code>uv sync</code> đọc <code>uv.lock</code> và cài đúng từng phiên bản, nên kết quả giống hệt máy gốc. Đây chính là điều diễn ra khi đồng nghiệp clone dự án của bạn, hoặc khi máy chủ CI chạy test (chặng 10).</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/library/venv.html" rel="noopener" target="_blank">venv: Creation of virtual environments</a>; <a href="https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/" rel="noopener" target="_blank">Python Packaging User Guide: pip và virtual environments</a>; <a href="https://docs.astral.sh/uv/guides/projects/" rel="noopener" target="_blank">uv: Working on projects</a>.</p>

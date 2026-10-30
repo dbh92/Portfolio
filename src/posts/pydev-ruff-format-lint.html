@@ -1,0 +1,145 @@
+<p>Trong một nhóm, nếu mỗi người viết một kiểu (người dùng 2 dấu cách, người 4; người để dòng dài 200 ký tự), thời gian review code bị tiêu vào tranh cãi định dạng thay vì logic. Còn những lỗi như import thừa, so sánh <code>== None</code>, <code>except:</code> trơn thì mắt người rất dễ bỏ sót. <strong>Ruff</strong> giải quyết cả hai: tự định dạng code (formatter) và tự tìm lỗi, thói quen xấu (linter), nhanh đến mức chạy trên cả dự án lớn trong chớp mắt.</p>
+
+<h2>1. PEP 8 và vì sao cần công cụ</h2>
+<p><a href="https://peps.python.org/pep-0008/" rel="noopener" target="_blank">PEP 8</a> là quy chuẩn trình bày code Python: thụt lề 4 dấu cách, tên hàm <code>chu_thuong</code>, tên lớp <code>CapWords</code>, khoảng trắng quanh toán tử, hai dòng trống giữa các hàm cấp module... Bạn không cần thuộc lòng: hãy để công cụ áp dụng tự động, và dành sức để đặt tên tốt, chia hàm hợp lý, những thứ công cụ không làm thay được.</p>
+
+<h2>2. Cài và chạy</h2>
+<pre><code class="language-text">$ uv add --dev ruff          # trong dự án uv
+$ uv tool install ruff       # hoặc cài dùng chung cho mọi dự án
+$ ruff --version
+ruff 0.17.3</code></pre>
+<p>Lấy một file viết ẩu làm ví dụ, <code>bao_cao.py</code>:</p>
+<pre><code class="language-python"># (minh họa) bao_cao.py: code chưa qua Ruff
+import os, sys
+import json
+from pathlib import Path
+
+def tong_tien(ds,thue = 0.08):
+    tong=0
+    for i in range(len(ds)):
+        tong+=ds[i]
+    if thue == None:
+        thue = 0
+    return tong*(1+thue)
+
+def doc(p):
+    try:
+        return json.loads(Path(p).read_text())
+    except:
+        return []</code></pre>
+
+<h2>3. ruff check: tìm lỗi</h2>
+<p>Với cấu hình ở mục 5, <code>ruff check</code> báo (dạng rút gọn):</p>
+<pre><code class="language-text">$ ruff check --output-format concise bao_cao.py
+bao_cao.py:1:1: E401 [*] Multiple imports on one line
+bao_cao.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+bao_cao.py:1:8: F401 [*] `os` imported but unused
+bao_cao.py:1:12: F401 [*] `sys` imported but unused
+bao_cao.py:9:16: E711 Comparison to `None` should be `cond is None`
+bao_cao.py:16:5: E722 Do not use bare `except`
+Found 6 errors.
+[*] 4 fixable with `--fix` (1 unsafe fix available with `--fix --unsafe-fixes`).</code></pre>
+<p>Mỗi dòng gồm vị trí, <strong>mã luật</strong> và mô tả. Mã luật cho biết nhóm: <code>F</code> (Pyflakes: lỗi thật như biến chưa định nghĩa, import thừa), <code>E</code>/<code>W</code> (pycodestyle: PEP 8), <code>I</code> (sắp xếp import), <code>B</code> (bugbear: bẫy hay gặp), <code>UP</code> (nâng cú pháp lên phiên bản mới), <code>SIM</code> (đơn giản hóa). Không hiểu luật nào, chạy <code>ruff rule E722</code> để đọc giải thích và ví dụ.</p>
+<pre><code class="language-text">$ ruff check --fix bao_cao.py
+Found 6 errors (4 fixed, 2 remaining).</code></pre>
+<p><code>--fix</code> tự sửa các lỗi có dấu <code>[*]</code> (an toàn, không đổi hành vi): tách và sắp xếp import, xóa import thừa. Hai lỗi còn lại cần bạn quyết định: <code>== None</code> được đánh dấu "unsafe" vì về lý thuyết một lớp có thể định nghĩa <code>__eq__</code> lạ, và <code>except:</code> trơn thì chỉ bạn biết nên bắt loại lỗi nào.</p>
+
+<h2>4. ruff format: định dạng tự động</h2>
+<pre><code class="language-text">$ ruff format bao_cao.py
+1 file reformatted</code></pre>
+<p>Sau <code>check --fix</code>, <code>format</code> và sửa tay hai lỗi còn lại (đồng thời viết lại cho Pythonic hơn):</p>
+<pre><code class="language-python">import json
+from pathlib import Path
+
+
+def tong_tien(ds: list[float], thue: float | None = 0.08) -&gt; float:
+    if thue is None:
+        thue = 0
+    return sum(ds) * (1 + thue)
+
+
+def doc(p: str | Path) -&gt; list:
+    try:
+        return json.loads(Path(p).read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+
+print(tong_tien([100, 200]), doc("khong_co.json"))</code></pre>
+<pre><code class="language-text">324.0 []</code></pre>
+<p><code>ruff format</code> tương thích với Black, công cụ định dạng phổ biến trước đó: hầu như mọi dự án Python mở trên GitHub hiện nay đều được định dạng theo phong cách này. <code>ruff format --check</code> chỉ kiểm tra không sửa, dùng trong CI (chặng 10).</p>
+
+<h2>5. Cấu hình trong pyproject.toml</h2>
+<pre><code class="language-text">[tool.ruff]
+line-length = 100            # mặc định 88
+target-version = "py312"     # cho phép đề xuất cú pháp từ 3.12
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]
+ignore = ["E501"]            # ví dụ: bỏ luật độ dài dòng, để formatter lo
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]         # cho phép assert trong test nếu bật nhóm S (bảo mật)</code></pre>
+<p>Mặc định Ruff chỉ bật <code>E</code> và <code>F</code> cơ bản. Bộ <code>select</code> ở trên là điểm khởi đầu tốt cho dự án mới; bật thêm dần (ví dụ <code>"PL"</code> của Pylint, <code>"S"</code> cho bảo mật) khi nhóm đã quen. Với code cũ có hàng trăm lỗi, đừng sửa một lần: bật từng nhóm luật một.</p>
+
+<h2>6. Tích hợp VS Code và pre-commit</h2>
+<p>Cài extension <strong>Ruff</strong> (của Astral) trong VS Code, rồi thêm vào <code>settings.json</code> để mỗi lần lưu file là tự format và sắp xếp import:</p>
+<pre><code class="language-text">"[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.fixAll": "explicit",
+        "source.organizeImports": "explicit"
+    }
+}</code></pre>
+<p><strong>pre-commit</strong> chạy kiểm tra ngay trước mỗi lần <code>git commit</code>: code chưa đạt thì không commit được. Tạo file <code>.pre-commit-config.yaml</code> ở gốc dự án:</p>
+<pre><code class="language-text">repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.3            # nên trùng phiên bản ruff của dự án
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format</code></pre>
+<pre><code class="language-text">$ uv add --dev pre-commit
+$ uv run pre-commit install          # gắn hook vào kho git, làm một lần
+$ uv run pre-commit run --all-files  # chạy thử trên mọi file</code></pre>
+<p>Từ giờ, mỗi lần commit, Ruff tự sửa những gì sửa được; nếu có thay đổi hoặc còn lỗi, commit bị dừng để bạn xem lại, <code>git add</code> và commit lại.</p>
+<div class="tip"><strong>Formatter không thay được việc đặt tên</strong>Ruff biến <code>def tt(d,t=0.08)</code> thành <code>def tt(d, t=0.08)</code>, nhưng không biến nó thành <code>def tong_tien(gia_list, thue=0.08)</code>. Code dễ đọc vẫn là trách nhiệm của bạn; xem thêm bài đọc thêm về viết code Python sạch.</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li><code>ruff check</code> tìm lỗi, <code>--fix</code> tự sửa phần an toàn; <code>ruff rule MÃ</code> để hiểu luật.</li>
+  <li><code>ruff format</code> định dạng theo phong cách Black; <code>--check</code> cho CI.</li>
+  <li>Cấu hình <code>[tool.ruff]</code> trong <code>pyproject.toml</code>; bật dần nhóm luật.</li>
+  <li>VS Code format khi lưu; pre-commit chặn commit code chưa đạt.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Dọn một dự án cũ</h3>
+<p>Chạy <code>ruff check</code> với bộ luật ở mục 5 trên dự án chi tiêu hoặc thư viện của bạn, sửa hết lỗi, ghi lại ba lỗi bạn thấy đáng chú ý nhất và lý do.</p>
+<details><summary>Xem gợi ý</summary>
+<p>Ba lỗi người mới hay gặp nhất và ý nghĩa: <code>B006</code> (list, dict làm giá trị mặc định: bẫy dùng chung ở chặng 2), <code>E722</code> hoặc <code>BLE001</code> (bắt ngoại lệ quá rộng: nuốt lỗi, chặng 3), <code>SIM108</code> (if/else bốn dòng có thể thành biểu thức điều kiện một dòng). Chạy <code>ruff check --statistics</code> để xem luật nào bị vi phạm nhiều nhất.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Cài pre-commit</h3>
+<p>Cài pre-commit với hook Ruff. Cố tình thêm <code>import os</code> không dùng vào một file rồi commit, quan sát điều gì xảy ra.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-text">$ git commit -am "Thử pre-commit"
+ruff check...............................................................Failed
+- hook id: ruff-check
+- files were modified by this hook
+
+Found 1 error (1 fixed, 0 remaining).
+
+ruff format..............................................................Failed
+- hook id: ruff-format
+- files were modified by this hook
+
+1 file reformatted</code></pre>
+<p><code>ruff-check</code> tự xóa <code>import os</code>; xóa xong đầu file còn dòng trống thừa nên <code>ruff-format</code> sửa tiếp. Vì file bị thay đổi, commit bị dừng. Chạy <code>git diff</code> để xem Ruff đã sửa gì, rồi <code>git add</code> và commit lại: lần này mọi hook đều <code>Passed</code>.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.astral.sh/ruff/" rel="noopener" target="_blank">Ruff documentation</a>; <a href="https://docs.astral.sh/ruff/rules/" rel="noopener" target="_blank">Ruff: Rules</a>; <a href="https://github.com/astral-sh/ruff-pre-commit" rel="noopener" target="_blank">ruff-pre-commit</a>; <a href="https://peps.python.org/pep-0008/" rel="noopener" target="_blank">PEP 8</a>.</p>

@@ -1,0 +1,198 @@
+<p>Bài thực hành cuối chặng 8 mô phỏng một việc rất thật: chuỗi cửa hàng cà phê có 4 chi nhánh, dữ liệu bán hàng 6 tháng nằm trong cơ sở dữ liệu, và quản lý cần câu trả lời cho vài câu hỏi kinh doanh trước cuộc họp sáng mai. Bạn sẽ kết hợp SQL (lấy và nối dữ liệu) với pandas (phân tích), rồi xuất báo cáo Excel nhiều sheet.</p>
+
+<h2>1. Bốn câu hỏi cần trả lời</h2>
+<ol>
+  <li>Doanh thu theo tháng đang tăng hay giảm?</li>
+  <li>Sản phẩm nào mang lại nhiều doanh thu nhất, chiếm bao nhiêu phần trăm?</li>
+  <li>Chi nhánh nào có giá trị đơn trung bình cao nhất?</li>
+  <li>10% khách mua nhiều nhất đóng góp bao nhiêu phần trăm doanh thu?</li>
+</ol>
+<p>Bắt đầu từ câu hỏi, không bắt đầu từ dữ liệu. Câu hỏi quyết định cần cột nào, nhóm theo gì, và biểu diễn kết quả ra sao.</p>
+
+<h2>2. Sinh dữ liệu mẫu</h2>
+<p>Script dưới đây tạo <code>ban_hang.db</code> gồm 4 bảng: <code>san_pham</code>, <code>khach_hang</code>, <code>don_hang</code> (mỗi đơn của một khách tại một chi nhánh) và <code>chi_tiet</code> (mỗi đơn có một đến ba món). <code>random.seed(2026)</code> bảo đảm ai chạy cũng ra cùng dữ liệu, nên bạn đối chiếu được kết quả với bài.</p>
+<pre><code class="language-python">"""sinh_du_lieu.py: tạo CSDL bán hàng mẫu ban_hang.db (5.000 đơn, cố định nhờ seed)."""
+
+import random
+import sqlite3
+from datetime import date, timedelta
+
+random.seed(2026)
+SAN_PHAM = [
+    ("Cà phê sữa", "Đồ uống", 29_000),
+    ("Trà đào", "Đồ uống", 39_000),
+    ("Bạc xỉu", "Đồ uống", 32_000),
+    ("Bánh mì", "Đồ ăn", 25_000),
+    ("Croissant", "Đồ ăn", 35_000),
+    ("Cà phê hạt 250g", "Hàng đóng gói", 120_000),
+]
+CHI_NHANH = ["Hoàn Kiếm", "Cầu Giấy", "Quận 1", "Thủ Đức"]
+TRONG_SO = [1 / i**0.8 for i in range(1, 301)]  # khách số nhỏ mua thường xuyên hơn
+
+conn = sqlite3.connect("ban_hang.db")
+conn.executescript("""
+DROP TABLE IF EXISTS chi_tiet; DROP TABLE IF EXISTS don_hang;
+DROP TABLE IF EXISTS san_pham; DROP TABLE IF EXISTS khach_hang;
+CREATE TABLE san_pham (id INTEGER PRIMARY KEY, ten TEXT, nhom TEXT, gia INTEGER);
+CREATE TABLE khach_hang (id INTEGER PRIMARY KEY, ten TEXT);
+CREATE TABLE don_hang (id INTEGER PRIMARY KEY, khach_id INTEGER REFERENCES khach_hang(id),
+                       chi_nhanh TEXT, ngay TEXT);
+CREATE TABLE chi_tiet (don_id INTEGER REFERENCES don_hang(id),
+                       san_pham_id INTEGER REFERENCES san_pham(id), so_luong INTEGER);
+""")
+with conn:
+    conn.executemany("INSERT INTO san_pham (ten, nhom, gia) VALUES (?, ?, ?)", SAN_PHAM)
+    conn.executemany(
+        "INSERT INTO khach_hang (ten) VALUES (?)", [(f"Khách {i:03d}",) for i in range(1, 301)]
+    )
+    bat_dau = date(2026, 4, 1)
+    for don_id in range(1, 5001):
+        ngay = bat_dau + timedelta(days=random.randrange(183))  # 01/04 → 30/09/2026
+        khach = random.choices(range(1, 301), weights=TRONG_SO)[0]
+        conn.execute(
+            "INSERT INTO don_hang VALUES (?, ?, ?, ?)",
+            (don_id, khach, random.choice(CHI_NHANH), ngay.isoformat()),
+        )
+        for sp in random.sample(range(1, 7), k=random.choice([1, 1, 2, 3])):
+            conn.execute(
+                "INSERT INTO chi_tiet VALUES (?, ?, ?)", (don_id, sp, random.randint(1, 3))
+            )
+print(
+    conn.execute("SELECT COUNT(*) FROM don_hang").fetchone()[0],
+    "đơn,",
+    conn.execute("SELECT COUNT(*) FROM chi_tiet").fetchone()[0],
+    "dòng chi tiết",
+)</code></pre>
+<pre><code class="language-text">5000 đơn, 8835 dòng chi tiết</code></pre>
+<p>Cấu trúc bốn bảng là thiết kế chuẩn hóa đã học ở bài SQL: giá nằm ở <code>san_pham</code>, không lặp lại trong từng dòng chi tiết. Trọng số <code>1 / i ** 0.8</code> làm khách có số thứ tự nhỏ mua thường xuyên hơn, giống thực tế: luôn có một nhóm khách quen mua rất nhiều.</p>
+
+<h2>3. Phân tích</h2>
+<p>Chiến lược: để SQL làm việc nó giỏi nhất (nối bảng, lọc), lấy về một bảng phẳng mỗi dòng là một món trong một đơn, rồi để pandas làm phần tổng hợp linh hoạt.</p>
+<pre><code class="language-python">"""phan_tich.py: trả lời 4 câu hỏi kinh doanh từ ban_hang.db và xuất báo cáo Excel."""
+
+import sqlite3
+
+import pandas as pd
+
+SQL = """
+SELECT d.id AS don_id, d.ngay, d.chi_nhanh, d.khach_id, k.ten AS khach,
+       s.ten AS san_pham, s.nhom, c.so_luong, s.gia, c.so_luong * s.gia AS thanh_tien
+FROM chi_tiet AS c
+JOIN don_hang  AS d ON d.id = c.don_id
+JOIN san_pham  AS s ON s.id = c.san_pham_id
+JOIN khach_hang AS k ON k.id = d.khach_id
+"""
+
+with sqlite3.connect("ban_hang.db") as conn:
+    df = pd.read_sql(SQL, conn, parse_dates=["ngay"])
+df["thang"] = df["ngay"].dt.to_period("M")
+print(df.shape, f"tổng doanh thu {df['thanh_tien'].sum():,}đ")
+
+# 1. Doanh thu theo tháng tăng hay giảm?
+theo_thang = df.groupby("thang").agg(doanh_thu=("thanh_tien", "sum"), so_don=("don_id", "nunique"))
+theo_thang["tang_truong"] = theo_thang["doanh_thu"].pct_change()
+print(
+    theo_thang.to_string(formatters={"doanh_thu": "{:,}".format, "tang_truong": "{:+.1%}".format})
+)
+
+# 2. Sản phẩm nào mang lại nhiều doanh thu nhất, chiếm bao nhiêu phần trăm?
+theo_sp = (
+    df.groupby(["nhom", "san_pham"])["thanh_tien"].sum().sort_values(ascending=False).reset_index()
+)
+theo_sp["ty_trong"] = theo_sp["thanh_tien"] / theo_sp["thanh_tien"].sum()
+print(
+    theo_sp.head(3).to_string(
+        index=False, formatters={"thanh_tien": "{:,}".format, "ty_trong": "{:.1%}".format}
+    )
+)
+
+# 3. Chi nhánh nào có giá trị đơn trung bình cao nhất?
+don = df.groupby(["don_id", "chi_nhanh"], as_index=False)["thanh_tien"].sum()
+print(
+    don.groupby("chi_nhanh")["thanh_tien"].mean().round(-2).sort_values(ascending=False).to_dict()
+)
+
+# 4. 10% khách mua nhiều nhất đóng góp bao nhiêu phần trăm doanh thu?
+theo_khach = df.groupby("khach")["thanh_tien"].sum().sort_values(ascending=False)
+top = theo_khach.head(len(theo_khach) // 10)
+print(
+    f"{len(theo_khach)} khách; top {len(top)} khách đóng góp {top.sum() / theo_khach.sum():.1%} doanh thu"
+)
+
+with pd.ExcelWriter("bao_cao_ban_hang.xlsx") as w:
+    theo_thang.assign(thang=theo_thang.index.astype(str)).to_excel(
+        w, sheet_name="Theo tháng", index=False
+    )
+    theo_sp.to_excel(w, sheet_name="Theo sản phẩm", index=False)
+    top.rename("doanh_thu").reset_index().to_excel(w, sheet_name="Top khách hàng", index=False)
+print(pd.ExcelFile("bao_cao_ban_hang.xlsx").sheet_names)</code></pre>
+<pre><code class="language-text">(8835, 11) tổng doanh thu 826,130,000đ
+          doanh_thu  so_don tang_truong
+thang                                  
+2026-04 138,430,000     845         NaN
+2026-05 139,398,000     815       +0.7%
+2026-06 136,634,000     818       -2.0%
+2026-07 145,092,000     885       +6.2%
+2026-08 140,873,000     850       -2.9%
+2026-09 125,703,000     787      -10.8%
+         nhom        san_pham  thanh_tien ty_trong
+Hàng đóng gói Cà phê hạt 250g 361,800,000    43.8%
+      Đồ uống         Trà đào 113,607,000    13.8%
+        Đồ ăn       Croissant  99,260,000    12.0%
+{'Quận 1': 166600.0, 'Hoàn Kiếm': 166100.0, 'Thủ Đức': 164400.0, 'Cầu Giấy': 163800.0}
+299 khách; top 29 khách đóng góp 48.9% doanh thu
+['Theo tháng', 'Theo sản phẩm', 'Top khách hàng']</code></pre>
+
+<h2>4. Đọc kết quả thành câu trả lời</h2>
+<p>Con số chưa phải là câu trả lời. Quản lý cần câu kết luận kèm số liệu:</p>
+<ol>
+  <li><strong>Doanh thu</strong> dao động quanh 136–145 triệu đồng mỗi tháng từ tháng 4 đến tháng 8, nhưng <strong>tháng 9 giảm 10,8%</strong> xuống 125,7 triệu, chủ yếu do số đơn giảm (787 so với 850). Cần tìm hiểu nguyên nhân.</li>
+  <li><strong>Cà phê hạt đóng gói</strong> chiếm 43,8% doanh thu dù chỉ là một trong sáu sản phẩm, vì giá cao gấp 3–5 lần đồ uống. Mặt hàng này đáng được ưu tiên trưng bày và khuyến mãi.</li>
+  <li>Giá trị đơn trung bình của 4 chi nhánh <strong>gần như bằng nhau</strong> (163.800–166.600đ, chênh chưa tới 2%): không có chi nhánh nào nổi trội về giá trị đơn.</li>
+  <li><strong>10% khách mua nhiều nhất</strong> (29 trên 299 khách) đóng góp gần <strong>một nửa doanh thu</strong> (48,9%). Chương trình khách hàng thân thiết cho nhóm này có tác động lớn.</li>
+</ol>
+<p>Vài kỹ thuật pandas đáng chú ý trong bài:</p>
+<ul>
+  <li><code>pd.read_sql(SQL, conn)</code> chạy câu truy vấn và trả thẳng DataFrame.</li>
+  <li><code>("don_id", "nunique")</code> đếm số đơn <strong>khác nhau</strong>: một đơn có nhiều dòng món, đếm dòng sẽ ra số sai.</li>
+  <li><code>pct_change()</code> tính phần trăm thay đổi so với dòng trước; tháng đầu không có tháng trước nên là <code>NaN</code>.</li>
+  <li>Câu 3 phải cộng thành tiền theo <strong>đơn</strong> trước rồi mới lấy trung bình; lấy trung bình trên từng dòng món sẽ ra "giá trị món trung bình", một con số khác hẳn.</li>
+  <li><code>pd.ExcelWriter</code> ghi nhiều DataFrame vào nhiều sheet của cùng một file.</li>
+</ul>
+<div class="warn"><strong>Dữ liệu mẫu, kết luận mẫu</strong>Dữ liệu ở đây được sinh ngẫu nhiên nên "tháng 9 giảm" không mang ý nghĩa gì về thị trường thật. Với dữ liệu thật, trước khi kết luận cần loại trừ các nguyên nhân kỹ thuật: tháng 9 đã có đủ dữ liệu chưa, có chi nhánh nào đóng cửa vài ngày không, có đơn bị hủy chưa lọc không.</div>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Chạy lại và trả lời</h3>
+<p>Sinh dữ liệu, chạy phân tích, đối chiếu kết quả với bài. Sau đó trả lời thêm: ngày nào trong tuần có doanh thu cao nhất?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python"># (minh họa) nối tiếp phan_tich.py, dùng DataFrame df
+THU = ["Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ nhật"]
+theo_thu = df.groupby(df["ngay"].dt.day_of_week)["thanh_tien"].sum()
+theo_thu.index = [THU[i] for i in theo_thu.index]
+print(theo_thu.sort_values(ascending=False).head(3).map("{:,}".format).to_dict())</code></pre>
+<pre><code class="language-text">{'Thứ Tư': '135,926,000', 'Chủ nhật': '119,760,000', 'Thứ Ba': '116,663,000'}</code></pre>
+<p><code>dt.day_of_week</code> trả 0 cho thứ Hai đến 6 cho Chủ nhật; ánh xạ sang tên tiếng Việt bằng list thay vì <code>day_name()</code> tiếng Anh. Với dữ liệu ngẫu nhiên phân bố đều, chênh lệch giữa các thứ chỉ là may rủi; với dữ liệu thật, đây là câu hỏi giúp xếp lịch nhân viên.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Thêm sheet doanh thu chi nhánh × tháng</h3>
+<p>Thêm vào báo cáo sheet "Chi nhánh theo tháng": mỗi dòng một tháng, mỗi cột một chi nhánh, giá trị là doanh thu, có dòng tổng cuối bảng.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python"># (minh họa) nối tiếp phan_tich.py
+bang = df.pivot_table(index="thang", columns="chi_nhanh", values="thanh_tien", aggfunc="sum",
+                      margins=True, margins_name="Tổng")
+print(bang[["Quận 1", "Tổng"]].tail(2))
+with pd.ExcelWriter("bao_cao_ban_hang.xlsx", mode="a", engine="openpyxl", if_sheet_exists="replace") as w:
+    bang.rename(index=str).to_excel(w, sheet_name="Chi nhánh theo tháng")
+print(pd.ExcelFile("bao_cao_ban_hang.xlsx").sheet_names)</code></pre>
+<pre><code class="language-text">chi_nhanh     Quận 1       Tổng
+thang                          
+2026-09     29701000  125703000
+Tổng       208900000  826130000
+['Theo tháng', 'Theo sản phẩm', 'Top khách hàng', 'Chi nhánh theo tháng']</code></pre>
+<p><code>margins=True</code> thêm dòng và cột tổng. <code>mode="a"</code> mở file Excel đã có để thêm sheet thay vì ghi đè cả file; <code>if_sheet_exists="replace"</code> cho phép chạy lại nhiều lần. Tổng ở góc dưới phải đúng bằng tổng doanh thu in ở dòng đầu của phân tích: 826.130.000đ.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://pandas.pydata.org/docs/reference/api/pandas.read_sql.html" rel="noopener" target="_blank">pandas.read_sql</a>; <a href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.pivot_table.html" rel="noopener" target="_blank">pandas.DataFrame.pivot_table</a>; <a href="https://pandas.pydata.org/docs/reference/api/pandas.ExcelWriter.html" rel="noopener" target="_blank">pandas.ExcelWriter</a>.</p>

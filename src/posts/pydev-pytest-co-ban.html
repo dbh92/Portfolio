@@ -1,0 +1,223 @@
+<p>Bạn sửa một dòng trong hàm tính tiền điện để thêm bậc mới. Làm sao chắc rằng các mức cũ vẫn tính đúng? Chạy tay thử vài số mỗi lần sửa thì chậm và dễ sót. <strong>Test tự động</strong> là những đoạn code kiểm tra code của bạn, chạy hàng trăm phép thử trong một giây mỗi khi có thay đổi. <strong>pytest</strong> là công cụ kiểm thử phổ biến nhất của Python, và viết test là kỹ năng phân biệt rõ nhất giữa người viết script và Python Developer.</p>
+
+<h2>1. Test đầu tiên</h2>
+<p>Cấu trúc dự án (theo kiểu <code>uv init</code> ở bài trước):</p>
+<pre><code class="language-text">tien-dien/
+├── pyproject.toml
+├── src/
+│   └── tien_dien/
+│       └── __init__.py      ← hàm tinh_tien_dien (bài thực hành chặng 1, thêm kiểm tra số âm)
+└── tests/
+    └── test_tien_dien.py</code></pre>
+<p>File <code>src/tien_dien/__init__.py</code>:</p>
+<pre><code class="language-python">"""Tính tiền điện sinh hoạt theo bậc thang."""
+
+BAC_GIA = [(50, 1984), (100, 2050), (200, 2380), (300, 2998), (400, 3350), (None, 3460)]
+
+
+def tinh_tien_dien(so_kwh: int) -&gt; int:
+    """Tiền điện (đồng, chưa thuế) cho so_kwh kWh."""
+    if so_kwh &lt; 0:
+        raise ValueError("Số kWh không được âm")
+    con_lai, muc_duoi, tong = so_kwh, 0, 0
+    for muc_tran, gia in BAC_GIA:
+        if con_lai &lt;= 0:
+            break
+        do_rong = con_lai if muc_tran is None else muc_tran - muc_duoi
+        kwh = min(con_lai, do_rong)
+        tong += kwh * gia
+        con_lai -= kwh
+        muc_duoi = muc_tran or muc_duoi
+    return tong</code></pre>
+<p>File <code>tests/test_tien_dien.py</code>:</p>
+<pre><code class="language-python"># (minh họa) cần package tien_dien ở trên
+from tien_dien import tinh_tien_dien
+
+
+def test_khong_dung_dien():
+    assert tinh_tien_dien(0) == 0
+
+
+def test_tron_bac_1():
+    assert tinh_tien_dien(50) == 50 * 1984</code></pre>
+<p>Thêm pytest và cấu hình vào <code>pyproject.toml</code>, rồi chạy:</p>
+<pre><code class="language-text">[tool.pytest.ini_options]
+pythonpath = ["src"]       # chỉ cần nếu dự án chưa được cài vào môi trường (uv đã tự cài)
+testpaths = ["tests"]
+
+$ uv add --dev pytest
+$ uv run pytest
+============================= test session starts =============================
+collected 2 items
+
+tests\test_tien_dien.py ..                                               [100%]
+
+============================== 2 passed in 0.02s ==============================</code></pre>
+<p>Quy ước của pytest: file tên <code>test_*.py</code>, hàm tên <code>test_*</code>, kiểm tra bằng lệnh <code>assert</code> thông thường của Python. Mỗi dấu chấm là một test đạt. Tùy chọn hay dùng: <code>-v</code> (in tên từng test), <code>-q</code> (gọn), <code>-x</code> (dừng ở lỗi đầu tiên), <code>-k tron</code> (chỉ chạy test có chữ "tron" trong tên).</p>
+
+<h2>2. Khi test thất bại</h2>
+<p>Giả sử bạn vô tình xóa dòng <code>muc_duoi = muc_tran or muc_duoi</code>. pytest chỉ ra chính xác chỗ sai:</p>
+<pre><code class="language-text">.....FF.                                                                 [100%]
+================================== FAILURES ===================================
+__________________________ test_cac_moc[150-320700] ___________________________
+
+so_kwh = 150, mong_doi = 320700
+
+    def test_cac_moc(so_kwh, mong_doi):
+&gt;       assert tinh_tien_dien(so_kwh) == mong_doi
+E       assert 304200 == 320700
+E        +  where 304200 = tinh_tien_dien(150)
+
+tests\test_tien_dien.py:25: AssertionError</code></pre>
+<p>pytest phân tích biểu thức <code>assert</code> và in cả giá trị thực tế (<code>304200</code>) lẫn giá trị mong đợi (<code>320700</code>), không cần bạn tự viết thông báo lỗi. Để ý: với lỗi này, các mức 51 và 100 kWh <strong>vẫn đúng</strong>, chỉ từ bậc 3 trở đi mới sai. Nếu chỉ thử tay vài số nhỏ, bạn sẽ không phát hiện ra. Đó là lý do cần test cho mọi mốc quan trọng.</p>
+
+<h2>3. parametrize: một test, nhiều bộ dữ liệu</h2>
+<pre><code class="language-python"># (minh họa) thêm vào tests/test_tien_dien.py
+import pytest
+
+from tien_dien import tinh_tien_dien
+
+
+@pytest.mark.parametrize(
+    ("so_kwh", "mong_doi"),
+    [
+        (1, 1984),
+        (51, 99_200 + 2050),
+        (100, 99_200 + 102_500),
+        (150, 320_700),
+        (420, 1_143_700),
+    ],
+)
+def test_cac_moc(so_kwh, mong_doi):
+    assert tinh_tien_dien(so_kwh) == mong_doi
+
+
+def test_so_am_bao_loi():
+    with pytest.raises(ValueError, match="không được âm"):
+        tinh_tien_dien(-1)</code></pre>
+<pre><code class="language-text">$ uv run pytest -v
+tests/test_tien_dien.py::test_khong_dung_dien PASSED                     [ 12%]
+tests/test_tien_dien.py::test_tron_bac_1 PASSED                          [ 25%]
+tests/test_tien_dien.py::test_cac_moc[1-1984] PASSED                     [ 37%]
+tests/test_tien_dien.py::test_cac_moc[51-101250] PASSED                  [ 50%]
+tests/test_tien_dien.py::test_cac_moc[100-201700] PASSED                 [ 62%]
+tests/test_tien_dien.py::test_cac_moc[150-320700] PASSED                 [ 75%]
+tests/test_tien_dien.py::test_cac_moc[420-1143700] PASSED                [ 87%]
+tests/test_tien_dien.py::test_so_am_bao_loi PASSED                       [100%]</code></pre>
+<ul>
+  <li><code>@pytest.mark.parametrize</code> chạy cùng một hàm test với từng bộ tham số; mỗi bộ là một test riêng có tên riêng.</li>
+  <li><code>pytest.raises(LoaiLoi, match="...")</code> là context manager kiểm tra khối lệnh <strong>phải</strong> ném đúng loại ngoại lệ với thông điệp khớp mẫu. Test hành vi lỗi quan trọng không kém test kết quả đúng.</li>
+</ul>
+<p>Chọn dữ liệu test thế nào? Giá trị biên (0, 50, 51, 100, 101), một giá trị điển hình mỗi vùng, giá trị cực lớn và dữ liệu không hợp lệ.</p>
+
+<h2>4. Fixture: chuẩn bị dữ liệu dùng chung</h2>
+<pre><code class="language-python"># (minh họa) tests/test_thu_vien.py, dùng lõi thư viện ở dự án chặng 4
+from datetime import date
+
+import pytest
+
+from thu_vien import Sach, SachDangDuocMuon, ThanhVien, ThuVien
+
+
+@pytest.fixture
+def tv() -&gt; ThuVien:
+    """Một thư viện có 2 sách, 1 thành viên; tạo mới cho MỖI test."""
+    t = ThuVien()
+    t.them_sach(Sach("S01", "Số đỏ", "Vũ Trọng Phụng"))
+    t.them_sach(Sach("S02", "Clean Code", "Robert C. Martin"))
+    t.them_thanh_vien(ThanhVien("TV1", "An"))
+    return t
+
+
+def test_muon_roi_khong_muon_lai_duoc(tv):
+    tv.muon("S01", "TV1", date(2026, 10, 1))
+    with pytest.raises(SachDangDuocMuon):
+        tv.muon("S01", "TV1", date(2026, 10, 2))
+
+
+def test_luu_va_nap_giu_nguyen_du_lieu(tv, tmp_path):
+    tv.muon("S02", "TV1", date(2026, 10, 1))
+    p = tmp_path / "tv.json"
+    tv.luu(p)
+    tv2 = ThuVien.nap(p)
+    assert set(tv2.sach) == {"S01", "S02"}
+    assert tv2.dang_muon["S02"].han_tra == date(2026, 10, 15)</code></pre>
+<ul>
+  <li>Hàm có <code>@pytest.fixture</code> chuẩn bị dữ liệu; test nào cần thì khai báo tham số <strong>trùng tên</strong>, pytest tự gọi fixture và truyền vào.</li>
+  <li>Mỗi test nhận một bản mới, nên test này mượn sách không ảnh hưởng test khác. Các test phải độc lập, chạy theo thứ tự nào cũng đúng.</li>
+  <li><code>tmp_path</code> là fixture có sẵn: một thư mục tạm riêng cho mỗi test, tự dọn sau đó. Không bao giờ để test ghi vào file thật của dự án.</li>
+  <li>Fixture dùng chung cho nhiều file test đặt trong <code>tests/conftest.py</code>, pytest tự tìm thấy mà không cần import.</li>
+</ul>
+
+<h2>5. monkeypatch: thay thế thứ khó kiểm soát</h2>
+<pre><code class="language-python"># (minh họa) code dùng biến môi trường và thời gian thực
+import os
+
+
+def che_do() -&gt; str:
+    return os.environ.get("CHE_DO", "phat_trien")
+
+
+def test_che_do_san_xuat(monkeypatch):
+    monkeypatch.setenv("CHE_DO", "san_xuat")     # chỉ có hiệu lực trong test này
+    assert che_do() == "san_xuat"
+
+
+def test_che_do_mac_dinh(monkeypatch):
+    monkeypatch.delenv("CHE_DO", raising=False)
+    assert che_do() == "phat_trien"</code></pre>
+<p><code>monkeypatch</code> tạm thay biến môi trường, thuộc tính, hàm (ví dụ thay hàm gọi mạng bằng hàm trả dữ liệu giả) và tự khôi phục sau test. Tuy vậy, cách tốt nhất vẫn là thiết kế để không cần nó: truyền <code>hom_nay</code>, truyền kênh gửi vào như các dự án trước. Code dễ test thường cũng là code thiết kế tốt.</p>
+
+<h2>6. Đo độ phủ (coverage)</h2>
+<pre><code class="language-text">$ uv add --dev pytest-cov
+$ uv run pytest --cov=tien_dien --cov-report=term-missing
+Name                        Stmts   Miss  Cover   Missing
+---------------------------------------------------------
+src\tien_dien\__init__.py      14      0   100%
+---------------------------------------------------------
+TOTAL                          14      0   100%</code></pre>
+<p>Coverage cho biết dòng nào chưa có test nào chạy qua (cột <code>Missing</code>). Hữu ích để tìm nhánh bị bỏ quên, nhưng 100% không có nghĩa là không có lỗi: nó chỉ nói dòng đã được <em>chạy</em>, không nói kết quả đã được <em>kiểm tra</em> đủ.</p>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>File <code>tests/test_*.py</code>, hàm <code>test_*</code>, kiểm tra bằng <code>assert</code>; chạy <code>uv run pytest</code>.</li>
+  <li><code>@pytest.mark.parametrize</code> cho nhiều bộ dữ liệu; <code>pytest.raises</code> cho ngoại lệ.</li>
+  <li>Fixture chuẩn bị dữ liệu, mỗi test một bản mới; <code>tmp_path</code>, <code>monkeypatch</code> có sẵn; dùng chung đặt ở <code>conftest.py</code>.</li>
+  <li>Test giá trị biên; dùng coverage để tìm chỗ chưa test.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Test tiền điện</h3>
+<p>Dựng dự án <code>tien-dien</code> như mục 1, viết đủ test ở mục 1 và 3 (gồm các mốc ranh giới) và chạy đạt 8/8. Sau đó cố tình làm sai hàm theo hai cách khác nhau, xác nhận test bắt được cả hai.</p>
+<details><summary>Xem gợi ý</summary>
+<p>Hai lỗi nên thử: đổi giá bậc 2 thành 2.500 (test 51 và 100 kWh phải đỏ), và đổi <code>if con_lai &lt;= 0</code> thành <code>if con_lai &lt; 0</code> (test có đỏ không? Nếu không, hãy giải thích vì sao lỗi này vô hại). Viết test để kiểm tra rằng test bắt được lỗi là cách nghĩ của "mutation testing".</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Test lõi thư viện</h3>
+<p>Viết file test cho lõi thư viện chặng 4 dùng fixture <code>tv</code> và <code>tmp_path</code>: mượn, trả đúng hạn (trả 0), trả muộn (trả số ngày quá hạn), sách không tồn tại, lưu và nạp.</p>
+<details><summary>Xem đáp án</summary>
+<p>Ngoài hai test ở mục 4, thêm:</p>
+<pre><code class="language-python"># (minh họa) nối vào tests/test_thu_vien.py
+from thu_vien import KhongTimThay
+
+
+@pytest.mark.parametrize(("ngay_tra", "qua_han"), [(date(2026, 10, 15), 0), (date(2026, 10, 18), 3)])
+def test_tra_sach(tv, ngay_tra, qua_han):
+    tv.muon("S01", "TV1", date(2026, 10, 1))      # hạn trả 15/10
+    assert tv.tra("S01", ngay_tra) == qua_han
+    assert "S01" not in tv.dang_muon
+
+
+def test_muon_sach_khong_ton_tai(tv):
+    with pytest.raises(KhongTimThay, match="S99"):
+        tv.muon("S99", "TV1", date(2026, 10, 1))</code></pre>
+<pre><code class="language-text">$ uv run pytest -q
+.....                                                                    [100%]
+5 passed in 0.03s</code></pre>
+<p>Ngày trả đúng hạn chót (15/10) phải trả về 0: đây chính là giá trị biên dễ sai nhất nếu viết <code>&gt;=</code> thay vì <code>&gt;</code>.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.pytest.org/en/stable/getting-started.html" rel="noopener" target="_blank">pytest: Get Started</a>; <a href="https://docs.pytest.org/en/stable/how-to/fixtures.html" rel="noopener" target="_blank">How to use fixtures</a>; <a href="https://docs.pytest.org/en/stable/how-to/parametrize.html" rel="noopener" target="_blank">How to parametrize</a>; <a href="https://pytest-cov.readthedocs.io/" rel="noopener" target="_blank">pytest-cov</a>.</p>

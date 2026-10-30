@@ -1,0 +1,271 @@
+<p>Dự án cuối chặng 7 ghép mọi kỹ năng tự động hóa vào một công cụ dùng được thật: lấy tỷ giá các ngoại tệ so với VND trong N ngày gần nhất từ Web API, tính biến động, xuất báo cáo Excel định dạng sẵn, ghi log, trả mã thoát, có test và chạy theo lịch mỗi sáng. Đây là dạng việc rất hay gặp ở bộ phận kế toán, mua hàng, xuất nhập khẩu, và là một dự án đẹp cho portfolio.</p>
+
+<h2>1. Đặc tả</h2>
+<ul>
+  <li><strong>Đầu vào</strong> (tham số dòng lệnh): số ngày (mặc định 7), ngày cuối (mặc định hôm nay), danh sách mã tiền tệ (mặc định USD, EUR, JPY, CNY, KRW), thư mục đích.</li>
+  <li><strong>Nguồn dữ liệu</strong>: <a href="https://frankfurter.dev/" rel="noopener" target="_blank">Frankfurter</a> API v2, miễn phí, không cần key, tổng hợp tỷ giá tham chiếu từ nhiều ngân hàng trung ương và có VND.</li>
+  <li><strong>Đầu ra</strong>: file <code>ty_gia_YYYYMMDD.xlsx</code> gồm sheet "Tỷ giá" (ngày × mã) và sheet "Biến động" (đầu kỳ, cuối kỳ, % thay đổi, cao nhất, thấp nhất).</li>
+  <li><strong>Vận hành</strong>: log ra file, mã thoát 0/1/2, chạy lại cùng ngày thì ghi đè (không tạo file trùng), phần xử lý có test không cần mạng.</li>
+</ul>
+<div class="warn"><strong>Tỷ giá tham chiếu, không phải tỷ giá giao dịch</strong>Đây là tỷ giá tham chiếu tổng hợp từ các ngân hàng trung ương, dùng để theo dõi xu hướng. Tỷ giá mua bán thực tế tại ngân hàng thương mại khác và thay đổi trong ngày. Báo cáo dùng cho quyết định tài chính phải ghi rõ nguồn.</div>
+
+<h2>2. Khảo sát API trước khi viết code</h2>
+<p>Gọi thử bằng trình duyệt hoặc vài dòng Python để xem định dạng dữ liệu:</p>
+<pre><code class="language-python">import requests
+
+r = requests.get("https://api.frankfurter.dev/v2/rates",
+                 params={"base": "USD", "quotes": "VND,EUR", "from": "2026-10-27", "to": "2026-10-28"},
+                 timeout=15)              # kết quả thay đổi nhẹ khi nguồn cập nhật số liệu
+r.raise_for_status()
+for ban_ghi in r.json():
+    print(ban_ghi)</code></pre>
+<pre><code class="language-text">{'date': '2026-10-27', 'base': 'USD', 'quote': 'EUR', 'rate': 0.89482}
+{'date': '2026-10-27', 'base': 'USD', 'quote': 'VND', 'rate': 25806}
+{'date': '2026-10-28', 'base': 'USD', 'quote': 'EUR', 'rate': 0.89634}
+{'date': '2026-10-28', 'base': 'USD', 'quote': 'VND', 'rate': 25796}</code></pre>
+<p>API trả một list phẳng, mỗi phần tử là tỷ giá một cặp trong một ngày, theo đồng cơ sở <code>USD</code>. Muốn biết 1 EUR bằng bao nhiêu đồng, dùng <strong>tỷ giá chéo</strong> qua USD: <code>VND_per_USD / EUR_per_USD</code> = 25.796 / 0,89634 ≈ 28.779 đồng. Một lần gọi API lấy được mọi mã cho mọi ngày. Tỷ giá tổng hợp có thể được nguồn điều chỉnh nhẹ sau khi công bố, nên số bạn nhận được có thể lệch ở chữ số cuối so với bài.</p>
+
+<h2>3. Mã nguồn</h2>
+<p>Cài thư viện: <code>uv add requests openpyxl</code>, dev: <code>uv add --dev pytest</code>. File <code>bao_cao_ty_gia.py</code>:</p>
+<pre><code class="language-python">"""bao_cao_ty_gia.py: lấy tỷ giá ngoại tệ/VND từ Frankfurter và ghi báo cáo Excel."""
+import argparse
+import logging
+import sys
+from collections import defaultdict
+from datetime import date, timedelta
+from pathlib import Path
+
+import requests
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill
+
+API = "https://api.frankfurter.dev/v2/rates"
+GOC = Path(__file__).resolve().parent
+log = logging.getLogger("ty_gia")
+
+
+def lay_du_lieu(tu: date, den: date, tien_te: list[str], session: requests.Session) -&gt; list[dict]:
+    """Gọi API một lần: tỷ giá theo USD của VND và các mã cần, cho mọi ngày trong khoảng."""
+    quotes = sorted({*tien_te, "VND"} - {"USD"})
+    r = session.get(API, params={"base": "USD", "quotes": ",".join(quotes),
+                                 "from": tu.isoformat(), "to": den.isoformat()}, timeout=15)
+    r.raise_for_status()
+    return r.json()
+
+
+def quy_doi_vnd(ban_ghi: list[dict], tien_te: list[str]) -&gt; dict[date, dict[str, float]]:
+    """[{date, quote, rate}] theo USD → {ngày: {mã: số đồng cho 1 đơn vị ngoại tệ}}."""
+    theo_ngay: dict[date, dict[str, float]] = defaultdict(lambda: {"USD": 1.0})
+    for b in ban_ghi:
+        theo_ngay[date.fromisoformat(b["date"])][b["quote"]] = b["rate"]
+    bang = {}
+    for ngay, ty_le in sorted(theo_ngay.items()):
+        if "VND" in ty_le:
+            bang[ngay] = {m: ty_le["VND"] / ty_le[m] for m in tien_te if m in ty_le}
+    return bang
+
+
+def thong_ke(bang: dict[date, dict[str, float]]) -&gt; list[dict]:
+    """Đầu kỳ, cuối kỳ, % thay đổi, cao nhất, thấp nhất của từng mã."""
+    cac_ngay = sorted(bang)
+    ket_qua = []
+    for ma in bang[cac_ngay[0]]:
+        chuoi = [bang[n][ma] for n in cac_ngay if ma in bang[n]]
+        dau, cuoi = chuoi[0], chuoi[-1]
+        ket_qua.append({"ma": ma, "dau_ky": dau, "cuoi_ky": cuoi, "thay_doi": (cuoi - dau) / dau,
+                        "cao": max(chuoi), "thap": min(chuoi)})
+    return ket_qua
+
+
+def ghi_excel(bang: dict[date, dict[str, float]], tk: list[dict], p: Path) -&gt; None:
+    tieu_de = Font(bold=True, color="FFFFFF")
+    nen = PatternFill("solid", fgColor="1F4E78")
+    wb = Workbook()
+
+    ws = wb.active
+    ws.title = "Tỷ giá"
+    cac_ma = [d["ma"] for d in tk]
+    ws.append(["Ngày", *cac_ma])
+    for ngay in sorted(bang):
+        ws.append([ngay, *(bang[ngay].get(m) for m in cac_ma)])
+
+    ws2 = wb.create_sheet("Biến động")
+    ws2.append(["Mã", "Đầu kỳ", "Cuối kỳ", "Thay đổi", "Cao nhất", "Thấp nhất"])
+    for d in tk:
+        ws2.append([d["ma"], d["dau_ky"], d["cuoi_ky"], d["thay_doi"], d["cao"], d["thap"]])
+
+    for sheet in (ws, ws2):
+        for o in sheet[1]:
+            o.font, o.fill = tieu_de, nen
+        for dong in sheet.iter_rows(min_row=2):
+            for o in dong[1:]:
+                o.number_format = "#,##0.00"
+        for cot in "ABCDEF":
+            sheet.column_dimensions[cot].width = 13
+        sheet.freeze_panes = "B2"
+    for o in ws["A"][1:]:
+        o.number_format = "dd/mm/yyyy"
+    for o in ws2["D"][1:]:
+        o.number_format = "+0.00%;-0.00%"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    wb.save(p)
+
+
+def main(argv: list[str] | None = None) -&gt; int:
+    ap = argparse.ArgumentParser(description="Báo cáo tỷ giá ngoại tệ/VND ra Excel.")
+    ap.add_argument("--so-ngay", type=int, default=7, help="số ngày gần nhất (mặc định 7)")
+    ap.add_argument("--den", type=date.fromisoformat, default=date.today(), help="ngày cuối, YYYY-MM-DD")
+    ap.add_argument("--tien-te", nargs="+", default=["USD", "EUR", "JPY", "CNY", "KRW"])
+    ap.add_argument("--dich", type=Path, default=GOC / "bao_cao")
+    args = ap.parse_args(argv)
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
+                        handlers=[logging.FileHandler(GOC / "ty_gia.log", encoding="utf-8"),
+                                  logging.StreamHandler()])
+    tien_te = [m.upper() for m in args.tien_te]
+    tu = args.den - timedelta(days=args.so_ngay - 1)
+    try:
+        with requests.Session() as s:
+            ban_ghi = lay_du_lieu(tu, args.den, tien_te, s)
+    except requests.RequestException:
+        log.exception("Không lấy được tỷ giá")
+        return 1
+    bang = quy_doi_vnd(ban_ghi, tien_te)
+    if not bang:
+        log.error("API không trả dữ liệu cho %s → %s", tu, args.den)
+        return 2
+    tk = thong_ke(bang)
+    p = args.dich / f"ty_gia_{args.den:%Y%m%d}.xlsx"     # cùng ngày thì ghi đè: chạy lại không tạo file trùng
+    ghi_excel(bang, tk, p)
+    for d in tk:
+        log.info("%s: %s → %s đ (%+.2f%%)", d["ma"], f"{d['dau_ky']:,.2f}", f"{d['cuoi_ky']:,.2f}",
+                 d["thay_doi"] * 100)
+    log.info("Đã ghi %s (%d ngày)", p.name, len(bang))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())</code></pre>
+<p>Cấu trúc giống mọi dự án trước, giờ đã thành phản xạ:</p>
+<table>
+  <thead><tr><th>Hàm</th><th>Loại</th><th>Test thế nào</th></tr></thead>
+  <tbody>
+    <tr><td><code>lay_du_lieu</code></td><td>Nhập xuất (mạng)</td><td>Thay <code>session</code> bằng đối tượng giả (bài tập 2)</td></tr>
+    <tr><td><code>quy_doi_vnd</code>, <code>thong_ke</code></td><td>Hàm thuần</td><td>Dữ liệu giả, không cần mạng</td></tr>
+    <tr><td><code>ghi_excel</code></td><td>Nhập xuất (file)</td><td>Ghi vào <code>tmp_path</code>, đọc lại kiểm tra</td></tr>
+    <tr><td><code>main</code></td><td>Lớp mỏng: tham số, log, mã thoát</td><td>Chạy tay với các tham số</td></tr>
+  </tbody>
+</table>
+<p>Chi tiết đáng chú ý: <code>lay_du_lieu</code> nhận <code>session</code> từ ngoài (dependency injection như chặng 4); <code>type=date.fromisoformat</code> cho argparse tự chuyển và kiểm tra ngày; <code>"+0.00%;-0.00%"</code> là định dạng Excel hiện dấu cộng trừ cho cột thay đổi; tên file theo ngày nên chạy lại là ghi đè, đúng nguyên tắc "chạy lại được" ở bài trước.</p>
+
+<h2>4. Chạy thử</h2>
+<pre><code class="language-text">$ uv run python bao_cao_ty_gia.py --so-ngay 7 --den 2026-10-28
+2026-10-29 07:30:02,600 INFO USD: 25,819.00 → 25,796.00 đ (-0.09%)
+2026-10-29 07:30:02,601 INFO EUR: 29,010.76 → 28,779.26 đ (-0.80%)
+2026-10-29 07:30:02,601 INFO JPY: 163.78 → 163.38 đ (-0.25%)
+2026-10-29 07:30:02,601 INFO CNY: 3,870.91 → 3,869.85 đ (-0.03%)
+2026-10-29 07:30:02,601 INFO KRW: 19.49 → 19.35 đ (-0.72%)
+2026-10-29 07:30:02,601 INFO Đã ghi ty_gia_20261028.xlsx (7 ngày)</code></pre>
+<p>Mở file Excel: sheet "Tỷ giá" có 7 dòng ngày (định dạng dd/mm/yyyy) × 5 cột tiền tệ, sheet "Biến động" có 5 dòng với cột Thay đổi hiện <code>-0.80%</code>. Thử thêm các trường hợp lỗi: <code>--den 2026-13-01</code> (argparse báo ngày không hợp lệ, mã thoát 2), ngắt mạng (log ghi traceback, mã thoát 1).</p>
+
+<h2>5. Test không cần mạng</h2>
+<p>File <code>test_bao_cao_ty_gia.py</code>, dữ liệu giả có cùng định dạng API trả về, với con số tròn để tính tay được:</p>
+<pre><code class="language-python"># (minh họa) cần file bao_cao_ty_gia.py ở cùng thư mục
+from datetime import date
+
+import pytest
+from openpyxl import load_workbook
+
+from bao_cao_ty_gia import ghi_excel, quy_doi_vnd, thong_ke
+
+# Dữ liệu giả cùng định dạng API trả về: tỷ giá theo USD
+GIA = [
+    {"date": "2026-10-27", "base": "USD", "quote": "EUR", "rate": 0.9},
+    {"date": "2026-10-27", "base": "USD", "quote": "VND", "rate": 25_000},
+    {"date": "2026-10-28", "base": "USD", "quote": "EUR", "rate": 0.8},
+    {"date": "2026-10-28", "base": "USD", "quote": "VND", "rate": 26_000},
+]
+
+
+def test_quy_doi_ra_vnd():
+    bang = quy_doi_vnd(GIA, ["USD", "EUR"])
+    assert bang[date(2026, 10, 27)]["USD"] == 25_000
+    assert bang[date(2026, 10, 28)]["EUR"] == pytest.approx(26_000 / 0.8)
+
+
+def test_bo_ngay_thieu_vnd():
+    bang = quy_doi_vnd(GIA + [{"date": "2026-10-29", "base": "USD", "quote": "EUR", "rate": 0.85}], ["EUR"])
+    assert list(bang) == [date(2026, 10, 27), date(2026, 10, 28)]
+
+
+def test_thong_ke():
+    tk = {d["ma"]: d for d in thong_ke(quy_doi_vnd(GIA, ["USD", "EUR"]))}
+    assert tk["USD"]["thay_doi"] == pytest.approx(0.04)
+    assert tk["EUR"]["cao"] == pytest.approx(32_500)
+
+
+def test_ghi_excel(tmp_path):
+    bang = quy_doi_vnd(GIA, ["USD", "EUR"])
+    p = tmp_path / "bc.xlsx"
+    ghi_excel(bang, thong_ke(bang), p)
+    wb = load_workbook(p)
+    assert wb.sheetnames == ["Tỷ giá", "Biến động"]
+    assert wb["Tỷ giá"]["B3"].value == 26_000</code></pre>
+<pre><code class="language-text">$ uv run pytest -q
+....                                                                     [100%]
+4 passed in 0.66s</code></pre>
+<p><code>pytest.approx</code> so sánh số thực có dung sai nhỏ, tránh bẫy <code>0.1 + 0.2 != 0.3</code> đã học ở chặng 1. USD tăng từ 25.000 lên 26.000 đồng là +4%: tính tay được nên đây là test đáng tin.</p>
+
+<h2>6. Chạy tự động mỗi sáng</h2>
+<p>Lên lịch 7:30 các ngày làm việc như bài trước. Windows:</p>
+<pre><code class="language-text">schtasks /Create /SC WEEKLY /D MON,TUE,WED,THU,FRI /ST 07:30 /TN "HocPython\TyGia" ^
+  /TR "\"D:\du-an\ty-gia\.venv\Scripts\python.exe\" \"D:\du-an\ty-gia\bao_cao_ty_gia.py\""</code></pre>
+<p>Linux (<code>crontab -e</code>):</p>
+<pre><code class="language-text">30 7 * * 1-5 /home/an/ty-gia/.venv/bin/python /home/an/ty-gia/bao_cao_ty_gia.py &gt;&gt; /home/an/ty-gia/cron.log 2&gt;&amp;1</code></pre>
+<p>Vì <code>GOC</code> tính từ <code>__file__</code>, log và thư mục <code>bao_cao</code> luôn nằm cạnh script dù lịch chạy khởi động ở thư mục nào.</p>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Chạy và kiểm tra báo cáo</h3>
+<p>Dựng dự án, chạy công cụ lấy tỷ giá 5 ngày gần nhất, mở file Excel kiểm tra hai sheet và định dạng; chạy lại lần hai trong cùng ngày, xác nhận không sinh file mới.</p>
+<details><summary>Xem gợi ý</summary>
+<p>Đếm file trước và sau lần chạy thứ hai bằng <code>len(list(Path("bao_cao").glob("*.xlsx")))</code>. Mở <code>ty_gia.log</code>: phải có đủ hai lần chạy với thời gian khác nhau. Nếu Excel hiện cột ngày thành số kiểu <code>46323</code>, định dạng <code>dd/mm/yyyy</code> chưa được áp vào cột A.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Test lay_du_lieu bằng session giả</h3>
+<p>Viết test kiểm tra <code>lay_du_lieu</code> gửi đúng tham số (đồng cơ sở USD, danh sách mã có VND, không có USD, khoảng ngày) mà không gọi mạng, bằng một lớp session giả.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python"># (minh họa) thêm vào test_bao_cao_ty_gia.py
+from bao_cao_ty_gia import lay_du_lieu
+
+
+class PhanHoiGia:
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        return GIA
+
+
+class SessionGia:
+    def __init__(self):
+        self.da_goi = []
+
+    def get(self, url, params, timeout):
+        self.da_goi.append(params)
+        return PhanHoiGia()
+
+
+def test_lay_du_lieu_gui_dung_tham_so():
+    s = SessionGia()
+    ket_qua = lay_du_lieu(date(2026, 10, 22), date(2026, 10, 28), ["USD", "EUR", "JPY"], s)
+    assert ket_qua == GIA
+    assert s.da_goi == [{"base": "USD", "quotes": "EUR,JPY,VND", "from": "2026-10-22", "to": "2026-10-28"}]</code></pre>
+<pre><code class="language-text">$ uv run pytest -q
+.....                                                                    [100%]
+5 passed in 0.61s</code></pre>
+<p>Nhờ <code>session</code> được truyền vào, test thay nó bằng lớp giả chỉ có đúng hai phương thức cần dùng (duck typing). Không cần thư viện mock, không cần mạng, test chạy trong vài mili giây.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://frankfurter.dev/" rel="noopener" target="_blank">Frankfurter API</a>; <a href="https://requests.readthedocs.io/en/latest/" rel="noopener" target="_blank">Requests</a>; <a href="https://openpyxl.readthedocs.io/en/stable/" rel="noopener" target="_blank">openpyxl</a>; <a href="https://docs.pytest.org/en/stable/reference/reference.html#pytest-approx" rel="noopener" target="_blank">pytest.approx</a>.</p>

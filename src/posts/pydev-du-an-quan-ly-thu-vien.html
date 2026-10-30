@@ -1,0 +1,215 @@
+<p>Dự án cuối chặng 4 mô phỏng phần lõi của một phần mềm quản lý thư viện: sách, thành viên, mượn và trả, quá hạn, lưu và nạp dữ liệu. Trọng tâm không phải số dòng code mà là <strong>thiết kế</strong>: tách lớp thế nào, quy tắc nghiệp vụ đặt ở đâu, lỗi nghiệp vụ báo ra sao. Đây cũng là cách bạn sẽ được đánh giá khi phỏng vấn vị trí Python Developer.</p>
+
+<h2>1. Từ yêu cầu đến lớp</h2>
+<p>Yêu cầu: thư viện có nhiều đầu sách, mỗi cuốn có mã riêng. Thành viên mượn sách trong 14 ngày. Một cuốn chỉ được một người mượn tại một thời điểm. Cần liệt kê sách quá hạn, lưu và nạp toàn bộ dữ liệu.</p>
+<p>Cách tìm lớp: gạch chân <strong>danh từ</strong> (sách, thành viên, lượt mượn, thư viện) để có lớp; <strong>động từ</strong> (mượn, trả, liệt kê, lưu) thành phương thức.</p>
+<table>
+  <thead><tr><th>Lớp</th><th>Trách nhiệm</th><th>Loại</th></tr></thead>
+  <tbody>
+    <tr><td><code>Sach</code></td><td>Mã, tên, tác giả</td><td>dataclass</td></tr>
+    <tr><td><code>ThanhVien</code></td><td>Mã, họ tên</td><td>dataclass</td></tr>
+    <tr><td><code>LuotMuon</code></td><td>Ai mượn cuốn nào, ngày mượn, hạn trả</td><td>dataclass</td></tr>
+    <tr><td><code>ThuVien</code></td><td>Giữ mọi thứ, áp quy tắc mượn trả, lưu/nạp</td><td>class có hành vi</td></tr>
+  </tbody>
+</table>
+<p>Quy tắc nghiệp vụ tập trung ở <code>ThuVien</code>, không rải rác ở nơi gọi. Vi phạm quy tắc thì ném <strong>ngoại lệ riêng</strong>, để giao diện (dòng lệnh hôm nay, web API ở chặng 9) quyết định hiển thị thông báo gì.</p>
+
+<h2>2. Mã nguồn</h2>
+<pre><code class="language-python">"""thu_vien.py: lõi quản lý thư viện."""
+import json
+from dataclasses import asdict, dataclass
+from datetime import date, timedelta
+from pathlib import Path
+
+SO_NGAY_MUON = 14
+
+
+class LoiThuVien(Exception):
+    """Lỗi nghiệp vụ của thư viện."""
+
+
+class KhongTimThay(LoiThuVien):
+    pass
+
+
+class SachDangDuocMuon(LoiThuVien):
+    pass
+
+
+@dataclass
+class Sach:
+    ma: str
+    ten: str
+    tac_gia: str
+
+
+@dataclass
+class ThanhVien:
+    ma: str
+    ho_ten: str
+
+
+@dataclass
+class LuotMuon:
+    ma_sach: str
+    ma_tv: str
+    ngay_muon: date
+    han_tra: date
+
+    def so_ngay_qua_han(self, hom_nay: date) -&gt; int:
+        return max(0, (hom_nay - self.han_tra).days)
+
+
+class ThuVien:
+    def __init__(self):
+        self.sach: dict[str, Sach] = {}
+        self.thanh_vien: dict[str, ThanhVien] = {}
+        self.dang_muon: dict[str, LuotMuon] = {}      # mã sách → lượt mượn đang mở
+
+    # ---- thêm dữ liệu
+    def them_sach(self, sach: Sach) -&gt; None:
+        if sach.ma in self.sach:
+            raise LoiThuVien(f"Trùng mã sách {sach.ma}")
+        self.sach[sach.ma] = sach
+
+    def them_thanh_vien(self, tv: ThanhVien) -&gt; None:
+        if tv.ma in self.thanh_vien:
+            raise LoiThuVien(f"Trùng mã thành viên {tv.ma}")
+        self.thanh_vien[tv.ma] = tv
+
+    # ---- nghiệp vụ
+    def _lay(self, kho: dict, ma: str, loai: str):
+        try:
+            return kho[ma]
+        except KeyError:
+            raise KhongTimThay(f"Không có {loai} {ma}") from None
+
+    def muon(self, ma_sach: str, ma_tv: str, hom_nay: date) -&gt; LuotMuon:
+        self._lay(self.sach, ma_sach, "sách")
+        self._lay(self.thanh_vien, ma_tv, "thành viên")
+        if ma_sach in self.dang_muon:
+            raise SachDangDuocMuon(f"Sách {ma_sach} đang được {self.dang_muon[ma_sach].ma_tv} mượn")
+        luot = LuotMuon(ma_sach, ma_tv, hom_nay, hom_nay + timedelta(days=SO_NGAY_MUON))
+        self.dang_muon[ma_sach] = luot
+        return luot
+
+    def tra(self, ma_sach: str, hom_nay: date) -&gt; int:
+        """Trả sách; trả về số ngày quá hạn (0 nếu đúng hạn)."""
+        luot = self.dang_muon.pop(ma_sach, None)
+        if luot is None:
+            raise LoiThuVien(f"Sách {ma_sach} không ở trạng thái đang mượn")
+        return luot.so_ngay_qua_han(hom_nay)
+
+    def tim(self, tu_khoa: str) -&gt; list[Sach]:
+        k = tu_khoa.casefold()
+        return [s for s in self.sach.values() if k in s.ten.casefold() or k in s.tac_gia.casefold()]
+
+    def qua_han(self, hom_nay: date) -&gt; list[tuple[LuotMuon, int]]:
+        ds = [(l, l.so_ngay_qua_han(hom_nay)) for l in self.dang_muon.values()]
+        return sorted([cap for cap in ds if cap[1] &gt; 0], key=lambda cap: cap[1], reverse=True)
+
+    # ---- lưu và nạp
+    def luu(self, p: Path) -&gt; None:
+        du_lieu = {
+            "sach": [asdict(s) for s in self.sach.values()],
+            "thanh_vien": [asdict(t) for t in self.thanh_vien.values()],
+            "dang_muon": [asdict(l) for l in self.dang_muon.values()],
+        }
+        p.write_text(json.dumps(du_lieu, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+
+    @classmethod
+    def nap(cls, p: Path) -&gt; "ThuVien":
+        du_lieu = json.loads(p.read_text(encoding="utf-8"))
+        tv = cls()
+        for s in du_lieu["sach"]:
+            tv.them_sach(Sach(**s))
+        for t in du_lieu["thanh_vien"]:
+            tv.them_thanh_vien(ThanhVien(**t))
+        for l in du_lieu["dang_muon"]:
+            tv.dang_muon[l["ma_sach"]] = LuotMuon(
+                l["ma_sach"], l["ma_tv"], date.fromisoformat(l["ngay_muon"]), date.fromisoformat(l["han_tra"]))
+        return tv
+
+
+# ---- kịch bản chạy thử
+tv = ThuVien()
+tv.them_sach(Sach("S01", "Dế Mèn phiêu lưu ký", "Tô Hoài"))
+tv.them_sach(Sach("S02", "Số đỏ", "Vũ Trọng Phụng"))
+tv.them_sach(Sach("S03", "Clean Code", "Robert C. Martin"))
+tv.them_thanh_vien(ThanhVien("TV1", "Nguyễn An"))
+tv.them_thanh_vien(ThanhVien("TV2", "Trần Bình"))
+
+d0 = date(2026, 10, 1)
+tv.muon("S01", "TV1", d0)
+tv.muon("S03", "TV2", d0 + timedelta(days=5))
+try:
+    tv.muon("S01", "TV2", d0 + timedelta(days=2))
+except SachDangDuocMuon as loi:
+    print("Từ chối:", loi)
+
+hom_nay = date(2026, 10, 29)
+for luot, so_ngay in tv.qua_han(hom_nay):
+    print(f"Quá hạn: {tv.sach[luot.ma_sach].ten} - {tv.thanh_vien[luot.ma_tv].ho_ten}, {so_ngay} ngày")
+
+p = Path("thu_vien.json")
+tv.luu(p)
+tv2 = ThuVien.nap(p)
+print("Trả S01, quá hạn", tv2.tra("S01", hom_nay), "ngày; còn đang mượn:", list(tv2.dang_muon))
+print([s.ten for s in tv2.tim("hoài")])</code></pre>
+<pre><code class="language-text">Từ chối: Sách S01 đang được TV1 mượn
+Quá hạn: Dế Mèn phiêu lưu ký - Nguyễn An, 14 ngày
+Quá hạn: Clean Code - Trần Bình, 9 ngày
+Trả S01, quá hạn 14 ngày; còn đang mượn: ['S03']
+['Dế Mèn phiêu lưu ký']</code></pre>
+
+<h2>3. Đọc kỹ các quyết định thiết kế</h2>
+<ul>
+  <li><strong>Dict theo mã</strong> (<code>self.sach: dict[str, Sach]</code>) thay vì list: tra cứu theo mã tức thì và tự chống trùng.</li>
+  <li><strong><code>dang_muon</code> dùng mã sách làm khóa</strong>: quy tắc "một cuốn một người" trở thành một phép kiểm tra <code>in</code>.</li>
+  <li><strong>Phân cấp ngoại lệ</strong>: <code>KhongTimThay</code> và <code>SachDangDuocMuon</code> đều là <code>LoiThuVien</code>. Giao diện có thể bắt riêng từng loại, hoặc bắt chung <code>LoiThuVien</code> để hiện thông báo. <code>from None</code> giấu <code>KeyError</code> bên trong khỏi traceback vì nó không giúp gì cho người đọc.</li>
+  <li><strong><code>hom_nay</code> là tham số</strong>, không gọi <code>date.today()</code> bên trong: kịch bản quá hạn kiểm tra được với ngày cố định.</li>
+  <li><strong><code>@classmethod nap</code></strong>: phương thức gọi trên lớp (<code>ThuVien.nap(p)</code>) và trả về đối tượng mới, cách viết chuẩn cho "hàm tạo thay thế". <code>asdict</code> chuyển dataclass thành dict để ghi JSON.</li>
+  <li><strong><code>nap</code> đi qua <code>them_sach</code></strong> thay vì gán thẳng vào dict, nên file JSON bị sửa tay có mã trùng cũng bị phát hiện.</li>
+</ul>
+<div class="tip"><strong>Vì sao không có hàm input() nào?</strong>Lõi <code>thu_vien.py</code> không hỏi, không in: chỉ nhận tham số, trả kết quả, ném ngoại lệ. Nhờ vậy cùng một lõi có thể gắn với menu dòng lệnh, giao diện đồ họa hay Web API mà không sửa dòng nào. Bạn sẽ viết test cho lõi này ở chặng 6.</div>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Chạy và mở rộng kịch bản</h3>
+<p>Chạy kịch bản ở mục 2. Thêm các bước: trả S03 đúng hạn (hạn là 20/10), thử trả lại S03 lần nữa (phải báo lỗi), mượn một mã sách không tồn tại (phải là <code>KhongTimThay</code>).</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python"># (minh họa) nối tiếp kịch bản ở mục 2
+print(tv2.tra("S03", date(2026, 10, 20)))            # 0: đúng hạn
+for thao_tac in (lambda: tv2.tra("S03", hom_nay), lambda: tv2.muon("S99", "TV1", hom_nay)):
+    try:
+        thao_tac()
+    except LoiThuVien as loi:
+        print(type(loi).__name__, "-", loi)</code></pre>
+<pre><code class="language-text">0
+LoiThuVien - Sách S03 không ở trạng thái đang mượn
+KhongTimThay - Không có sách S99</code></pre>
+<p>Dùng list các <code>lambda</code> để chạy nhiều thao tác cùng một cách bắt lỗi. Một <code>except LoiThuVien</code> bắt được cả lớp con <code>KhongTimThay</code>.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Giới hạn 3 cuốn</h3>
+<p>Thêm quy tắc: mỗi thành viên mượn tối đa 3 cuốn cùng lúc; vi phạm thì raise <code>VuotGioiHan</code> (lớp con của <code>LoiThuVien</code>).</p>
+<details><summary>Xem đáp án</summary>
+<p>Thêm lớp ngoại lệ và hằng số, rồi chèn một kiểm tra vào đầu <code>muon</code>, ngay sau khi kiểm tra sách và thành viên tồn tại:</p>
+<pre><code class="language-python"># (minh họa) thêm vào thu_vien.py
+TOI_DA_MOI_NGUOI = 3
+
+
+class VuotGioiHan(LoiThuVien):
+    pass
+
+
+# trong ThuVien.muon, trước khi kiểm tra SachDangDuocMuon:
+        dang_giu = sum(1 for l in self.dang_muon.values() if l.ma_tv == ma_tv)
+        if dang_giu &gt;= TOI_DA_MOI_NGUOI:
+            raise VuotGioiHan(f"{ma_tv} đang giữ {dang_giu} cuốn, tối đa {TOI_DA_MOI_NGUOI}")</code></pre>
+<p>Kiểm tra bằng cách thêm 4 cuốn sách và cho cùng một thành viên mượn lần lượt: ba lần đầu thành công, lần thứ tư ném <code>VuotGioiHan</code>. Đếm bằng cách duyệt <code>dang_muon</code> là đủ cho thư viện nhỏ; với hàng triệu lượt mượn, bạn sẽ để cơ sở dữ liệu đếm (chặng 8).</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/library/dataclasses.html#dataclasses.asdict" rel="noopener" target="_blank">dataclasses.asdict</a>; <a href="https://docs.python.org/3/library/functions.html#classmethod" rel="noopener" target="_blank">classmethod</a>; <a href="https://docs.python.org/3/reference/simple_stmts.html#the-raise-statement" rel="noopener" target="_blank">The raise statement (from None)</a>.</p>

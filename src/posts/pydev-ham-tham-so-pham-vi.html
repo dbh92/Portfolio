@@ -1,0 +1,180 @@
+<p>Ở bài thực hành tiền điện, đoạn code tính tiền bị chép lại hai lần. Sửa giá thì phải sửa hai chỗ, quên một chỗ là sai. <strong>Hàm</strong> giải quyết đúng vấn đề đó: đặt tên cho một đoạn code, gọi lại bao nhiêu lần cũng được. Viết hàm tốt là kỹ năng quan trọng nhất để chuyển từ "viết script" sang "viết phần mềm".</p>
+
+<h2>1. Định nghĩa, gọi và trả về</h2>
+<pre><code class="language-python">def tinh_tien_dien(so_kwh: int) -&gt; int:
+    """Tiền điện sinh hoạt (đồng, chưa thuế) theo 6 bậc."""
+    bac_gia = [(50, 1984), (100, 2050), (200, 2380), (300, 2998), (400, 3350), (None, 3460)]
+    con_lai, muc_duoi, tong = so_kwh, 0, 0
+    for muc_tran, gia in bac_gia:
+        if con_lai &lt;= 0:
+            break
+        do_rong = con_lai if muc_tran is None else muc_tran - muc_duoi
+        kwh = min(con_lai, do_rong)
+        tong += kwh * gia
+        con_lai -= kwh
+        muc_duoi = muc_tran or muc_duoi
+    return tong
+
+
+print(tinh_tien_dien(150))
+print(tinh_tien_dien(50) + tinh_tien_dien(51))</code></pre>
+<pre><code class="language-text">320700
+200450</code></pre>
+<ul>
+  <li><code>def</code>, tên hàm (động từ, chữ thường), tham số trong ngoặc, dấu <code>:</code>, thân hàm thụt lề.</li>
+  <li>Chuỗi ngay dưới <code>def</code> là <strong>docstring</strong>; VS Code hiện nó khi rê chuột lên tên hàm.</li>
+  <li><code>so_kwh: int</code> và <code>-&gt; int</code> là <strong>type hint</strong>: ghi chú kiểu, giúp VS Code gợi ý và cảnh báo. Python không kiểm tra khi chạy.</li>
+  <li><code>return</code> trả kết quả và kết thúc hàm ngay. Hàm không có <code>return</code> trả về <code>None</code>.</li>
+</ul>
+<div class="tip"><strong>Trả kết quả, đừng in</strong>Hàm <code>return</code> kết quả thì dùng được ở mọi nơi: cộng, so sánh, ghi file, trả qua API. Hàm chỉ <code>print</code> thì chỉ dùng được để xem. Để việc in ấn cho phần chương trình chính.</div>
+
+<h2>2. Các kiểu tham số</h2>
+<pre><code class="language-python">def chao(ten, loi_chao="Xin chào", dau_cau="!"):
+    return f"{loi_chao}, {ten}{dau_cau}"
+
+
+print(chao("An"))                              # dùng giá trị mặc định
+print(chao("Bình", "Chào buổi sáng"))          # theo vị trí
+print(chao("Chi", dau_cau="."))                # theo tên, bỏ qua tham số giữa
+print(chao(loi_chao="Hello", ten="Dũng"))      # theo tên, thứ tự tùy ý</code></pre>
+<pre><code class="language-text">Xin chào, An!
+Chào buổi sáng, Bình!
+Xin chào, Chi.
+Hello, Dũng!</code></pre>
+<p>Tham số có giá trị mặc định phải đứng sau tham số bắt buộc. Gọi theo tên giúp code tự giải thích, nhất là với tham số kiểu <code>True/False</code>: <code>xuat_bao_cao(du_lieu, gui_email=True)</code> dễ hiểu hơn <code>xuat_bao_cao(du_lieu, True)</code>.</p>
+<p>Đặt <code>*</code> trong danh sách tham số để <strong>bắt buộc</strong> các tham số phía sau phải gọi theo tên:</p>
+<pre><code class="language-python">def chuyen_tien(so_tien, *, tu_tk, den_tk):
+    return f"Chuyển {so_tien:,}đ từ {tu_tk} đến {den_tk}"
+
+
+print(chuyen_tien(500_000, tu_tk="001", den_tk="002"))
+# chuyen_tien(500_000, "001", "002") → TypeError: tránh nhầm thứ tự hai tài khoản</code></pre>
+<pre><code class="language-text">Chuyển 500,000đ từ 001 đến 002</code></pre>
+
+<h2>3. *args và **kwargs</h2>
+<pre><code class="language-python">def tong(*so):                 # gom mọi tham số vị trí thành tuple
+    return sum(so)
+
+
+def tao_the(ten_the, **thuoc_tinh):   # gom tham số theo tên thành dict
+    attrs = " ".join(f'{k}="{v}"' for k, v in thuoc_tinh.items())
+    return f"&lt;{ten_the} {attrs}&gt;"
+
+
+print(tong(1, 2, 3), tong())
+print(tao_the("input", type="email", name="email"))
+
+ds = [4, 5, 6]
+print(tong(*ds))               # * khi gọi: mở list thành các tham số
+cau_hinh = {"type": "text", "name": "ho_ten"}
+print(tao_the("input", **cau_hinh))   # ** khi gọi: mở dict thành tham số theo tên</code></pre>
+<pre><code class="language-text">6 0
+&lt;input type="email" name="email"&gt;
+15
+&lt;input type="text" name="ho_ten"&gt;</code></pre>
+<p>Tên <code>args</code>, <code>kwargs</code> chỉ là quy ước; dấu <code>*</code>, <code>**</code> mới quan trọng. Bạn sẽ gặp chúng nhiều khi đọc code thư viện và khi viết decorator ở chặng 5.</p>
+
+<h2>4. Phạm vi biến</h2>
+<pre><code class="language-python">THUE = 0.08                 # biến toàn cục (hằng số)
+
+def gia_sau_thue(gia):
+    tien_thue = gia * THUE  # biến cục bộ, chỉ sống trong hàm
+    return gia + tien_thue
+
+print(gia_sau_thue(100_000))
+# print(tien_thue) → NameError
+
+dem = 0
+def tang_sai():
+    dem = dem + 1           # UnboundLocalError: gán làm dem thành biến cục bộ
+
+def tang_dung(gia_tri):
+    return gia_tri + 1      # nhận vào, trả ra: không phụ thuộc biến bên ngoài
+
+dem = tang_dung(dem)
+print(dem)</code></pre>
+<pre><code class="language-text">108000.0
+1</code></pre>
+<p>Hàm <strong>đọc</strong> được biến toàn cục, nhưng hễ có lệnh <strong>gán</strong> tên đó trong hàm thì Python coi nó là biến cục bộ. Có từ khóa <code>global</code> để sửa biến toàn cục, nhưng gần như luôn có cách tốt hơn: truyền vào qua tham số, trả ra qua <code>return</code>. Hàm như vậy gọi là hàm "thuần": cùng đầu vào luôn cho cùng kết quả, dễ hiểu và dễ test.</p>
+
+<h2>5. Bẫy: giá trị mặc định là list</h2>
+<pre><code class="language-python">def them_sai(mon, gio=[]):
+    gio.append(mon)
+    return gio
+
+print(them_sai("táo"))
+print(them_sai("cam"))      # bất ngờ: còn "táo" của lần trước!
+
+
+def them_dung(mon, gio=None):
+    if gio is None:
+        gio = []
+    gio.append(mon)
+    return gio
+
+print(them_dung("táo"))
+print(them_dung("cam"))</code></pre>
+<pre><code class="language-text">['táo']
+['táo', 'cam']
+['táo']
+['cam']</code></pre>
+<p>Giá trị mặc định được tạo <strong>một lần</strong> lúc định nghĩa hàm, không phải mỗi lần gọi. List mặc định vì vậy bị dùng chung. Luôn dùng <code>None</code> làm mặc định cho list, dict, set.</p>
+
+<h2>6. lambda: hàm một dòng không tên</h2>
+<pre><code class="language-python">sinh_vien = [("An", 8.5), ("Bình", 7.0), ("Chi", 8.5), ("Dũng", 9.0)]
+
+print(sorted(sinh_vien, key=lambda sv: sv[1], reverse=True))
+print(max(sinh_vien, key=lambda sv: sv[1]))</code></pre>
+<pre><code class="language-text">[('Dũng', 9.0), ('An', 8.5), ('Chi', 8.5), ('Bình', 7.0)]
+('Dũng', 9.0)</code></pre>
+<p><code>lambda sv: sv[1]</code> tương đương một hàm nhận <code>sv</code> và trả <code>sv[1]</code>. Chỉ dùng lambda cho biểu thức ngắn truyền vào <code>key=</code>; logic dài thì viết <code>def</code> có tên rõ ràng.</p>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Hàm làm một việc, tên là động từ, có docstring, nhận qua tham số, trả qua <code>return</code>.</li>
+  <li>Tham số mặc định đứng sau; gọi theo tên cho rõ; <code>*</code> bắt buộc gọi theo tên.</li>
+  <li><code>*args</code> gom tham số vị trí thành tuple, <code>**kwargs</code> gom tham số tên thành dict.</li>
+  <li>Biến trong hàm là cục bộ; tránh <code>global</code>; mặc định cho list dùng <code>None</code>.</li>
+  <li><code>lambda</code> cho <code>key=</code> ngắn.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Tính hóa đơn</h3>
+<p>Viết <code>tinh_hoa_don(*gia, giam_gia=0, vat=0.08)</code>: cộng các giá, trừ giảm giá theo tỉ lệ (0–1), cộng VAT, làm tròn đến đồng. Giảm giá ngoài 0–1 thì raise <code>ValueError</code>.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">def tinh_hoa_don(*gia: int, giam_gia: float = 0, vat: float = 0.08) -&gt; int:
+    """Tổng tiền phải trả, làm tròn đến đồng."""
+    if not 0 &lt;= giam_gia &lt;= 1:
+        raise ValueError("giam_gia phải trong khoảng 0–1")
+    tam_tinh = sum(gia) * (1 - giam_gia)
+    return round(tam_tinh * (1 + vat))
+
+
+print(tinh_hoa_don(120_000, 45_000, 35_000))
+print(tinh_hoa_don(120_000, 45_000, 35_000, giam_gia=0.1))
+print(tinh_hoa_don(99_000, vat=0))</code></pre>
+<pre><code class="language-text">216000
+194400
+99000</code></pre>
+<p><code>giam_gia</code> và <code>vat</code> đứng sau <code>*gia</code> nên tự động thành tham số bắt buộc gọi theo tên. Bạn sẽ học <code>raise</code> kỹ hơn ở chặng 3.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Sắp xếp nhiều tiêu chí</h3>
+<p>Sắp xếp sinh viên theo điểm giảm dần; cùng điểm thì theo tên tăng dần.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">sinh_vien = [("Chi", 8.5), ("Bình", 7.0), ("An", 8.5), ("Dũng", 9.0), ("Em", 7.0)]
+ket_qua = sorted(sinh_vien, key=lambda sv: (-sv[1], sv[0]))
+for ten, diem in ket_qua:
+    print(f"{ten:&lt;6}{diem}")</code></pre>
+<pre><code class="language-text">Dũng  9.0
+An    8.5
+Chi   8.5
+Bình  7.0
+Em    7.0</code></pre>
+<p>Key là tuple <code>(-điểm, tên)</code>: Python so sánh tuple lần lượt từng phần tử. Đổi dấu điểm để điểm cao xếp trước trong khi tên vẫn tăng dần.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/tutorial/controlflow.html#defining-functions" rel="noopener" target="_blank">Python Tutorial: Defining Functions</a>; <a href="https://docs.python.org/3/faq/programming.html#why-are-default-values-shared-between-objects" rel="noopener" target="_blank">Programming FAQ: Why are default values shared between objects?</a></p>

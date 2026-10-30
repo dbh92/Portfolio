@@ -1,0 +1,163 @@
+<p>Bạn đã viết được mọi thứ bằng vòng <code>for</code> và <code>if</code>. Nhưng mở code của một dự án Python chuyên nghiệp, bạn sẽ thấy rất ít vòng lặp "thủ công" kiểu tạo list rỗng rồi <code>append</code>. Thay vào đó là comprehension, unpacking, <code>zip</code>, <code>enumerate</code>, <code>any</code>, <code>sorted(key=...)</code>. Bài này giúp bạn đọc hiểu và viết được phong cách đó, gọi là code <strong>Pythonic</strong>.</p>
+
+<h2>1. List comprehension</h2>
+<pre><code class="language-python">gia = [120_000, 45_000, 300_000, 80_000]
+
+# Cách thủ công
+sau_giam = []
+for g in gia:
+    if g &gt;= 50_000:
+        sau_giam.append(g * 0.9)
+
+# List comprehension: [biểu thức for phần_tử in dãy if điều_kiện]
+sau_giam = [g * 0.9 for g in gia if g &gt;= 50_000]
+print(sau_giam)
+
+nhan = ["rẻ" if g &lt; 100_000 else "đắt" for g in gia]   # if...else đứng TRƯỚC for
+print(nhan)</code></pre>
+<pre><code class="language-text">[108000.0, 270000.0, 72000.0]
+['đắt', 'rẻ', 'đắt', 'rẻ']</code></pre>
+<p>Đọc comprehension từ chữ <code>for</code>: "với mỗi <code>g</code> trong <code>gia</code>, nếu <code>g &gt;= 50.000</code>, lấy <code>g * 0.9</code>". Chú ý hai vị trí khác nhau của <code>if</code>: <code>if</code> ở cuối là <strong>lọc</strong> (bỏ phần tử), <code>x if dk else y</code> ở đầu là <strong>chọn giá trị</strong> (giữ đủ số phần tử).</p>
+
+<h2>2. Dict comprehension, set comprehension, generator expression</h2>
+<pre><code class="language-python">san_pham = [("Bút", 5_000), ("Vở", 12_000), ("Thước", 8_000), ("Bút", 6_000)]
+
+bang_gia = {ten: gia for ten, gia in san_pham}          # khóa trùng: giá trị sau ghi đè
+print(bang_gia)
+ten_viet_hoa = {ten.upper() for ten, _ in san_pham}      # set: tự loại trùng
+print(sorted(ten_viet_hoa))
+dao_nguoc = {gia: ten for ten, gia in bang_gia.items()}
+print(dao_nguoc[12_000])
+
+tong = sum(gia for _, gia in san_pham)                   # generator expression: không tạo list
+print(tong)</code></pre>
+<pre><code class="language-text">{'Bút': 6000, 'Vở': 12000, 'Thước': 8000}
+['BÚT', 'THƯỚC', 'VỞ']
+Vở
+31000</code></pre>
+<p>Đặt comprehension trong ngoặc tròn (hoặc làm tham số duy nhất của hàm như <code>sum(...)</code>) là <strong>generator expression</strong>: sinh từng giá trị khi cần, không tạo list trung gian. Dùng nó khi chỉ cần duyệt một lần (tính tổng, tìm max). Bài sau nói kỹ về generator. Tên <code>_</code> là quy ước cho biến không dùng tới.</p>
+<div class="warn"><strong>Đừng lạm dụng</strong>Comprehension lồng hai, ba tầng kèm nhiều điều kiện rất khó đọc. Quy tắc: nếu không đọc xong trong một hơi hoặc phải xuống dòng nhiều lần, hãy viết vòng <code>for</code> thường. Và không bao giờ dùng comprehension chỉ để gọi hàm có tác dụng phụ như <code>[print(x) for x in ds]</code>.</div>
+
+<h2>3. Unpacking</h2>
+<pre><code class="language-python">diem = (10, 20)
+x, y = diem
+
+dau, *giua, cuoi = [1, 2, 3, 4, 5]
+print(dau, giua, cuoi)
+
+(ten, tuoi), thanh_pho = ("An", 25), "Huế"       # mở gói lồng nhau
+print(ten, tuoi, thanh_pho)
+
+a = [1, 2]
+b = [3, 4]
+print([*a, *b, 5])                              # gộp list
+mac_dinh = {"mau": "đen", "co": "M"}
+tuy_chon = {"co": "L"}
+print({**mac_dinh, **tuy_chon})                 # gộp dict, dict sau ghi đè
+print(mac_dinh | tuy_chon)                      # cách viết tương đương (Python 3.9+)</code></pre>
+<pre><code class="language-text">1 [2, 3, 4] 5
+An 25 Huế
+[1, 2, 3, 4, 5]
+{'mau': 'đen', 'co': 'L'}
+{'mau': 'đen', 'co': 'L'}</code></pre>
+
+<h2>4. enumerate và zip</h2>
+<pre><code class="language-python">ten = ["An", "Bình", "Chi"]
+diem = [8.5, 7.0, 9.0]
+
+# Không Pythonic: for i in range(len(ten)): print(ten[i], diem[i])
+for i, (t, d) in enumerate(zip(ten, diem), start=1):
+    print(f"{i}. {t}: {d}")
+
+bang = dict(zip(ten, diem))                     # hai list → dict
+print(bang)
+
+hang = [(1, 2, 3), (4, 5, 6)]
+print(list(zip(*hang)))                         # chuyển hàng thành cột
+
+print(list(zip([1, 2, 3], ["a", "b"])))         # dừng ở list ngắn nhất
+# zip(..., strict=True) báo lỗi nếu độ dài khác nhau (Python 3.10+)</code></pre>
+<pre><code class="language-text">1. An: 8.5
+2. Bình: 7.0
+3. Chi: 9.0
+{'An': 8.5, 'Bình': 7.0, 'Chi': 9.0}
+[(1, 4), (2, 5), (3, 6)]
+[(1, 'a'), (2, 'b')]</code></pre>
+<p><code>for i in range(len(ds))</code> gần như luôn có cách viết tốt hơn: cần phần tử thì duyệt thẳng, cần cả chỉ số dùng <code>enumerate</code>, duyệt song song nhiều list dùng <code>zip</code>.</p>
+
+<h2>5. any, all, min, max, sorted với key</h2>
+<pre><code class="language-python">don_hang = [
+    {"ma": "D1", "khach": "An", "tong": 450_000, "da_tt": True},
+    {"ma": "D2", "khach": "Bình", "tong": 1_200_000, "da_tt": False},
+    {"ma": "D3", "khach": "An", "tong": 90_000, "da_tt": True},
+]
+
+print(any(d["tong"] &gt; 1_000_000 for d in don_hang))      # có ít nhất một?
+print(all(d["da_tt"] for d in don_hang))                 # tất cả đều?
+lon_nhat = max(don_hang, key=lambda d: d["tong"])
+print(lon_nhat["ma"])
+print([d["ma"] for d in sorted(don_hang, key=lambda d: (d["khach"], -d["tong"]))])
+print(min((d["tong"] for d in don_hang if not d["da_tt"]), default=0))</code></pre>
+<pre><code class="language-text">True
+False
+D2
+['D1', 'D3', 'D2']
+1200000</code></pre>
+<p><code>any</code>, <code>all</code> dừng ngay khi đã biết kết quả (gặp phần tử đúng đầu tiên với <code>any</code>, sai đầu tiên với <code>all</code>). <code>max</code>, <code>min</code> nhận <code>key</code> giống <code>sorted</code> và <code>default</code> cho trường hợp dãy rỗng. Muốn key là thuộc tính hay khóa dict, module <code>operator</code> có <code>itemgetter("tong")</code>, <code>attrgetter("gia")</code> thay cho lambda.</p>
+
+<h2>6. Toán tử walrus :=</h2>
+<pre><code class="language-python">import re
+
+dong_log = ["ok", "ERROR code=503", "ok", "ERROR code=404"]
+ma_loi = [int(m.group(1)) for d in dong_log if (m := re.search(r"code=(\d+)", d))]
+print(ma_loi)</code></pre>
+<pre><code class="language-text">[503, 404]</code></pre>
+<p><code>:=</code> (Python 3.8+) vừa gán vừa trả giá trị, giúp không phải gọi <code>re.search</code> hai lần (một lần để lọc, một lần để lấy kết quả). Dùng tiết chế; bạn sẽ học biểu thức chính quy <code>re</code> ở chặng 7.</p>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li><code>[f(x) for x in ds if dk]</code>; <code>{k: v for ...}</code>; <code>{x for ...}</code>; <code>sum(x for ...)</code>.</li>
+  <li><code>a, *giua, b = ds</code>; <code>[*a, *b]</code>; <code>{**d1, **d2}</code> hoặc <code>d1 | d2</code>.</li>
+  <li>Thay <code>range(len(...))</code> bằng <code>enumerate</code>, <code>zip</code>.</li>
+  <li><code>any</code>, <code>all</code>, <code>max/min(key=, default=)</code>, <code>sorted(key=)</code>.</li>
+  <li>Comprehension khó đọc thì quay về vòng <code>for</code>.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Tổng tiền theo khách</h3>
+<p>Từ list đơn hàng (dict có <code>khach</code>, <code>tong</code>), tạo dict khách → tổng tiền bằng một vòng duyệt, rồi lấy 3 khách mua nhiều nhất.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">from collections import Counter
+
+don_hang = [
+    {"khach": "An", "tong": 450_000}, {"khach": "Bình", "tong": 1_200_000},
+    {"khach": "An", "tong": 900_000}, {"khach": "Chi", "tong": 300_000},
+    {"khach": "Dũng", "tong": 1_000_000}, {"khach": "Chi", "tong": 150_000},
+]
+tong_theo_khach = Counter()
+for d in don_hang:
+    tong_theo_khach[d["khach"]] += d["tong"]
+top3 = sorted(tong_theo_khach.items(), key=lambda kv: kv[1], reverse=True)[:3]
+print(top3)
+print(tong_theo_khach.most_common(3) == top3)</code></pre>
+<pre><code class="language-text">[('An', 1350000), ('Bình', 1200000), ('Dũng', 1000000)]
+True</code></pre>
+<p>Cộng dồn theo nhóm là việc có trạng thái, nên vòng <code>for</code> + <code>Counter</code> rõ ràng hơn mọi kiểu comprehension. Pythonic không có nghĩa là "một dòng".</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Lọc người đạt</h3>
+<p>Ghép hai list <code>ten</code> và <code>diem</code> thành list tuple, lọc người đạt từ 5 điểm, sắp theo điểm giảm dần, không dùng vòng <code>for</code> thường.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">ten = ["An", "Bình", "Chi", "Dũng", "Em"]
+diem = [4.5, 7.0, 9.25, 5.0, 3.0]
+dat = sorted(((t, d) for t, d in zip(ten, diem, strict=True) if d &gt;= 5),
+             key=lambda td: td[1], reverse=True)
+print(dat)</code></pre>
+<pre><code class="language-text">[('Chi', 9.25), ('Bình', 7.0), ('Dũng', 5.0)]</code></pre>
+<p><code>strict=True</code> bảo đảm hai list cùng độ dài: dữ liệu lệch một dòng sẽ báo lỗi thay vì âm thầm ghép sai người với sai điểm.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/tutorial/datastructures.html#list-comprehensions" rel="noopener" target="_blank">Python Tutorial: List Comprehensions</a>; <a href="https://docs.python.org/3/library/functions.html" rel="noopener" target="_blank">Built-in Functions</a>; <a href="https://peps.python.org/pep-0572/" rel="noopener" target="_blank">PEP 572: Assignment Expressions</a>.</p>

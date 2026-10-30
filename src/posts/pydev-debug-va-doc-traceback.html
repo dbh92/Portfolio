@@ -1,0 +1,143 @@
+<p>Lập trình viên dành nhiều thời gian tìm lỗi hơn viết code mới. Người mới thường rải <code>print</code> khắp nơi rồi đoán; người có kinh nghiệm đọc traceback có phương pháp và dùng <strong>debugger</strong> để dừng chương trình, nhìn giá trị mọi biến, đi từng dòng. Bài này dạy cả hai, cùng một quy trình gỡ lỗi dùng được cho mọi tình huống.</p>
+
+<h2>1. Đọc traceback nhiều tầng</h2>
+<p>Traceback liệt kê chuỗi lời gọi hàm dẫn đến lỗi, <strong>từ ngoài vào trong</strong>: dòng trên cùng là nơi chương trình bắt đầu, dòng cuối là nơi lỗi thực sự xảy ra. Chạy file <code>bao_cao.py</code> sau:</p>
+<pre><code class="language-python">def trung_binh(ds):
+    return sum(ds) / len(ds)
+
+
+def bao_cao_lop(lop):
+    return {ten: trung_binh(diem) for ten, diem in lop.items()}
+
+
+lop = {"An": [8, 9], "Bình": [], "Chi": [7]}
+print(bao_cao_lop(lop))</code></pre>
+<pre><code class="language-text">Traceback (most recent call last):
+  File "bao_cao.py", line 10, in &lt;module&gt;
+    print(bao_cao_lop(lop))
+          ~~~~~~~~~~~^^^^^
+  File "bao_cao.py", line 6, in bao_cao_lop
+    return {ten: trung_binh(diem) for ten, diem in lop.items()}
+                 ~~~~~~~~~~^^^^^^
+  File "bao_cao.py", line 2, in trung_binh
+    return sum(ds) / len(ds)
+           ~~~~~~~~^~~~~~~~~
+ZeroDivisionError: division by zero</code></pre>
+<p>Quy trình đọc:</p>
+<ol>
+  <li><strong>Dòng cuối</strong>: chuyện gì? Chia cho 0.</li>
+  <li><strong>Khung cuối</strong> (<code>trung_binh</code>, dòng 2): ở đâu? <code>len(ds)</code> bằng 0, tức <code>ds</code> rỗng.</li>
+  <li><strong>Đi ngược lên</strong> tìm khung đầu tiên thuộc code của <em>bạn</em> và có quyết định sai: <code>bao_cao_lop</code> truyền danh sách điểm rỗng của Bình. Lỗi thật là "chưa xử lý học sinh chưa có điểm", không phải "phép chia sai".</li>
+</ol>
+<p>Khi lỗi xảy ra sâu trong thư viện (requests, pandas...), các khung cuối nằm trong mã thư viện. Đừng nghi thư viện trước: tìm khung cuối cùng thuộc file của bạn, gần như chắc chắn bạn đã truyền dữ liệu sai vào đó.</p>
+
+<h2>2. Debugger trong VS Code</h2>
+<p>Mở file, bấm vào lề trái cạnh số dòng để đặt <strong>breakpoint</strong> (chấm đỏ), rồi nhấn <code>F5</code> và chọn <strong>Python Debugger: Current File</strong>. Chương trình chạy đến breakpoint thì dừng, trước khi thực hiện dòng đó.</p>
+<table>
+  <thead><tr><th>Phím</th><th>Lệnh</th><th>Ý nghĩa</th></tr></thead>
+  <tbody>
+    <tr><td><code>F5</code></td><td>Continue</td><td>Chạy tiếp đến breakpoint kế tiếp</td></tr>
+    <tr><td><code>F10</code></td><td>Step Over</td><td>Chạy dòng hiện tại, không đi vào hàm được gọi</td></tr>
+    <tr><td><code>F11</code></td><td>Step Into</td><td>Đi vào bên trong hàm được gọi ở dòng hiện tại</td></tr>
+    <tr><td><code>Shift+F11</code></td><td>Step Out</td><td>Chạy hết hàm hiện tại, quay về nơi gọi</td></tr>
+    <tr><td><code>Shift+F5</code></td><td>Stop</td><td>Dừng gỡ lỗi</td></tr>
+  </tbody>
+</table>
+<p>Khi đang dừng, bạn có:</p>
+<ul>
+  <li><strong>Variables</strong>: giá trị mọi biến cục bộ và toàn cục, mở rộng được list, dict, đối tượng.</li>
+  <li><strong>Watch</strong>: thêm biểu thức tùy ý (ví dụ <code>len(ds)</code>, <code>tong / so_luong</code>) để theo dõi qua từng bước.</li>
+  <li><strong>Call Stack</strong>: chuỗi lời gọi hàm hiện tại, giống traceback; bấm vào một khung để xem biến của hàm đó.</li>
+  <li><strong>Debug Console</strong>: gõ lệnh Python bất kỳ trong ngữ cảnh đang dừng, kể cả gọi hàm để thử.</li>
+</ul>
+<h3>Breakpoint có điều kiện</h3>
+<p>Lỗi chỉ xảy ra ở lần lặp thứ 500 trong 1.000? Chuột phải vào breakpoint, chọn <strong>Edit Breakpoint › Expression</strong> và nhập <code>i == 500</code>: chương trình chỉ dừng khi điều kiện đúng. <strong>Logpoint</strong> (chuột phải lề trái › Add Logpoint) in một thông điệp như <code>i={i}, tong={tong}</code> mà không dừng và không phải sửa code: thay thế hoàn hảo cho <code>print</code> tạm.</p>
+<div class="tip"><strong>Dừng ngay khi có ngoại lệ</strong>Trong khung <strong>Breakpoints</strong> của VS Code, tích <strong>Uncaught Exceptions</strong> (mặc định đã bật) hoặc <strong>Raised Exceptions</strong>: debugger dừng đúng dòng ném lỗi, với mọi biến còn nguyên để bạn xem, thay vì chỉ để lại traceback.</div>
+
+<h2>3. breakpoint() và pdb: gỡ lỗi không cần giao diện</h2>
+<p>Trên máy chủ qua SSH hay trong Docker không có VS Code, Python có sẵn debugger dòng lệnh <code>pdb</code>. Đặt <code>breakpoint()</code> vào code:</p>
+<pre><code class="language-python"># (minh họa) chương trình sẽ dừng ở breakpoint() và chờ lệnh
+def trung_binh(ds):
+    breakpoint()
+    return sum(ds) / len(ds)</code></pre>
+<pre><code class="language-text">&gt; bao_cao.py(3)trung_binh()
+-&gt; return sum(ds) / len(ds)
+(Pdb) p ds
+[8, 9]
+(Pdb) c
+&gt; bao_cao.py(3)trung_binh()
+-&gt; return sum(ds) / len(ds)
+(Pdb) p ds, len(ds)
+([], 0)
+(Pdb) w
+(Pdb) q</code></pre>
+<table>
+  <thead><tr><th>Lệnh pdb</th><th>Ý nghĩa</th></tr></thead>
+  <tbody>
+    <tr><td><code>p bieu_thuc</code></td><td>In giá trị</td></tr>
+    <tr><td><code>n</code> / <code>s</code></td><td>Dòng kế tiếp (step over) / đi vào hàm (step into)</td></tr>
+    <tr><td><code>c</code></td><td>Chạy tiếp đến breakpoint sau</td></tr>
+    <tr><td><code>l</code> / <code>w</code></td><td>Xem code quanh dòng hiện tại / xem call stack</td></tr>
+    <tr><td><code>q</code></td><td>Thoát</td></tr>
+  </tbody>
+</table>
+<p>Chạy <code>python -m pdb bao_cao.py</code> để bắt đầu gỡ lỗi từ dòng đầu, hoặc <code>pytest --pdb</code> để tự mở pdb tại test thất bại. Nhớ xóa <code>breakpoint()</code> trước khi commit; Ruff có luật <code>T100</code> để phát hiện dòng sót lại.</p>
+
+<h2>4. Quy trình gỡ lỗi có phương pháp</h2>
+<ol>
+  <li><strong>Tái hiện</strong> lỗi một cách chắc chắn, với dữ liệu nhỏ nhất có thể. Lỗi không tái hiện được thì không sửa được.</li>
+  <li><strong>Viết test</strong> thất bại mô tả đúng lỗi (bài pytest). Test này đỏ bây giờ và sẽ chống lỗi quay lại sau này.</li>
+  <li><strong>Thu hẹp</strong>: đọc traceback, đặt breakpoint, kiểm tra giả thuyết "biến X lẽ ra phải bằng Y". Mỗi bước loại bớt một nửa khả năng.</li>
+  <li><strong>Sửa nguyên nhân</strong>, không sửa triệu chứng. Bọc <code>try/except ZeroDivisionError</code> quanh <code>trung_binh</code> là che giấu; quyết định rõ "học sinh chưa có điểm thì báo cáo hiển thị gì" mới là sửa.</li>
+  <li><strong>Chạy lại toàn bộ test</strong> để chắc không làm hỏng chỗ khác.</li>
+</ol>
+<p>Kẹt quá 20 phút? Giải thích vấn đề thành lời cho người khác, hoặc cho một con vịt cao su. Rất thường xuyên bạn tự nhận ra lỗi giữa chừng khi phải nói rõ từng bước, kỹ thuật này được gọi đùa là "rubber duck debugging".</p>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Traceback: đọc dòng cuối, khung cuối, rồi đi ngược tìm khung đầu tiên trong code của bạn có quyết định sai.</li>
+  <li>VS Code: breakpoint, <code>F5</code>/<code>F10</code>/<code>F11</code>, Variables, Watch, Call Stack, Debug Console; breakpoint có điều kiện, logpoint.</li>
+  <li><code>breakpoint()</code> + pdb khi không có giao diện; <code>pytest --pdb</code>.</li>
+  <li>Tái hiện → viết test → thu hẹp → sửa nguyên nhân → chạy lại test.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Tìm lỗi bằng debugger</h3>
+<p>Hàm dưới đây cho kết quả sai với <code>[2, 4, 6]</code> (mong đợi 4.0). Dùng debugger VS Code, theo dõi <code>tong</code> và <code>i</code> qua từng vòng, tìm và sửa lỗi.</p>
+<pre><code class="language-python"># (minh họa) hàm có lỗi
+def trung_binh(ds):
+    tong = 0
+    for i in range(1, len(ds)):
+        tong += ds[i]
+    return tong / len(ds)
+
+
+print(trung_binh([2, 4, 6]))</code></pre>
+<details><summary>Xem đáp án</summary>
+<p>Đặt breakpoint ở dòng <code>tong += ds[i]</code>, thêm Watch <code>ds[i]</code>. Lần dừng đầu tiên đã thấy <code>i = 1</code>, <code>ds[i] = 4</code>: phần tử đầu tiên (2) bị bỏ qua vì <code>range</code> bắt đầu từ 1. Kết quả in ra là <code>3.3333333333333335</code> thay vì 4.0.</p>
+<pre><code class="language-python">def trung_binh(ds: list[float]) -&gt; float:
+    if not ds:
+        raise ValueError("Danh sách rỗng")
+    return sum(ds) / len(ds)
+
+
+print(trung_binh([2, 4, 6]))</code></pre>
+<pre><code class="language-text">4.0</code></pre>
+<p>Cách sửa tốt nhất là bỏ vòng lặp thủ công: dùng <code>sum()</code> thì không còn chỗ để viết sai chỉ số. Đồng thời quyết định rõ hành vi với list rỗng.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Breakpoint có điều kiện</h3>
+<p>Trong vòng lặp 1.000 lần dưới đây, đặt breakpoint có điều kiện để dừng đúng lúc <code>i == 500</code>, xem giá trị <code>tong</code> lúc đó, rồi thay bằng logpoint in <code>i</code> và <code>tong</code> mỗi 100 vòng.</p>
+<pre><code class="language-python">tong = 0
+for i in range(1000):
+    tong += i * i
+print(tong)</code></pre>
+<pre><code class="language-text">332833500</code></pre>
+<details><summary>Xem đáp án</summary>
+<p>Breakpoint ở dòng <code>tong += i * i</code> với Expression <code>i == 500</code>: khi dừng, dòng đó <strong>chưa</strong> chạy cho <code>i = 500</code>, nên <code>tong</code> là tổng bình phương từ 0 đến 499, bằng <code>41541750</code>. Logpoint với điều kiện <code>i % 100 == 0</code> (Edit Breakpoint › Expression) và thông điệp <code>i={i} tong={tong}</code> in 10 dòng vào Debug Console mà chương trình không dừng.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://code.visualstudio.com/docs/python/debugging" rel="noopener" target="_blank">VS Code: Python debugging</a>; <a href="https://docs.python.org/3/library/pdb.html" rel="noopener" target="_blank">pdb: The Python Debugger</a>; <a href="https://docs.pytest.org/en/stable/how-to/failures.html" rel="noopener" target="_blank">pytest: Handling test failures (--pdb)</a>.</p>

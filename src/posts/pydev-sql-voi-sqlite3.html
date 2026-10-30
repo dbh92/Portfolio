@@ -1,0 +1,186 @@
+<p>File JSON ổn với vài trăm bản ghi. Khi dữ liệu lên hàng trăm nghìn dòng, nhiều người cùng ghi, cần tìm "khách nào mua nhiều nhất tháng này" trong tích tắc, bạn cần <strong>cơ sở dữ liệu quan hệ</strong> và ngôn ngữ truy vấn <strong>SQL</strong>. SQL là kỹ năng bắt buộc của mọi backend developer. Bài này học SQL ngay trong Python với <code>sqlite3</code>: có sẵn, không cần cài máy chủ, toàn bộ CSDL nằm trong một file.</p>
+
+<h2>1. Kết nối và tạo bảng</h2>
+<pre><code class="language-python">import sqlite3
+
+conn = sqlite3.connect("cua_hang.db")      # tạo file nếu chưa có; ":memory:" để thử trong RAM
+conn.execute("PRAGMA foreign_keys = ON")    # SQLite cần bật kiểm tra khóa ngoại cho mỗi kết nối
+conn.executescript("""
+DROP TABLE IF EXISTS don_hang;
+DROP TABLE IF EXISTS khach_hang;
+
+CREATE TABLE khach_hang (
+    id        INTEGER PRIMARY KEY,          -- tự tăng
+    ho_ten    TEXT NOT NULL,
+    email     TEXT UNIQUE,
+    thanh_pho TEXT
+);
+
+CREATE TABLE don_hang (
+    id       INTEGER PRIMARY KEY,
+    khach_id INTEGER NOT NULL REFERENCES khach_hang(id),
+    ngay     TEXT NOT NULL,                 -- lưu ngày dạng ISO 'YYYY-MM-DD'
+    tong     INTEGER NOT NULL CHECK (tong &gt;= 0)
+);
+""")
+print([r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")])</code></pre>
+<pre><code class="language-text">['khach_hang', 'don_hang']</code></pre>
+<ul>
+  <li>Một <strong>bảng</strong> giống một sheet Excel có cột cố định kiểu dữ liệu; mỗi dòng là một bản ghi.</li>
+  <li><code>PRIMARY KEY</code>: khóa chính, định danh duy nhất mỗi dòng. <code>INTEGER PRIMARY KEY</code> trong SQLite tự tăng.</li>
+  <li><code>REFERENCES khach_hang(id)</code>: <strong>khóa ngoại</strong>, mỗi đơn hàng phải thuộc một khách có thật.</li>
+  <li><code>NOT NULL</code>, <code>UNIQUE</code>, <code>CHECK</code>: ràng buộc để CSDL tự từ chối dữ liệu sai, kể cả khi code của bạn có lỗi.</li>
+</ul>
+<p>Thay vì lưu tên khách lặp lại trong mỗi đơn hàng, ta tách hai bảng và nối bằng <code>khach_id</code>. Sửa email khách chỉ phải sửa một chỗ. Đây là ý tưởng cốt lõi của CSDL quan hệ (gọi là <em>chuẩn hóa</em>).</p>
+
+<h2>2. Chèn dữ liệu với tham số ?</h2>
+<pre><code class="language-python">import sqlite3
+
+conn = sqlite3.connect("cua_hang.db")
+conn.execute("PRAGMA foreign_keys = ON")
+khach = [("Nguyễn An", "an@x.vn", "Hà Nội"), ("Trần Bình", "binh@x.vn", "TP.HCM"),
+         ("Lê Chi", "chi@x.vn", "Hà Nội"), ("Phạm Dũng", None, "Đà Nẵng")]
+don = [(1, "2026-10-01", 450_000), (1, "2026-10-15", 1_200_000), (2, "2026-10-03", 300_000),
+       (3, "2026-09-28", 850_000), (3, "2026-10-20", 150_000), (2, "2026-10-25", 2_100_000)]
+with conn:                                   # transaction: tự commit nếu thành công
+    conn.executemany("INSERT INTO khach_hang (ho_ten, email, thanh_pho) VALUES (?, ?, ?)", khach)
+    conn.executemany("INSERT INTO don_hang (khach_id, ngay, tong) VALUES (?, ?, ?)", don)
+print(conn.execute("SELECT COUNT(*) FROM don_hang").fetchone()[0])</code></pre>
+<pre><code class="language-text">6</code></pre>
+<div class="warn"><strong>Không bao giờ ghép chuỗi vào câu SQL</strong>Viết <code>f"SELECT * FROM khach_hang WHERE email = '{email}'"</code> với <code>email</code> do người dùng nhập là lỗ hổng <strong>SQL injection</strong>: nhập <code>' OR '1'='1</code> là lấy được toàn bộ bảng, nhập khéo hơn có thể xóa dữ liệu. Luôn dùng dấu <code>?</code> và truyền giá trị riêng: thư viện tự xử lý an toàn mọi ký tự đặc biệt.</div>
+
+<h2>3. SELECT: lấy dữ liệu</h2>
+<pre><code class="language-python">import sqlite3
+
+conn = sqlite3.connect("cua_hang.db")
+conn.row_factory = sqlite3.Row               # truy cập cột theo tên: dong["ho_ten"]
+
+sql = """
+SELECT ho_ten, thanh_pho
+FROM khach_hang
+WHERE thanh_pho = ? AND email IS NOT NULL
+ORDER BY ho_ten
+"""
+for dong in conn.execute(sql, ("Hà Nội",)):  # tham số luôn là tuple, chú ý dấu phẩy
+    print(dong["ho_ten"], "-", dong["thanh_pho"])
+
+print(conn.execute("SELECT ho_ten FROM khach_hang WHERE ho_ten LIKE ?", ("%n%",)).fetchall()[0][0])
+print(conn.execute("SELECT MAX(tong), MIN(ngay) FROM don_hang").fetchone()[:])</code></pre>
+<pre><code class="language-text">Lê Chi - Hà Nội
+Nguyễn An - Hà Nội
+Nguyễn An
+(2100000, '2026-09-28')</code></pre>
+<p>Thứ tự viết một câu SELECT: <code>SELECT</code> cột → <code>FROM</code> bảng → <code>WHERE</code> điều kiện lọc dòng → <code>GROUP BY</code> → <code>HAVING</code> → <code>ORDER BY</code> → <code>LIMIT</code>. <code>LIKE '%n%'</code> tìm chuỗi chứa "n"; <code>IS NULL</code>/<code>IS NOT NULL</code> kiểm tra giá trị rỗng (không dùng <code>= NULL</code>). Lấy kết quả bằng <code>fetchone()</code> (một dòng), <code>fetchall()</code> (mọi dòng) hoặc duyệt thẳng bằng <code>for</code>.</p>
+
+<h2>4. JOIN và GROUP BY</h2>
+<pre><code class="language-python">import sqlite3
+
+conn = sqlite3.connect("cua_hang.db")
+sql = """
+SELECT k.ho_ten,
+       COUNT(d.id)          AS so_don,
+       COALESCE(SUM(d.tong), 0) AS tong_chi
+FROM khach_hang AS k
+LEFT JOIN don_hang AS d ON d.khach_id = k.id AND d.ngay &gt;= ?
+GROUP BY k.id
+ORDER BY tong_chi DESC
+"""
+for ho_ten, so_don, tong_chi in conn.execute(sql, ("2026-10-01",)):
+    print(f"{ho_ten:&lt;10} {so_don} đơn {tong_chi:&gt;12,}đ")</code></pre>
+<pre><code class="language-text">Trần Bình  2 đơn    2,400,000đ
+Nguyễn An  2 đơn    1,650,000đ
+Lê Chi     1 đơn      150,000đ
+Phạm Dũng  0 đơn            0đ</code></pre>
+<ul>
+  <li><code>JOIN ... ON</code> ghép dòng của hai bảng theo điều kiện. <code>INNER JOIN</code> (hay <code>JOIN</code>) chỉ giữ dòng khớp ở cả hai bên; <code>LEFT JOIN</code> giữ <strong>mọi</strong> dòng bảng trái, kể cả khách chưa có đơn (Phạm Dũng).</li>
+  <li><code>GROUP BY</code> gom dòng theo nhóm, dùng kèm hàm tổng hợp <code>COUNT</code>, <code>SUM</code>, <code>AVG</code>, <code>MIN</code>, <code>MAX</code>. Lọc trên kết quả tổng hợp thì dùng <code>HAVING</code> (ví dụ <code>HAVING tong_chi &gt; 1000000</code>), không dùng <code>WHERE</code>.</li>
+  <li><code>COALESCE(x, 0)</code> đổi <code>NULL</code> thành 0. Điều kiện ngày đặt trong <code>ON</code> chứ không ở <code>WHERE</code>, để khách không có đơn tháng 10 vẫn hiện với 0 đơn.</li>
+</ul>
+
+<h2>5. UPDATE, DELETE và transaction</h2>
+<pre><code class="language-python">import sqlite3
+
+conn = sqlite3.connect("cua_hang.db")
+conn.execute("PRAGMA foreign_keys = ON")
+
+
+def them_don(conn, khach_id: int, ngay: str, cac_mon: list[int]) -&gt; int:
+    """Thêm đơn và trừ điểm thưởng: cả hai thành công, hoặc không gì cả."""
+    with conn:                                        # lỗi giữa chừng → tự rollback
+        cur = conn.execute("INSERT INTO don_hang (khach_id, ngay, tong) VALUES (?, ?, ?)",
+                           (khach_id, ngay, sum(cac_mon)))
+        if any(gia &lt; 0 for gia in cac_mon):
+            raise ValueError("Giá món không hợp lệ")
+        return cur.lastrowid
+
+
+print("Đơn mới:", them_don(conn, 4, "2026-10-29", [120_000, 80_000]))
+for khach_id, mon in [(4, [100_000, -5]), (99, [50_000])]:
+    try:
+        them_don(conn, khach_id, "2026-10-29", mon)
+    except (ValueError, sqlite3.IntegrityError) as loi:
+        print("Hủy:", loi)
+with conn:
+    n = conn.execute("UPDATE khach_hang SET email = ? WHERE id = ?", ("dung@x.vn", 4)).rowcount
+print(n, conn.execute("SELECT COUNT(*) FROM don_hang WHERE khach_id = 4").fetchone()[0])</code></pre>
+<pre><code class="language-text">Đơn mới: 7
+Hủy: Giá món không hợp lệ
+Hủy: FOREIGN KEY constraint failed
+1 1</code></pre>
+<p><strong>Transaction</strong> gom nhiều lệnh thành một khối "tất cả hoặc không gì cả". <code>with conn:</code> tự <code>commit</code> khi khối chạy xong, tự <code>rollback</code> khi có ngoại lệ: đơn thứ hai đã được <code>INSERT</code> nhưng bị hủy hoàn toàn khi phát hiện giá âm, nên khách 4 chỉ có đúng một đơn. Khóa ngoại chặn đơn của khách 99 không tồn tại. Quên commit là lỗi kinh điển: dữ liệu "biến mất" khi đóng chương trình.</p>
+<div class="tip"><strong>SQLite có đủ cho dự án thật không?</strong>SQLite chạy trong hàng tỷ thiết bị (điện thoại, trình duyệt) và rất hợp cho ứng dụng nhỏ, công cụ nội bộ, dữ liệu một máy. Khi nhiều máy chủ cùng ghi đồng thời, dùng PostgreSQL hoặc MySQL. SQL bạn học ở đây dùng được gần như nguyên vẹn; ở bài sau, SQLAlchemy giúp đổi CSDL chỉ bằng một dòng cấu hình.</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li><code>sqlite3.connect</code>, <code>CREATE TABLE</code> với khóa chính, khóa ngoại, ràng buộc; bật <code>PRAGMA foreign_keys</code>.</li>
+  <li>Luôn dùng tham số <code>?</code>; không ghép chuỗi vào SQL.</li>
+  <li><code>SELECT ... WHERE ... GROUP BY ... HAVING ... ORDER BY ... LIMIT</code>; <code>JOIN</code>, <code>LEFT JOIN</code>.</li>
+  <li><code>with conn:</code> là transaction: commit khi xong, rollback khi lỗi; <code>row_factory = sqlite3.Row</code>.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Top 3 khách hàng</h3>
+<p>Với CSDL ở trên, viết một câu SQL lấy 3 khách chi nhiều nhất (mọi thời gian), kèm số đơn và giá trị đơn trung bình (làm tròn).</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import sqlite3
+
+conn = sqlite3.connect("cua_hang.db")
+sql = """
+SELECT k.ho_ten, COUNT(*) AS so_don, SUM(d.tong) AS tong_chi, ROUND(AVG(d.tong)) AS tb
+FROM don_hang AS d
+JOIN khach_hang AS k ON k.id = d.khach_id
+GROUP BY k.id
+ORDER BY tong_chi DESC
+LIMIT 3
+"""
+for dong in conn.execute(sql):
+    print(dong)</code></pre>
+<pre><code class="language-text">('Trần Bình', 2, 2400000, 1200000.0)
+('Nguyễn An', 2, 1650000, 825000.0)
+('Lê Chi', 2, 1000000, 500000.0)</code></pre>
+<p>Ở đây dùng <code>JOIN</code> thường vì chỉ quan tâm khách đã có đơn. Phạm Dũng có 200.000đ từ đơn ở mục 5 nên xếp thứ 4.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Doanh thu theo tháng</h3>
+<p>Viết câu SQL tính doanh thu và số đơn theo từng tháng, sắp tăng dần theo tháng. Gợi ý: <code>substr(ngay, 1, 7)</code> lấy <code>'YYYY-MM'</code>.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import sqlite3
+
+conn = sqlite3.connect("cua_hang.db")
+sql = """
+SELECT substr(ngay, 1, 7) AS thang, COUNT(*) AS so_don, SUM(tong) AS doanh_thu
+FROM don_hang
+GROUP BY thang
+ORDER BY thang
+"""
+for thang, so_don, doanh_thu in conn.execute(sql):
+    print(f"{thang}: {so_don} đơn, {doanh_thu:,}đ")</code></pre>
+<pre><code class="language-text">2026-09: 1 đơn, 850,000đ
+2026-10: 6 đơn, 4,400,000đ</code></pre>
+<p>Lưu ngày dạng ISO <code>YYYY-MM-DD</code> giúp cắt chuỗi, so sánh và sắp xếp đều đúng. Nếu lưu <code>29/10/2026</code>, sắp xếp theo chuỗi sẽ sai ngay.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/library/sqlite3.html" rel="noopener" target="_blank">sqlite3: DB-API 2.0 interface for SQLite databases</a>; <a href="https://www.sqlite.org/lang.html" rel="noopener" target="_blank">SQLite: SQL As Understood By SQLite</a>; <a href="https://www.sqlite.org/foreignkeys.html" rel="noopener" target="_blank">SQLite Foreign Key Support</a>; <a href="https://owasp.org/www-community/attacks/SQL_Injection" rel="noopener" target="_blank">OWASP: SQL Injection</a>.</p>
