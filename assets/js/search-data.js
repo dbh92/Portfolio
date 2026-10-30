@@ -1,6 +1,769 @@
 /* Tự động sinh bởi tools/build.py – không sửa tay */
 window.HF_POSTS = [
  {
+  "t": "Cài Python, VS Code và chạy chương trình Python đầu tiên",
+  "u": "hoc/pydev-cai-dat-python-va-vs-code.html",
+  "e": "Cài Python 3 bản ổn định mới, VS Code và extension Python, chạy code trong REPL, file .py, terminal và đọc traceback để tự sửa lỗi.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/pydev-cai-dat-python-va-vs-code.webp",
+  "tags": [
+   "Python",
+   "Lập trình",
+   "Công cụ"
+  ]
+ },
+ {
+  "t": "Biến, kiểu dữ liệu, toán tử và input() trong Python",
+  "u": "hoc/pydev-bien-kieu-du-lieu-toan-tu.html",
+  "e": "Biến là nhãn dán lên đối tượng; int, float, str, bool, None; toán tử //, %, **; so sánh, logic, ép kiểu và nhập liệu bằng input().",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/pydev-bien-kieu-du-lieu-toan-tu.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Chuỗi trong Python: slicing, phương thức và f-string",
+  "u": "hoc/pydev-chuoi-va-f-string.html",
+  "e": "Xử lý chuỗi tiếng Việt trong Python: chỉ số, slicing, split, join, strip, replace, tìm kiếm và định dạng số, căn lề bằng f-string.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/pydev-chuoi-va-f-string.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Rẽ nhánh và vòng lặp trong Python: if, match, for, while",
+  "u": "hoc/pydev-re-nhanh-va-vong-lap.html",
+  "e": "Viết điều kiện if/elif/else, match-case, vòng lặp for với range, while, break, continue, else và cách tránh vòng lặp vô hạn.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/pydev-re-nhanh-va-vong-lap.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Thực hành Python: trò chơi đoán số và tính tiền điện bậc thang",
+  "u": "hoc/pydev-lab-doan-so-va-tinh-tien-dien.html",
+  "e": "Bài thực hành đầu tiên: viết trò chơi đoán số có giới hạn lượt và chương trình tính tiền điện bậc thang, kiểm tra dữ liệu nhập sai.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/pydev-lab-doan-so-va-tinh-tien-dien.webp",
+  "tags": [
+   "Python",
+   "Lập trình",
+   "Source Code"
+  ]
+ },
+ {
+  "t": "List và tuple trong Python: thêm, xóa, cắt, sắp xếp, sao chép",
+  "u": "hoc/pydev-list-va-tuple.html",
+  "e": "Làm chủ list và tuple: append, insert, pop, slicing, sort và sorted, tham chiếu và sao chép, list lồng nhau, khi nào nên chọn tuple.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/pydev-list-va-tuple.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Dict và set trong Python: tra cứu, đếm, nhóm dữ liệu",
+  "u": "hoc/pydev-dict-va-set.html",
+  "e": "Dùng dict để tra cứu nhanh theo khóa, set để loại trùng và so sánh tập hợp, Counter để đếm và defaultdict để nhóm dữ liệu theo nhóm.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/pydev-dict-va-set.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Hàm trong Python: tham số, *args, **kwargs, phạm vi và lambda",
+  "u": "hoc/pydev-ham-tham-so-pham-vi.html",
+  "e": "Viết hàm đúng cách: tham số mặc định, theo tên, *args, **kwargs, keyword-only, phạm vi biến, bẫy mặc định là list và lambda.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/pydev-ham-tham-so-pham-vi.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Module, package và thư viện chuẩn Python: datetime, random, math",
+  "u": "hoc/pydev-module-package-thu-vien-chuan.html",
+  "e": "Tách code thành module và package, import đúng cách, khối __main__, cùng các module chuẩn hay dùng: datetime, random, math, statistics.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/pydev-module-package-thu-vien-chuan.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Dự án Python: ứng dụng quản lý chi tiêu chạy trên dòng lệnh",
+  "u": "hoc/pydev-du-an-quan-ly-chi-tieu.html",
+  "e": "Dự án đầu tay: ứng dụng quản lý chi tiêu dòng lệnh với list, dict, hàm, menu, kiểm tra đầu vào và thống kê theo danh mục, tháng.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/pydev-du-an-quan-ly-chi-tieu.webp",
+  "tags": [
+   "Python",
+   "Lập trình",
+   "Source Code"
+  ]
+ },
+ {
+  "t": "Đọc ghi file và pathlib trong Python: UTF-8, thư mục, glob",
+  "u": "hoc/pydev-doc-ghi-file-pathlib.html",
+  "e": "Đọc ghi file văn bản an toàn với with và encoding UTF-8, thao tác đường dẫn bằng pathlib, tìm file bằng glob, rglob trên mọi hệ điều hành.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/pydev-doc-ghi-file-pathlib.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "JSON và CSV trong Python: lưu, đọc dữ liệu và mở bằng Excel",
+  "u": "hoc/pydev-json-va-csv.html",
+  "e": "Lưu và đọc dữ liệu bằng module json và csv: dumps, loads, DictReader, DictWriter, tiếng Việt, utf-8-sig để Excel mở đúng dấu.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/pydev-json-va-csv.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Xử lý ngoại lệ trong Python: try, except, else, finally, raise",
+  "u": "hoc/pydev-xu-ly-ngoai-le.html",
+  "e": "Đọc traceback, bắt đúng loại ngoại lệ, dùng else và finally, tự định nghĩa exception và các lỗi người mới hay mắc khi dùng except.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/pydev-xu-ly-ngoai-le.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Logging trong Python: ghi log thay print, mức log, file xoay vòng",
+  "u": "hoc/pydev-logging.html",
+  "e": "Dùng module logging thay print: 5 mức log, getLogger theo module, định dạng, ghi ra file xoay vòng và lưu traceback khi có lỗi.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/pydev-logging.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Thực hành Python: script tự dọn dẹp thư mục Downloads",
+  "u": "hoc/pydev-lab-don-dep-thu-muc.html",
+  "e": "Viết script phân loại file trong thư mục Downloads theo đuôi, có chế độ chạy thử, xử lý trùng tên, ghi log và báo cáo JSON.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/pydev-lab-don-dep-thu-muc.webp",
+  "tags": [
+   "Python",
+   "Lập trình",
+   "Source Code"
+  ]
+ },
+ {
+  "t": "Class và đối tượng trong Python: __init__, self, thuộc tính",
+  "u": "hoc/pydev-class-va-doi-tuong.html",
+  "e": "Lập trình hướng đối tượng từ đầu: class, đối tượng, __init__, self, phương thức, thuộc tính lớp và khi nào thật sự cần class.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/pydev-class-va-doi-tuong.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Phương thức đặc biệt (dunder) và @property trong Python",
+  "u": "hoc/pydev-phuong-thuc-dac-biet-property.html",
+  "e": "Làm đối tượng dùng tự nhiên như kiểu có sẵn: __repr__, __str__, __eq__, __lt__, __add__, __len__, __iter__ và @property có setter.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/pydev-phuong-thuc-dac-biet-property.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Kế thừa, composition, ABC và Protocol trong Python",
+  "u": "hoc/pydev-ke-thua-va-composition.html",
+  "e": "Khi nào kế thừa, khi nào composition: ghi đè, super(), lớp trừu tượng ABC, Protocol và duck typing, kèm ví dụ thiết kế thực tế.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/pydev-ke-thua-va-composition.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "dataclass, Enum và NamedTuple: lớp dữ liệu gọn trong Python",
+  "u": "hoc/pydev-dataclass-va-enum.html",
+  "e": "Khai báo lớp dữ liệu bằng @dataclass với field, frozen, order, __post_init__, slots; dùng Enum thay hằng chuỗi và NamedTuple.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/pydev-dataclass-va-enum.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Dự án Python OOP: quản lý thư viện sách, lưu JSON",
+  "u": "hoc/pydev-du-an-quan-ly-thu-vien.html",
+  "e": "Dự án OOP hoàn chỉnh: thiết kế lớp Sach, ThanhVien, ThuVien, quy tắc mượn trả bằng ngoại lệ riêng, lưu và nạp dữ liệu bằng JSON.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/pydev-du-an-quan-ly-thu-vien.webp",
+  "tags": [
+   "Python",
+   "Lập trình",
+   "Source Code"
+  ]
+ },
+ {
+  "t": "Comprehension, unpacking, zip, enumerate: viết Python gọn",
+  "u": "hoc/pydev-comprehension-va-ham-dung-san.html",
+  "e": "Viết code Pythonic: list, dict, set comprehension, unpacking với dấu *, enumerate, zip, any, all và sorted, min, max với key.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/pydev-comprehension-va-ham-dung-san.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Iterator và generator trong Python: yield, itertools, file lớn",
+  "u": "hoc/pydev-iterator-va-generator.html",
+  "e": "Hiểu iterator đằng sau vòng for, viết generator với yield, generator expression, xử lý file lớn từng dòng và các hàm itertools.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/pydev-iterator-va-generator.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Closure và decorator trong Python: wraps, lru_cache, retry",
+  "u": "hoc/pydev-closure-va-decorator.html",
+  "e": "Hàm là đối tượng, closure giữ biến, cách viết decorator có tham số với functools.wraps, decorator đo thời gian, thử lại và lru_cache.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/pydev-closure-va-decorator.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Context manager trong Python: with, __enter__, contextlib",
+  "u": "hoc/pydev-context-manager.html",
+  "e": "Hiểu câu lệnh with, tự viết context manager bằng __enter__, __exit__ và contextlib, dùng suppress, ExitStack để dọn tài nguyên.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 6,
+  "img": "assets/images/posts/pydev-context-manager.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Type hint nâng cao trong Python và kiểm tra kiểu bằng mypy",
+  "u": "hoc/pydev-type-hint-nang-cao.html",
+  "e": "Type hint cho dự án thật: list, dict, Optional, Union, Callable, TypedDict, Literal, Generic, Protocol và chạy mypy bắt lỗi sớm.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/pydev-type-hint-nang-cao.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Môi trường ảo, pip, uv và pyproject.toml cho dự án Python",
+  "u": "hoc/pydev-moi-truong-ao-pip-uv.html",
+  "e": "Mỗi dự án một môi trường: venv, pip, requirements.txt, rồi chuyển sang uv với pyproject.toml, uv.lock, uv add, uv run, uv sync.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/pydev-moi-truong-ao-pip-uv.webp",
+  "tags": [
+   "Python",
+   "Lập trình",
+   "Công cụ"
+  ]
+ },
+ {
+  "t": "Git và GitHub cho lập trình viên Python: commit, nhánh, PR",
+  "u": "hoc/pydev-git-va-github.html",
+  "e": "Quy trình Git hằng ngày cho dự án Python: init, add, commit, .gitignore, push lên GitHub, nhánh, pull request và cách viết commit.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/pydev-git-va-github.webp",
+  "tags": [
+   "Python",
+   "Lập trình",
+   "Git",
+   "Công cụ"
+  ]
+ },
+ {
+  "t": "Ruff: format và lint code Python tự động, cấu hình pre-commit",
+  "u": "hoc/pydev-ruff-format-lint.html",
+  "e": "Giữ code đúng PEP 8 không cần nhớ luật: ruff format, ruff check --fix, chọn bộ luật trong pyproject.toml, tích hợp VS Code, pre-commit.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/pydev-ruff-format-lint.webp",
+  "tags": [
+   "Python",
+   "Lập trình",
+   "Công cụ"
+  ]
+ },
+ {
+  "t": "pytest cơ bản: viết test, fixture, parametrize, đo coverage",
+  "u": "hoc/pydev-pytest-co-ban.html",
+  "e": "Kiểm thử tự động với pytest: assert, cấu trúc thư mục tests, fixture, parametrize, pytest.raises, tmp_path, monkeypatch và coverage.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/pydev-pytest-co-ban.webp",
+  "tags": [
+   "Python",
+   "Lập trình",
+   "Công cụ"
+  ]
+ },
+ {
+  "t": "Debug Python: đọc traceback, breakpoint VS Code và pdb",
+  "u": "hoc/pydev-debug-va-doc-traceback.html",
+  "e": "Tìm lỗi có phương pháp: đọc traceback nhiều tầng, breakpoint, step over, step into, watch, conditional breakpoint trong VS Code và pdb.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/pydev-debug-va-doc-traceback.webp",
+  "tags": [
+   "Python",
+   "Lập trình",
+   "Công cụ",
+   "VS Code"
+  ]
+ },
+ {
+  "t": "Cấu trúc dự án Python chuẩn: src layout, pyproject, lệnh CLI",
+  "u": "hoc/pydev-cau-truc-du-an-chuan.html",
+  "e": "Tổ chức dự án Python như người đi làm: src layout, tests, pyproject.toml, project.scripts tạo lệnh, cài editable và build wheel.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/pydev-cau-truc-du-an-chuan.webp",
+  "tags": [
+   "Python",
+   "Lập trình",
+   "Công cụ"
+  ]
+ },
+ {
+  "t": "Viết công cụ dòng lệnh Python với argparse và Typer",
+  "u": "hoc/pydev-cli-argparse-typer.html",
+  "e": "Biến script thành công cụ dòng lệnh: argparse với tham số, tùy chọn, cờ, lệnh con, mã thoát, rồi viết lại gọn hơn bằng Typer.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/pydev-cli-argparse-typer.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Gọi Web API bằng requests: GET, POST, JSON, timeout, thử lại",
+  "u": "hoc/pydev-goi-api-requests.html",
+  "e": "Lấy dữ liệu từ Web API bằng requests: GET, POST, params, header, JSON, timeout, raise_for_status, Session, thử lại và giữ API key.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/pydev-goi-api-requests.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Tự động hóa Excel bằng Python với openpyxl: đọc, ghi, định dạng",
+  "u": "hoc/pydev-excel-openpyxl.html",
+  "e": "Đọc ghi file Excel bằng openpyxl: ô, dòng, sheet, định dạng số, độ rộng cột, công thức, gộp nhiều file thành một báo cáo.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/pydev-excel-openpyxl.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Biểu thức chính quy trong Python: re.search, findall, sub",
+  "u": "hoc/pydev-bieu-thuc-chinh-quy.html",
+  "e": "Regex từ cơ bản đến dùng được: lớp ký tự, lượng từ, neo, nhóm có tên, re.search, findall, sub, compile và các bẫy hay gặp.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/pydev-bieu-thuc-chinh-quy.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "subprocess và lên lịch chạy script Python: Task Scheduler, cron",
+  "u": "hoc/pydev-subprocess-va-lap-lich.html",
+  "e": "Gọi chương trình khác bằng subprocess.run, viết script chạy không giám sát và lên lịch bằng Task Scheduler trên Windows, cron trên Linux.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 9,
+  "img": "assets/images/posts/pydev-subprocess-va-lap-lich.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Dự án Python: báo cáo tỷ giá tự động từ API ra file Excel",
+  "u": "hoc/pydev-du-an-bao-cao-tu-dong.html",
+  "e": "Dự án tự động hóa: CLI lấy tỷ giá từ Web API, tính biến động, ghi báo cáo Excel định dạng sẵn, có log, test và chạy theo lịch.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 11,
+  "img": "assets/images/posts/pydev-du-an-bao-cao-tu-dong.webp",
+  "tags": [
+   "Python",
+   "Lập trình",
+   "Source Code"
+  ]
+ },
+ {
+  "t": "SQL cơ bản với Python sqlite3: bảng, JOIN, GROUP BY, an toàn",
+  "u": "hoc/pydev-sql-voi-sqlite3.html",
+  "e": "Học SQL ngay trong Python với sqlite3: CREATE TABLE, INSERT, SELECT, JOIN, GROUP BY, tham số chống SQL injection và transaction.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/pydev-sql-voi-sqlite3.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "SQLAlchemy 2.0 ORM: model, Session, select và quan hệ",
+  "u": "hoc/pydev-sqlalchemy-orm.html",
+  "e": "Làm việc với CSDL bằng đối tượng: SQLAlchemy 2.0 với Mapped, mapped_column, Session, select(), quan hệ một nhiều và lazy loading.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/pydev-sqlalchemy-orm.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "pandas cơ bản: DataFrame, lọc, groupby, làm sạch, xuất Excel",
+  "u": "hoc/pydev-pandas-co-ban.html",
+  "e": "Xử lý bảng dữ liệu bằng pandas: read_csv, lọc với loc, thêm cột, xử lý giá trị thiếu, groupby, agg, merge và xuất CSV, Excel.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/pydev-pandas-co-ban.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Thực hành Python: phân tích dữ liệu bán hàng từ SQLite bằng pandas",
+  "u": "hoc/pydev-lab-phan-tich-ban-hang.html",
+  "e": "Quy trình phân tích dữ liệu thật: sinh dữ liệu vào SQLite, truy vấn SQL, xử lý bằng pandas, trả lời câu hỏi kinh doanh, xuất Excel.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 9,
+  "img": "assets/images/posts/pydev-lab-phan-tich-ban-hang.webp",
+  "tags": [
+   "Python",
+   "Lập trình",
+   "Source Code"
+  ]
+ },
+ {
+  "t": "HTTP và REST cho backend developer: phương thức, mã trạng thái",
+  "u": "hoc/pydev-http-va-rest.html",
+  "e": "Nền tảng trước khi viết API: request, response, GET, POST, PUT, PATCH, DELETE, mã trạng thái, header, JSON và thiết kế REST.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/pydev-http-va-rest.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "FastAPI đầu tiên: endpoint, path, query, Pydantic, /docs",
+  "u": "hoc/pydev-fastapi-dau-tien.html",
+  "e": "Viết Web API đầu tiên bằng FastAPI: cài đặt, fastapi dev, path và query parameter, request body Pydantic, mã lỗi và /docs.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/pydev-fastapi-dau-tien.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "FastAPI với SQLAlchemy: CRUD, dependency, schema Pydantic",
+  "u": "hoc/pydev-fastapi-co-so-du-lieu.html",
+  "e": "Kết nối FastAPI với SQLite qua SQLAlchemy 2.0: cấu trúc module, dependency cấp Session, schema tạo, đọc, cập nhật và CRUD đầy đủ.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 9,
+  "img": "assets/images/posts/pydev-fastapi-co-so-du-lieu.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Xác thực trong FastAPI: băm mật khẩu Argon2 và JWT",
+  "u": "hoc/pydev-fastapi-xac-thuc-jwt.html",
+  "e": "Bảo vệ API: băm mật khẩu Argon2 với pwdlib, cấp JWT bằng PyJWT, OAuth2PasswordBearer, get_current_user và phân quyền theo người dùng.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 12,
+  "img": "assets/images/posts/pydev-fastapi-xac-thuc-jwt.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Kiểm thử API FastAPI bằng pytest và TestClient",
+  "u": "hoc/pydev-fastapi-kiem-thu.html",
+  "e": "Viết test tự động cho FastAPI: TestClient, fixture tạo CSDL SQLite riêng, dependency_overrides, kiểm thử 404, 422 và luồng đăng nhập.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 9,
+  "img": "assets/images/posts/pydev-fastapi-kiem-thu.webp",
+  "tags": [
+   "Python",
+   "Lập trình",
+   "Công cụ"
+  ]
+ },
+ {
+  "t": "Dự án FastAPI: API quản lý công việc có đăng nhập và test",
+  "u": "hoc/pydev-du-an-api-quan-ly-cong-viec.html",
+  "e": "Dự án backend hoàn chỉnh: API quản lý công việc với FastAPI, SQLAlchemy, JWT, lọc, phân trang, phân quyền và bộ test pytest.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 13,
+  "img": "assets/images/posts/pydev-du-an-api-quan-ly-cong-viec.webp",
+  "tags": [
+   "Python",
+   "Lập trình",
+   "Source Code"
+  ]
+ },
+ {
+  "t": "Đo và tối ưu hiệu năng Python: timeit, cProfile, Big-O",
+  "u": "hoc/pydev-do-va-toi-uu-hieu-nang.html",
+  "e": "Tối ưu đúng chỗ: đo bằng timeit, perf_counter, tìm điểm nghẽn bằng cProfile, chọn cấu trúc dữ liệu đúng và hiểu độ phức tạp.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/pydev-do-va-toi-uu-hieu-nang.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Thread, process và GIL trong Python: concurrent.futures",
+  "u": "hoc/pydev-thread-process-gil.html",
+  "e": "Chạy song song đúng cách: tác vụ I/O và CPU, ThreadPoolExecutor, ProcessPoolExecutor, Lock, GIL và bản Python free-threaded.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 11,
+  "img": "assets/images/posts/pydev-thread-process-gil.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "asyncio trong Python: async, await, gather, TaskGroup, httpx",
+  "u": "hoc/pydev-asyncio-co-ban.html",
+  "e": "Lập trình bất đồng bộ: event loop, coroutine, await, gather, TaskGroup, Semaphore, timeout và gọi HTTP đồng thời bằng httpx.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 8,
+  "img": "assets/images/posts/pydev-asyncio-co-ban.webp",
+  "tags": [
+   "Python",
+   "Lập trình"
+  ]
+ },
+ {
+  "t": "Đóng gói ứng dụng Python bằng Docker: Dockerfile, compose",
+  "u": "hoc/pydev-docker-cho-python.html",
+  "e": "Đưa ứng dụng FastAPI vào container: Dockerfile tối ưu cache, .dockerignore, user không phải root, biến môi trường và docker compose.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/pydev-docker-cho-python.webp",
+  "tags": [
+   "Python",
+   "Lập trình",
+   "Công cụ"
+  ]
+ },
+ {
+  "t": "CI cho dự án Python với GitHub Actions: Ruff, mypy, pytest",
+  "u": "hoc/pydev-ci-github-actions.html",
+  "e": "Tự động kiểm tra mỗi lần đẩy code: workflow GitHub Actions cài uv, chạy Ruff, mypy, pytest trên nhiều phiên bản Python bằng matrix.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 7,
+  "img": "assets/images/posts/pydev-ci-github-actions.webp",
+  "tags": [
+   "Python",
+   "Lập trình",
+   "Công cụ",
+   "GitHub"
+  ]
+ },
+ {
+  "t": "Dự án cuối khóa Python Developer, portfolio và phỏng vấn",
+  "u": "hoc/pydev-du-an-cuoi-khoa-va-portfolio.html",
+  "e": "Ba đề tài cuối khóa kèm danh sách nghiệm thu, cách viết README, portfolio GitHub, CV và các câu phỏng vấn Python Developer hay gặp.",
+  "c": "hoc",
+  "cn": "Học AI & Lập trình",
+  "d": "29/10/2026",
+  "m": 13,
+  "img": "assets/images/posts/pydev-du-an-cuoi-khoa-va-portfolio.webp",
+  "tags": [
+   "Python",
+   "Lập trình",
+   "Source Code"
+  ]
+ },
+ {
   "t": "Dự án: kiểm tra thứ tự màu dây trong connector của bó dây điện",
   "u": "projects/du-an-kiem-tra-thu-tu-mau-day-connector.html",
   "e": "Trạm camera đọc màu 8 dây khi connector lệch, đèn đổi màu: đo đóng góp từng bước, bỏ vệt bóng, ΔE00 chặn màu lạ, mã lỗi cho PLC.",
@@ -5023,7 +5786,7 @@ window.HF_TOPICS = [
   "u": "hoc/python.html",
   "s": "Học AI & Lập trình",
   "g": "Programming",
-  "n": 66
+  "n": 119
  },
  {
   "t": "C#",
@@ -5198,7 +5961,7 @@ window.HF_TOPICS = [
   "u": "kien-thuc/programming.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 12
+  "n": 65
  },
  {
   "t": "AI / Machine Learning",
@@ -5247,7 +6010,7 @@ window.HF_TOPICS = [
   "u": "kien-thuc/tools-frameworks.html",
   "s": "Kiến thức",
   "g": "Công cụ & mẹo",
-  "n": 6
+  "n": 16
  },
  {
   "t": "Tips & Tricks",
@@ -5394,7 +6157,7 @@ window.HF_TOPICS = [
   "u": "tai-nguyen/source-code.html",
   "s": "Tài nguyên",
   "g": "",
-  "n": 3
+  "n": 11
  },
  {
   "t": "Dataset",
@@ -5457,9 +6220,9 @@ window.HF_TOPICS = [
  },
  {
   "t": "Python Developer",
-  "u": "lo-trinh/#python-developer",
+  "u": "lo-trinh/python-developer.html",
   "s": "Learning Path",
-  "g": "Python, công cụ, tự động hóa",
+  "g": "Python, tự động hóa, dữ liệu và Web API",
   "n": -1,
   "f": 0
  },
@@ -5713,6 +6476,76 @@ window.HF_TOPICS = [
   "u": "lo-trinh/hsk3/luyen-de.html",
   "s": "HSK 3",
   "g": "4 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 1: Bắt đầu: cú pháp và tư duy lập trình",
+  "u": "lo-trinh/python-developer/bat-dau.html",
+  "s": "Python Developer",
+  "g": "5 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 2: Cấu trúc dữ liệu và hàm",
+  "u": "lo-trinh/python-developer/cau-truc-du-lieu-va-ham.html",
+  "s": "Python Developer",
+  "g": "5 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 3: File, dữ liệu và xử lý lỗi",
+  "u": "lo-trinh/python-developer/file-du-lieu-va-loi.html",
+  "s": "Python Developer",
+  "g": "5 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 4: Lập trình hướng đối tượng",
+  "u": "lo-trinh/python-developer/lap-trinh-huong-doi-tuong.html",
+  "s": "Python Developer",
+  "g": "5 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 5: Python nâng cao: code Pythonic",
+  "u": "lo-trinh/python-developer/python-nang-cao.html",
+  "s": "Python Developer",
+  "g": "5 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 6: Công cụ nghề: môi trường, Git, kiểm thử",
+  "u": "lo-trinh/python-developer/cong-cu-nghe.html",
+  "s": "Python Developer",
+  "g": "6 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 7: Tự động hóa công việc",
+  "u": "lo-trinh/python-developer/tu-dong-hoa.html",
+  "s": "Python Developer",
+  "g": "6 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 8: Cơ sở dữ liệu và xử lý dữ liệu",
+  "u": "lo-trinh/python-developer/du-lieu-va-csdl.html",
+  "s": "Python Developer",
+  "g": "4 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 9: Web API với FastAPI",
+  "u": "lo-trinh/python-developer/web-api-fastapi.html",
+  "s": "Python Developer",
+  "g": "6 bài học",
+  "n": -1
+ },
+ {
+  "t": "Chặng 10: Hiệu năng, đồng thời và triển khai",
+  "u": "lo-trinh/python-developer/hieu-nang-va-trien-khai.html",
+  "s": "Python Developer",
+  "g": "6 bài học",
   "n": -1
  }
 ];

@@ -1,0 +1,173 @@
+<p>Python không bắt bạn khai báo kiểu, và đó là lý do nó dễ học. Nhưng khi dự án lên vài nghìn dòng và có nhiều người cùng sửa, câu hỏi "hàm này nhận gì, trả gì, có thể trả <code>None</code> không?" tốn rất nhiều thời gian. <strong>Type hint</strong> trả lời câu hỏi đó ngay trong code, và <strong>mypy</strong> dùng nó để bắt lỗi <em>trước khi chạy</em>. Gần như mọi dự án Python chuyên nghiệp hiện nay đều dùng type hint.</p>
+
+<h2>1. Nhắc lại và mở rộng cú pháp cơ bản</h2>
+<pre><code class="language-python">from pathlib import Path
+
+ten: str = "An"
+diem: list[float] = [8.5, 7.0]
+bang_gia: dict[str, int] = {"bút": 5000}
+toa_do: tuple[float, float] = (21.03, 105.85)
+cac_so: tuple[int, ...] = (1, 2, 3)          # tuple độ dài bất kỳ
+the_loai: set[str] = {"web", "data"}
+
+
+def doc_file(p: str | Path, gioi_han: int | None = None) -&gt; list[str]:
+    dong = Path(p).read_text(encoding="utf-8").splitlines()
+    return dong if gioi_han is None else dong[:gioi_han]
+
+
+def ghi_log(thong_diep: str) -&gt; None:        # không trả gì: -&gt; None
+    print(thong_diep)
+
+
+print(doc_file.__annotations__)</code></pre>
+<pre><code class="language-text">{'p': str | pathlib.Path, 'gioi_han': int | None, 'return': list[str]}</code></pre>
+<ul>
+  <li>Từ Python 3.9 dùng thẳng <code>list[int]</code>, <code>dict[str, int]</code>; code cũ hay thấy <code>List</code>, <code>Dict</code> import từ <code>typing</code>, nay không cần nữa.</li>
+  <li><code>X | Y</code> (3.10+) nghĩa là "X hoặc Y"; <code>int | None</code> là "số nguyên hoặc không có", trước đây viết <code>Optional[int]</code>.</li>
+  <li>Type hint chỉ là chú thích, lưu trong <code>__annotations__</code>; Python <strong>không</strong> kiểm tra khi chạy.</li>
+</ul>
+
+<h2>2. mypy: kiểm tra kiểu tĩnh</h2>
+<p>Cài <code>pip install mypy</code> (hoặc <code>uv add --dev mypy</code> ở chặng 6). Cho file <code>don_hang.py</code> có ba lỗi chưa lộ ra khi đọc lướt:</p>
+<pre><code class="language-python"># (minh họa) don_hang.py: code có lỗi để mypy phát hiện
+def tong_tien(gia: list[int], giam_gia: float = 0) -&gt; int:
+    return round(sum(gia) * (1 - giam_gia))
+
+
+def tim_khach(ma: str, kho: dict[str, str]) -&gt; str | None:
+    return kho.get(ma)
+
+
+tong = tong_tien(["120000", "45000"])
+ten = tim_khach("KH01", {"KH01": "An"})
+print(ten.upper())</code></pre>
+<pre><code class="language-text">$ mypy don_hang.py
+don_hang.py:9: error: List item 0 has incompatible type "str"; expected "int"  [list-item]
+don_hang.py:9: error: List item 1 has incompatible type "str"; expected "int"  [list-item]
+don_hang.py:11: error: Item "None" of "str | None" has no attribute "upper"  [union-attr]
+Found 3 errors in 1 file (checked 1 source file)</code></pre>
+<p>Lỗi ở dòng 11 đặc biệt giá trị: chương trình chạy đúng với dữ liệu thử (có khách KH01), nhưng ngày nào đó khách không tồn tại thì sập với <code>AttributeError</code>. mypy buộc bạn xử lý trường hợp <code>None</code>:</p>
+<pre><code class="language-python">def tim_khach(ma: str, kho: dict[str, str]) -&gt; str | None:
+    return kho.get(ma)
+
+
+ten = tim_khach("KH99", {"KH01": "An"})
+if ten is not None:                 # sau dòng này mypy biết ten là str
+    print(ten.upper())
+else:
+    print("Không có khách")</code></pre>
+<pre><code class="language-text">Không có khách</code></pre>
+<p>Kỹ thuật này gọi là <strong>thu hẹp kiểu</strong> (narrowing): sau <code>if ten is not None</code>, <code>isinstance(x, str)</code> hoặc <code>if not ten: return</code>, mypy hiểu kiểu đã hẹp lại. Pylance trong VS Code làm việc tương tự ngay khi bạn gõ (bật <strong>Type Checking Mode: standard</strong> trong cài đặt).</p>
+
+<h2>3. Callable, Literal, TypedDict</h2>
+<pre><code class="language-python">from typing import Callable, Literal, TypedDict
+
+
+class DonHang(TypedDict):                  # mô tả dict có khóa cố định, ví dụ JSON từ API
+    ma: str
+    tong: int
+    trang_thai: Literal["moi", "dang_giao", "da_giao"]
+
+
+def loc(ds: list[DonHang], dieu_kien: Callable[[DonHang], bool]) -&gt; list[DonHang]:
+    return [d for d in ds if dieu_kien(d)]
+
+
+don: list[DonHang] = [
+    {"ma": "D1", "tong": 450_000, "trang_thai": "moi"},
+    {"ma": "D2", "tong": 90_000, "trang_thai": "da_giao"},
+]
+print([d["ma"] for d in loc(don, lambda d: d["tong"] &gt; 100_000)])</code></pre>
+<pre><code class="language-text">['D1']</code></pre>
+<ul>
+  <li><code>Callable[[A, B], R]</code>: hàm nhận tham số kiểu A, B và trả R.</li>
+  <li><code>Literal["moi", ...]</code>: chỉ chấp nhận đúng các giá trị liệt kê. Gõ <code>"dang giao"</code> (thiếu gạch dưới) thì mypy báo <code>Incompatible types</code>.</li>
+  <li><code>TypedDict</code>: kiểu cho dict có cấu trúc cố định. Khi dữ liệu là của riêng bạn, dataclass thường tốt hơn; TypedDict hợp với dict đến từ JSON mà bạn không muốn chuyển đổi.</li>
+</ul>
+
+<h2>4. Generic: hàm giữ nguyên kiểu đầu vào</h2>
+<pre><code class="language-python">from collections.abc import Sequence
+from typing import TypeVar
+
+T = TypeVar("T")
+
+
+def dau_tien(ds: Sequence[T]) -&gt; T | None:
+    return ds[0] if ds else None
+
+
+so = dau_tien([3, 1, 2])          # mypy suy ra: int | None
+chu = dau_tien("xin chào")        # str | None
+print(so, chu, dau_tien([]))</code></pre>
+<pre><code class="language-text">3 x None</code></pre>
+<p><code>T</code> là một <strong>biến kiểu</strong>: "đưa vào dãy các <code>T</code> thì nhận lại <code>T</code>". Từ Python 3.12 có cú pháp gọn hơn, không cần dòng <code>TypeVar</code>: <code>def dau_tien[T](ds: Sequence[T]) -&gt; T | None:</code>. Bài dùng <code>TypeVar</code> vì chạy được trên mọi phiên bản và bạn sẽ gặp nó rất nhiều trong code hiện có. Viết <code>reveal_type(so)</code> trong file và chạy mypy để xem kiểu nó suy ra (<code>Revealed type is "int | None"</code>).</p>
+<p>Khi khai báo tham số, ưu tiên kiểu <strong>trừu tượng</strong> từ <code>collections.abc</code>: <code>Sequence</code> (chỉ đọc, có thứ tự), <code>Iterable</code> (duyệt được), <code>Mapping</code> (dict chỉ đọc). Hàm nhận <code>Iterable[str]</code> dùng được với list, tuple, set, generator; hàm nhận <code>list[str]</code> thì chỉ list.</p>
+
+<h2>5. Áp dụng vào dự án như thế nào</h2>
+<ul>
+  <li>Thêm type hint cho <strong>chữ ký hàm</strong> (tham số, giá trị trả về) là đủ hiệu quả; biến cục bộ mypy tự suy ra.</li>
+  <li>Tránh <code>Any</code>: nó tắt kiểm tra. Khi chưa chắc, <code>object</code> an toàn hơn.</li>
+  <li>Bắt đầu với <code>mypy .</code> mặc định, sau đó bật dần chế độ nghiêm ngặt trong <code>pyproject.toml</code> (chặng 6):</li>
+</ul>
+<pre><code class="language-text">[tool.mypy]
+python_version = "3.12"
+strict = true            # bắt buộc mọi hàm có type hint, cấm Any ngầm định...
+exclude = ["build/"]</code></pre>
+<div class="tip"><strong>Pydantic dùng type hint khi chạy</strong>Python không kiểm tra kiểu, nhưng thư viện có thể đọc <code>__annotations__</code> để làm việc đó. Pydantic (chặng 9) dựa vào type hint để kiểm tra và chuyển đổi dữ liệu từ request: khai báo <code>tuoi: int</code> là API tự từ chối <code>"abc"</code>. Viết type hint tốt từ bây giờ là chuẩn bị cho FastAPI.</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li><code>list[int]</code>, <code>dict[str, int]</code>, <code>tuple[int, ...]</code>, <code>X | None</code>, <code>-&gt; None</code>.</li>
+  <li>mypy bắt lỗi kiểu trước khi chạy, nhất là quên xử lý <code>None</code>; thu hẹp kiểu bằng <code>is not None</code>, <code>isinstance</code>.</li>
+  <li><code>Callable</code>, <code>Literal</code>, <code>TypedDict</code>, <code>Protocol</code> (chặng 4), generic với <code>TypeVar</code> hoặc <code>def f[T](...)</code> (3.12+).</li>
+  <li>Tham số dùng <code>Sequence</code>, <code>Iterable</code>, <code>Mapping</code>; tránh <code>Any</code>.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Đưa dự án chặng 2 qua mypy</h3>
+<p>Thêm type hint cho mọi hàm trong dự án quản lý chi tiêu, chạy <code>mypy --strict chi_tieu.py</code> và sửa đến khi sạch lỗi.</p>
+<details><summary>Xem gợi ý</summary>
+<p>Lỗi hay gặp nhất với <code>--strict</code>: <code>Missing type parameters for generic type "dict"</code>. Mỗi khoản chi là dict có khóa cố định, nên khai báo một <code>TypedDict</code>:</p>
+<pre><code class="language-python">from datetime import date
+from typing import TypedDict
+
+
+class KhoanChi(TypedDict):
+    ngay: date
+    so_tien: int
+    danh_muc: str
+    ghi_chu: str
+
+
+def tong(ds: list[KhoanChi]) -&gt; int:
+    return sum(kc["so_tien"] for kc in ds)
+
+
+print(tong([{"ngay": date(2026, 10, 1), "so_tien": 45_000, "danh_muc": "ăn uống", "ghi_chu": ""}]))</code></pre>
+<pre><code class="language-text">45000</code></pre>
+<p>Thay <code>list[dict]</code> bằng <code>list[KhoanChi]</code> ở mọi hàm. Tham số <code>khoa</code> của <code>tong_theo</code> có kiểu <code>Callable[[KhoanChi], str]</code>. Cách tốt hơn nữa: đổi <code>KhoanChi</code> thành dataclass như chặng 4.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Hàm generic cuối cùng</h3>
+<p>Viết <code>phan_tu_cuoi(ds: Sequence[T], mac_dinh: T) -&gt; T</code> trả phần tử cuối hoặc giá trị mặc định khi dãy rỗng. Dùng <code>reveal_type</code> kiểm tra mypy suy đúng kiểu.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">from collections.abc import Sequence
+from typing import TypeVar
+
+T = TypeVar("T")
+
+
+def phan_tu_cuoi(ds: Sequence[T], mac_dinh: T) -&gt; T:
+    return ds[-1] if ds else mac_dinh
+
+
+print(phan_tu_cuoi([1, 2, 3], 0), phan_tu_cuoi([], "trống"), phan_tu_cuoi(("a", "b"), ""))</code></pre>
+<pre><code class="language-text">3 trống b</code></pre>
+<p>Thêm dòng <code>reveal_type(phan_tu_cuoi([1.5], 0.0))</code> rồi chạy mypy, kết quả: <code>Revealed type is "float"</code>. Không có <code>| None</code> vì luôn có giá trị mặc định. Nhớ xóa <code>reveal_type</code> trước khi chạy bằng Python 3.10 trở về trước (hàm này chỉ có sẵn khi chạy từ Python 3.11).</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/library/typing.html" rel="noopener" target="_blank">typing: Support for type hints</a>; <a href="https://mypy.readthedocs.io/en/stable/getting_started.html" rel="noopener" target="_blank">mypy: Getting started</a>; <a href="https://peps.python.org/pep-0695/" rel="noopener" target="_blank">PEP 695: Type Parameter Syntax</a>.</p>

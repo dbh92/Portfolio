@@ -1,0 +1,162 @@
+<p>Đến giờ bạn mô tả một tài khoản ngân hàng bằng dict <code>{"chu": "An", "so_du": 500000}</code> và viết các hàm rời rạc thao tác trên dict đó. Cách này ổn với chương trình nhỏ, nhưng khi dữ liệu và hành vi nhiều lên, bạn dễ gọi nhầm hàm, sửa sai khóa, quên kiểm tra. <strong>Lập trình hướng đối tượng</strong> (OOP) gom dữ liệu và các hàm thao tác trên dữ liệu đó vào một chỗ: <strong>class</strong>.</p>
+
+<h2>1. Class là bản thiết kế, đối tượng là sản phẩm</h2>
+<pre><code class="language-python">class TaiKhoan:
+    """Tài khoản ngân hàng đơn giản."""
+
+    def __init__(self, chu: str, so_du: int = 0):
+        self.chu = chu            # thuộc tính của đối tượng
+        self.so_du = so_du
+
+    def nap(self, so_tien: int) -&gt; None:     # phương thức
+        self.so_du += so_tien
+
+    def mo_ta(self) -&gt; str:
+        return f"{self.chu}: {self.so_du:,}đ"
+
+
+tk_an = TaiKhoan("An", 500_000)    # tạo đối tượng: Python gọi __init__
+tk_binh = TaiKhoan("Bình")
+tk_an.nap(200_000)
+print(tk_an.mo_ta())
+print(tk_binh.mo_ta())
+print(type(tk_an), isinstance(tk_an, TaiKhoan))</code></pre>
+<pre><code class="language-text">An: 700,000đ
+Bình: 0đ
+&lt;class '__main__.TaiKhoan'&gt; True</code></pre>
+<ul>
+  <li><code>class TenLop:</code> định nghĩa lớp. Tên lớp viết kiểu <strong>CapWords</strong> (mỗi từ viết hoa chữ đầu), khác với tên hàm, tên biến.</li>
+  <li><code>__init__</code> là phương thức khởi tạo, chạy tự động khi tạo đối tượng <code>TaiKhoan(...)</code>. Nó gán các thuộc tính ban đầu.</li>
+  <li><code>self</code> là chính đối tượng đang được gọi. Khi viết <code>tk_an.nap(200_000)</code>, Python thực chất gọi <code>TaiKhoan.nap(tk_an, 200_000)</code>: <code>self</code> chính là <code>tk_an</code>.</li>
+  <li>Mỗi đối tượng có bộ thuộc tính riêng: nạp tiền cho An không ảnh hưởng Bình.</li>
+</ul>
+
+<h2>2. Bảo vệ tính đúng đắn của dữ liệu</h2>
+<p>Lợi ích lớn nhất của class: các quy tắc nằm cạnh dữ liệu. Không ai có thể rút quá số dư nếu mọi thao tác đi qua phương thức:</p>
+<pre><code class="language-python">class TaiKhoan:
+    def __init__(self, chu: str, so_du: int = 0):
+        if so_du &lt; 0:
+            raise ValueError("Số dư ban đầu không được âm")
+        self.chu = chu
+        self._so_du = so_du
+        self._lich_su: list[tuple[str, int]] = []
+
+    def nap(self, so_tien: int) -&gt; None:
+        if so_tien &lt;= 0:
+            raise ValueError("Số tiền nạp phải dương")
+        self._so_du += so_tien
+        self._lich_su.append(("nạp", so_tien))
+
+    def rut(self, so_tien: int) -&gt; None:
+        if so_tien &lt;= 0:
+            raise ValueError("Số tiền rút phải dương")
+        if so_tien &gt; self._so_du:
+            raise ValueError(f"Không đủ số dư ({self._so_du:,}đ)")
+        self._so_du -= so_tien
+        self._lich_su.append(("rút", so_tien))
+
+    def so_du(self) -&gt; int:
+        return self._so_du
+
+    def lich_su(self) -&gt; list[tuple[str, int]]:
+        return list(self._lich_su)          # trả bản sao, bên ngoài sửa không ảnh hưởng
+
+
+tk = TaiKhoan("Chi", 1_000_000)
+tk.nap(500_000)
+tk.rut(300_000)
+try:
+    tk.rut(5_000_000)
+except ValueError as loi:
+    print("Từ chối:", loi)
+print(tk.so_du(), tk.lich_su())</code></pre>
+<pre><code class="language-text">Từ chối: Không đủ số dư (1,200,000đ)
+1200000 [('nạp', 500000), ('rút', 300000)]</code></pre>
+<p>Dấu gạch dưới đầu tên (<code>_so_du</code>) là <strong>quy ước</strong> trong Python: "thuộc tính nội bộ, đừng đụng từ bên ngoài". Python không cấm, nhưng mọi lập trình viên Python đều hiểu và tôn trọng quy ước này. Ở bài sau, bạn sẽ dùng <code>@property</code> để đọc <code>tk.so_du</code> như thuộc tính mà vẫn chặn được việc gán bậy.</p>
+
+<h2>3. Thuộc tính của lớp và thuộc tính của đối tượng</h2>
+<pre><code class="language-python">class SanPham:
+    VAT = 0.08                 # thuộc tính lớp: dùng chung cho mọi đối tượng
+    so_luong_tao = 0
+
+    def __init__(self, ten: str, gia: int):
+        self.ten = ten         # thuộc tính đối tượng: riêng từng cái
+        self.gia = gia
+        SanPham.so_luong_tao += 1
+
+    def gia_sau_thue(self) -&gt; int:
+        return round(self.gia * (1 + self.VAT))
+
+
+a = SanPham("Bút", 10_000)
+b = SanPham("Vở", 15_000)
+print(a.gia_sau_thue(), b.gia_sau_thue(), SanPham.so_luong_tao)</code></pre>
+<pre><code class="language-text">10800 16200 2</code></pre>
+<p>Thuộc tính lớp hợp cho hằng số và bộ đếm dùng chung. Khi đọc <code>self.VAT</code>, Python tìm trong đối tượng trước, không thấy thì tìm lên lớp.</p>
+<div class="warn"><strong>Đừng đặt list hay dict làm thuộc tính lớp</strong>Viết <code>class GioHang: mat_hang = []</code> thì <strong>mọi</strong> giỏ hàng dùng chung một list: thêm hàng vào giỏ này, giỏ khác cũng thấy. Đây là cùng một bẫy với tham số mặc định là list ở chặng 2. Thuộc tính thay đổi được luôn tạo trong <code>__init__</code>: <code>self.mat_hang = []</code>.</div>
+
+<h2>4. Khi nào nên viết class?</h2>
+<p>Không phải mọi thứ đều cần class. Python rất thoải mái với hàm và dict. Dùng class khi:</p>
+<ul>
+  <li>Có <strong>dữ liệu đi kèm quy tắc</strong> phải luôn đúng (số dư không âm, đơn hàng đã giao không được sửa).</li>
+  <li>Có <strong>trạng thái thay đổi theo thời gian</strong> và nhiều thao tác trên trạng thái đó (giỏ hàng, kết nối, trò chơi).</li>
+  <li>Cần <strong>nhiều biến thể cùng giao diện</strong> (gửi thông báo qua email hay SMS): bài kế thừa sẽ nói kỹ.</li>
+</ul>
+<p>Một class chỉ có <code>__init__</code> và một phương thức khác thường nên là một hàm. Một class chỉ chứa dữ liệu, không có hành vi, thì dùng <code>dataclass</code> (bài 4 của chặng này).</p>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li><code>class TenLop:</code>, <code>__init__(self, ...)</code> gán thuộc tính; phương thức luôn nhận <code>self</code> đầu tiên.</li>
+  <li>Đặt quy tắc kiểm tra trong phương thức để dữ liệu luôn hợp lệ; <code>_ten</code> là quy ước "nội bộ".</li>
+  <li>Thuộc tính lớp dùng chung; thuộc tính thay đổi được tạo trong <code>__init__</code>.</li>
+  <li>Dùng class khi có dữ liệu + quy tắc + trạng thái; không thì hàm là đủ.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Tài khoản có lịch sử</h3>
+<p>Viết lại lớp <code>TaiKhoan</code> ở mục 2 mà không nhìn bài, chạy kịch bản: mở với 1.000.000đ, nạp 500.000đ, rút 2.000.000đ (phải bị từ chối), rút 300.000đ; in số dư và lịch sử.</p>
+<details><summary>Xem gợi ý</summary>
+<p>So sánh kết quả với ví dụ ở mục 2: số dư cuối 1.200.000đ, lịch sử gồm đúng hai giao dịch. Lần rút bị từ chối <strong>không</strong> được ghi vào lịch sử, vì <code>raise</code> nằm trước dòng <code>append</code>.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Giỏ hàng</h3>
+<p>Viết lớp <code>GioHang</code> với <code>them(ten, gia, so_luong=1)</code> (thêm trùng tên thì cộng số lượng), <code>xoa(ten)</code>, <code>tong_tien()</code> và <code>so_mat_hang()</code>.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">class GioHang:
+    def __init__(self):
+        self._hang: dict[str, dict] = {}
+
+    def them(self, ten: str, gia: int, so_luong: int = 1) -&gt; None:
+        if so_luong &lt;= 0 or gia &lt; 0:
+            raise ValueError("Giá và số lượng không hợp lệ")
+        if ten in self._hang:
+            self._hang[ten]["so_luong"] += so_luong
+        else:
+            self._hang[ten] = {"gia": gia, "so_luong": so_luong}
+
+    def xoa(self, ten: str) -&gt; None:
+        if ten not in self._hang:
+            raise KeyError(f"Không có '{ten}' trong giỏ")
+        del self._hang[ten]
+
+    def tong_tien(self) -&gt; int:
+        return sum(m["gia"] * m["so_luong"] for m in self._hang.values())
+
+    def so_mat_hang(self) -&gt; int:
+        return len(self._hang)
+
+
+gio = GioHang()
+gio.them("Áo thun", 150_000, 2)
+gio.them("Quần jean", 450_000)
+gio.them("Áo thun", 150_000)
+gio.xoa("Quần jean")
+print(gio.so_mat_hang(), f"{gio.tong_tien():,}đ")</code></pre>
+<pre><code class="language-text">1 450,000đ</code></pre>
+<p>Dữ liệu bên trong là dict tên → thông tin; bên ngoài chỉ thấy các phương thức. Sau này đổi cách lưu (ví dụ sang list hoặc CSDL), code dùng <code>GioHang</code> không phải sửa gì.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/tutorial/classes.html" rel="noopener" target="_blank">Python Tutorial: Classes</a>; <a href="https://peps.python.org/pep-0008/#naming-conventions" rel="noopener" target="_blank">PEP 8: Naming Conventions</a>.</p>

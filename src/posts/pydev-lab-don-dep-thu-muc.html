@@ -1,0 +1,190 @@
+<p>Thư mục Downloads của hầu hết mọi người là một bãi lộn xộn: PDF, ảnh, file cài đặt, file nén nằm lẫn với nhau. Bài thực hành này viết một script dọn dẹp thật sự hữu ích, đồng thời ôn lại cả chặng 3: <code>pathlib</code>, dict, ngoại lệ, logging và JSON. Điểm quan trọng nhất bạn học được là cách viết script <strong>an toàn</strong> khi nó di chuyển file của người khác.</p>
+
+<h2>1. Yêu cầu</h2>
+<ul>
+  <li>Phân loại file ở cấp đầu của thư mục nguồn vào các thư mục con theo đuôi: <code>Tai_lieu</code>, <code>Anh</code>, <code>Video</code>, <code>Nen</code>, <code>Cai_dat</code>, còn lại vào <code>Khac</code>.</li>
+  <li><strong>Chế độ chạy thử</strong> (mặc định): chỉ ghi log sẽ làm gì, không di chuyển file nào.</li>
+  <li>Trùng tên ở đích: không ghi đè, đổi tên thành <code>bao_cao (1).pdf</code>, <code>bao_cao (2).pdf</code>...</li>
+  <li>Bỏ qua file đang tải dở (<code>.crdownload</code>, <code>.part</code>) và file ẩn.</li>
+  <li>Một file lỗi (ví dụ đang mở bởi chương trình khác) không làm dừng cả script.</li>
+  <li>Ghi báo cáo JSON: số file theo nhóm, số lỗi.</li>
+</ul>
+
+<h2>2. Thiết kế</h2>
+<p>Chia thành các hàm nhỏ, mỗi hàm một nhiệm vụ, dễ thử riêng:</p>
+<table>
+  <thead><tr><th>Hàm</th><th>Nhiệm vụ</th></tr></thead>
+  <tbody>
+    <tr><td><code>chon_nhom(p)</code></td><td>Đuôi file → tên nhóm (hàm thuần, không đụng ổ đĩa)</td></tr>
+    <tr><td><code>ten_khong_trung(dich)</code></td><td>Tìm tên chưa tồn tại ở đích</td></tr>
+    <tr><td><code>don_dep(nguon, chay_that)</code></td><td>Duyệt, quyết định, di chuyển, đếm; trả về báo cáo</td></tr>
+    <tr><td><code>main()</code></td><td>Cấu hình log, gọi <code>don_dep</code>, ghi báo cáo</td></tr>
+  </tbody>
+</table>
+<p>Bảng phân loại là <strong>dữ liệu</strong>, không phải chuỗi <code>if/elif</code> dài. Muốn thêm đuôi mới chỉ cần sửa dict.</p>
+
+<h2>3. Mã nguồn</h2>
+<pre><code class="language-python">"""don_dep.py: phân loại file trong một thư mục theo đuôi."""
+import json
+import logging
+import shutil
+import sys
+from collections import Counter
+from pathlib import Path
+
+log = logging.getLogger("don_dep")
+
+NHOM = {
+    "Tai_lieu": {".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".csv"},
+    "Anh": {".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".svg"},
+    "Video": {".mp4", ".mkv", ".mov", ".avi"},
+    "Nen": {".zip", ".rar", ".7z", ".tar", ".gz"},
+    "Cai_dat": {".exe", ".msi", ".dmg", ".pkg", ".deb"},
+}
+DUOI_SANG_NHOM = {duoi: nhom for nhom, cac_duoi in NHOM.items() for duoi in cac_duoi}
+BO_QUA = {".crdownload", ".part", ".tmp"}
+
+
+def chon_nhom(p: Path) -&gt; str | None:
+    """Tên nhóm cho file p; None nếu phải bỏ qua."""
+    if p.name.startswith(".") or p.suffix.lower() in BO_QUA:
+        return None
+    return DUOI_SANG_NHOM.get(p.suffix.lower(), "Khac")
+
+
+def ten_khong_trung(dich: Path) -&gt; Path:
+    """bao_cao.pdf đã có → bao_cao (1).pdf, rồi (2)..."""
+    if not dich.exists():
+        return dich
+    i = 1
+    while True:
+        ung_vien = dich.with_name(f"{dich.stem} ({i}){dich.suffix}")
+        if not ung_vien.exists():
+            return ung_vien
+        i += 1
+
+
+def don_dep(nguon: Path, chay_that: bool = False) -&gt; dict:
+    dem: Counter[str] = Counter()
+    loi = 0
+    for p in sorted(nguon.iterdir()):
+        if not p.is_file():
+            continue
+        nhom = chon_nhom(p)
+        if nhom is None:
+            log.debug("Bỏ qua %s", p.name)
+            dem["bo_qua"] += 1
+            continue
+        dich = ten_khong_trung(nguon / nhom / p.name)
+        if not chay_that:
+            log.info("[THỬ] %s → %s/%s", p.name, nhom, dich.name)
+            dem[nhom] += 1
+            continue
+        try:
+            dich.parent.mkdir(exist_ok=True)
+            shutil.move(p, dich)
+        except OSError:
+            log.exception("Không chuyển được %s", p.name)
+            loi += 1
+            continue
+        log.info("%s → %s/%s", p.name, nhom, dich.name)
+        dem[nhom] += 1
+    return {"thu_muc": str(nguon), "chay_that": chay_that, "theo_nhom": dict(dem), "loi": loi}
+
+
+def main(argv: list[str]) -&gt; int:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)-7s %(message)s", stream=sys.stdout)
+    nguon = Path(argv[1]) if len(argv) &gt; 1 else Path.home() / "Downloads"
+    chay_that = "--that" in argv
+    if not nguon.is_dir():
+        log.error("Không có thư mục %s", nguon)
+        return 1
+    bao_cao = don_dep(nguon, chay_that)
+    Path("bao_cao_don_dep.json").write_text(
+        json.dumps(bao_cao, ensure_ascii=False, indent=2), encoding="utf-8")
+    log.info("Xong: %s, %d lỗi", bao_cao["theo_nhom"], bao_cao["loi"])
+    return 0 if bao_cao["loi"] == 0 else 2
+
+
+# Tạo thư mục mẫu rồi chạy thử, sau đó chạy thật
+mau = Path("tai_ve_mau")
+mau.mkdir(exist_ok=True)
+for ten in ["bao_cao.pdf", "anh_cuoi.JPG", "setup.exe", "du_lieu.zip", "ghi_am.m4a",
+            "phim.mp4.crdownload", ".an"]:
+    (mau / ten).write_text("x", encoding="utf-8")
+(mau / "Tai_lieu").mkdir(exist_ok=True)
+(mau / "Tai_lieu" / "bao_cao.pdf").write_text("bản cũ", encoding="utf-8")
+
+main(["don_dep.py", str(mau)])
+print("---")
+main(["don_dep.py", str(mau), "--that"])
+print(sorted(p.relative_to(mau).as_posix() for p in mau.rglob("*") if p.is_file()))</code></pre>
+<pre><code class="language-text">INFO    [THỬ] anh_cuoi.JPG → Anh/anh_cuoi.JPG
+INFO    [THỬ] bao_cao.pdf → Tai_lieu/bao_cao (1).pdf
+INFO    [THỬ] du_lieu.zip → Nen/du_lieu.zip
+INFO    [THỬ] ghi_am.m4a → Khac/ghi_am.m4a
+INFO    [THỬ] setup.exe → Cai_dat/setup.exe
+INFO    Xong: {'bo_qua': 2, 'Anh': 1, 'Tai_lieu': 1, 'Nen': 1, 'Khac': 1, 'Cai_dat': 1}, 0 lỗi
+---
+INFO    anh_cuoi.JPG → Anh/anh_cuoi.JPG
+INFO    bao_cao.pdf → Tai_lieu/bao_cao (1).pdf
+INFO    du_lieu.zip → Nen/du_lieu.zip
+INFO    ghi_am.m4a → Khac/ghi_am.m4a
+INFO    setup.exe → Cai_dat/setup.exe
+INFO    Xong: {'bo_qua': 2, 'Anh': 1, 'Tai_lieu': 1, 'Nen': 1, 'Khac': 1, 'Cai_dat': 1}, 0 lỗi
+['.an', 'Anh/anh_cuoi.JPG', 'Cai_dat/setup.exe', 'Khac/ghi_am.m4a', 'Nen/du_lieu.zip', 'Tai_lieu/bao_cao (1).pdf', 'Tai_lieu/bao_cao.pdf', 'phim.mp4.crdownload']</code></pre>
+<p>Khi dùng thật, bỏ phần "tạo thư mục mẫu" ở cuối và thay bằng:</p>
+<pre><code class="language-python"># (minh họa) cuối file don_dep.py khi dùng thật
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))</code></pre>
+<pre><code class="language-text">PS&gt; python don_dep.py                          # chạy thử trên Downloads
+PS&gt; python don_dep.py D:\tai_ve --that         # chạy thật trên thư mục khác</code></pre>
+
+<h2>4. Những quyết định thiết kế đáng chú ý</h2>
+<ul>
+  <li><strong>Mặc định là chạy thử.</strong> Muốn chạy thật phải gõ <code>--that</code>. Script đụng tới file người dùng nên chọn mặc định an toàn. Đọc log chạy thử trước, thấy đúng mới chạy thật.</li>
+  <li><strong><code>DUOI_SANG_NHOM</code> đảo ngược dict</strong> một lần lúc khởi động bằng dict comprehension, để tra đuôi file nhanh thay vì duyệt mọi nhóm cho mỗi file.</li>
+  <li><strong>Bắt <code>OSError</code> quanh từng file</strong>, không quanh cả vòng lặp. <code>OSError</code> là lớp cha của <code>PermissionError</code>, <code>FileNotFoundError</code>... nên một file đang bị khóa chỉ làm hỏng chính nó. <code>log.exception</code> giữ traceback để điều tra.</li>
+  <li><strong><code>main</code> trả về mã thoát</strong>: 0 là thành công, khác 0 là có vấn đề. Khi script chạy theo lịch (chặng 7), hệ thống dựa vào mã này để biết lần chạy có lỗi.</li>
+  <li><strong><code>main(argv)</code> nhận tham số</strong> thay vì đọc thẳng <code>sys.argv</code> bên trong, nên ta gọi thử được với tham số tùy ý như ở cuối ví dụ. Chặng 7 sẽ thay việc tự đọc <code>argv</code> bằng <code>argparse</code>.</li>
+</ul>
+<div class="warn"><strong>Đừng chạy thử script mới trên dữ liệu thật</strong>Luôn thử trên thư mục mẫu trước, như cách bài này tạo <code>tai_ve_mau</code>. Với dữ liệu quan trọng, sao lưu trước khi chạy thật.</div>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Kiểm tra chế độ chạy thử</h3>
+<p>Tạo thư mục mẫu với ít nhất 10 file thuộc đủ các nhóm, có trùng tên ở đích và có file tải dở. Chạy chế độ thử, đối chiếu log với dự đoán của bạn, rồi xác nhận <strong>không file nào bị di chuyển</strong>.</p>
+<details><summary>Xem gợi ý</summary>
+<p>Đếm số file trước và sau khi chạy thử bằng <code>len([p for p in mau.iterdir() if p.is_file()])</code>: hai con số phải bằng nhau. Mở <code>bao_cao_don_dep.json</code>, kiểm tra <code>"chay_that": false</code>.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. File cũ vào thư mục Cu</h3>
+<p>Thêm quy tắc: file sửa lần cuối hơn 30 ngày trước thì chuyển vào <code>Cu/&lt;nhóm&gt;/</code>. Viết thành một hàm thuần nhận thời điểm hiện tại làm tham số để dễ thử.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import os
+import time
+from pathlib import Path
+
+NGAY = 24 * 3600
+
+
+def thu_muc_dich(nhom: str, mtime: float, bay_gio: float, so_ngay_cu: int = 30) -&gt; str:
+    """'Anh' hoặc 'Cu/Anh' tùy file đã cũ chưa."""
+    return f"Cu/{nhom}" if bay_gio - mtime &gt; so_ngay_cu * NGAY else nhom
+
+
+bay_gio = time.time()
+p = Path("anh_cu.png")
+p.write_text("x", encoding="utf-8")
+os.utime(p, (bay_gio - 45 * NGAY, bay_gio - 45 * NGAY))   # giả lập file sửa 45 ngày trước
+
+print(thu_muc_dich("Anh", p.stat().st_mtime, bay_gio))
+print(thu_muc_dich("Anh", bay_gio - 2 * NGAY, bay_gio))</code></pre>
+<pre><code class="language-text">Cu/Anh
+Anh</code></pre>
+<p>Trong <code>don_dep</code>, thay <code>nguon / nhom / p.name</code> bằng <code>nguon / thu_muc_dich(nhom, p.stat().st_mtime, bay_gio) / p.name</code> và đổi <code>mkdir(exist_ok=True)</code> thành <code>mkdir(parents=True, exist_ok=True)</code> vì giờ có hai cấp thư mục.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/library/shutil.html#shutil.move" rel="noopener" target="_blank">shutil.move</a>; <a href="https://docs.python.org/3/library/exceptions.html#os-exceptions" rel="noopener" target="_blank">OS exceptions</a>; <a href="https://docs.python.org/3/library/pathlib.html" rel="noopener" target="_blank">pathlib</a>.</p>

@@ -1,0 +1,159 @@
+<p>Tìm mọi số điện thoại trong một đoạn văn, lấy mã đơn hàng khỏi tiêu đề email, kiểm tra định dạng email, tách giờ và mức lỗi khỏi từng dòng log: các phương thức chuỗi như <code>split</code>, <code>find</code> không đủ. <strong>Biểu thức chính quy</strong> (regular expression, regex) là một ngôn ngữ nhỏ để mô tả <em>mẫu</em> văn bản. Module <code>re</code> có sẵn trong Python.</p>
+
+<h2>1. Mẫu cơ bản</h2>
+<pre><code class="language-python">import re
+
+van_ban = "Đơn DH2026-0157 giao ngày 29/10, đơn DH2026-0158 giao ngày 30/10."
+print(re.findall(r"DH\d{4}-\d{4}", van_ban))
+print(re.findall(r"\d{1,2}/\d{1,2}", van_ban))</code></pre>
+<pre><code class="language-text">['DH2026-0157', 'DH2026-0158']
+['29/10', '30/10']</code></pre>
+<p>Luôn viết mẫu bằng <strong>chuỗi thô</strong> <code>r"..."</code> để dấu <code>\</code> không bị Python hiểu thành ký tự đặc biệt. Bảng ký hiệu dùng nhiều nhất:</p>
+<table>
+  <thead><tr><th>Mẫu</th><th>Khớp</th></tr></thead>
+  <tbody>
+    <tr><td><code>\d</code>, <code>\w</code>, <code>\s</code></td><td>Một chữ số; một ký tự chữ, số hoặc <code>_</code> (gồm cả chữ có dấu); một khoảng trắng</td></tr>
+    <tr><td><code>\D</code>, <code>\W</code>, <code>\S</code></td><td>Ngược lại của ba mẫu trên</td></tr>
+    <tr><td><code>.</code></td><td>Một ký tự bất kỳ trừ xuống dòng</td></tr>
+    <tr><td><code>[abc]</code>, <code>[0-9]</code>, <code>[^,]</code></td><td>Một ký tự trong tập; khoảng; ký tự <em>không</em> phải dấu phẩy</td></tr>
+    <tr><td><code>*</code>, <code>+</code>, <code>?</code></td><td>0 lần trở lên; 1 lần trở lên; 0 hoặc 1 lần</td></tr>
+    <tr><td><code>{3}</code>, <code>{2,4}</code></td><td>Đúng 3 lần; từ 2 đến 4 lần</td></tr>
+    <tr><td><code>^</code>, <code>$</code></td><td>Đầu chuỗi (dòng); cuối chuỗi (dòng)</td></tr>
+    <tr><td><code>\b</code></td><td>Ranh giới từ</td></tr>
+    <tr><td><code>a|b</code>, <code>(...)</code></td><td>a hoặc b; nhóm</td></tr>
+    <tr><td><code>\.</code>, <code>\+</code></td><td>Dấu chấm, dấu cộng thật (thoát ký tự đặc biệt)</td></tr>
+  </tbody>
+</table>
+
+<h2>2. Các hàm của module re</h2>
+<pre><code class="language-python">import re
+
+s = "Liên hệ: an@cty.vn hoặc 0912 345 678. Hotline +84 28 3822 1234."
+
+m = re.search(r"\w+@\w+\.\w+", s)          # vị trí khớp ĐẦU TIÊN, hoặc None
+if m:
+    print(m.group(), m.start(), m.end())
+
+print(re.match(r"\d", s))                  # chỉ khớp ở ĐẦU chuỗi → None
+print(re.fullmatch(r"\d{10}", "0912345678") is not None)   # khớp TOÀN BỘ chuỗi
+print(re.sub(r"\s+", " ", "nhiều    khoảng    trắng"))    # thay thế
+print(re.split(r"[,;]\s*", "Hà Nội, Huế;Đà Nẵng,  Cần Thơ"))
+print(re.sub(r"(\d{4}) (\d{3}) (\d{3})", r"\1.\2.\3", s))  # dùng lại nhóm khi thay</code></pre>
+<pre><code class="language-text">an@cty.vn 9 18
+None
+True
+nhiều khoảng trắng
+['Hà Nội', 'Huế', 'Đà Nẵng', 'Cần Thơ']
+Liên hệ: an@cty.vn hoặc 0912.345.678. Hotline +84 28 3822 1234.</code></pre>
+<ul>
+  <li><code>search</code> tìm ở bất kỳ đâu, <code>match</code> chỉ ở đầu chuỗi, <code>fullmatch</code> cả chuỗi (dùng để <strong>kiểm tra định dạng</strong>).</li>
+  <li><code>findall</code> trả list mọi chuỗi khớp; <code>finditer</code> trả từng đối tượng khớp (khi cần vị trí hoặc nhóm).</li>
+  <li><code>sub</code> thay thế; trong chuỗi thay thế, <code>\1</code>, <code>\2</code> là nội dung nhóm 1, 2.</li>
+</ul>
+
+<h2>3. Nhóm và nhóm có tên</h2>
+<pre><code class="language-python">import re
+
+dong_log = [
+    "2026-10-29 08:15:02 INFO  dang_nhap user=an",
+    "2026-10-29 08:15:09 ERROR thanh_toan ma=503 thoi_gian=2300ms",
+    "2026-10-29 09:02:44 ERROR thanh_toan ma=504 thoi_gian=30000ms",
+]
+MAU = re.compile(r"^(?P&lt;ngay&gt;\S+) (?P&lt;gio&gt;\d{2}):\d{2}:\d{2} (?P&lt;muc&gt;[A-Z]+)\s+(?P&lt;module&gt;\w+)")
+
+for dong in dong_log:
+    m = MAU.match(dong)
+    print(m["gio"], m["muc"], m["module"], m.groupdict()["ngay"])
+
+ma_loi = [int(x) for x in re.findall(r"ma=(\d+)", " ".join(dong_log))]
+print(ma_loi)</code></pre>
+<pre><code class="language-text">08 INFO dang_nhap 2026-10-29
+08 ERROR thanh_toan 2026-10-29
+09 ERROR thanh_toan 2026-10-29
+[503, 504]</code></pre>
+<ul>
+  <li><code>(?P&lt;ten&gt;...)</code> đặt tên cho nhóm, lấy bằng <code>m["ten"]</code> hoặc <code>m.groupdict()</code>. Mẫu dài nên luôn dùng nhóm có tên: đọc lại sau một tháng vẫn hiểu.</li>
+  <li>Khi mẫu có <strong>một</strong> nhóm, <code>findall</code> trả nội dung nhóm thay vì cả chuỗi khớp (như <code>ma=(\d+)</code> trả số).</li>
+  <li><code>re.compile</code> biên dịch mẫu một lần, dùng lại nhiều lần; hợp khi mẫu dùng trong vòng lặp hoặc ở nhiều hàm.</li>
+</ul>
+
+<h2>4. Tham lam và không tham lam</h2>
+<pre><code class="language-python">import re
+
+html = '&lt;b&gt;Giá&lt;/b&gt;: &lt;b&gt;250.000đ&lt;/b&gt;'
+print(re.findall(r"&lt;b&gt;(.*)&lt;/b&gt;", html))     # tham lam: lấy dài nhất có thể
+print(re.findall(r"&lt;b&gt;(.*?)&lt;/b&gt;", html))    # thêm ?: lấy ngắn nhất</code></pre>
+<pre><code class="language-text">['Giá&lt;/b&gt;: &lt;b&gt;250.000đ']
+['Giá', '250.000đ']</code></pre>
+<p><code>*</code>, <code>+</code> mặc định "tham lam", nuốt càng nhiều càng tốt. Thêm <code>?</code> phía sau (<code>*?</code>, <code>+?</code>) để lấy ít nhất. Ví dụ này chỉ để minh họa: đừng dùng regex để phân tích HTML thật, hãy dùng thư viện chuyên dụng như BeautifulSoup.</p>
+
+<h2>5. Cờ hay dùng</h2>
+<pre><code class="language-python">import re
+
+print(re.findall(r"python", "Python, PYTHON, python", flags=re.IGNORECASE))
+van_ban = "dòng 1: OK\ndòng 2: LỖI\ndòng 3: OK"
+print(re.findall(r"^dòng (\d+): LỖI$", van_ban, flags=re.MULTILINE))
+MAU_GIA = re.compile(r"""
+    (?P&lt;so&gt;\d{1,3}(?:\.\d{3})*)   # 1.250.000: nhóm 3 chữ số cách bằng dấu chấm
+    \s*(?:đ|VND|vnđ)             # đơn vị
+""", re.VERBOSE | re.IGNORECASE)
+print([m["so"] for m in MAU_GIA.finditer("Giá 1.250.000 đ, giảm còn 990.000VND")])</code></pre>
+<pre><code class="language-text">['Python', 'PYTHON', 'python']
+['2']
+['1.250.000', '990.000']</code></pre>
+<p><code>re.VERBOSE</code> cho phép viết mẫu nhiều dòng kèm chú thích, rất nên dùng cho mẫu phức tạp. <code>(?:...)</code> là nhóm không bắt (chỉ để gom, không tạo nhóm kết quả).</p>
+<div class="tip"><strong>Khi nào KHÔNG dùng regex</strong>Kiểm tra chuỗi bắt đầu bằng gì: <code>startswith</code>. Tách CSV: module <code>csv</code>. Đọc JSON: <code>json</code>. Phân tích HTML: BeautifulSoup. Kiểm tra email "đúng tuyệt đối": gần như không thể bằng regex, hãy kiểm tra sơ bộ rồi gửi email xác nhận. Regex mạnh nhưng khó đọc; dùng công cụ đơn giản nhất làm được việc.</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Mẫu viết bằng <code>r"..."</code>; <code>\d \w \s . [] * + ? {m,n} ^ $ \b | ()</code>.</li>
+  <li><code>search</code>, <code>match</code>, <code>fullmatch</code>, <code>findall</code>, <code>finditer</code>, <code>sub</code>, <code>split</code>; <code>compile</code> để dùng lại.</li>
+  <li>Nhóm có tên <code>(?P&lt;ten&gt;...)</code>; không tham lam <code>*?</code>; cờ <code>IGNORECASE</code>, <code>MULTILINE</code>, <code>VERBOSE</code>.</li>
+  <li>Thử mẫu trên regex101.com (chọn Python) trước khi đưa vào code.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Số điện thoại di động</h3>
+<p>Trích mọi số di động Việt Nam (bắt đầu bằng <code>0</code> hoặc <code>+84</code>, sau đó là 9 chữ số bắt đầu bằng 3, 5, 7, 8 hoặc 9; có thể có dấu cách hoặc dấu chấm phân cách) và chuẩn hóa về dạng <code>0xxxxxxxxx</code>.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import re
+
+van_ban = "Gọi 0912.345.678 hoặc +84 987 654 321; bàn: 028 3822 1234; sai: 0123456789, 09123456789."
+MAU = re.compile(r"(?&lt;!\d)(?:\+84|0)[\s.]?([35789]\d{2})[\s.]?(\d{3})[\s.]?(\d{3})(?!\d)")
+ket_qua = ["0" + "".join(m.groups()) for m in MAU.finditer(van_ban)]
+print(ket_qua)</code></pre>
+<pre><code class="language-text">['0912345678', '0987654321']</code></pre>
+<p><code>(?&lt;!\d)</code> và <code>(?!\d)</code> là "nhìn quanh": đảm bảo trước và sau số không dính thêm chữ số, nên <code>09123456789</code> (11 số) bị loại. Số bàn <code>028...</code> bị loại vì chữ số sau 0 là 2. Ba nhóm 3-3-3 chữ số cho phép có hoặc không có dấu cách, dấu chấm ở giữa; ghép ba nhóm lại và thêm <code>0</code> phía trước là ra dạng chuẩn. Đầu số di động thay đổi theo quy hoạch; dự án thật nên cập nhật theo danh sách đầu số hiện hành.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Đếm lỗi theo giờ</h3>
+<p>Từ file log có dạng ở mục 3, đếm số dòng ERROR theo từng giờ bằng nhóm có tên và <code>Counter</code>.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import re
+from collections import Counter
+from pathlib import Path
+
+Path("app.log").write_text(
+    "2026-10-29 08:15:02 INFO  dang_nhap\n"
+    "2026-10-29 08:15:09 ERROR thanh_toan\n"
+    "2026-10-29 08:40:00 ERROR thanh_toan\n"
+    "dòng rác không đúng định dạng\n"
+    "2026-10-29 09:02:44 ERROR kho\n",
+    encoding="utf-8",
+)
+MAU = re.compile(r"^\S+ (?P&lt;gio&gt;\d{2}):\d{2}:\d{2} (?P&lt;muc&gt;[A-Z]+)\b")
+dem = Counter()
+with open("app.log", encoding="utf-8") as f:
+    for dong in f:
+        m = MAU.match(dong)
+        if m and m["muc"] == "ERROR":
+            dem[m["gio"] + "h"] += 1
+print(dict(sorted(dem.items())))</code></pre>
+<pre><code class="language-text">{'08h': 2, '09h': 1}</code></pre>
+<p>Dòng không khớp mẫu (<code>m</code> là <code>None</code>) bị bỏ qua thay vì làm chương trình dừng. Với log thật, nên đếm luôn số dòng không khớp để phát hiện định dạng log bị đổi.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/howto/regex.html" rel="noopener" target="_blank">Regular Expression HOWTO</a>; <a href="https://docs.python.org/3/library/re.html" rel="noopener" target="_blank">re: Regular expression operations</a>; <a href="https://regex101.com/" rel="noopener" target="_blank">regex101</a>.</p>

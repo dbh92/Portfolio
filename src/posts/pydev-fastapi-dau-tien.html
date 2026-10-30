@@ -1,0 +1,171 @@
+<p><strong>FastAPI</strong> là framework xây Web API phổ biến bậc nhất của Python hiện nay. Bạn khai báo kiểu dữ liệu bằng type hint như đã học ở chặng 5, FastAPI tự kiểm tra dữ liệu vào, chuyển đổi dữ liệu ra, trả lỗi rõ ràng và sinh tài liệu tương tác. Bài này xây API "sổ ghi chú" đầu tiên, lưu trong bộ nhớ; hai bài sau sẽ thêm cơ sở dữ liệu và đăng nhập.</p>
+
+<h2>1. Cài đặt và Hello World</h2>
+<pre><code class="language-text">$ uv init --no-package so-ghi-chu &amp;&amp; cd so-ghi-chu
+$ uv add "fastapi[standard]"</code></pre>
+<p>Gói <code>fastapi[standard]</code> kèm sẵn máy chủ Uvicorn, lệnh <code>fastapi</code> và các thư viện hay dùng. Tạo <code>main.py</code>:</p>
+<pre><code class="language-python"># (minh họa) main.py tối giản
+from fastapi import FastAPI
+
+app = FastAPI()
+
+
+@app.get("/")
+def trang_chu() -&gt; dict[str, str]:
+    return {"thong_diep": "Xin chào từ FastAPI"}</code></pre>
+<pre><code class="language-text">$ uv run fastapi dev main.py
+ ⚡️ Starting FastAPI in development mode
+ 🌐 Server started at http://127.0.0.1:8000
+    Documentation at http://127.0.0.1:8000/docs
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Application startup complete.</code></pre>
+<p>Mở <code>http://127.0.0.1:8000</code> trong trình duyệt sẽ thấy <code>{"thong_diep":"Xin chào từ FastAPI"}</code>. <code>@app.get("/")</code> là decorator (chặng 5) đăng ký hàm xử lý cho <code>GET /</code>; giá trị trả về (dict, list, đối tượng Pydantic) được tự chuyển thành JSON. <code>fastapi dev</code> tự khởi động lại mỗi khi bạn lưu file; chạy thật dùng <code>fastapi run</code>.</p>
+
+<h2>2. API sổ ghi chú hoàn chỉnh</h2>
+<pre><code class="language-python">from datetime import datetime
+from typing import Annotated
+
+from fastapi import FastAPI, HTTPException, Query, status
+from pydantic import BaseModel, Field
+
+app = FastAPI(title="Sổ ghi chú", version="0.1.0")
+
+
+class GhiChuTao(BaseModel):
+    """Dữ liệu client gửi lên khi tạo ghi chú."""
+
+    tieu_de: str = Field(min_length=1, max_length=100)
+    noi_dung: str = ""
+    the: list[str] = []
+
+
+class GhiChu(GhiChuTao):
+    """Dữ liệu API trả về: thêm id và thời điểm tạo."""
+
+    id: int
+    tao_luc: datetime
+
+
+KHO: dict[int, GhiChu] = {}  # lưu trong bộ nhớ: mất khi tắt máy chủ (bài sau dùng CSDL)
+id_ke_tiep = 1
+
+
+@app.get("/")
+def trang_chu() -&gt; dict[str, str]:
+    return {"thong_diep": "Xin chào từ FastAPI"}
+
+
+@app.post("/ghi-chu", status_code=status.HTTP_201_CREATED)
+def tao_ghi_chu(du_lieu: GhiChuTao) -&gt; GhiChu:
+    global id_ke_tiep
+    gc = GhiChu(id=id_ke_tiep, tao_luc=datetime.now(), **du_lieu.model_dump())
+    KHO[gc.id] = gc
+    id_ke_tiep += 1
+    return gc
+
+
+@app.get("/ghi-chu")
+def liet_ke(
+    tu_khoa: str | None = None,
+    skip: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -&gt; list[GhiChu]:
+    ket_qua = list(KHO.values())
+    if tu_khoa:
+        k = tu_khoa.casefold()
+        ket_qua = [g for g in ket_qua if k in g.tieu_de.casefold() or k in g.noi_dung.casefold()]
+    return ket_qua[skip : skip + limit]
+
+
+@app.get("/ghi-chu/{ghi_chu_id}")
+def xem(ghi_chu_id: int) -&gt; GhiChu:
+    if ghi_chu_id not in KHO:
+        raise HTTPException(status_code=404, detail="Không tìm thấy ghi chú")
+    return KHO[ghi_chu_id]
+
+
+@app.delete("/ghi-chu/{ghi_chu_id}", status_code=status.HTTP_204_NO_CONTENT)
+def xoa(ghi_chu_id: int) -&gt; None:
+    if KHO.pop(ghi_chu_id, None) is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy ghi chú")</code></pre>
+<p>Hơn 60 dòng, đủ 4 endpoint, kiểm tra dữ liệu và tài liệu tự động. Phần tiếp theo giải thích từng thành phần.</p>
+
+<h2>3. Pydantic model: khai báo và kiểm tra dữ liệu</h2>
+<p><code>GhiChuTao</code> kế thừa <code>BaseModel</code> của Pydantic: khai báo trường bằng type hint, ràng buộc bằng <code>Field</code>. Khi endpoint có tham số kiểu model (<code>du_lieu: GhiChuTao</code>), FastAPI đọc body JSON, kiểm tra từng trường, chuyển kiểu, và chỉ gọi hàm của bạn khi dữ liệu hợp lệ. Gửi tiêu đề rỗng:</p>
+<pre><code class="language-text">$ curl -s -X POST localhost:8000/ghi-chu -H "Content-Type: application/json" -d '{"tieu_de": ""}'
+{"detail":[{"type":"string_too_short","loc":["body","tieu_de"],"msg":"String should have at least 1 character","input":"","ctx":{"min_length":1}}]}</code></pre>
+<p>Mã 422 kèm vị trí lỗi (<code>body → tieu_de</code>) và lý do, bạn không viết dòng kiểm tra nào. Tách hai model <code>GhiChuTao</code> (client gửi lên) và <code>GhiChu</code> (API trả về, có thêm <code>id</code>, <code>tao_luc</code>) là thói quen quan trọng: client không được tự đặt <code>id</code>. Kiểu trả về <code>-&gt; GhiChu</code> khiến FastAPI kiểm tra và lọc dữ liệu ra theo đúng model: lỡ trả thừa trường bí mật (như mật khẩu đã băm ở bài sau) thì trường đó bị loại bỏ.</p>
+
+<h2>4. Path parameter và query parameter</h2>
+<pre><code class="language-text">$ curl -s localhost:8000/ghi-chu/abc
+{"detail":[{"type":"int_parsing","loc":["path","ghi_chu_id"],"msg":"Input should be a valid integer, unable to parse string as an integer","input":"abc"}]}
+$ curl -s "localhost:8000/ghi-chu?limit=500"
+{"detail":[{"type":"less_than_equal","loc":["query","limit"],"msg":"Input should be less than or equal to 100","input":"500","ctx":{"le":100}}]}
+$ curl -s "localhost:8000/ghi-chu?tu_khoa=sữa"
+[{"tieu_de":"Mua sữa","noi_dung":"2 hộp không đường","the":["việc nhà"],"id":1,"tao_luc":"2026-10-29T16:35:24.215696"}]</code></pre>
+<ul>
+  <li>Tham số có tên trùng với <code>{ghi_chu_id}</code> trong đường dẫn là <strong>path parameter</strong>; kiểu <code>int</code> làm FastAPI tự chuyển <code>"42"</code> thành 42 và từ chối <code>"abc"</code>.</li>
+  <li>Tham số còn lại có kiểu đơn giản là <strong>query parameter</strong>; có giá trị mặc định thì không bắt buộc. <code>str | None = None</code> nghĩa là tùy chọn.</li>
+  <li><code>Annotated[int, Query(ge=0)]</code> thêm ràng buộc: lớn hơn hoặc bằng 0. Giới hạn <code>limit</code> tối đa 100 bảo vệ máy chủ khỏi request đòi trả hàng triệu bản ghi.</li>
+</ul>
+
+<h2>5. Lỗi và mã trạng thái</h2>
+<p><code>raise HTTPException(status_code=404, detail="...")</code> dừng xử lý và trả lỗi cho client, đúng mã trạng thái như đã thiết kế ở bài HTTP. <code>status_code=status.HTTP_201_CREATED</code> trong decorator đặt mã cho trường hợp thành công; <code>status</code> chứa sẵn hằng số cho mọi mã, đọc dễ hơn số trần. Endpoint xóa trả <code>204</code> không có body.</p>
+
+<h2>6. Tài liệu tự động /docs</h2>
+<p>Mở <code>http://127.0.0.1:8000/docs</code>: FastAPI sinh trang tài liệu Swagger UI từ code, liệt kê mọi endpoint, tham số, ràng buộc, model dữ liệu. Bấm <strong>Try it out</strong> để gửi request thật ngay trên trình duyệt. <code>/redoc</code> là một giao diện tài liệu khác; <code>/openapi.json</code> là bản mô tả OpenAPI dạng máy đọc được, dùng để sinh code client tự động. Tài liệu luôn khớp với code, vì nó <em>được sinh từ</em> code.</p>
+<div class="warn"><strong>Dữ liệu trong bộ nhớ chỉ để học</strong>Biến <code>KHO</code> mất sạch khi máy chủ khởi động lại (kể cả mỗi lần <code>fastapi dev</code> tự nạp lại khi bạn lưu file), và không dùng chung được khi chạy nhiều tiến trình. Bài sau thay bằng SQLite qua SQLAlchemy. <code>global id_ke_tiep</code> cũng chỉ chấp nhận được trong ví dụ này.</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li><code>uv add "fastapi[standard]"</code>; <code>fastapi dev main.py</code> khi phát triển, <code>fastapi run</code> khi chạy thật.</li>
+  <li><code>@app.get/post/patch/delete("/duong-dan/{id}")</code>; giá trị trả về tự thành JSON.</li>
+  <li>Pydantic <code>BaseModel</code> + <code>Field</code> cho body; tách model tạo và model trả về; kiểu trả về lọc dữ liệu ra.</li>
+  <li>Path parameter theo tên trong đường dẫn, query parameter có mặc định, ràng buộc bằng <code>Annotated[..., Query(...)]</code>.</li>
+  <li><code>HTTPException</code> cho lỗi; <code>/docs</code> để thử API.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Chạy và thử API</h3>
+<p>Chạy API sổ ghi chú, dùng <code>/docs</code> tạo 3 ghi chú, liệt kê, xem ghi chú số 2, xóa ghi chú số 1, rồi xem lại số 1 (phải là 404). Thử gửi body thiếu <code>tieu_de</code> và đọc lỗi 422.</p>
+<details><summary>Xem gợi ý</summary>
+<p>Thiếu trường bắt buộc cho lỗi kiểu <code>"type":"missing","loc":["body","tieu_de"]</code>. Thử thêm <code>"the": "abc"</code> (chuỗi thay vì list) để thấy Pydantic báo <code>list_type</code>. Mỗi lần lưu <code>main.py</code>, máy chủ nạp lại và dữ liệu mất: đúng như cảnh báo ở mục 6.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Lọc theo thẻ</h3>
+<p>Thêm query parameter <code>the</code> cho endpoint liệt kê: chỉ trả ghi chú có thẻ đó. Kết hợp được với <code>tu_khoa</code> và phân trang.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python"># (minh họa) thay hàm liet_ke trong main.py
+@app.get("/ghi-chu")
+def liet_ke(
+    tu_khoa: str | None = None,
+    the: str | None = None,
+    skip: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -&gt; list[GhiChu]:
+    ket_qua = list(KHO.values())
+    if tu_khoa:
+        k = tu_khoa.casefold()
+        ket_qua = [g for g in ket_qua if k in g.tieu_de.casefold() or k in g.noi_dung.casefold()]
+    if the:
+        ket_qua = [g for g in ket_qua if the in g.the]
+    return ket_qua[skip : skip + limit]</code></pre>
+<pre><code class="language-text">$ curl -s "localhost:8000/ghi-chu?the=việc%20nhà" | python -m json.tool --no-ensure-ascii
+[
+    {
+        "tieu_de": "Mua sữa",
+        "noi_dung": "2 hộp không đường",
+        "the": [
+            "việc nhà"
+        ],
+        "id": 1,
+        "tao_luc": "2026-10-29T16:35:24.215696"
+    }
+]</code></pre>
+<p>Thứ tự lọc rồi mới phân trang là quan trọng: phân trang trước sẽ làm mất kết quả khớp nằm ở trang sau. <code>python -m json.tool --no-ensure-ascii</code> định dạng JSON cho dễ đọc và giữ nguyên chữ có dấu. Ở bài sau, lọc sẽ do câu SQL làm thay vì duyệt list trong Python.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://fastapi.tiangolo.com/tutorial/first-steps/" rel="noopener" target="_blank">FastAPI: First Steps</a>; <a href="https://fastapi.tiangolo.com/tutorial/body/" rel="noopener" target="_blank">Request Body</a>; <a href="https://fastapi.tiangolo.com/tutorial/query-params-str-validations/" rel="noopener" target="_blank">Query Parameters and String Validations</a>; <a href="https://docs.pydantic.dev/latest/concepts/models/" rel="noopener" target="_blank">Pydantic: Models</a>.</p>

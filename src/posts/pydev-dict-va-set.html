@@ -1,0 +1,161 @@
+<p>Muốn biết giá của "cà phê sữa" trong một list 500 món, bạn phải duyệt từng phần tử. Với <strong>dict</strong>, bạn tra thẳng theo tên, nhanh như tra từ điển, dù có hàng triệu món. <strong>set</strong> là tập hợp không trùng, dùng để loại trùng và so sánh hai nhóm. Hai cấu trúc này cùng list là bộ ba bạn dùng mỗi ngày.</p>
+
+<h2>1. Dict: cặp khóa – giá trị</h2>
+<pre><code class="language-python">gia = {"cà phê": 25000, "trà sữa": 35000, "bánh mì": 20000}
+
+print(gia["trà sữa"])            # tra theo khóa
+gia["nước cam"] = 30000          # thêm mới
+gia["cà phê"] = 27000            # sửa
+del gia["bánh mì"]               # xóa
+print(gia)
+print(len(gia), "cà phê" in gia, 27000 in gia)</code></pre>
+<pre><code class="language-text">35000
+{'cà phê': 27000, 'trà sữa': 35000, 'nước cam': 30000}
+3 True False</code></pre>
+<ul>
+  <li>Khóa phải là kiểu <strong>bất biến</strong>: <code>str</code>, <code>int</code>, <code>tuple</code>... Không dùng list làm khóa.</li>
+  <li>Khóa không trùng; gán lại khóa cũ là sửa giá trị.</li>
+  <li><code>in</code> kiểm tra <strong>khóa</strong>, không kiểm tra giá trị.</li>
+  <li>Từ Python 3.7, dict giữ thứ tự chèn.</li>
+</ul>
+
+<h2>2. Đọc an toàn và duyệt dict</h2>
+<pre><code class="language-python">gia = {"cà phê": 27000, "trà sữa": 35000}
+
+# gia["sinh tố"] → KeyError vì không có khóa này
+print(gia.get("sinh tố"))            # None
+print(gia.get("sinh tố", 0))         # giá trị mặc định
+
+for mon in gia:                      # duyệt khóa
+    print(mon, end="; ")
+print()
+for mon, tien in gia.items():        # duyệt cặp khóa, giá trị
+    print(f"{mon}: {tien:,}đ")
+print(list(gia.keys()), list(gia.values()))</code></pre>
+<pre><code class="language-text">None
+0
+cà phê; trà sữa;
+cà phê: 27,000đ
+trà sữa: 35,000đ
+['cà phê', 'trà sữa'] [27000, 35000]</code></pre>
+<p>Dùng <code>d[khoa]</code> khi khóa <strong>chắc chắn</strong> có (thiếu là lỗi logic, nên để chương trình báo lỗi). Dùng <code>d.get(khoa, mac_dinh)</code> khi khóa có thể thiếu.</p>
+
+<h2>3. Dict lồng nhau: mô tả một bản ghi</h2>
+<pre><code class="language-python">nhan_vien = [
+    {"ten": "An", "phong": "Kế toán", "luong": 15_000_000},
+    {"ten": "Bình", "phong": "IT", "luong": 22_000_000},
+    {"ten": "Chi", "phong": "IT", "luong": 18_000_000},
+]
+tong_theo_phong = {}
+for nv in nhan_vien:
+    phong = nv["phong"]
+    tong_theo_phong[phong] = tong_theo_phong.get(phong, 0) + nv["luong"]
+print(tong_theo_phong)
+
+cau_hinh = {"db": {"host": "localhost", "port": 5432}, "debug": True}
+print(cau_hinh["db"]["port"])</code></pre>
+<pre><code class="language-text">{'Kế toán': 15000000, 'IT': 40000000}
+5432</code></pre>
+<p>List chứa dict là dạng dữ liệu bạn gặp liên tục: dòng CSV, kết quả truy vấn CSDL, JSON từ Web API đều có dạng này. Mẫu <code>d[k] = d.get(k, 0) + x</code> dùng để cộng dồn theo nhóm.</p>
+
+<h2>4. Counter và defaultdict</h2>
+<p>Đếm và nhóm phổ biến đến mức module <code>collections</code> có sẵn công cụ riêng:</p>
+<pre><code class="language-python">from collections import Counter, defaultdict
+
+don = ["cà phê", "trà sữa", "cà phê", "bánh mì", "cà phê", "trà sữa"]
+dem = Counter(don)
+print(dem)
+print(dem["cà phê"], dem["sinh tố"])   # khóa thiếu trả 0, không lỗi
+print(dem.most_common(2))
+
+theo_chu_cai = defaultdict(list)       # khóa thiếu tự tạo list rỗng
+for mon in sorted(set(don)):
+    theo_chu_cai[mon[0]].append(mon)
+print(dict(theo_chu_cai))</code></pre>
+<pre><code class="language-text">Counter({'cà phê': 3, 'trà sữa': 2, 'bánh mì': 1})
+3 0
+[('cà phê', 3), ('trà sữa', 2)]
+{'b': ['bánh mì'], 'c': ['cà phê'], 't': ['trà sữa']}</code></pre>
+<p><code>Counter</code> là dict chuyên đếm; <code>most_common(n)</code> trả n phần tử nhiều nhất. <code>defaultdict(list)</code> giúp viết thẳng <code>d[k].append(x)</code> mà không cần kiểm tra khóa đã có chưa.</p>
+
+<h2>5. Set: tập hợp không trùng</h2>
+<pre><code class="language-python">the_loai = {"python", "web", "python", "data"}
+print(the_loai)                    # phần tử trùng bị loại, thứ tự không đảm bảo
+the_loai.add("ai")
+the_loai.discard("web")            # xóa, không lỗi nếu không có
+print(sorted(the_loai), "ai" in the_loai)
+
+rong = set()                       # {} là dict rỗng, không phải set rỗng</code></pre>
+<p>Set không có thứ tự và không có chỉ số (<code>the_loai[0]</code> lỗi), nên ví dụ trên in bằng <code>sorted()</code> để kết quả ổn định. Điểm mạnh của set: kiểm tra <code>in</code> cực nhanh và các phép toán tập hợp:</p>
+<pre><code class="language-python">lop_python = {"an@x.vn", "binh@x.vn", "chi@x.vn"}
+lop_sql = {"chi@x.vn", "dung@x.vn"}
+
+print(sorted(lop_python &amp; lop_sql))   # giao: học cả hai
+print(sorted(lop_python | lop_sql))   # hợp: học ít nhất một
+print(sorted(lop_python - lop_sql))   # hiệu: chỉ học Python
+print(sorted(lop_python ^ lop_sql))   # hiệu đối xứng: chỉ học một lớp</code></pre>
+<pre><code class="language-text">['chi@x.vn']
+['an@x.vn', 'binh@x.vn', 'chi@x.vn', 'dung@x.vn']
+['an@x.vn', 'binh@x.vn']
+['an@x.vn', 'binh@x.vn', 'dung@x.vn']</code></pre>
+<div class="tip"><strong>Vì sao dict và set tra cứu nhanh?</strong>Chúng dùng <strong>bảng băm</strong>: Python tính "mã băm" của khóa để nhảy thẳng tới vị trí lưu, nên thời gian tra cứu gần như không đổi dù có 10 hay 10 triệu phần tử. Tìm trong list thì phải so lần lượt. Ở chặng 10 bạn sẽ tự đo sự khác biệt này.</div>
+
+<h2>6. Chọn cấu trúc nào?</h2>
+<table>
+  <thead><tr><th>Cần</th><th>Dùng</th></tr></thead>
+  <tbody>
+    <tr><td>Dãy có thứ tự, thêm bớt, có thể trùng</td><td><code>list</code></td></tr>
+    <tr><td>Bản ghi cố định vài thành phần</td><td><code>tuple</code></td></tr>
+    <tr><td>Tra cứu theo khóa, đếm, nhóm</td><td><code>dict</code>, <code>Counter</code>, <code>defaultdict</code></td></tr>
+    <tr><td>Loại trùng, kiểm tra thành viên, so sánh nhóm</td><td><code>set</code></td></tr>
+  </tbody>
+</table>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li><code>d[k]</code> khi chắc có khóa, <code>d.get(k, mac_dinh)</code> khi không chắc; duyệt bằng <code>.items()</code>.</li>
+  <li><code>Counter</code> để đếm, <code>defaultdict(list)</code> để nhóm.</li>
+  <li>Set: không trùng, không thứ tự; <code>&amp;</code>, <code>|</code>, <code>-</code>, <code>^</code>; set rỗng là <code>set()</code>.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Đếm từ</h3>
+<p>Đếm số lần xuất hiện mỗi từ (không phân biệt hoa thường, bỏ dấu câu <code>.,!?</code>) trong đoạn văn, in 5 từ nhiều nhất.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">from collections import Counter
+
+doan_van = """Python dễ học. Python mạnh mẽ! Học Python để làm web,
+làm dữ liệu, làm tự động hóa. Dễ học, dễ dùng."""
+
+for dau in ".,!?":
+    doan_van = doan_van.replace(dau, " ")
+dem = Counter(doan_van.lower().split())
+for tu, so_lan in dem.most_common(5):
+    print(f"{tu:&lt;8}{so_lan}")</code></pre>
+<pre><code class="language-text">python  3
+dễ      3
+học     3
+làm     3
+mạnh    1</code></pre>
+<p>Khi nhiều từ cùng số lần, <code>most_common</code> giữ thứ tự xuất hiện đầu tiên. Ở chặng 7 bạn sẽ tách từ gọn hơn bằng biểu thức chính quy.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. So sánh hai danh sách đăng ký</h3>
+<p>Với hai list email (có thể trùng, lẫn hoa thường), in số người học cả hai khóa, danh sách người chỉ học một khóa.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">khoa_a = ["An@x.vn", "binh@x.vn", "chi@x.vn", "an@x.vn"]
+khoa_b = ["CHI@x.vn", "dung@x.vn", "binh@x.vn"]
+
+a = {e.lower() for e in khoa_a}
+b = {e.lower() for e in khoa_b}
+print("Học cả hai:", len(a &amp; b))
+print("Chỉ học một khóa:", sorted(a ^ b))</code></pre>
+<pre><code class="language-text">Học cả hai: 2
+Chỉ học một khóa: ['an@x.vn', 'dung@x.vn']</code></pre>
+<p><code>{e.lower() for e in khoa_a}</code> là set comprehension: tạo set từ các email đã chuyển chữ thường. Chuẩn hóa dữ liệu trước khi so sánh là bước không thể bỏ qua với dữ liệu thật.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/tutorial/datastructures.html#dictionaries" rel="noopener" target="_blank">Python Tutorial: Dictionaries</a>; <a href="https://docs.python.org/3/library/collections.html" rel="noopener" target="_blank">collections: Container datatypes</a>; <a href="https://docs.python.org/3/library/stdtypes.html#set-types-set-frozenset" rel="noopener" target="_blank">Set Types</a>.</p>

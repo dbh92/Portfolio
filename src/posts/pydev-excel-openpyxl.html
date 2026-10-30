@@ -1,0 +1,171 @@
+<p>Ở hầu hết công ty Việt Nam, báo cáo cuối cùng vẫn là một file Excel. Tự động hóa Excel bằng Python là một trong những kỹ năng mang lại giá trị nhanh nhất: việc gộp 30 file doanh thu chi nhánh mất cả buổi chiều có thể còn vài giây. Bài này dùng <strong>openpyxl</strong>, thư viện đọc ghi file <code>.xlsx</code> phổ biến nhất, chạy được mà không cần cài Excel.</p>
+
+<h2>1. Tạo và ghi file</h2>
+<p>Cài: <code>uv add openpyxl</code>.</p>
+<pre><code class="language-python">from openpyxl import Workbook
+
+wb = Workbook()                     # file mới, có sẵn một sheet
+ws = wb.active
+ws.title = "Doanh thu"
+
+ws["A1"] = "Chi nhánh"              # ghi theo địa chỉ ô
+ws["B1"] = "Tháng"
+ws["C1"] = "Doanh thu"
+du_lieu = [("Hà Nội", 10, 1_250_000_000), ("Đà Nẵng", 10, 640_000_000), ("TP.HCM", 10, 1_830_000_000)]
+for dong in du_lieu:
+    ws.append(dong)                 # thêm vào dòng trống kế tiếp
+
+ws.cell(row=5, column=1, value="Tổng")
+ws["C5"] = "=SUM(C2:C4)"            # công thức Excel: lưu dạng chuỗi bắt đầu bằng =
+wb.save("doanh_thu.xlsx")
+print(ws.max_row, ws.max_column, ws["A3"].value, ws.cell(row=4, column=3).value)</code></pre>
+<pre><code class="language-text">5 3 Đà Nẵng 1830000000</code></pre>
+<ul>
+  <li><strong>Workbook</strong> là file, <strong>Worksheet</strong> là sheet, <strong>Cell</strong> là ô. Truy cập ô bằng địa chỉ <code>ws["C2"]</code> hoặc số <code>ws.cell(row=2, column=3)</code> (đánh số từ 1, không phải 0).</li>
+  <li><code>ws.append(list_hoac_tuple)</code> là cách nhanh nhất để ghi từng dòng dữ liệu.</li>
+  <li>Công thức được lưu nguyên văn; Excel tính khi mở file. openpyxl <strong>không</strong> tự tính công thức.</li>
+</ul>
+
+<h2>2. Định dạng cho ra dáng báo cáo</h2>
+<pre><code class="language-python">from openpyxl import load_workbook
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+
+wb = load_workbook("doanh_thu.xlsx")
+ws = wb["Doanh thu"]
+
+dam = Font(bold=True, color="FFFFFF")
+nen = PatternFill("solid", fgColor="1F4E78")
+vien = Border(bottom=Side(style="thin", color="999999"))
+for o in ws[1]:                                  # ws[1] là cả dòng 1
+    o.font, o.fill = dam, nen
+    o.alignment = Alignment(horizontal="center")
+
+for dong in ws.iter_rows(min_row=2, min_col=3, max_col=3):
+    for o in dong:
+        o.number_format = "#,##0"                # phân cách hàng nghìn
+        o.border = vien
+ws["A5"].font = ws["C5"].font = Font(bold=True)
+
+ws.column_dimensions["A"].width = 14
+ws.column_dimensions["C"].width = 18
+ws.freeze_panes = "A2"                           # cố định dòng tiêu đề khi cuộn
+ws.auto_filter.ref = "A1:C4"                     # nút lọc trên tiêu đề
+wb.save("doanh_thu.xlsx")
+print(ws["C2"].number_format, ws.freeze_panes)</code></pre>
+<pre><code class="language-text">#,##0 A2</code></pre>
+<p><code>number_format</code> dùng đúng mã định dạng như trong hộp thoại Format Cells của Excel: <code>"#,##0"</code>, <code>"0.0%"</code>, <code>"dd/mm/yyyy"</code>. Excel hiển thị dấu phân cách theo cài đặt vùng của máy người mở (máy cài tiếng Việt sẽ thấy <code>1.250.000.000</code>), còn giá trị trong ô vẫn là số để cộng trừ, lọc, vẽ biểu đồ. Đây là lý do <strong>ghi số chứ không ghi chuỗi đã định dạng</strong> vào ô.</p>
+
+<h2>3. Đọc file</h2>
+<pre><code class="language-python">from openpyxl import load_workbook
+
+wb = load_workbook("doanh_thu.xlsx", data_only=True)   # data_only: lấy giá trị đã tính của công thức
+ws = wb.active
+print(wb.sheetnames)
+for chi_nhanh, thang, doanh_thu in ws.iter_rows(min_row=2, max_row=4, values_only=True):
+    print(f"{chi_nhanh:&lt;8} T{thang}: {doanh_thu / 1e9:.2f} tỷ")
+print(ws["C5"].value)</code></pre>
+<pre><code class="language-text">['Doanh thu']
+Hà Nội   T10: 1.25 tỷ
+Đà Nẵng  T10: 0.64 tỷ
+TP.HCM   T10: 1.83 tỷ
+None</code></pre>
+<p><code>iter_rows(values_only=True)</code> trả từng dòng thành tuple giá trị, tiện mở gói thẳng vào biến. Chú ý dòng cuối: <code>data_only=True</code> đọc giá trị công thức mà Excel đã tính và lưu lần cuối. File do openpyxl tạo chưa từng được mở bằng Excel nên chưa có giá trị đó, kết quả là <code>None</code>. Nếu cần con số tổng trong Python, hãy tự tính bằng Python thay vì đọc lại công thức.</p>
+<div class="warn"><strong>Bẫy hay gặp khi đọc file Excel thật</strong>File người dùng gửi thường có dòng tiêu đề không ở dòng 1, ô gộp, dòng trống giữa bảng, số lưu dạng chữ (<code>"1.250.000"</code>), ngày lưu dạng chuỗi. Luôn kiểm tra kiểu từng giá trị và viết hàm làm sạch riêng. openpyxl chỉ đọc <code>.xlsx</code>; file <code>.xls</code> cũ cần chuyển đổi hoặc dùng thư viện khác.</div>
+
+<h2>4. Gộp nhiều file thành một</h2>
+<p>Bài toán kinh điển: mỗi chi nhánh gửi một file <code>doanh_thu_&lt;chi_nhanh&gt;.xlsx</code> cùng cấu trúc, cần gộp vào một sheet.</p>
+<pre><code class="language-python">from pathlib import Path
+
+from openpyxl import Workbook, load_workbook
+
+# Tạo dữ liệu mẫu: 3 file chi nhánh
+thu_muc = Path("bao_cao_chi_nhanh")
+thu_muc.mkdir(exist_ok=True)
+for cn, so in {"ha_noi": [120, 95], "da_nang": [60], "hcm": [210, 180, 75]}.items():
+    wb = Workbook()
+    wb.active.append(["Mã đơn", "Số tiền"])
+    for i, tien in enumerate(so, 1):
+        wb.active.append([f"{cn[:2].upper()}{i:03d}", tien * 1000])
+    wb.save(thu_muc / f"doanh_thu_{cn}.xlsx")
+
+
+def gop(thu_muc: Path, dich: Path) -&gt; int:
+    ket_qua = Workbook()
+    ws_ra = ket_qua.active
+    ws_ra.title = "Tổng hợp"
+    ws_ra.append(["Chi nhánh", "Mã đơn", "Số tiền"])
+    so_dong = 0
+    for p in sorted(thu_muc.glob("doanh_thu_*.xlsx")):
+        chi_nhanh = p.stem.removeprefix("doanh_thu_")
+        ws_vao = load_workbook(p, read_only=True).active
+        for ma, tien in ws_vao.iter_rows(min_row=2, values_only=True):
+            if ma is None:                     # bỏ dòng trống
+                continue
+            ws_ra.append([chi_nhanh, ma, tien])
+            so_dong += 1
+    ws_ra.append(["Tổng", None, f"=SUM(C2:C{so_dong + 1})"])
+    ket_qua.save(dich)
+    return so_dong
+
+
+print(gop(thu_muc, Path("tong_hop.xlsx")), "dòng")
+for dong in load_workbook("tong_hop.xlsx").active.iter_rows(values_only=True):
+    print(dong)</code></pre>
+<pre><code class="language-text">6 dòng
+('Chi nhánh', 'Mã đơn', 'Số tiền')
+('da_nang', 'DA001', 60000)
+('ha_noi', 'HA001', 120000)
+('ha_noi', 'HA002', 95000)
+('hcm', 'HC001', 210000)
+('hcm', 'HC002', 180000)
+('hcm', 'HC003', 75000)
+('Tổng', None, '=SUM(C2:C7)')</code></pre>
+<p><code>read_only=True</code> giúp đọc file lớn nhanh và tốn ít bộ nhớ. Với dữ liệu phân tích phức tạp (lọc, nhóm, pivot), pandas ở chặng 8 gọn hơn nhiều: <code>pd.read_excel</code> rồi <code>pd.concat</code>. openpyxl mạnh ở chỗ kiểm soát chi tiết từng ô và định dạng.</p>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li><code>Workbook()</code> tạo mới, <code>load_workbook(p)</code> mở; <code>ws["A1"]</code>, <code>ws.cell(row, column)</code>, <code>ws.append()</code>.</li>
+  <li>Định dạng: <code>Font</code>, <code>PatternFill</code>, <code>Border</code>, <code>number_format</code>, <code>column_dimensions</code>, <code>freeze_panes</code>.</li>
+  <li>Đọc: <code>iter_rows(min_row=2, values_only=True)</code>; <code>data_only=True</code> lấy giá trị công thức đã lưu.</li>
+  <li>Ghi số vào ô và định dạng bằng <code>number_format</code>, không ghi chuỗi đã định dạng.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Báo cáo định dạng sẵn</h3>
+<p>Tạo <code>bao_cao.xlsx</code> từ list sản phẩm (tên, số lượng, đơn giá): cột thành tiền dùng công thức <code>=B*C</code>, tiêu đề in đậm nền xanh, cột tiền định dạng <code>#,##0</code>, dòng tổng dùng <code>SUM</code>.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill
+
+hang = [("Bàn phím", 3, 850_000), ("Chuột", 5, 250_000), ("Màn hình", 2, 3_900_000)]
+wb = Workbook()
+ws = wb.active
+ws.append(["Sản phẩm", "Số lượng", "Đơn giá", "Thành tiền"])
+for o in ws[1]:
+    o.font = Font(bold=True, color="FFFFFF")
+    o.fill = PatternFill("solid", fgColor="2E75B6")
+for i, (ten, sl, gia) in enumerate(hang, start=2):
+    ws.append([ten, sl, gia, f"=B{i}*C{i}"])
+cuoi = len(hang) + 1
+ws.append(["Tổng", f"=SUM(B2:B{cuoi})", None, f"=SUM(D2:D{cuoi})"])
+for cot in "CD":
+    for o in ws[cot][1:]:
+        o.number_format = "#,##0"
+    ws.column_dimensions[cot].width = 15
+ws.column_dimensions["A"].width = 14
+wb.save("bao_cao.xlsx")
+print([o.value for o in ws[cuoi + 1]])</code></pre>
+<pre><code class="language-text">['Tổng', '=SUM(B2:B4)', None, '=SUM(D2:D4)']</code></pre>
+<p>Mở file bằng Excel: cột Thành tiền tự tính, sửa số lượng thì tổng cập nhật ngay. Đó là ưu điểm của ghi công thức thay vì ghi kết quả tính sẵn.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Gộp file kèm tên file</h3>
+<p>Sửa hàm <code>gop</code> ở mục 4: bỏ qua file đang mở bởi Excel (tên bắt đầu bằng <code>~$</code>), định dạng cột tiền <code>#,##0</code>, và in số dòng lấy từ mỗi file.</p>
+<details><summary>Xem gợi ý</summary>
+<p>Excel tạo file khóa ẩn <code>~$doanh_thu_ha_noi.xlsx</code> khi đang mở file; mẫu <code>doanh_thu_*.xlsx</code> không khớp tên này nên đã an toàn, nhưng nếu đổi mẫu thành <code>*.xlsx</code> thì phải lọc <code>if p.name.startswith("~$"): continue</code>. Đếm số dòng mỗi file bằng một biến riêng trong vòng lặp ngoài, ghi log mức INFO thay vì <code>print</code> như chặng 3.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://openpyxl.readthedocs.io/en/stable/tutorial.html" rel="noopener" target="_blank">openpyxl: Tutorial</a>; <a href="https://openpyxl.readthedocs.io/en/stable/styles.html" rel="noopener" target="_blank">openpyxl: Working with styles</a>; <a href="https://openpyxl.readthedocs.io/en/stable/optimized.html" rel="noopener" target="_blank">openpyxl: Optimised modes (read-only)</a>.</p>

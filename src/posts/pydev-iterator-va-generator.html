@@ -1,0 +1,204 @@
+<p>Đọc file log 5 GB bằng <code>f.read()</code> là cách nhanh nhất để máy treo. Python có một cơ chế xử lý dữ liệu "từng phần tử một", không bao giờ nạp tất cả vào bộ nhớ: <strong>iterator</strong> và <strong>generator</strong>. Hiểu chúng, bạn sẽ hiểu điều gì thực sự xảy ra sau mỗi vòng <code>for</code>, và viết được pipeline xử lý dữ liệu lớn chỉ với vài dòng.</p>
+
+<h2>1. Điều gì xảy ra trong vòng for</h2>
+<pre><code class="language-python">ds = ["a", "b", "c"]
+it = iter(ds)              # lấy iterator từ một iterable
+print(next(it))            # lấy phần tử kế tiếp
+print(next(it), next(it))
+try:
+    next(it)
+except StopIteration:
+    print("Hết phần tử")</code></pre>
+<pre><code class="language-text">a
+b c
+Hết phần tử</code></pre>
+<p>Vòng <code>for x in ds</code> thực chất làm đúng như trên: gọi <code>iter(ds)</code>, rồi gọi <code>next()</code> liên tục cho đến khi gặp <code>StopIteration</code> thì dừng. Hai khái niệm:</p>
+<ul>
+  <li><strong>Iterable</strong>: thứ duyệt được (list, str, dict, file, <code>range</code>...), có <code>__iter__</code>.</li>
+  <li><strong>Iterator</strong>: con trỏ đang duyệt, có <code>__next__</code>, nhớ mình đang ở đâu và <strong>chỉ đi một chiều, dùng một lần</strong>.</li>
+</ul>
+<pre><code class="language-python">so = map(int, ["1", "2", "3"])      # map, filter, zip trả về iterator
+print(sum(so))
+print(sum(so))                      # lần hai: đã cạn!</code></pre>
+<pre><code class="language-text">6
+0</code></pre>
+<p>Đây là lỗi kinh điển: duyệt một iterator hai lần thì lần hai rỗng. Cần dùng nhiều lần thì chuyển thành list: <code>so = list(map(...))</code>.</p>
+
+<h2>2. Generator: hàm có yield</h2>
+<p>Tự viết iterator bằng class với <code>__iter__</code>, <code>__next__</code> khá dài. <strong>Generator</strong> là cách ngắn gọn: một hàm có từ khóa <code>yield</code>.</p>
+<pre><code class="language-python">def dem_nguoc(n):
+    print("Bắt đầu")
+    while n &gt; 0:
+        yield n                # trả n ra ngoài và TẠM DỪNG tại đây
+        n -= 1                 # lần next() sau chạy tiếp từ dòng này
+    print("Kết thúc")
+
+
+gen = dem_nguoc(3)             # chưa chạy dòng nào!
+print(type(gen).__name__)
+for x in gen:
+    print(x)</code></pre>
+<pre><code class="language-text">generator
+Bắt đầu
+3
+2
+1
+Kết thúc</code></pre>
+<p>Gọi hàm generator không chạy thân hàm mà trả về một đối tượng generator. Mỗi lần <code>next()</code>, hàm chạy tới <code>yield</code> kế tiếp, trả giá trị và "đóng băng" mọi biến cục bộ, chờ lần gọi sau. Khi hàm chạy hết, <code>StopIteration</code> được ném tự động.</p>
+
+<h2>3. Vì sao generator tiết kiệm bộ nhớ</h2>
+<pre><code class="language-python">import sys
+
+ds = [x * x for x in range(1_000_000)]
+gen = (x * x for x in range(1_000_000))
+print(f"list: {sys.getsizeof(ds) / 1e6:.1f} MB, generator: {sys.getsizeof(gen)} byte")
+print(sum(ds) == sum(gen))</code></pre>
+<pre><code class="language-text">list: 8.4 MB, generator: 208 byte
+True</code></pre>
+<p>(Số byte chính xác khác nhau đôi chút giữa các phiên bản Python; kết quả trên chạy bằng Python 3.14.) List giữ cả triệu phần tử cùng lúc (con số 8,4 MB mới chỉ là mảng con trỏ, chưa tính các số nguyên). Generator chỉ giữ trạng thái hiện tại, dù sinh ra một tỉ phần tử. Đổi lại, generator không có <code>len()</code>, không truy cập <code>gen[5]</code>, không duyệt lại được.</p>
+
+<h2>4. Xử lý file lớn bằng pipeline generator</h2>
+<pre><code class="language-python">from pathlib import Path
+
+Path("truy_cap.log").write_text(
+    "# log máy chủ\n"
+    "2026-10-29 08:01 GET /trang-chu 200 120ms\n"
+    "2026-10-29 08:02 GET /api/don-hang 500 2300ms\n"
+    "\n"
+    "2026-10-29 08:03 POST /api/don-hang 201 340ms\n"
+    "2026-10-29 08:05 GET /api/don-hang 500 2100ms\n",
+    encoding="utf-8",
+)
+
+
+def doc_dong(p):
+    with open(p, encoding="utf-8") as f:
+        for dong in f:
+            dong = dong.strip()
+            if dong and not dong.startswith("#"):
+                yield dong
+
+
+def phan_tich(cac_dong):
+    for dong in cac_dong:
+        ngay, gio, phuong_thuc, duong_dan, ma, thoi_gian = dong.split()
+        yield {"duong_dan": duong_dan, "ma": int(ma), "ms": int(thoi_gian.removesuffix("ms"))}
+
+
+def chi_loi(ban_ghi):
+    return (b for b in ban_ghi if b["ma"] &gt;= 500)
+
+
+loi = list(chi_loi(phan_tich(doc_dong("truy_cap.log"))))
+print(len(loi), max(b["ms"] for b in loi), loi[0]["duong_dan"])</code></pre>
+<pre><code class="language-text">2 2300 /api/don-hang</code></pre>
+<p>Ba bước nối nhau như đường ống: đọc dòng → tách trường → lọc lỗi. Mỗi bước nhận một iterable và trả về generator, nên tại bất kỳ thời điểm nào chỉ có <strong>một dòng</strong> đi qua đường ống. File 5 GB hay 5 KB, bộ nhớ dùng gần như như nhau. Mỗi bước là một hàm nhỏ, dễ hiểu, dễ thử riêng.</p>
+
+<h2>5. yield from và generator vô hạn</h2>
+<pre><code class="language-python">from pathlib import Path
+
+
+def ma_don_hang(tien_to="DH", bat_dau=1):
+    n = bat_dau
+    while True:                     # vô hạn: chỉ an toàn vì người dùng lấy có giới hạn
+        yield f"{tien_to}{n:05d}"
+        n += 1
+
+
+gen = ma_don_hang()
+print([next(gen) for _ in range(3)])
+
+
+def moi_dong(cac_file):
+    for p in cac_file:
+        yield from Path(p).read_text(encoding="utf-8").splitlines()   # chuyển tiếp từng phần tử
+
+
+Path("a.txt").write_text("a1\na2", encoding="utf-8")
+Path("b.txt").write_text("b1", encoding="utf-8")
+print(list(moi_dong(["a.txt", "b.txt"])))</code></pre>
+<pre><code class="language-text">['DH00001', 'DH00002', 'DH00003']
+['a1', 'a2', 'b1']</code></pre>
+
+<h2>6. itertools: hộp đồ nghề cho iterator</h2>
+<pre><code class="language-python">import itertools as it
+
+print(list(it.islice(it.count(10, 5), 4)))            # lấy 4 phần tử đầu của dãy vô hạn
+print(list(it.chain([1, 2], (3, 4), "ab")))            # nối nhiều iterable
+print(list(it.batched(range(7), 3)))                    # chia lô (Python 3.12+)
+print(list(it.pairwise([10, 13, 11, 18])))              # cặp liên tiếp (3.10+)
+print(list(it.accumulate([100, -30, 50])))              # cộng dồn
+print(list(it.product("AB", [1, 2])))                   # tích Descartes
+print(list(it.combinations(["An", "Bình", "Chi"], 2)))  # tổ hợp chập 2
+
+don = sorted([("Hà Nội", 3), ("Huế", 1), ("Hà Nội", 2)], key=lambda d: d[0])
+for tp, nhom in it.groupby(don, key=lambda d: d[0]):    # cần sắp theo khóa trước!
+    print(tp, sum(sl for _, sl in nhom))</code></pre>
+<pre><code class="language-text">[10, 15, 20, 25]
+[1, 2, 3, 4, 'a', 'b']
+[(0, 1, 2), (3, 4, 5), (6,)]
+[(10, 13), (13, 11), (11, 18)]
+[100, 70, 120]
+[('A', 1), ('A', 2), ('B', 1), ('B', 2)]
+[('An', 'Bình'), ('An', 'Chi'), ('Bình', 'Chi')]
+Huế 1
+Hà Nội 5</code></pre>
+<p>Thứ tự in <code>Huế</code> trước <code>Hà Nội</code> vì so sánh chuỗi theo mã Unicode: chữ "u" (U+0075) đứng trước "à" (U+00E0). <code>groupby</code> chỉ gom các phần tử <strong>liền kề</strong> có cùng khóa, nên luôn sắp xếp theo khóa đó trước.</p>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li><code>for</code> = <code>iter()</code> + <code>next()</code> đến <code>StopIteration</code>; iterator chỉ dùng một lần.</li>
+  <li>Hàm có <code>yield</code> là generator: chạy lười, tạm dừng ở mỗi <code>yield</code>, tốn rất ít bộ nhớ.</li>
+  <li>Xử lý file lớn: pipeline các generator nhỏ nối nhau.</li>
+  <li><code>yield from</code> chuyển tiếp; <code>itertools</code>: <code>islice</code>, <code>chain</code>, <code>batched</code>, <code>pairwise</code>, <code>groupby</code>...</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Đọc dòng hợp lệ</h3>
+<p>Viết generator <code>doc_dong_hop_le(duong_dan)</code> trả từng dòng đã bỏ khoảng trắng hai đầu, bỏ qua dòng trống và dòng bắt đầu bằng <code>#</code>, kèm số dòng gốc.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">from pathlib import Path
+
+
+def doc_dong_hop_le(duong_dan):
+    with open(duong_dan, encoding="utf-8") as f:
+        for so_dong, dong in enumerate(f, start=1):
+            dong = dong.strip()
+            if dong and not dong.startswith("#"):
+                yield so_dong, dong
+
+
+Path("cau_hinh.txt").write_text("# cấu hình\nhost=localhost\n\n  port=8000  \n#debug=1\n", encoding="utf-8")
+for so, noi_dung in doc_dong_hop_le("cau_hinh.txt"):
+    print(so, noi_dung)</code></pre>
+<pre><code class="language-text">2 host=localhost
+4 port=8000</code></pre>
+<p>Giữ số dòng gốc giúp báo lỗi chính xác ("dòng 4 sai định dạng") khi xử lý tiếp.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Xử lý theo lô</h3>
+<p>Chia 10.000 bản ghi thành các lô 500 để "gửi" (giả lập bằng cách đếm), in số lô và kích thước lô cuối. Làm hai cách: <code>itertools.batched</code> (3.12+) và <code>islice</code> (mọi phiên bản).</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import itertools as it
+
+ban_ghi = ({"id": i} for i in range(10_000))          # generator: giả lập nguồn dữ liệu lớn
+lo = list(it.batched(ban_ghi, 500))
+print(len(lo), len(lo[-1]))
+
+
+def chia_lo(iterable, kich_thuoc):
+    nguon = iter(iterable)
+    while lo := list(it.islice(nguon, kich_thuoc)):
+        yield lo
+
+
+print(sum(1 for _ in chia_lo(range(10_250), 500)), len(list(chia_lo(range(10_250), 500))[-1]))</code></pre>
+<pre><code class="language-text">20 500
+21 250</code></pre>
+<p>Gửi theo lô là kỹ thuật chuẩn khi ghi vào CSDL hay gọi API: mỗi lần gửi 500 bản ghi nhanh hơn rất nhiều so với 10.000 lần gửi lẻ, mà không phải giữ cả 10.000 bản ghi trong bộ nhớ. Ở ví dụ đầu, <code>list(...)</code> bên ngoài chỉ để đếm cho dễ thấy; khi dùng thật, duyệt <code>for lo in it.batched(...)</code> và xử lý từng lô.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/tutorial/classes.html#iterators" rel="noopener" target="_blank">Python Tutorial: Iterators, Generators</a>; <a href="https://docs.python.org/3/howto/functional.html" rel="noopener" target="_blank">Functional Programming HOWTO</a>; <a href="https://docs.python.org/3/library/itertools.html" rel="noopener" target="_blank">itertools</a>.</p>

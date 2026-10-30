@@ -1,0 +1,162 @@
+<p>Đến giờ dự án của bạn là vài file <code>.py</code> nằm chung một thư mục, chạy bằng <code>python main.py</code>. Dự án thật cần nhiều hơn: tách mã nguồn khỏi test, khai báo thư viện phụ thuộc, có lệnh chạy riêng, cài được vào máy khác. Bài cuối chặng 6 gom mọi công cụ đã học thành một <strong>cấu trúc dự án chuẩn</strong>, thứ bạn sẽ thấy ở hầu hết dự án Python chuyên nghiệp.</p>
+
+<h2>1. src layout</h2>
+<pre><code class="language-text">chi-tieu/
+├── .gitignore
+├── .pre-commit-config.yaml
+├── .python-version
+├── pyproject.toml           ← khai báo mọi thứ của dự án
+├── uv.lock
+├── README.md
+├── src/
+│   └── chi_tieu/            ← package (tên dùng gạch dưới)
+│       ├── __init__.py
+│       ├── __main__.py      ← cho phép chạy: python -m chi_tieu
+│       ├── cli.py           ← giao diện dòng lệnh (input, print)
+│       ├── luu_tru.py       ← đọc ghi JSON
+│       └── xu_ly.py         ← logic thuần: tính tổng, báo cáo
+└── tests/
+    ├── conftest.py
+    ├── test_xu_ly.py
+    └── test_luu_tru.py</code></pre>
+<p>Vì sao đặt package trong <code>src/</code> thay vì ngay thư mục gốc? Với layout phẳng, khi chạy test từ thư mục gốc, Python import thẳng file trong thư mục hiện tại, nên test vẫn đạt dù package <strong>cài đặt</strong> bị thiếu file hay khai báo sai. Với src layout, code chỉ import được sau khi được cài vào môi trường, nên test kiểm tra đúng thứ người dùng sẽ nhận. Đây là khuyến nghị của Python Packaging User Guide, và cũng là mặc định của <code>uv init</code>.</p>
+<p>Tên dự án (trên PyPI, trong <code>pyproject.toml</code>) thường dùng gạch ngang: <code>chi-tieu</code>. Tên package Python (để import) phải dùng gạch dưới: <code>chi_tieu</code>.</p>
+
+<h2>2. Chia module theo trách nhiệm</h2>
+<p>Áp dụng bài học từ dự án chặng 2 và chặng 4: tách logic thuần khỏi nhập xuất.</p>
+<ul>
+  <li><code>xu_ly.py</code>: hàm thuần, không <code>input</code>, không <code>print</code>, không đọc file. Dễ test nhất, nên có nhiều test nhất.</li>
+  <li><code>luu_tru.py</code>: đọc ghi JSON, nhận đường dẫn làm tham số (test dùng <code>tmp_path</code>).</li>
+  <li><code>cli.py</code>: lớp mỏng nối người dùng với hai module trên, chứa hàm <code>main()</code>.</li>
+</ul>
+<pre><code class="language-python"># (minh họa) src/chi_tieu/cli.py
+import argparse
+from pathlib import Path
+
+from chi_tieu.luu_tru import nap, luu        # import tuyệt đối theo tên package
+from chi_tieu.xu_ly import bao_cao
+
+
+def main(argv: list[str] | None = None) -&gt; int:
+    parser = argparse.ArgumentParser(prog="chi-tieu", description="Quản lý chi tiêu cá nhân")
+    parser.add_argument("--file", type=Path, default=Path.home() / ".chi_tieu.json")
+    args = parser.parse_args(argv)
+    print(bao_cao(nap(args.file)))
+    return 0</code></pre>
+<pre><code class="language-python"># (minh họa) src/chi_tieu/__main__.py
+import sys
+
+from chi_tieu.cli import main
+
+sys.exit(main())</code></pre>
+<p>Trong package, import theo tên đầy đủ <code>from chi_tieu.xu_ly import ...</code> (import tuyệt đối). Có thể viết tương đối <code>from .xu_ly import ...</code>, nhưng tuyệt đối rõ ràng hơn và là lựa chọn phổ biến. <code>argparse</code> sẽ được học kỹ ở chặng 7.</p>
+
+<h2>3. pyproject.toml: một file cho mọi cấu hình</h2>
+<pre><code class="language-text">[project]
+name = "chi-tieu"
+version = "0.2.0"
+description = "Quản lý chi tiêu cá nhân trên dòng lệnh"
+readme = "README.md"
+requires-python = "&gt;=3.12"
+dependencies = []
+
+[project.scripts]
+chi-tieu = "chi_tieu.cli:main"      # tên lệnh = "module:hàm"
+
+[build-system]
+requires = ["uv_build&gt;=0.13.6,&lt;0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = ["pytest&gt;=9.2", "pytest-cov", "ruff", "mypy", "pre-commit"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]
+
+[tool.mypy]
+strict = true</code></pre>
+<ul>
+  <li><code>[project]</code>: thông tin dự án theo chuẩn chung (PEP 621), mọi công cụ đều đọc được.</li>
+  <li><code>[project.scripts]</code>: khi cài, tạo một lệnh <code>chi-tieu</code> gọi hàm <code>main</code> trong <code>chi_tieu/cli.py</code>. Giá trị <code>main()</code> trả về trở thành mã thoát.</li>
+  <li><code>[build-system]</code>: công cụ đóng gói. Bài dùng <code>uv_build</code> do <code>uv init</code> tạo; các dự án khác có thể dùng <code>hatchling</code> hay <code>setuptools</code>, cách dùng như nhau.</li>
+  <li><code>[tool.*]</code>: cấu hình pytest, Ruff, mypy ở cùng một chỗ, thay cho hàng loạt file <code>setup.cfg</code>, <code>pytest.ini</code>, <code>.flake8</code> của dự án cũ.</li>
+</ul>
+
+<h2>4. Cài editable và chạy như một lệnh</h2>
+<pre><code class="language-text">$ uv sync                     # tạo .venv, cài thư viện VÀ cài chính dự án ở chế độ editable
+$ uv run chi-tieu --help
+usage: chi-tieu [-h] [--file FILE]
+
+Quản lý chi tiêu cá nhân
+
+options:
+  -h, --help   show this help message and exit
+  --file FILE
+$ uv run python -m chi_tieu   # chạy qua __main__.py, tương đương
+$ uv run pytest               # test import chi_tieu như người dùng thật</code></pre>
+<p><strong>Editable</strong> nghĩa là môi trường trỏ thẳng vào thư mục <code>src/</code>: sửa code xong chạy lại là thấy ngay, không cần cài lại. Với pip, lệnh tương đương là <code>pip install -e .</code>.</p>
+
+<h2>5. Build và cài ở nơi khác</h2>
+<pre><code class="language-text">$ uv build
+Building source distribution...
+Building wheel from source distribution...
+Successfully built dist\chi_tieu-0.1.0.tar.gz
+Successfully built dist\chi_tieu-0.1.0-py3-none-any.whl</code></pre>
+<p>File <code>.whl</code> (wheel) là gói cài đặt chuẩn của Python. Gửi file này cho đồng nghiệp, hoặc cài vào máy chủ:</p>
+<pre><code class="language-text">$ uv venv &amp;&amp; uv pip install dist/chi_tieu-0.1.0-py3-none-any.whl
+$ .venv/Scripts/chi-tieu        (Windows: .venv\Scripts\chi-tieu.exe)</code></pre>
+<p>Muốn chia sẻ công khai, <code>uv publish</code> đưa gói lên PyPI để ai cũng <code>pip install chi-tieu</code> được (cần tài khoản PyPI; nên thử trước trên TestPyPI). Ứng dụng web thì thường không build wheel mà đóng gói bằng Docker (chặng 10).</p>
+
+<h2>6. README: mặt tiền của dự án</h2>
+<pre><code class="language-text"># chi-tieu
+
+Quản lý chi tiêu cá nhân trên dòng lệnh: thêm khoản chi, báo cáo theo danh mục và tháng.
+
+## Cài đặt
+    uv sync
+
+## Sử dụng
+    uv run chi-tieu --file du_lieu.json
+
+## Phát triển
+    uv run pytest          # chạy test
+    uv run ruff check .    # lint
+    uv run mypy src        # kiểm tra kiểu</code></pre>
+<p>Người mới clone dự án phải chạy được trong 5 phút chỉ bằng cách đọc README. Đó là thước đo đơn giản và chính xác cho một dự án được tổ chức tốt.</p>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>src layout: <code>src/ten_package/</code> và <code>tests/</code> tách biệt; test chạy trên bản đã cài.</li>
+  <li>Chia module: logic thuần, lưu trữ, giao diện; import tuyệt đối theo tên package.</li>
+  <li><code>pyproject.toml</code>: <code>[project]</code>, <code>[project.scripts]</code>, <code>[build-system]</code>, <code>[dependency-groups]</code>, <code>[tool.*]</code>.</li>
+  <li><code>uv sync</code> cài editable; <code>uv build</code> ra wheel; README chạy được trong 5 phút.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Chuyển dự án chi tiêu sang src layout</h3>
+<p>Tổ chức lại dự án quản lý chi tiêu (chặng 2, đã thêm lưu JSON) theo cấu trúc ở mục 1: ba module, <code>__main__.py</code>, thư mục <code>tests/</code> có ít nhất 5 test, lệnh <code>chi-tieu</code> chạy được bằng <code>uv run chi-tieu</code>.</p>
+<details><summary>Xem gợi ý</summary>
+<p>Thứ tự làm an toàn: <code>uv init chi-tieu</code> tạo khung; chuyển các hàm thuần (<code>doc_ngay</code>, <code>doc_so_tien</code>, <code>tong_theo</code>, <code>bao_cao</code>) vào <code>xu_ly.py</code> và viết test cho chúng <strong>trước</strong>; sau đó mới chuyển phần menu vào <code>cli.py</code>. Chạy <code>uv run pytest</code>, <code>uv run ruff check .</code> và <code>uv run mypy src</code> đến khi cả ba đều sạch.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Build và cài thử</h3>
+<p>Build wheel bằng <code>uv build</code>, tạo một môi trường ảo mới ở thư mục khác, cài wheel vào đó và chạy lệnh <code>chi-tieu</code>.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-text">$ cd chi-tieu &amp;&amp; uv build
+$ cd .. &amp;&amp; mkdir thu-cai &amp;&amp; cd thu-cai
+$ uv venv
+$ uv pip install ../chi-tieu/dist/chi_tieu-0.2.0-py3-none-any.whl
+$ .venv\Scripts\chi-tieu --help        (macOS, Linux: .venv/bin/chi-tieu --help)</code></pre>
+<p>Nếu lệnh báo <code>ModuleNotFoundError</code>, kiểm tra hai chỗ: package có nằm đúng <code>src/chi_tieu/</code> và có <code>__init__.py</code> không, và <code>[project.scripts]</code> có trỏ đúng <code>chi_tieu.cli:main</code> không. Lỗi kiểu này chỉ lộ ra khi cài thật: đúng lý do để dùng src layout.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://packaging.python.org/en/latest/discussions/src-layout-vs-flat-layout/" rel="noopener" target="_blank">Python Packaging User Guide: src layout vs flat layout</a>; <a href="https://packaging.python.org/en/latest/guides/writing-pyproject-toml/" rel="noopener" target="_blank">Writing your pyproject.toml</a>; <a href="https://docs.astral.sh/uv/concepts/projects/init/" rel="noopener" target="_blank">uv: Creating projects</a>; <a href="https://docs.astral.sh/uv/guides/package/" rel="noopener" target="_blank">uv: Building and publishing a package</a>.</p>

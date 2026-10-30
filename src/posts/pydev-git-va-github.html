@@ -1,0 +1,105 @@
+<p>Không có công ty phần mềm nào làm việc mà không có hệ thống quản lý phiên bản. <strong>Git</strong> ghi lại mọi thay đổi của code, cho phép quay lại bất kỳ thời điểm nào, thử nghiệm trên nhánh riêng và làm việc cùng người khác mà không ghi đè lên nhau. <strong>GitHub</strong> là nơi lưu kho Git trên mạng, đồng thời là portfolio của lập trình viên. Bài này dạy đúng những gì bạn dùng hằng ngày.</p>
+
+<h2>1. Cài đặt và cấu hình một lần</h2>
+<pre><code class="language-text">$ git --version
+$ git config --global user.name "Nguyễn Văn An"
+$ git config --global user.email "an@example.com"
+$ git config --global init.defaultBranch main</code></pre>
+<p>Windows: cài từ <a href="https://git-scm.com/" rel="noopener" target="_blank">git-scm.com</a> (giữ lựa chọn mặc định). Tên và email gắn vào mọi commit; dùng email trùng với tài khoản GitHub để commit hiện đúng người.</p>
+
+<h2>2. Ba vùng của Git</h2>
+<pre><code class="language-text">Thư mục làm việc  --git add--&gt;  Vùng chuẩn bị (staging)  --git commit--&gt;  Lịch sử (.git)</code></pre>
+<p>Bạn sửa file trong thư mục làm việc, chọn những thay đổi muốn ghi bằng <code>git add</code>, rồi chốt thành một <strong>commit</strong> (ảnh chụp có lời nhắn) bằng <code>git commit</code>. Vùng chuẩn bị cho phép chia một loạt thay đổi thành nhiều commit có nghĩa.</p>
+
+<h2>3. Vòng làm việc hằng ngày</h2>
+<pre><code class="language-text">$ cd thu-vien
+$ git init                         # tạo kho (uv init đã làm sẵn bước này)
+$ git status                       # xem gì đã đổi: lệnh dùng nhiều nhất
+$ git add thu_vien.py README.md    # chọn file
+$ git add .                        # hoặc mọi thay đổi (kiểm tra git status trước!)
+$ git commit -m "Thêm lớp ThuVien với mượn, trả sách"
+$ git log --oneline                # xem lịch sử ngắn gọn
+a1b2c3d (HEAD -&gt; main) Thêm lớp ThuVien với mượn, trả sách
+$ git diff                         # xem chi tiết thay đổi chưa add
+$ git diff --staged                # thay đổi đã add, sắp commit</code></pre>
+<p>Một commit tốt chứa <strong>một thay đổi có nghĩa</strong> và lời nhắn nói rõ "làm gì": <code>"Sửa lỗi tính quá hạn khi trả đúng ngày"</code> tốt hơn nhiều so với <code>"update"</code> hay <code>"sửa"</code>. Commit thường xuyên, mỗi khi xong một bước nhỏ chạy được.</p>
+
+<h2>4. .gitignore cho dự án Python</h2>
+<p>File <code>.gitignore</code> ở gốc dự án liệt kê những gì Git bỏ qua. Với Python, tối thiểu:</p>
+<pre><code class="language-text"># môi trường và bộ nhớ đệm
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+# build
+dist/
+build/
+*.egg-info/
+# bí mật và dữ liệu cục bộ
+.env
+*.log
+*.db</code></pre>
+<div class="warn"><strong>Không bao giờ commit mật khẩu, API key</strong>Đặt bí mật trong file <code>.env</code> (đã nằm trong <code>.gitignore</code>) và đọc bằng biến môi trường. Một khi key đã lên GitHub, coi như đã lộ, kể cả khi bạn xóa commit sau đó: có các bot quét GitHub liên tục để tìm key. Lỡ đẩy lên rồi thì <strong>thu hồi key ngay</strong> ở nhà cung cấp và tạo key mới.</div>
+
+<h2>5. Hoàn tác thường gặp</h2>
+<pre><code class="language-text">$ git restore thu_vien.py          # bỏ thay đổi chưa add của file (MẤT thay đổi đó)
+$ git restore --staged thu_vien.py # bỏ khỏi vùng chuẩn bị, giữ thay đổi
+$ git commit --amend -m "Lời nhắn mới"   # sửa commit cuối (khi CHƯA push)
+$ git revert a1b2c3d               # tạo commit mới đảo ngược một commit cũ (an toàn khi đã push)</code></pre>
+
+<h2>6. Đưa lên GitHub</h2>
+<p>Tạo kho mới trên GitHub (nút <strong>New repository</strong>, không tích tạo README vì bạn đã có), rồi:</p>
+<pre><code class="language-text">$ git remote add origin https://github.com/ten-ban/thu-vien.git
+$ git push -u origin main          # lần đầu; sau đó chỉ cần: git push
+$ git pull                         # lấy thay đổi mới từ GitHub về</code></pre>
+<p>Lần đầu push, Git trên Windows mở cửa sổ đăng nhập GitHub qua trình duyệt (Git Credential Manager). Một cách khác tiện cho cả máy Linux: cài GitHub CLI và chạy <code>gh auth login</code>. GitHub không còn nhận mật khẩu tài khoản khi push qua HTTPS.</p>
+
+<h2>7. Nhánh và pull request</h2>
+<p>Không ai sửa thẳng trên <code>main</code> ở công ty. Mỗi tính năng, mỗi lần sửa lỗi làm trên một <strong>nhánh</strong> riêng, rồi mở <strong>pull request</strong> (PR) để đồng nghiệp xem lại trước khi gộp.</p>
+<pre><code class="language-text">$ git switch -c them-tim-kiem       # tạo nhánh mới và chuyển sang
+  ... sửa code, git add, git commit ...
+$ git push -u origin them-tim-kiem
+  → GitHub hiện nút "Compare &amp; pull request": viết mô tả, tạo PR
+  → đồng nghiệp xem, góp ý; bạn sửa và push thêm commit vào nhánh
+  → bấm "Merge pull request"
+$ git switch main
+$ git pull                          # lấy main mới đã có tính năng
+$ git branch -d them-tim-kiem       # xóa nhánh đã gộp</code></pre>
+<p>Khi hai người sửa cùng một dòng, Git báo <strong>xung đột</strong> (conflict) và đánh dấu trong file:</p>
+<pre><code class="language-text">&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD
+SO_NGAY_MUON = 14
+=======
+SO_NGAY_MUON = 21
+&gt;&gt;&gt;&gt;&gt;&gt;&gt; them-gia-han</code></pre>
+<p>Sửa file thành nội dung đúng (xóa các dòng đánh dấu), rồi <code>git add</code> và <code>git commit</code>. VS Code có nút "Accept Current / Incoming / Both" giúp việc này dễ hơn.</p>
+<div class="tip"><strong>GitHub là CV của bạn</strong>Nhà tuyển dụng Python Developer thường xem GitHub trước khi xem CV. Vài dự án có README rõ ràng, lịch sử commit đều đặn, có test và CI (chặng 10) có sức nặng hơn nhiều so với một danh sách kỹ năng.</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li><code>git status</code> → <code>git add</code> → <code>git commit -m "..."</code>; commit nhỏ, lời nhắn rõ.</li>
+  <li><code>.gitignore</code> loại <code>.venv</code>, cache, <code>.env</code>; không bao giờ commit bí mật.</li>
+  <li><code>git remote add origin ...</code>, <code>git push -u origin main</code>, <code>git pull</code>.</li>
+  <li>Mỗi tính năng một nhánh <code>git switch -c</code>, gộp qua pull request.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Đưa dự án thư viện lên GitHub</h3>
+<p>Đưa dự án quản lý thư viện ở chặng 4 lên GitHub với <code>.gitignore</code> đúng và <code>README.md</code> có mô tả, cách chạy.</p>
+<details><summary>Xem gợi ý</summary>
+<p>Trước khi commit lần đầu, chạy <code>git status</code> và kiểm tra không có <code>.venv/</code>, <code>__pycache__/</code> hay <code>thu_vien.json</code> chứa dữ liệu thật trong danh sách. README tối thiểu: một câu mô tả, yêu cầu (Python 3.12+), lệnh chạy, ví dụ kết quả. Sau khi push, mở trang kho trên GitHub và đọc lại README như một người lạ.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Nhánh và pull request</h3>
+<p>Tạo nhánh <code>them-tim-kiem</code>, thêm tính năng tìm sách theo năm xuất bản (hoặc tính năng tùy ý), mở pull request và tự gộp vào <code>main</code>.</p>
+<details><summary>Xem gợi ý</summary>
+<p>Trong mô tả PR, viết ba phần: <strong>Làm gì</strong>, <strong>Vì sao</strong>, <strong>Kiểm tra thế nào</strong>. Đây là thói quen được đánh giá cao ở mọi nhóm phát triển. Sau khi gộp, chạy <code>git log --oneline --graph</code> trên <code>main</code> để thấy commit của nhánh đã vào lịch sử.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://git-scm.com/book/en/v2" rel="noopener" target="_blank">Pro Git (sách miễn phí)</a>; <a href="https://docs.github.com/en/get-started/using-git/about-git" rel="noopener" target="_blank">GitHub Docs: About Git</a>; <a href="https://github.com/github/gitignore/blob/main/Python.gitignore" rel="noopener" target="_blank">github/gitignore: Python.gitignore</a>.</p>

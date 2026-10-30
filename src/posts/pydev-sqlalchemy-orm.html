@@ -1,0 +1,208 @@
+<p>Viết SQL bằng chuỗi trong Python hoạt động tốt, nhưng khi ứng dụng lớn lên, bạn phải tự chuyển từng dòng kết quả thành đối tượng, tự ghép câu lệnh theo điều kiện lọc, và gõ sai tên cột thì chỉ biết khi chạy. <strong>ORM</strong> (Object-Relational Mapping) cho phép làm việc với bảng như với class Python. <strong>SQLAlchemy</strong> là ORM phổ biến nhất của Python, và là nền tảng CSDL cho FastAPI ở chặng 9.</p>
+
+<h2>1. Khai báo model</h2>
+<p>Cài: <code>uv add sqlalchemy</code>. Bài dùng cú pháp của SQLAlchemy 2.x (bản 2.0 trở lên), có type hint đầy đủ.</p>
+<pre><code class="language-python">from sqlalchemy import ForeignKey, String, create_engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class TacGia(Base):
+    __tablename__ = "tac_gia"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ten: Mapped[str] = mapped_column(String(100), unique=True)
+    sach: Mapped[list["Sach"]] = relationship(back_populates="tac_gia", cascade="all, delete-orphan")
+
+    def __repr__(self) -&gt; str:
+        return f"TacGia({self.ten!r})"
+
+
+class Sach(Base):
+    __tablename__ = "sach"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ten: Mapped[str] = mapped_column(String(200))
+    nam: Mapped[int]
+    gia: Mapped[int | None]                                   # cho phép NULL
+    tac_gia_id: Mapped[int] = mapped_column(ForeignKey("tac_gia.id"))
+    tac_gia: Mapped[TacGia] = relationship(back_populates="sach")
+
+    def __repr__(self) -&gt; str:
+        return f"Sach({self.ten!r}, {self.nam})"
+
+
+engine = create_engine("sqlite:///thu_vien.db")
+Base.metadata.drop_all(engine)
+Base.metadata.create_all(engine)          # tạo mọi bảng chưa có
+print(list(Base.metadata.tables))</code></pre>
+<pre><code class="language-text">['tac_gia', 'sach']</code></pre>
+<ul>
+  <li>Mỗi class kế thừa <code>Base</code> là một bảng; <code>__tablename__</code> là tên bảng.</li>
+  <li><code>Mapped[int]</code> khai báo cột và kiểu; <code>Mapped[int | None]</code> nghĩa là cột cho phép <code>NULL</code>, không có <code>None</code> thì là <code>NOT NULL</code>. <code>mapped_column(...)</code> thêm chi tiết: khóa chính, độ dài, khóa ngoại, unique.</li>
+  <li><code>relationship</code> không phải cột: nó cho phép đi từ đối tượng này sang đối tượng liên quan (<code>sach.tac_gia</code>, <code>tac_gia.sach</code>). <code>back_populates</code> nối hai chiều với nhau.</li>
+  <li><code>create_engine("sqlite:///thu_vien.db")</code>: đổi sang PostgreSQL chỉ cần đổi chuỗi kết nối, ví dụ <code>"postgresql+psycopg://user:mk@host/db"</code> (cần cài driver).</li>
+</ul>
+
+<h2>2. Thêm dữ liệu với Session</h2>
+<pre><code class="language-python"># (minh họa) nối tiếp mục 1
+with Session(engine) as session:
+    to_hoai = TacGia(ten="Tô Hoài")
+    nam_cao = TacGia(ten="Nam Cao", sach=[Sach(ten="Chí Phèo", nam=1941, gia=65_000),
+                                         Sach(ten="Lão Hạc", nam=1943, gia=None)])
+    to_hoai.sach.append(Sach(ten="Dế Mèn phiêu lưu ký", nam=1941, gia=85_000))
+    session.add_all([to_hoai, nam_cao])
+    session.add(Sach(ten="Vợ chồng A Phủ", nam=1952, gia=55_000, tac_gia=to_hoai))
+    session.commit()
+    print(to_hoai.id, nam_cao.id, [s.ten for s in to_hoai.sach])</code></pre>
+<pre><code class="language-text">1 2 ['Dế Mèn phiêu lưu ký', 'Vợ chồng A Phủ']</code></pre>
+<p><strong>Session</strong> là "phiên làm việc" với CSDL: bạn thêm, sửa đối tượng Python, Session theo dõi thay đổi và khi <code>commit()</code> thì gửi đúng các câu <code>INSERT</code>/<code>UPDATE</code> cần thiết trong một transaction. Không cần ghi <code>tac_gia_id</code> bằng tay: gán quan hệ <code>tac_gia=to_hoai</code> hoặc thêm vào list <code>sach</code> là đủ. Sau <code>commit</code>, <code>id</code> do CSDL sinh ra đã có trên đối tượng.</p>
+
+<h2>3. Truy vấn với select()</h2>
+<pre><code class="language-python"># (minh họa) nối tiếp mục 1, 2
+from sqlalchemy import func, select
+
+with Session(engine) as session:
+    sach_1941 = session.scalars(select(Sach).where(Sach.nam == 1941).order_by(Sach.ten)).all()
+    print(sach_1941)
+
+    mot = session.scalars(select(Sach).where(Sach.ten.ilike("%hạc%"))).first()
+    print(mot, mot.tac_gia.ten)                      # đi theo quan hệ sang tác giả
+
+    print(session.get(TacGia, 2))                    # lấy theo khóa chính
+
+    re_nhat = session.scalars(select(Sach).where(Sach.gia.is_not(None)).order_by(Sach.gia).limit(1)).one()
+    print(re_nhat, re_nhat.gia)
+
+    thong_ke = session.execute(
+        select(TacGia.ten, func.count(Sach.id), func.min(Sach.nam))
+        .join(TacGia.sach)
+        .group_by(TacGia.id)
+        .order_by(TacGia.ten)
+    ).all()
+    for ten, so_sach, nam_dau in thong_ke:
+        print(f"{ten}: {so_sach} cuốn, từ năm {nam_dau}")</code></pre>
+<pre><code class="language-text">[Sach('Chí Phèo', 1941), Sach('Dế Mèn phiêu lưu ký', 1941)]
+Sach('Lão Hạc', 1943) Nam Cao
+TacGia('Nam Cao')
+Sach('Vợ chồng A Phủ', 1952) 55000
+Nam Cao: 2 cuốn, từ năm 1941
+Tô Hoài: 2 cuốn, từ năm 1941</code></pre>
+<ul>
+  <li><code>select(Sach)</code> tạo câu truy vấn; nối thêm <code>.where()</code>, <code>.order_by()</code>, <code>.limit()</code>, <code>.join()</code>, <code>.group_by()</code>. Điều kiện viết bằng toán tử Python trên thuộc tính lớp: <code>Sach.nam == 1941</code>, <code>Sach.gia &gt; 50_000</code>, <code>Sach.ten.ilike("%hạc%")</code>, <code>Sach.gia.is_not(None)</code>.</li>
+  <li><code>session.scalars(...)</code> khi chọn một thứ (đối tượng); <code>.all()</code>, <code>.first()</code> (hoặc <code>None</code>), <code>.one()</code> (đúng một, không thì lỗi). <code>session.execute(...)</code> khi chọn nhiều cột, kết quả là các dòng tuple.</li>
+  <li>Gõ sai <code>Sach.nma</code> là <code>AttributeError</code> ngay và VS Code gạch đỏ trước khi chạy: ưu điểm lớn so với chuỗi SQL.</li>
+</ul>
+<p>Muốn xem SQL thật SQLAlchemy sinh ra, tạo engine với <code>echo=True</code>, hoặc <code>print(select(Sach).where(Sach.nam == 1941))</code>.</p>
+
+<h2>4. Sửa và xóa</h2>
+<pre><code class="language-python"># (minh họa) nối tiếp các mục trên
+with Session(engine) as session:
+    lao_hac = session.scalars(select(Sach).where(Sach.ten == "Lão Hạc")).one()
+    lao_hac.gia = 60_000                            # sửa thuộc tính như đối tượng thường
+    to_hoai = session.scalars(select(TacGia).where(TacGia.ten == "Tô Hoài")).one()
+    session.delete(to_hoai)                         # cascade: xóa luôn sách của Tô Hoài
+    session.commit()
+    print(session.scalar(select(func.count()).select_from(Sach)), lao_hac.gia)</code></pre>
+<pre><code class="language-text">2 60000</code></pre>
+<p>Session tự phát hiện thuộc tính bị đổi và sinh <code>UPDATE</code> khi commit. <code>cascade="all, delete-orphan"</code> khai báo ở <code>TacGia.sach</code> làm xóa tác giả kéo theo xóa sách của họ. Thiếu cascade, xóa tác giả còn sách sẽ bị khóa ngoại chặn (với CSDL có kiểm tra khóa ngoại).</p>
+
+<h2>5. Lazy loading và bẫy N+1</h2>
+<pre><code class="language-python"># (minh họa) nối tiếp các mục trên
+from sqlalchemy.orm import selectinload
+
+with Session(engine) as session:
+    # Mỗi lần chạm tac_gia.sach là MỘT câu SELECT mới: 100 tác giả = 101 câu truy vấn
+    for tg in session.scalars(select(TacGia)):
+        print(tg.ten, len(tg.sach))
+
+    # selectinload: nạp sách của mọi tác giả trong 1 câu truy vấn thêm
+    for tg in session.scalars(select(TacGia).options(selectinload(TacGia.sach))):
+        print(tg.ten, [s.ten for s in tg.sach])</code></pre>
+<p>Mặc định quan hệ được nạp <strong>lười</strong> (lazy): chỉ khi bạn truy cập <code>tg.sach</code> mới truy vấn. Trong vòng lặp, điều đó sinh ra N câu truy vấn thêm, gọi là <strong>bài toán N+1</strong>, nguyên nhân số một khiến trang web chậm. Biết trước sẽ dùng quan hệ thì nạp sẵn bằng <code>selectinload</code>.</p>
+<div class="tip"><strong>Thay đổi cấu trúc bảng khi đã có dữ liệu</strong><code>create_all</code> chỉ tạo bảng chưa có, không thêm cột vào bảng cũ. Dự án thật dùng <strong>Alembic</strong> (cùng tác giả SQLAlchemy) để tạo các file "migration" ghi lại từng thay đổi cấu trúc và áp dụng lên CSDL thật một cách an toàn. Bạn nên tìm hiểu Alembic sau khi xong lộ trình.</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Model: lớp kế thừa <code>DeclarativeBase</code>, <code>Mapped[...]</code>, <code>mapped_column</code>, <code>ForeignKey</code>, <code>relationship(back_populates=...)</code>.</li>
+  <li><code>with Session(engine) as session:</code> → <code>add</code>, <code>delete</code>, sửa thuộc tính → <code>commit()</code>.</li>
+  <li>Truy vấn: <code>session.scalars(select(X).where(...).order_by(...))</code>, <code>session.get(X, id)</code>, <code>session.execute</code> cho nhiều cột.</li>
+  <li>Cẩn thận N+1: dùng <code>selectinload</code>; đổi cấu trúc bảng bằng Alembic.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Tác giả kèm số sách</h3>
+<p>Dựng lại model ở mục 1 trong file mới, thêm 3 tác giả với tổng 6 cuốn, rồi in mỗi tác giả kèm số sách, sắp theo số sách giảm dần, kể cả tác giả chưa có sách nào.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">from sqlalchemy import ForeignKey, create_engine, func, select
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class TacGia(Base):
+    __tablename__ = "tac_gia"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ten: Mapped[str]
+    sach: Mapped[list["Sach"]] = relationship(back_populates="tac_gia")
+
+
+class Sach(Base):
+    __tablename__ = "sach"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ten: Mapped[str]
+    nam: Mapped[int]
+    tac_gia_id: Mapped[int] = mapped_column(ForeignKey("tac_gia.id"))
+    tac_gia: Mapped[TacGia] = relationship(back_populates="sach")
+
+
+engine = create_engine("sqlite://")              # CSDL trong RAM
+Base.metadata.create_all(engine)
+with Session(engine) as s:
+    s.add_all([
+        TacGia(ten="Nguyễn Nhật Ánh", sach=[Sach(ten="Mắt biếc", nam=1990), Sach(ten="Cho tôi xin một vé đi tuổi thơ", nam=2008),
+                                            Sach(ten="Tôi thấy hoa vàng trên cỏ xanh", nam=2010)]),
+        TacGia(ten="Nguyễn Du", sach=[Sach(ten="Truyện Kiều", nam=1820)]),
+        TacGia(ten="Xuân Quỳnh"),
+        TacGia(ten="Vũ Trọng Phụng", sach=[Sach(ten="Số đỏ", nam=1936), Sach(ten="Giông tố", nam=1936)]),
+    ])
+    s.commit()
+    so_sach = func.count(Sach.id).label("so_sach")
+    q = select(TacGia.ten, so_sach).outerjoin(TacGia.sach).group_by(TacGia.id).order_by(so_sach.desc(), TacGia.ten)
+    for ten, n in s.execute(q):
+        print(f"{ten:&lt;16}{n}")</code></pre>
+<pre><code class="language-text">Nguyễn Nhật Ánh 3
+Vũ Trọng Phụng  2
+Nguyễn Du       1
+Xuân Quỳnh      0</code></pre>
+<p><code>outerjoin</code> là <code>LEFT JOIN</code>: giữ tác giả chưa có sách. <code>func.count(Sach.id)</code> đếm sách thật (bỏ <code>NULL</code>), nên Xuân Quỳnh được 0 chứ không phải 1.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Tìm sách theo từ khóa</h3>
+<p>Viết hàm <code>tim_sach(session, tu_khoa, tu_nam=None)</code> tìm sách có tên chứa từ khóa (không phân biệt hoa thường), lọc thêm theo năm nếu có, sắp theo năm.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python"># (minh họa) dùng model và dữ liệu của bài 1
+def tim_sach(session: Session, tu_khoa: str, tu_nam: int | None = None) -&gt; list[Sach]:
+    q = select(Sach).where(Sach.ten.ilike(f"%{tu_khoa}%"))
+    if tu_nam is not None:
+        q = q.where(Sach.nam &gt;= tu_nam)              # ghép thêm điều kiện khi cần
+    return list(session.scalars(q.order_by(Sach.nam)))
+
+
+with Session(engine) as s:
+    print([x.ten for x in tim_sach(s, "tôi")])
+    print([x.ten for x in tim_sach(s, "tôi", tu_nam=2009)])</code></pre>
+<pre><code class="language-text">['Cho tôi xin một vé đi tuổi thơ', 'Tôi thấy hoa vàng trên cỏ xanh']
+['Tôi thấy hoa vàng trên cỏ xanh']</code></pre>
+<p>Ghép điều kiện từng bước bằng <code>q = q.where(...)</code> là điểm mạnh của SQLAlchemy so với tự nối chuỗi SQL, và vẫn an toàn trước SQL injection vì từ khóa được truyền dưới dạng tham số. Lưu ý: SQLite chỉ so sánh không phân biệt hoa thường cho chữ cái ASCII, nên <code>"TÔI"</code> viết hoa có dấu sẽ không khớp <code>"tôi"</code>; PostgreSQL thì xử lý đúng với <code>ILIKE</code>.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.sqlalchemy.org/en/20/tutorial/" rel="noopener" target="_blank">SQLAlchemy Unified Tutorial</a>; <a href="https://docs.sqlalchemy.org/en/20/orm/quickstart.html" rel="noopener" target="_blank">ORM Quick Start</a>; <a href="https://docs.sqlalchemy.org/en/20/orm/queryguide/relationships.html" rel="noopener" target="_blank">Relationship Loading Techniques</a>; <a href="https://alembic.sqlalchemy.org/" rel="noopener" target="_blank">Alembic</a>.</p>

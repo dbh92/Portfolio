@@ -1,0 +1,240 @@
+<p>Khi nhiều lớp có phần giống nhau, bạn có hai cách dùng lại code: <strong>kế thừa</strong> (lớp con "là một" lớp cha) và <strong>composition</strong> (lớp "có một" đối tượng khác bên trong). Chọn sai cách là nguồn gốc của rất nhiều code rối. Bài này dạy cả hai, cùng cách định nghĩa "giao diện" bằng lớp trừu tượng và <code>Protocol</code>.</p>
+
+<h2>1. Kế thừa và ghi đè</h2>
+<pre><code class="language-python">class NhanVien:
+    def __init__(self, ten: str, luong_co_ban: int):
+        self.ten = ten
+        self.luong_co_ban = luong_co_ban
+
+    def tinh_luong(self) -&gt; int:
+        return self.luong_co_ban
+
+    def __repr__(self):
+        return f"{type(self).__name__}({self.ten!r})"
+
+
+class NhanVienKinhDoanh(NhanVien):            # kế thừa NhanVien
+    def __init__(self, ten: str, luong_co_ban: int, doanh_so: int):
+        super().__init__(ten, luong_co_ban)   # gọi __init__ của lớp cha
+        self.doanh_so = doanh_so
+
+    def tinh_luong(self) -&gt; int:              # ghi đè (override)
+        return super().tinh_luong() + int(self.doanh_so * 0.05)
+
+
+class QuanLy(NhanVien):
+    PHU_CAP = 5_000_000
+
+    def tinh_luong(self) -&gt; int:
+        return self.luong_co_ban + self.PHU_CAP
+
+
+cong_ty = [NhanVien("An", 12_000_000), NhanVienKinhDoanh("Bình", 10_000_000, 200_000_000),
+           QuanLy("Chi", 25_000_000)]
+for nv in cong_ty:
+    print(f"{nv!r:&lt;28}{nv.tinh_luong():&gt;12,}")
+print(isinstance(cong_ty[2], NhanVien), issubclass(QuanLy, NhanVien))</code></pre>
+<pre><code class="language-text">NhanVien('An')                12,000,000
+NhanVienKinhDoanh('Bình')     20,000,000
+QuanLy('Chi')                 30,000,000
+True True</code></pre>
+<ul>
+  <li><code>class Con(Cha):</code> thừa hưởng mọi thuộc tính, phương thức của lớp cha. <code>QuanLy</code> không viết <code>__init__</code> nên dùng luôn của <code>NhanVien</code>.</li>
+  <li>Ghi đè: lớp con định nghĩa lại phương thức cùng tên. <code>super().ten_phuong_thuc()</code> gọi bản của lớp cha để mở rộng thay vì viết lại từ đầu.</li>
+  <li><strong>Đa hình</strong>: vòng lặp gọi <code>nv.tinh_luong()</code> mà không cần biết <code>nv</code> là loại nào; mỗi đối tượng tự biết cách tính của mình. Thêm loại nhân viên mới không phải sửa vòng lặp.</li>
+</ul>
+
+<h2>2. Lớp trừu tượng: bắt buộc lớp con phải làm gì</h2>
+<pre><code class="language-python">from abc import ABC, abstractmethod
+import math
+
+
+class HinhHoc(ABC):
+    @abstractmethod
+    def dien_tich(self) -&gt; float: ...
+
+    def mo_ta(self) -&gt; str:                   # phương thức dùng chung, dựa trên phương thức trừu tượng
+        return f"{type(self).__name__}: diện tích {self.dien_tich():.2f}"
+
+
+class HinhTron(HinhHoc):
+    def __init__(self, r: float):
+        self.r = r
+
+    def dien_tich(self) -&gt; float:
+        return math.pi * self.r ** 2
+
+
+class HinhVuong(HinhHoc):
+    def __init__(self, canh: float):
+        self.canh = canh
+    # quên viết dien_tich
+
+
+print(HinhTron(1).mo_ta())
+try:
+    HinhVuong(2)
+except TypeError as loi:
+    print("Lỗi:", loi)</code></pre>
+<pre><code class="language-text">HinhTron: diện tích 3.14
+Lỗi: Can't instantiate abstract class HinhVuong without an implementation for abstract method 'dien_tich'</code></pre>
+<p>Lớp kế thừa <code>ABC</code> có phương thức <code>@abstractmethod</code> thì không tạo đối tượng được, và lớp con nào quên viết phương thức đó cũng bị chặn <strong>ngay lúc tạo đối tượng</strong>, thay vì đợi đến lúc gọi mới lỗi.</p>
+
+<h2>3. Composition: "có một" thay vì "là một"</h2>
+<p>Giả sử bạn cần gửi thông báo qua email hoặc SMS, và mỗi thông báo có thể ghi log hoặc không. Dùng kế thừa sẽ sinh ra <code>ThongBaoEmail</code>, <code>ThongBaoSMS</code>, <code>ThongBaoEmailCoLog</code>, <code>ThongBaoSMSCoLog</code>... số lớp tăng theo cấp số nhân. Composition giải quyết gọn: thông báo <strong>có một</strong> kênh gửi, kênh được truyền vào từ ngoài.</p>
+<pre><code class="language-python">class KenhEmail:
+    def gui(self, den: str, noi_dung: str) -&gt; str:
+        return f"[email → {den}] {noi_dung}"
+
+
+class KenhSMS:
+    def gui(self, den: str, noi_dung: str) -&gt; str:
+        return f"[sms → {den}] {noi_dung[:30]}"    # SMS giới hạn độ dài
+
+
+class KenhGia:
+    """Kênh giả dùng khi kiểm thử: không gửi thật, chỉ ghi lại."""
+    def __init__(self):
+        self.da_gui: list[tuple[str, str]] = []
+
+    def gui(self, den: str, noi_dung: str) -&gt; str:
+        self.da_gui.append((den, noi_dung))
+        return "ok"
+
+
+class DichVuThongBao:
+    def __init__(self, kenh):                 # nhận kênh từ bên ngoài
+        self.kenh = kenh
+
+    def bao_don_hang(self, den: str, ma_don: str) -&gt; str:
+        return self.kenh.gui(den, f"Đơn {ma_don} đã được giao cho đơn vị vận chuyển")
+
+
+print(DichVuThongBao(KenhEmail()).bao_don_hang("an@x.vn", "DH001"))
+print(DichVuThongBao(KenhSMS()).bao_don_hang("0912345678", "DH002"))
+gia = KenhGia()
+DichVuThongBao(gia).bao_don_hang("test", "DH003")
+print(gia.da_gui)</code></pre>
+<pre><code class="language-text">[email → an@x.vn] Đơn DH001 đã được giao cho đơn vị vận chuyển
+[sms → 0912345678] Đơn DH002 đã được giao cho đơn
+[('test', 'Đơn DH003 đã được giao cho đơn vị vận chuyển')]</code></pre>
+<p>Kỹ thuật "truyền phụ thuộc từ ngoài vào" gọi là <strong>dependency injection</strong>. Lợi ích thấy ngay ở <code>KenhGia</code>: kiểm thử <code>DichVuThongBao</code> mà không gửi email thật. Bạn sẽ gặp lại ý tưởng này trong pytest (chặng 6) và FastAPI (chặng 9, với <code>Depends</code>).</p>
+<div class="tip"><strong>Quy tắc chọn</strong>Ưu tiên composition. Chỉ dùng kế thừa khi câu "B <em>là một</em> A" đúng một cách tự nhiên và B dùng được ở mọi chỗ cần A (nhân viên kinh doanh là một nhân viên). "Ô tô có động cơ", "thông báo có kênh gửi": đó là composition.</div>
+
+<h2>4. Protocol: giao diện không cần kế thừa</h2>
+<p>Ở mục 3, ba lớp kênh không kế thừa gì cả; chúng chỉ cùng có phương thức <code>gui</code>. Đó là duck typing: "đi như vịt, kêu như vịt thì là vịt". <code>typing.Protocol</code> giúp ghi rõ điều này cho công cụ kiểm tra kiểu:</p>
+<pre><code class="language-python">from typing import Protocol
+
+
+class KenhGui(Protocol):
+    def gui(self, den: str, noi_dung: str) -&gt; str: ...
+
+
+class KenhZalo:                                # không kế thừa KenhGui
+    def gui(self, den: str, noi_dung: str) -&gt; str:
+        return f"[zalo → {den}] {noi_dung}"
+
+
+def thong_bao(kenh: KenhGui, den: str) -&gt; str:
+    return kenh.gui(den, "Xin chào")
+
+
+print(thong_bao(KenhZalo(), "Lan"))</code></pre>
+<pre><code class="language-text">[zalo → Lan] Xin chào</code></pre>
+<p>Khi chạy, Python không kiểm tra gì thêm. Nhưng mypy hoặc Pylance sẽ báo lỗi nếu bạn truyền một đối tượng thiếu phương thức <code>gui</code> hoặc sai kiểu tham số (chặng 5 dạy mypy). So với ABC: ABC buộc lớp con phải kế thừa; Protocol chỉ cần "có đúng hình dạng", hợp với cả lớp của thư viện bên ngoài mà bạn không sửa được.</p>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Kế thừa <code>class Con(Cha)</code>, ghi đè phương thức, <code>super()</code> để mở rộng bản của cha.</li>
+  <li><code>ABC</code> + <code>@abstractmethod</code> bắt buộc lớp con cài đặt.</li>
+  <li>Composition: đối tượng chứa đối tượng khác, nhận từ ngoài vào (dependency injection); ưu tiên hơn kế thừa.</li>
+  <li><code>Protocol</code> mô tả giao diện theo hình dạng, không cần kế thừa.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Ba hình học</h3>
+<p>Dựa trên <code>HinhHoc</code> ở mục 2, viết <code>HinhTron</code>, <code>HinhChuNhat</code>, <code>TamGiac</code> (ba cạnh, dùng công thức Heron), sắp xếp danh sách hình theo diện tích.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import math
+from abc import ABC, abstractmethod
+
+
+class HinhHoc(ABC):
+    @abstractmethod
+    def dien_tich(self) -&gt; float: ...
+
+    def __repr__(self):
+        return f"{type(self).__name__}({self.dien_tich():.2f})"
+
+
+class HinhTron(HinhHoc):
+    def __init__(self, r):
+        self.r = r
+
+    def dien_tich(self):
+        return math.pi * self.r ** 2
+
+
+class HinhChuNhat(HinhHoc):
+    def __init__(self, dai, rong):
+        self.dai, self.rong = dai, rong
+
+    def dien_tich(self):
+        return self.dai * self.rong
+
+
+class TamGiac(HinhHoc):
+    def __init__(self, a, b, c):
+        if a + b &lt;= c or a + c &lt;= b or b + c &lt;= a:
+            raise ValueError("Ba cạnh không tạo thành tam giác")
+        self.a, self.b, self.c = a, b, c
+
+    def dien_tich(self):
+        p = (self.a + self.b + self.c) / 2
+        return math.sqrt(p * (p - self.a) * (p - self.b) * (p - self.c))
+
+
+hinh = [HinhTron(1.5), HinhChuNhat(2, 3), TamGiac(3, 4, 5)]
+print(sorted(hinh, key=lambda h: h.dien_tich()))</code></pre>
+<pre><code class="language-text">[HinhChuNhat(6.00), TamGiac(6.00), HinhTron(7.07)]</code></pre>
+<p>Hình chữ nhật 2 × 3 và tam giác 3-4-5 cùng diện tích 6. <code>sorted</code> là sắp xếp <strong>ổn định</strong>: các phần tử có key bằng nhau giữ nguyên thứ tự như trong list gốc, nên hình chữ nhật (đứng trước trong <code>hinh</code>) vẫn đứng trước tam giác. Vòng lặp sắp xếp gọi <code>dien_tich()</code> trên mọi hình mà không cần biết hình nào là loại gì: đó là đa hình.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Thông báo nhiều kênh</h3>
+<p>Viết lớp <code>KenhNhieu</code> nhận một list kênh và gửi qua tất cả; dùng nó với <code>DichVuThongBao</code> mà không sửa lớp đó.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">class KenhEmail:
+    def gui(self, den, noi_dung):
+        return f"email:{den}"
+
+
+class KenhSMS:
+    def gui(self, den, noi_dung):
+        return f"sms:{den}"
+
+
+class KenhNhieu:
+    def __init__(self, cac_kenh):
+        self.cac_kenh = list(cac_kenh)
+
+    def gui(self, den, noi_dung):
+        return " | ".join(k.gui(den, noi_dung) for k in self.cac_kenh)
+
+
+class DichVuThongBao:
+    def __init__(self, kenh):
+        self.kenh = kenh
+
+    def bao_don_hang(self, den, ma_don):
+        return self.kenh.gui(den, f"Đơn {ma_don} đã giao")
+
+
+print(DichVuThongBao(KenhNhieu([KenhEmail(), KenhSMS()])).bao_don_hang("An", "DH9"))</code></pre>
+<pre><code class="language-text">email:An | sms:An</code></pre>
+<p><code>KenhNhieu</code> có cùng "hình dạng" với một kênh (có <code>gui</code>) nên <code>DichVuThongBao</code> dùng được ngay. Đây là mẫu thiết kế Composite: một nhóm đối tượng được dùng như một đối tượng.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/tutorial/classes.html#inheritance" rel="noopener" target="_blank">Python Tutorial: Inheritance</a>; <a href="https://docs.python.org/3/library/abc.html" rel="noopener" target="_blank">abc: Abstract Base Classes</a>; <a href="https://typing.python.org/en/latest/spec/protocol.html" rel="noopener" target="_blank">Typing spec: Protocols</a>.</p>

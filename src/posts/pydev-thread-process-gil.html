@@ -1,0 +1,213 @@
+<p>Tải 100 file mà tải lần lượt từng cái, chương trình dành 99% thời gian để <em>chờ</em> mạng. Tính toán nặng trên máy 8 nhân mà chỉ dùng 1 nhân, 7 nhân còn lại ngồi chơi. Chạy <strong>đồng thời</strong> giải quyết cả hai, nhưng mỗi loại việc cần một công cụ khác nhau. Bài này giải thích sự khác biệt đó, cơ chế <strong>GIL</strong> của Python, bản Python không GIL (free-threaded), và cách dùng <code>concurrent.futures</code> an toàn.</p>
+
+<h2>1. Hai loại việc: chờ I/O và nặng CPU</h2>
+<table>
+  <thead><tr><th>Loại</th><th>Ví dụ</th><th>Thời gian đi đâu</th><th>Công cụ</th></tr></thead>
+  <tbody>
+    <tr><td><strong>I/O-bound</strong></td><td>Gọi API, tải web, truy vấn CSDL, đọc ghi file</td><td>Chờ mạng, chờ đĩa</td><td>Thread, asyncio (bài sau)</td></tr>
+    <tr><td><strong>CPU-bound</strong></td><td>Tính toán số, xử lý ảnh, nén dữ liệu</td><td>CPU tính liên tục</td><td>Process (hoặc thread trên bản free-threaded)</td></tr>
+  </tbody>
+</table>
+<p>Xác định đúng loại trước khi chọn công cụ: dùng profiler (bài trước) hoặc quan sát CPU khi chạy. Chương trình chạy chậm mà CPU gần như rảnh là đang chờ I/O.</p>
+
+<h2>2. ThreadPoolExecutor cho việc chờ I/O</h2>
+<pre><code class="language-python">import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+
+def tai(url: str) -&gt; str:
+    time.sleep(0.5)                       # giả lập chờ mạng 0,5 giây
+    return f"{url}: xong"
+
+
+urls = [f"https://vi-du.vn/trang/{i}" for i in range(10)]
+
+t = time.perf_counter()
+ket_qua = [tai(u) for u in urls]
+print(f"Tuần tự: {time.perf_counter() - t:.1f} s")
+
+t = time.perf_counter()
+with ThreadPoolExecutor(max_workers=10) as pool:
+    ket_qua = list(pool.map(tai, urls))   # giữ đúng thứ tự đầu vào
+print(f"10 luồng: {time.perf_counter() - t:.1f} s, {len(ket_qua)} kết quả")
+
+with ThreadPoolExecutor(max_workers=5) as pool:
+    tuong_lai = {pool.submit(tai, u): u for u in urls[:3]}
+    for f in as_completed(tuong_lai):     # lấy kết quả theo thứ tự XONG TRƯỚC
+        print(f.result())                 # kết quả thay đổi mỗi lần chạy</code></pre>
+<pre><code class="language-text">Tuần tự: 5.0 s
+10 luồng: 0.5 s, 10 kết quả
+https://vi-du.vn/trang/1: xong
+https://vi-du.vn/trang/0: xong
+https://vi-du.vn/trang/2: xong</code></pre>
+<ul>
+  <li><code>ThreadPoolExecutor</code> quản lý một nhóm luồng; <code>with</code> bảo đảm chờ mọi việc xong rồi mới đi tiếp.</li>
+  <li><code>pool.map(ham, ds)</code>: giống <code>map</code>, trả kết quả theo thứ tự đầu vào.</li>
+  <li><code>pool.submit(ham, ...)</code> trả về một <code>Future</code> (lời hứa có kết quả sau); <code>as_completed</code> lấy theo thứ tự xong trước. <code>f.result()</code> ném lại ngoại lệ nếu hàm bị lỗi, nên bọc <code>try/except</code> ở đó.</li>
+  <li>Khi một luồng chờ (sleep, mạng, đĩa), các luồng khác chạy. 10 việc chờ 0,5 giây chạy song song chỉ mất 0,5 giây.</li>
+</ul>
+<p>Với gọi API thật, thay thân hàm <code>tai</code> bằng <code>requests.get(url, timeout=10)</code>, dùng mỗi luồng một <code>Session</code> hoặc gọi lẻ. Đừng mở hàng trăm luồng cùng lúc vào một máy chủ: giới hạn <code>max_workers</code> hợp lý (5–20) để không bị chặn vì gọi quá nhiều.</p>
+
+<h2>3. Race condition và Lock</h2>
+<p>Luồng dùng chung bộ nhớ: tiện, nhưng nguy hiểm khi nhiều luồng cùng sửa một dữ liệu.</p>
+<pre><code class="language-python">import threading
+import time
+
+so_du = 100
+
+
+def rut(so_tien: int) -&gt; None:
+    global so_du
+    if so_du &gt;= so_tien:          # kiểm tra...
+        time.sleep(0.01)          # ...thao tác chậm, ví dụ gọi CSDL...
+        so_du -= so_tien          # ...rồi mới trừ: luồng khác đã chen vào giữa
+
+
+luong = [threading.Thread(target=rut, args=(80,)) for _ in range(2)]
+for t in luong:
+    t.start()
+for t in luong:
+    t.join()
+print("Số dư không có khóa:", so_du)
+
+so_du = 100
+khoa = threading.Lock()
+
+
+def rut_an_toan(so_tien: int) -&gt; None:
+    global so_du
+    with khoa:                    # chỉ một luồng được ở trong khối này
+        if so_du &gt;= so_tien:
+            time.sleep(0.01)
+            so_du -= so_tien
+
+
+luong = [threading.Thread(target=rut_an_toan, args=(80,)) for _ in range(2)]
+for t in luong:
+    t.start()
+for t in luong:
+    t.join()
+print("Số dư có khóa:", so_du)</code></pre>
+<pre><code class="language-text">Số dư không có khóa: -60
+Số dư có khóa: 20</code></pre>
+<p>Cả hai luồng đều kiểm tra thấy đủ 100 ≥ 80 trước khi luồng kia kịp trừ, nên rút tổng 160 từ tài khoản 100. Lỗi kiểu này gọi là <strong>race condition</strong>: kết quả phụ thuộc thứ tự chạy của các luồng, có thể chỉ xuất hiện một lần trong nghìn lần, cực khó tái hiện. <code>threading.Lock</code> dùng với <code>with</code> bảo đảm đoạn "kiểm tra rồi sửa" chạy trọn vẹn trong một luồng.</p>
+<div class="tip"><strong>Cách an toàn nhất: không chia sẻ trạng thái</strong>Thiết kế để mỗi luồng nhận dữ liệu riêng và <strong>trả kết quả</strong> qua <code>pool.map</code> hoặc <code>Future</code>, rồi gộp ở luồng chính, như mục 2. Không có biến dùng chung thì không có race condition. Cần trao đổi liên tục giữa các luồng thì dùng <code>queue.Queue</code>, vốn đã an toàn khi dùng từ nhiều luồng.</div>
+
+<h2>4. GIL và việc nặng CPU</h2>
+<p>CPython (bản Python chuẩn) có <strong>GIL</strong> (Global Interpreter Lock): tại mỗi thời điểm chỉ một luồng được chạy mã Python. Luồng nhả GIL khi chờ I/O (nên mục 2 chạy song song tốt), nhưng với việc tính toán thuần Python, nhiều luồng chỉ thay nhau chạy trên một nhân. Muốn dùng nhiều nhân, dùng <strong>nhiều tiến trình</strong>: mỗi tiến trình là một trình thông dịch riêng với GIL riêng.</p>
+<pre><code class="language-python">import os
+import sys
+import time
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+
+
+def dem_nguyen_to(bat_dau: int, ket_thuc: int) -&gt; int:
+    """Đếm số nguyên tố trong [bat_dau, ket_thuc) bằng cách thử chia: cố tình tốn CPU."""
+    dem = 0
+    for n in range(max(bat_dau, 2), ket_thuc):
+        if all(n % d for d in range(2, int(n**0.5) + 1)):
+            dem += 1
+    return dem
+
+
+def chia_doan(n: int, so_doan: int) -&gt; list[tuple[int, int]]:
+    buoc = n // so_doan
+    return [(i * buoc, n if i == so_doan - 1 else (i + 1) * buoc) for i in range(so_doan)]
+
+
+if __name__ == "__main__":  # bắt buộc với ProcessPoolExecutor trên Windows, macOS
+    N = 2_000_000
+    doan = chia_doan(N, 4)
+    gil = sys._is_gil_enabled() if hasattr(sys, "_is_gil_enabled") else True
+    print(f"Python {sys.version_info.major}.{sys.version_info.minor}, GIL bật: {gil}, CPU: {os.cpu_count()}")
+
+    t = time.perf_counter()
+    kq = dem_nguyen_to(0, N)
+    print(f"Tuần tự:        {kq} số nguyên tố, {time.perf_counter() - t:.1f} s")    # kết quả thay đổi theo máy
+
+    for ten, Pool in (("4 luồng", ThreadPoolExecutor), ("4 tiến trình", ProcessPoolExecutor)):
+        t = time.perf_counter()
+        with Pool(max_workers=4) as pool:
+            kq = sum(pool.map(dem_nguyen_to, *zip(*doan)))
+        print(f"{ten:&lt;15} {kq} số nguyên tố, {time.perf_counter() - t:.1f} s")</code></pre>
+<p>Kết quả thật trên một máy 8 nhân, với Python 3.14 bản thường và bản free-threaded (mục 5):</p>
+<table>
+  <thead><tr><th>Cách chạy</th><th>Python 3.14 (có GIL)</th><th>Python 3.14t (không GIL)</th></tr></thead>
+  <tbody>
+    <tr><td>Tuần tự</td><td>9,2 s</td><td>11,7 s</td></tr>
+    <tr><td>4 luồng</td><td>9,3 s</td><td><strong>4,0 s</strong></td></tr>
+    <tr><td>4 tiến trình</td><td><strong>3,7 s</strong></td><td>4,7 s</td></tr>
+  </tbody>
+</table>
+<ul>
+  <li>Bản có GIL: 4 luồng <strong>không nhanh hơn</strong> chạy tuần tự; 4 tiến trình nhanh gấp khoảng 2,5 lần.</li>
+  <li>Vì sao không gấp 4? Đoạn cuối chứa số lớn nhất, thử chia lâu nhất, nên một tiến trình phải làm lâu hơn ba tiến trình kia. Chia nhỏ thành 32 đoạn cho 4 tiến trình thay nhau nhận, thời gian còn 3,0 giây (bài tập 2).</li>
+  <li><code>if __name__ == "__main__":</code> là <strong>bắt buộc</strong> với tiến trình trên Windows và macOS: tiến trình con import lại file của bạn, thiếu khối này thì mỗi tiến trình con lại tạo thêm tiến trình con.</li>
+  <li>Dữ liệu gửi qua lại giữa các tiến trình phải được tuần tự hóa (pickle) nên có chi phí; hàm chạy trong tiến trình phải định nghĩa ở cấp module (không dùng lambda). Chia việc thành phần đủ lớn để chi phí đó không đáng kể.</li>
+</ul>
+
+<h2>5. Python free-threaded: bản không có GIL</h2>
+<p>Từ Python 3.13 có thêm bản dựng <strong>free-threaded</strong> (tên chương trình có hậu tố <code>t</code>, ví dụ <code>python3.14t</code>) tắt GIL, cho phép các luồng chạy song song thật trên nhiều nhân. Cài bằng <code>uv python install 3.14t</code> hoặc trên Windows <code>py install 3.14t</code>. Kiểm tra bằng <code>sys._is_gil_enabled()</code> hoặc <code>python -VV</code> (hiện chữ "free-threading build").</p>
+<p>Bảng ở mục 4 cho thấy cả ưu và nhược điểm: 4 luồng chạy nhanh gần gấp 3 nhờ không còn GIL, nhưng chạy tuần tự chậm hơn bản thường. Tài liệu chính thức ghi nhận chi phí đơn luồng trung bình khoảng 1–8% trên bộ đo pyperformance, tùy nền tảng; với vòng lặp tính toán thuần như ví dụ này, chênh lệch có thể lớn hơn. Ngoài ra, một số thư viện viết bằng C chưa hỗ trợ sẽ tự bật lại GIL khi được import, và bộ nhớ dùng nhiều hơn. Bản có GIL vẫn là mặc định; dùng bản free-threaded khi bạn đã đo và thấy lợi, và mọi thư viện cần dùng đều đã hỗ trợ.</p>
+
+<h2>6. Chọn công cụ nào?</h2>
+<table>
+  <thead><tr><th>Tình huống</th><th>Chọn</th></tr></thead>
+  <tbody>
+    <tr><td>Gọi vài chục API, tải file, truy vấn CSDL đồng thời</td><td><code>ThreadPoolExecutor</code></td></tr>
+    <tr><td>Hàng nghìn kết nối mạng đồng thời, máy chủ web</td><td><code>asyncio</code> (bài sau)</td></tr>
+    <tr><td>Tính toán nặng bằng Python thuần, chia được thành phần độc lập</td><td><code>ProcessPoolExecutor</code></td></tr>
+    <tr><td>Tính toán trên mảng số lớn</td><td>NumPy, pandas (đã chạy bằng C, nhanh hơn mọi cách chia luồng bằng Python)</td></tr>
+  </tbody>
+</table>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>I/O-bound: thread hoặc asyncio; CPU-bound: process, hoặc thread trên bản free-threaded.</li>
+  <li><code>concurrent.futures</code>: <code>ThreadPoolExecutor</code>, <code>ProcessPoolExecutor</code>, <code>map</code>, <code>submit</code>, <code>as_completed</code>.</li>
+  <li>Dữ liệu dùng chung giữa các luồng cần <code>Lock</code>; tốt hơn là trả kết quả thay vì sửa biến chung.</li>
+  <li>GIL chỉ cho một luồng chạy mã Python tại một thời điểm; process cần <code>if __name__ == "__main__"</code>.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Kiểm tra nhiều trang web đồng thời</h3>
+<p>Viết hàm kiểm tra danh sách URL trả về mã trạng thái nào, chạy tuần tự rồi chạy bằng <code>ThreadPoolExecutor</code> 8 luồng, so sánh thời gian. URL lỗi (mất mạng, hết thời gian chờ) ghi là "lỗi" thay vì làm dừng chương trình.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python"># (minh họa) cần mạng; thời gian phụ thuộc đường truyền
+import time
+from concurrent.futures import ThreadPoolExecutor
+
+import requests
+
+URLS = ["https://www.python.org", "https://docs.python.org/3/", "https://pypi.org",
+        "https://fastapi.tiangolo.com", "https://docs.astral.sh/uv/", "https://httpbin.org/status/404",
+        "https://khong-ton-tai.vi-du.invalid", "https://github.com"]
+
+
+def kiem_tra(url: str) -&gt; tuple[str, str]:
+    try:
+        return url, str(requests.get(url, timeout=10).status_code)
+    except requests.RequestException:
+        return url, "lỗi"
+
+
+for ten, chay in [("Tuần tự", lambda: [kiem_tra(u) for u in URLS]),
+                  ("8 luồng", lambda: list(ThreadPoolExecutor(8).map(kiem_tra, URLS)))]:
+    t = time.perf_counter()
+    ket_qua = chay()
+    print(f"{ten}: {time.perf_counter() - t:.1f} s", dict(ket_qua)["https://httpbin.org/status/404"])</code></pre>
+<pre><code class="language-text">Tuần tự: 2.1 s 404
+8 luồng: 0.8 s 404</code></pre>
+<p>Thời gian 8 luồng xấp xỉ thời gian của trang chậm nhất, thay vì tổng thời gian mọi trang. Lỗi được bắt bên trong hàm chạy ở luồng, nên một URL hỏng không ảnh hưởng các URL khác. Tên miền <code>.invalid</code> được dành riêng để không bao giờ tồn tại, tiện cho thử nghiệm lỗi.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Cân bằng tải khi chia việc</h3>
+<p>Chạy chương trình ở mục 4 với 4 đoạn, rồi với 32 đoạn (vẫn 4 tiến trình). Giải thích vì sao chia nhỏ hơn lại nhanh hơn.</p>
+<details><summary>Xem đáp án</summary>
+<p>Đổi <code>doan = chia_doan(N, 4)</code> thành <code>chia_doan(N, 32)</code>. Trên máy thử nghiệm, 4 tiến trình giảm từ 3,7 giây xuống 3,0 giây. Với 4 đoạn, đoạn cuối (1.500.000 đến 2.000.000) tốn nhiều thời gian nhất vì số lớn cần thử nhiều ước hơn; ba tiến trình xong sớm phải ngồi chờ. Với 32 đoạn nhỏ, tiến trình nào xong trước thì nhận đoạn kế tiếp, công việc được chia đều hơn. Chia quá nhỏ (hàng nghìn đoạn) lại chậm vì chi phí gửi nhận dữ liệu giữa các tiến trình; <code>pool.map</code> có tham số <code>chunksize</code> để điều chỉnh việc này.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/library/concurrent.futures.html" rel="noopener" target="_blank">concurrent.futures</a>; <a href="https://docs.python.org/3/library/threading.html" rel="noopener" target="_blank">threading</a>; <a href="https://docs.python.org/3/howto/free-threading-python.html" rel="noopener" target="_blank">Python support for free threading</a>; <a href="https://peps.python.org/pep-0703/" rel="noopener" target="_blank">PEP 703: Making the GIL Optional</a>.</p>

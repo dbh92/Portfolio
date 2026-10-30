@@ -1,0 +1,252 @@
+<p>Thử API bằng <code>/docs</code> sau mỗi lần sửa code thì chậm và chắc chắn sẽ có lúc quên một trường hợp. Với API có đăng nhập, phân quyền và hàng chục endpoint, <strong>test tự động</strong> là thứ duy nhất cho bạn sự tự tin khi sửa code hay nâng cấp thư viện. FastAPI được thiết kế để test rất dễ: bài này viết bộ test hoàn chỉnh cho API sổ ghi chú ở bài trước bằng pytest (chặng 6) và <code>TestClient</code>.</p>
+
+<h2>1. TestClient: gọi API mà không cần chạy máy chủ</h2>
+<pre><code class="language-python"># (minh họa) cần API sổ ghi chú ở bài FastAPI đầu tiên
+from fastapi.testclient import TestClient
+
+from main import app
+
+client = TestClient(app)
+
+
+def test_trang_chu():
+    r = client.get("/")
+    assert r.status_code == 200
+    assert r.json() == {"thong_diep": "Xin chào từ FastAPI"}</code></pre>
+<p><code>TestClient</code> gọi thẳng vào ứng dụng trong cùng tiến trình, không mở cổng mạng, nên test chạy rất nhanh. Cách dùng giống hệt requests và httpx (chặng 7): <code>client.get</code>, <code>client.post(url, json=...)</code>, <code>headers=...</code>, <code>r.status_code</code>, <code>r.json()</code>. Viết <code>with TestClient(app) as c:</code> để chạy cả <code>lifespan</code> khi khởi động.</p>
+
+<h2>2. Vấn đề: test không được đụng CSDL thật</h2>
+<p>Nếu test dùng <code>so_ghi_chu.db</code> như khi chạy thật, mỗi lần chạy test sẽ để lại dữ liệu rác, test sau phụ thuộc test trước, và tệ nhất là có thể xóa dữ liệu thật. Ta cần mỗi test một CSDL riêng, trống trơn. Đây là lúc dependency injection ở bài trước phát huy tác dụng: endpoint nhận Session qua <code>Depends(get_session)</code>, nên khi test ta chỉ việc <strong>thay</strong> <code>get_session</code> bằng hàm khác.</p>
+<pre><code class="language-text">so-ghi-chu/
+├── app/ ...
+└── tests/
+    ├── conftest.py      ← fixture dùng chung: client, người dùng đã đăng nhập
+    ├── test_auth.py
+    └── test_ghi_chu.py</code></pre>
+<pre><code class="language-python"># (minh họa) tests/conftest.py
+import os
+
+os.environ["DATABASE_URL"] = "sqlite://"  # đặt TRƯỚC khi import app: không bao giờ đụng CSDL thật
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+from sqlalchemy.pool import StaticPool
+
+from app.database import Base, get_session
+from app.main import app
+
+
+@pytest.fixture
+def client():
+    """Mỗi test một CSDL SQLite trong RAM, trống trơn."""
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+    Base.metadata.create_all(engine)
+
+    def get_session_test():
+        with Session(engine) as session:
+            yield session
+
+    app.dependency_overrides[get_session] = get_session_test
+    with TestClient(app) as c:
+        yield c
+    app.dependency_overrides.clear()
+
+
+def dang_ky_va_dang_nhap(client: TestClient, ten: str, mat_khau: str = "matkhau-123") -&gt; dict:
+    """Trả header Authorization sẵn dùng."""
+    r = client.post("/auth/dang-ky", json={"ten_dang_nhap": ten, "mat_khau": mat_khau})
+    assert r.status_code == 201
+    r = client.post("/auth/token", data={"username": ten, "password": mat_khau})
+    return {"Authorization": f"Bearer {r.json()['access_token']}"}
+
+
+@pytest.fixture
+def an(client):
+    return dang_ky_va_dang_nhap(client, "an_nguyen")
+
+
+@pytest.fixture
+def binh(client):
+    return dang_ky_va_dang_nhap(client, "binh")</code></pre>
+<ul>
+  <li><code>os.environ["DATABASE_URL"] = "sqlite://"</code> đặt <strong>trước</strong> khi import <code>app</code>, để engine của ứng dụng (và <code>create_all</code> trong lifespan) trỏ vào CSDL trong RAM, không tạo file thật.</li>
+  <li><code>"sqlite://"</code> là SQLite trong RAM. <code>StaticPool</code> buộc mọi kết nối dùng chung một kết nối duy nhất; không có nó, mỗi kết nối mới sẽ thấy một CSDL trống khác, bảng vừa tạo "biến mất".</li>
+  <li><code>app.dependency_overrides[get_session] = get_session_test</code>: mọi endpoint đang dùng <code>get_session</code> sẽ nhận Session của CSDL test. Sau test thì <code>clear()</code> để không ảnh hưởng test khác.</li>
+  <li>Fixture <code>client</code> có <code>yield</code>: phần trước là chuẩn bị, phần sau là dọn dẹp. Mỗi test gọi tới <code>client</code> nhận một CSDL mới tinh.</li>
+  <li>Fixture <code>an</code>, <code>binh</code> dùng fixture <code>client</code> để đăng ký, đăng nhập và trả về header <code>Authorization</code>. Test nào cần người dùng đăng nhập chỉ việc khai báo tham số <code>an</code>.</li>
+</ul>
+
+<h2>3. Test luồng xác thực</h2>
+<pre><code class="language-python"># (minh họa) tests/test_auth.py
+def test_dang_ky_khong_tra_mat_khau(client):
+    r = client.post("/auth/dang-ky", json={"ten_dang_nhap": "lan", "mat_khau": "matkhau-123"})
+    assert r.status_code == 201
+    assert r.json() == {"id": 1, "ten_dang_nhap": "lan"}
+
+
+def test_dang_ky_trung_ten(client, an):
+    r = client.post("/auth/dang-ky", json={"ten_dang_nhap": "an_nguyen", "mat_khau": "khac-12345"})
+    assert r.status_code == 409
+
+
+def test_dang_nhap_sai_mat_khau(client, an):
+    r = client.post("/auth/token", data={"username": "an_nguyen", "password": "sai-roi-123"})
+    assert r.status_code == 401
+    assert r.headers["www-authenticate"] == "Bearer"
+
+
+def test_toi(client, an):
+    assert client.get("/nguoi-dung/toi", headers=an).json()["ten_dang_nhap"] == "an_nguyen"
+
+
+def test_chua_dang_nhap_hoac_token_gia(client):
+    assert client.get("/ghi-chu").status_code == 401
+    assert (
+        client.get("/ghi-chu", headers={"Authorization": "Bearer abc.def.ghi"}).status_code == 401
+    )</code></pre>
+<p>Test đầu tiên kiểm tra một yêu cầu bảo mật quan trọng: response đăng ký <strong>đúng bằng</strong> <code>{"id": 1, "ten_dang_nhap": "lan"}</code>, tức là không lộ <code>mat_khau_bam</code>. So sánh cả dict thay vì từng trường giúp phát hiện trường thừa.</p>
+
+<h2>4. Test nghiệp vụ và phân quyền</h2>
+<pre><code class="language-python"># (minh họa) tests/test_ghi_chu.py
+import pytest
+
+
+def test_vong_doi_ghi_chu(client, an):
+    r = client.post("/ghi-chu", json={"tieu_de": "Mua sữa", "the": ["việc nhà"]}, headers=an)
+    assert r.status_code == 201
+    gc = r.json()
+    assert gc["tieu_de"] == "Mua sữa" and gc["noi_dung"] == ""
+
+    assert [g["id"] for g in client.get("/ghi-chu", headers=an).json()] == [gc["id"]]
+
+    r = client.patch(f"/ghi-chu/{gc['id']}", json={"noi_dung": "2 hộp"}, headers=an)
+    assert r.status_code == 200
+    assert r.json()["noi_dung"] == "2 hộp"
+    assert r.json()["the"] == ["việc nhà"]  # trường không gửi thì giữ nguyên
+
+    assert client.delete(f"/ghi-chu/{gc['id']}", headers=an).status_code == 204
+    assert client.get(f"/ghi-chu/{gc['id']}", headers=an).status_code == 404
+
+
+@pytest.mark.parametrize(
+    "body",
+    [{}, {"tieu_de": ""}, {"tieu_de": "x" * 101}, {"tieu_de": "a", "the": "khong-phai-list"}],
+)
+def test_tao_du_lieu_sai(client, an, body):
+    assert client.post("/ghi-chu", json=body, headers=an).status_code == 422
+
+
+def test_patch_null_bi_tu_choi(client, an):
+    gc = client.post("/ghi-chu", json={"tieu_de": "A"}, headers=an).json()
+    assert (
+        client.patch(f"/ghi-chu/{gc['id']}", json={"tieu_de": None}, headers=an).status_code == 422
+    )
+
+
+def test_tim_kiem_va_phan_trang(client, an):
+    for i in range(5):
+        client.post(
+            "/ghi-chu",
+            json={"tieu_de": f"Việc {i}", "noi_dung": "gấp" if i % 2 else ""},
+            headers=an,
+        )
+    assert len(client.get("/ghi-chu", params={"tu_khoa": "gấp"}, headers=an).json()) == 2
+    trang_2 = client.get("/ghi-chu", params={"skip": 2, "limit": 2}, headers=an).json()
+    assert [g["tieu_de"] for g in trang_2] == ["Việc 2", "Việc 3"]
+
+
+def test_khong_dung_duoc_ghi_chu_nguoi_khac(client, an, binh):
+    gc = client.post("/ghi-chu", json={"tieu_de": "Bí mật của An"}, headers=an).json()
+    assert client.get(f"/ghi-chu/{gc['id']}", headers=binh).status_code == 404
+    assert (
+        client.patch(f"/ghi-chu/{gc['id']}", json={"tieu_de": "Bị sửa"}, headers=binh).status_code
+        == 404
+    )
+    assert client.delete(f"/ghi-chu/{gc['id']}", headers=binh).status_code == 404
+    assert client.get("/ghi-chu", headers=binh).json() == []
+    assert client.get(f"/ghi-chu/{gc['id']}", headers=an).json()["tieu_de"] == "Bí mật của An"</code></pre>
+<ul>
+  <li><strong>Một test cho cả vòng đời</strong> tạo, xem, sửa, xóa: các bước phụ thuộc nhau nên gom lại hợp lý. Kiểm tra cả việc PATCH không làm mất trường không gửi.</li>
+  <li><code>parametrize</code> chạy một test với 4 kiểu dữ liệu sai: thiếu trường, rỗng, quá dài, sai kiểu.</li>
+  <li>Test cuối là quan trọng nhất về bảo mật: Bình <strong>không</strong> đọc, sửa, xóa, liệt kê được ghi chú của An, và ghi chú của An vẫn nguyên vẹn sau các thử nghiệm đó. Lỗi phân quyền thường không ai phát hiện khi thử bằng tay với một tài khoản.</li>
+</ul>
+
+<h2>5. Chạy và đọc kết quả</h2>
+<pre><code class="language-text">$ uv run pytest -v
+tests/test_auth.py::test_dang_ky_khong_tra_mat_khau PASSED               [  7%]
+tests/test_auth.py::test_dang_ky_trung_ten PASSED                        [ 15%]
+tests/test_auth.py::test_dang_nhap_sai_mat_khau PASSED                   [ 23%]
+tests/test_auth.py::test_toi PASSED                                      [ 30%]
+tests/test_auth.py::test_chua_dang_nhap_hoac_token_gia PASSED            [ 38%]
+tests/test_ghi_chu.py::test_vong_doi_ghi_chu PASSED                      [ 46%]
+tests/test_ghi_chu.py::test_tao_du_lieu_sai[body0] PASSED                [ 53%]
+tests/test_ghi_chu.py::test_tao_du_lieu_sai[body1] PASSED                [ 61%]
+tests/test_ghi_chu.py::test_tao_du_lieu_sai[body2] PASSED                [ 69%]
+tests/test_ghi_chu.py::test_tao_du_lieu_sai[body3] PASSED                [ 76%]
+tests/test_ghi_chu.py::test_patch_null_bi_tu_choi PASSED                 [ 84%]
+tests/test_ghi_chu.py::test_tim_kiem_va_phan_trang PASSED                [ 92%]
+tests/test_ghi_chu.py::test_khong_dung_duoc_ghi_chu_nguoi_khac PASSED    [100%]
+============================= 13 passed in 1.79s ==============================
+
+$ uv run pytest -q --cov=app --cov-report=term-missing
+Name              Stmts   Miss  Cover   Missing
+-----------------------------------------------
+app\auth.py          18      1    94%   29
+app\database.py      14      2    86%   20-21
+app\main.py          68      0   100%
+app\security.py      22      0   100%
+...
+TOTAL               163      3    98%</code></pre>
+<p>Hơn một nửa thời gian chạy là băm mật khẩu Argon2: cố tình chậm như đã giải thích. Coverage chỉ ra hai chỗ chưa test: dòng 20–21 của <code>database.py</code> là <code>get_session</code> thật (đã bị thay khi test, bình thường), và dòng 29 của <code>auth.py</code>: trường hợp token hợp lệ nhưng người dùng không còn tồn tại. Đó chính là bài tập 1.</p>
+<div class="tip"><strong>Khi test chạy chậm vì Argon2</strong>Với vài trăm test có đăng nhập, có thể giảm chi phí băm trong môi trường test (ví dụ dùng fixture phạm vi <code>session</code> để tạo người dùng một lần, hoặc cấu hình hàm băm rẻ hơn chỉ khi test). Không bao giờ hạ tham số băm của môi trường chạy thật.</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li><code>TestClient(app)</code> gọi API trong tiến trình; <code>with</code> để chạy lifespan.</li>
+  <li>Thay CSDL bằng <code>app.dependency_overrides[get_session]</code>; SQLite trong RAM + <code>StaticPool</code>; đặt biến môi trường trước khi import app.</li>
+  <li>Fixture cho client và người dùng đã đăng nhập, đặt trong <code>conftest.py</code>.</li>
+  <li>Test mã trạng thái, nội dung trả về, lỗi 401, 404, 409, 422 và đặc biệt là phân quyền giữa các người dùng.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Phủ nốt nhánh còn thiếu</h3>
+<p>Viết test cho hai trường hợp: token hợp lệ nhưng người dùng không tồn tại, và token đã hết hạn. Cả hai phải trả 401; chạy lại coverage để thấy <code>auth.py</code> đạt 100%.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python"># (minh họa) tests/test_token.py
+from datetime import UTC, datetime, timedelta
+
+import jwt
+
+from app.security import ALGORITHM, SECRET_KEY, tao_token
+
+
+def test_token_hop_le_nhung_nguoi_dung_khong_ton_tai(client):
+    h = {"Authorization": f"Bearer {tao_token('nguoi_da_bi_xoa')}"}
+    assert client.get("/nguoi-dung/toi", headers=h).status_code == 401
+
+
+def test_token_het_han(client, an):
+    het_han = datetime.now(UTC) - timedelta(minutes=1)
+    cu = jwt.encode({"sub": "an_nguyen", "exp": het_han}, SECRET_KEY, algorithm=ALGORITHM)
+    r = client.get("/nguoi-dung/toi", headers={"Authorization": f"Bearer {cu}"})
+    assert r.status_code == 401</code></pre>
+<pre><code class="language-text">$ uv run pytest -q --cov=app --cov-report=term-missing
+app\auth.py          18      0   100%
+15 passed in 2.10s</code></pre>
+<p>Test thứ hai tự tạo một token đã hết hạn một phút bằng đúng khóa của ứng dụng: chữ ký hợp lệ nhưng <code>exp</code> đã qua, PyJWT ném <code>ExpiredSignatureError</code> (lớp con của <code>InvalidTokenError</code>) và API trả 401.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Test cho tính năng mới</h3>
+<p>Thêm query parameter <code>the</code> để lọc ghi chú theo thẻ (như bài tập bài FastAPI đầu tiên, nhưng giờ trên CSDL). Viết test <strong>trước</strong>, thấy nó đỏ, rồi mới viết code cho xanh.</p>
+<details><summary>Xem gợi ý</summary>
+<p>Test: An tạo 3 ghi chú, hai cái có thẻ <code>"việc nhà"</code>; <code>GET /ghi-chu?the=việc nhà</code> phải trả đúng 2 ghi chú; Bình gọi cùng tham số phải nhận list rỗng. Cột <code>the</code> là JSON nên lọc trong SQL phụ thuộc CSDL; cách đơn giản chạy được trên SQLite là lọc bằng Python sau khi truy vấn theo <code>chu_id</code>, nhớ lọc <em>trước</em> khi cắt trang. Quy trình "viết test trước, code sau" gọi là TDD (Test-Driven Development).</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://fastapi.tiangolo.com/tutorial/testing/" rel="noopener" target="_blank">FastAPI: Testing</a>; <a href="https://fastapi.tiangolo.com/advanced/testing-dependencies/" rel="noopener" target="_blank">FastAPI: Testing Dependencies with Overrides</a>; <a href="https://docs.sqlalchemy.org/en/20/dialects/sqlite.html#using-a-memory-database-in-multiple-threads" rel="noopener" target="_blank">SQLAlchemy: SQLite in-memory database và StaticPool</a>; <a href="https://docs.pytest.org/en/stable/how-to/fixtures.html" rel="noopener" target="_blank">pytest fixtures</a>.</p>

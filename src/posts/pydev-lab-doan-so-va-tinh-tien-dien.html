@@ -1,0 +1,166 @@
+<p>Bài thực hành đầu tiên ghép mọi thứ của chặng 1 vào hai chương trình hoàn chỉnh: trò chơi đoán số và máy tính tiền điện bậc thang. Mục tiêu không chỉ là chạy được, mà là tập quy trình người đi làm vẫn dùng: <strong>hiểu đề → chia bước → viết từng bước → chạy thử với dữ liệu biết trước kết quả</strong>.</p>
+
+<h2>1. Chia bài toán trước khi viết code</h2>
+<p>Đừng mở VS Code ngay. Viết ra giấy (hoặc comment) các bước bằng tiếng Việt. Với trò đoán số:</p>
+<ol>
+  <li>Máy chọn ngẫu nhiên một số từ 1 đến 100.</li>
+  <li>Lặp tối đa 7 lượt: hỏi người chơi một số.</li>
+  <li>Nếu nhập không phải số hoặc ngoài 1–100: báo lỗi, không tính lượt.</li>
+  <li>So sánh: lớn hơn, nhỏ hơn, hoặc đúng thì chúc mừng và dừng.</li>
+  <li>Hết 7 lượt mà chưa đúng: thông báo đáp án.</li>
+</ol>
+<p>Mỗi bước gần như là một vài dòng code. Vì sao 7 lượt? Mỗi lần đoán ở giữa khoảng còn lại sẽ loại một nửa khả năng: 100 → 50 → 25 → 13 → 7 → 4 → 2 → 1. Người chơi khéo luôn thắng trong 7 lượt; đây chính là ý tưởng của <strong>tìm kiếm nhị phân</strong>.</p>
+
+<h2>2. Trò chơi đoán số</h2>
+<pre><code class="language-python">import random
+
+SO_LUOT = 7
+bi_mat = random.randint(1, 100)       # số nguyên ngẫu nhiên, gồm cả 1 và 100
+print(f"Tôi đã chọn một số từ 1 đến 100. Bạn có {SO_LUOT} lượt.")
+
+luot = 0
+while luot &lt; SO_LUOT:
+    nhap = input(f"Lượt {luot + 1}: ").strip()
+    if not nhap.isdigit():
+        print("  Hãy nhập một số nguyên dương.")
+        continue                       # không tăng lượt
+    doan = int(nhap)
+    if not 1 &lt;= doan &lt;= 100:
+        print("  Số phải trong khoảng 1–100.")
+        continue
+    luot += 1
+    if doan &lt; bi_mat:
+        print("  Lớn hơn nữa.")
+    elif doan &gt; bi_mat:
+        print("  Nhỏ hơn nữa.")
+    else:
+        print(f"  Chính xác! Bạn đoán đúng sau {luot} lượt.")
+        break
+else:
+    print(f"Hết lượt. Số bí mật là {bi_mat}.")</code></pre>
+<pre><code class="language-text">Tôi đã chọn một số từ 1 đến 100. Bạn có 7 lượt.
+Lượt 1: 50
+  Nhỏ hơn nữa.
+Lượt 2: abc
+  Hãy nhập một số nguyên dương.
+Lượt 2: 25
+  Lớn hơn nữa.
+Lượt 3: 37
+  Lớn hơn nữa.
+Lượt 4: 43
+  Chính xác! Bạn đoán đúng sau 4 lượt.</code></pre>
+<p>Các điểm đáng chú ý:</p>
+<ul>
+  <li><code>isdigit()</code> kiểm tra chuỗi chỉ gồm chữ số trước khi gọi <code>int()</code>, tránh lỗi <code>ValueError</code>. Ở chặng 3 bạn sẽ dùng <code>try/except</code> cho việc này.</li>
+  <li><code>continue</code> khi nhập sai nằm <strong>trước</strong> <code>luot += 1</code>, nên nhập sai không mất lượt.</li>
+  <li><code>while ... else</code>: khối <code>else</code> chỉ chạy khi hết lượt mà không <code>break</code>, tức là người chơi thua.</li>
+  <li><code>SO_LUOT</code> viết hoa vì là hằng số cấu hình; muốn đổi luật chỉ sửa một chỗ.</li>
+</ul>
+<div class="tip"><strong>Mẹo kiểm thử với số ngẫu nhiên</strong>Thêm <code>random.seed(1)</code> ngay sau <code>import random</code> thì mỗi lần chạy máy chọn cùng một số. Nhờ vậy bạn kiểm tra được mọi nhánh. Nhớ xóa dòng đó khi chơi thật.</div>
+
+<h2>3. Tính tiền điện bậc thang</h2>
+<p>Giá điện sinh hoạt ở Việt Nam tính lũy tiến theo bậc: số kWh ở bậc nào tính theo giá bậc đó. Bài dùng biểu giá theo Quyết định 1279/QĐ-BCT (hiệu lực từ 10/05/2025), giá chưa gồm thuế GTGT:</p>
+<table>
+  <thead><tr><th>Bậc</th><th>Mức sử dụng</th><th>Giá (đ/kWh)</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>0–50 kWh</td><td>1.984</td></tr>
+    <tr><td>2</td><td>51–100 kWh</td><td>2.050</td></tr>
+    <tr><td>3</td><td>101–200 kWh</td><td>2.380</td></tr>
+    <tr><td>4</td><td>201–300 kWh</td><td>2.998</td></tr>
+    <tr><td>5</td><td>301–400 kWh</td><td>3.350</td></tr>
+    <tr><td>6</td><td>Từ 401 kWh</td><td>3.460</td></tr>
+  </tbody>
+</table>
+<p>Giá điện có thể được điều chỉnh; khi dùng thật, hãy kiểm tra biểu giá hiện hành trên trang của EVN. Cách thiết kế dưới đây giúp đổi giá chỉ bằng cách sửa bảng, không sửa logic.</p>
+<p>Trước khi code, <strong>tính tay một ví dụ</strong> để có kết quả đối chiếu. Với 150 kWh: 50 × 1.984 + 50 × 2.050 + 50 × 2.380 = 99.200 + 102.500 + 119.000 = <strong>320.700 đ</strong>.</p>
+<pre><code class="language-python"># (mức trần của bậc, giá); None nghĩa là không giới hạn
+BAC_GIA = [(50, 1984), (100, 2050), (200, 2380), (300, 2998), (400, 3350), (None, 3460)]
+
+so_kwh = 150
+con_lai = so_kwh
+muc_duoi = 0
+tong = 0
+for muc_tran, gia in BAC_GIA:
+    if con_lai &lt;= 0:
+        break
+    do_rong = con_lai if muc_tran is None else muc_tran - muc_duoi
+    kwh_bac = min(con_lai, do_rong)
+    tien = kwh_bac * gia
+    print(f"{kwh_bac:4} kWh x {gia:,} = {tien:&gt;10,} đ")
+    tong += tien
+    con_lai -= kwh_bac
+    if muc_tran is not None:
+        muc_duoi = muc_tran
+print(f"Tổng {so_kwh} kWh: {tong:,} đ (chưa thuế)")</code></pre>
+<pre><code class="language-text">  50 kWh x 1,984 =     99,200 đ
+  50 kWh x 2,050 =    102,500 đ
+  50 kWh x 2,380 =    119,000 đ
+Tổng 150 kWh: 320,700 đ (chưa thuế)</code></pre>
+<p>Kết quả khớp với số tính tay. Ý tưởng chính: mỗi bậc "ăn" tối đa <code>do_rong</code> kWh (độ rộng của bậc), phần còn lại chuyển xuống bậc sau. Bậc cuối có <code>muc_tran = None</code> nên ăn hết phần còn lại.</p>
+<div class="warn"><strong>Kiểm tra ranh giới</strong>Lỗi bậc thang hay nằm ở ranh giới: 50, 51, 100, 101 kWh. Luôn thử các giá trị đó. Với 50 kWh kết quả phải là 99.200 đ; với 51 kWh phải là 99.200 + 2.050 = 101.250 đ. Ở chặng 6, bạn sẽ biến các phép thử này thành test tự động bằng pytest.</div>
+
+<h2>4. Tổng kết quy trình</h2>
+<ul>
+  <li>Viết các bước bằng lời trước khi code.</li>
+  <li>Tính tay ít nhất một ví dụ để có đáp án đối chiếu.</li>
+  <li>Đưa các con số dễ thay đổi (số lượt, bảng giá) lên đầu file thành hằng số.</li>
+  <li>Thử dữ liệu sai (chữ thay số, số âm) và giá trị ranh giới.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Hỏi chơi lại</h3>
+<p>Bọc trò chơi trong một vòng lặp ngoài: hết ván thì hỏi "Chơi lại? (c/k)", trả lời <code>c</code> thì chơi ván mới với số bí mật mới.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import random
+
+SO_LUOT = 7
+while True:
+    bi_mat = random.randint(1, 100)
+    luot = 0
+    print(f"\nSố mới từ 1 đến 100, bạn có {SO_LUOT} lượt.")
+    while luot &lt; SO_LUOT:
+        nhap = input(f"Lượt {luot + 1}: ").strip()
+        if not nhap.isdigit() or not 1 &lt;= int(nhap) &lt;= 100:
+            print("  Nhập số nguyên từ 1 đến 100.")
+            continue
+        luot += 1
+        doan = int(nhap)
+        if doan == bi_mat:
+            print(f"  Chính xác sau {luot} lượt!")
+            break
+        print("  Lớn hơn nữa." if doan &lt; bi_mat else "  Nhỏ hơn nữa.")
+    else:
+        print(f"Hết lượt. Số bí mật là {bi_mat}.")
+    if input("Chơi lại? (c/k): ").strip().lower() != "c":
+        print("Hẹn gặp lại!")
+        break</code></pre>
+<p><code>not nhap.isdigit() or ...</code>: nhờ cơ chế "đoản mạch", nếu vế trái đúng (không phải số) thì Python không tính vế phải, nên <code>int(nhap)</code> không bị gọi với chuỗi chữ.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Tiền điện cho nhiều mức</h3>
+<p>Tính tiền điện (chưa thuế) cho 50, 51, 150 và 420 kWh. Kiểm tra bằng tay ít nhất một giá trị.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">BAC_GIA = [(50, 1984), (100, 2050), (200, 2380), (300, 2998), (400, 3350), (None, 3460)]
+
+for so_kwh in [50, 51, 150, 420]:
+    con_lai, muc_duoi, tong = so_kwh, 0, 0
+    for muc_tran, gia in BAC_GIA:
+        if con_lai &lt;= 0:
+            break
+        do_rong = con_lai if muc_tran is None else muc_tran - muc_duoi
+        kwh_bac = min(con_lai, do_rong)
+        tong += kwh_bac * gia
+        con_lai -= kwh_bac
+        muc_duoi = muc_tran or muc_duoi
+    print(f"{so_kwh:&gt;4} kWh: {tong:&gt;10,} đ")</code></pre>
+<pre><code class="language-text">  50 kWh:     99,200 đ
+  51 kWh:    101,250 đ
+ 150 kWh:    320,700 đ
+ 420 kWh:  1,143,700 đ</code></pre>
+<p>Tính tay 420 kWh: 99.200 + 102.500 + 238.000 + 299.800 + 335.000 + 20 × 3.460 = 1.143.700 đ. Đoạn code tính tiền đang bị chép lại ở hai nơi; ở chặng 2 bạn sẽ gói nó thành hàm <code>tinh_tien_dien(so_kwh)</code> để dùng lại.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/library/random.html" rel="noopener" target="_blank">Python docs: random</a>; biểu giá bán lẻ điện sinh hoạt theo Quyết định 1279/QĐ-BCT của Bộ Công Thương (hiệu lực từ 10/05/2025), tổng hợp tại <a href="https://techcombank.com/thong-tin/blog/cach-tinh-tien-dien-sinh-hoat" rel="noopener" target="_blank">Techcombank: Cách tính tiền điện sinh hoạt</a>.</p>

@@ -1,0 +1,129 @@
+<p>Ở chặng 7 bạn đã <em>gọi</em> Web API của người khác. Từ chặng này, bạn <em>xây</em> API cho người khác gọi: ứng dụng di động, trang web, hệ thống khác trong công ty. Trước khi viết dòng FastAPI đầu tiên, cần hiểu rõ ngôn ngữ chung của mọi API: giao thức <strong>HTTP</strong> và phong cách thiết kế <strong>REST</strong>. Phần lớn lỗi thiết kế API của người mới đến từ việc bỏ qua bài này.</p>
+
+<h2>1. Một request và một response trông thế nào</h2>
+<pre><code class="language-text">$ curl -i "https://httpbin.org/get?thanh_pho=hue" -H "Accept: application/json"
+HTTP/1.1 200 OK
+content-type: application/json
+content-length: 255
+date: Thu, 29 Oct 2026 09:35:42 GMT
+
+{
+  "args": {
+    "thanh_pho": "hue"
+  },
+  "headers": {
+    "Accept": "application/json",
+    "Host": "httpbin.org",
+    "User-Agent": "curl/8.1.2"
+  },
+  "method": "GET",
+  "origin": "203.0.113.7",
+  "url": "https://httpbin.org/get?thanh_pho=hue"
+}</code></pre>
+<p><code>curl</code> có sẵn trên Windows 10 trở lên, macOS và Linux; <code>-i</code> in cả phần đầu của response. Request mà curl đã gửi gồm:</p>
+<ul>
+  <li><strong>Phương thức</strong> (method): <code>GET</code>.</li>
+  <li><strong>Đường dẫn</strong> (path) <code>/get</code> và <strong>chuỗi truy vấn</strong> (query string) <code>?thanh_pho=hue</code>.</li>
+  <li><strong>Header</strong>: cặp khóa – giá trị mô tả request, như <code>Accept: application/json</code> (muốn nhận JSON), <code>Authorization</code> (thông tin đăng nhập).</li>
+  <li><strong>Body</strong>: dữ liệu gửi kèm (với <code>POST</code>, <code>PUT</code>, <code>PATCH</code>); request này không có.</li>
+</ul>
+<p>Response gồm <strong>mã trạng thái</strong> (<code>200 OK</code>), header (<code>content-type: application/json</code>) và body. HTTP là giao thức <strong>không trạng thái</strong>: mỗi request độc lập, máy chủ không tự nhớ request trước; muốn biết "ai đang gọi" thì mỗi request phải tự mang thông tin xác thực (bài JWT).</p>
+
+<h2>2. Các phương thức và ý nghĩa</h2>
+<table>
+  <thead><tr><th>Phương thức</th><th>Ý nghĩa</th><th>An toàn</th><th>Lặp lại cho cùng kết quả</th></tr></thead>
+  <tbody>
+    <tr><td><code>GET</code></td><td>Đọc dữ liệu</td><td>Có</td><td>Có</td></tr>
+    <tr><td><code>POST</code></td><td>Tạo mới, hoặc hành động không thuộc loại khác</td><td>Không</td><td>Không</td></tr>
+    <tr><td><code>PUT</code></td><td>Thay thế toàn bộ một tài nguyên</td><td>Không</td><td>Có</td></tr>
+    <tr><td><code>PATCH</code></td><td>Sửa một phần tài nguyên</td><td>Không</td><td>Không nhất thiết</td></tr>
+    <tr><td><code>DELETE</code></td><td>Xóa</td><td>Không</td><td>Có</td></tr>
+  </tbody>
+</table>
+<p><strong>An toàn</strong>: không làm thay đổi dữ liệu. <strong>Lặp lại cho cùng kết quả</strong> (idempotent): gửi một lần hay mười lần thì trạng thái cuối giống nhau. Đây là lý do ở chặng 7 ta chỉ tự thử lại <code>GET</code>: thử lại <code>POST /don-hang</code> có thể tạo hai đơn. Không bao giờ dùng <code>GET</code> để xóa hay sửa dữ liệu: trình duyệt, công cụ quét và bộ nhớ đệm có thể tự gọi <code>GET</code> bất cứ lúc nào.</p>
+
+<h2>3. Mã trạng thái: nói đúng chuyện gì đã xảy ra</h2>
+<table>
+  <thead><tr><th>Mã</th><th>Khi nào trả</th></tr></thead>
+  <tbody>
+    <tr><td><code>200 OK</code></td><td>Thành công, có dữ liệu trả về</td></tr>
+    <tr><td><code>201 Created</code></td><td>Đã tạo tài nguyên mới (sau <code>POST</code>)</td></tr>
+    <tr><td><code>204 No Content</code></td><td>Thành công, không có body (thường sau <code>DELETE</code>)</td></tr>
+    <tr><td><code>400 Bad Request</code></td><td>Request sai cú pháp hoặc vi phạm quy tắc nghiệp vụ</td></tr>
+    <tr><td><code>401 Unauthorized</code></td><td>Chưa đăng nhập hoặc token không hợp lệ</td></tr>
+    <tr><td><code>403 Forbidden</code></td><td>Đã đăng nhập nhưng không có quyền</td></tr>
+    <tr><td><code>404 Not Found</code></td><td>Không có tài nguyên</td></tr>
+    <tr><td><code>409 Conflict</code></td><td>Xung đột trạng thái, ví dụ email đã được đăng ký</td></tr>
+    <tr><td><code>422 Unprocessable Content</code></td><td>Dữ liệu sai định dạng, thiếu trường (FastAPI dùng mã này khi kiểm tra dữ liệu thất bại)</td></tr>
+    <tr><td><code>500 Internal Server Error</code></td><td>Lỗi trong code của máy chủ</td></tr>
+  </tbody>
+</table>
+<p>Quy tắc dễ nhớ: <strong>2xx</strong> thành công, <strong>4xx</strong> lỗi do client (client phải sửa request), <strong>5xx</strong> lỗi do máy chủ (bạn phải sửa code). Trả <code>200</code> kèm body <code>{"loi": "không tìm thấy"}</code> là lỗi thiết kế phổ biến: client, công cụ giám sát và bộ nhớ đệm đều tưởng mọi thứ ổn.</p>
+
+<h2>4. Thiết kế REST: đường dẫn là danh từ</h2>
+<p>REST tổ chức API quanh <strong>tài nguyên</strong> (danh từ: công việc, người dùng, đơn hàng), còn hành động thể hiện qua phương thức HTTP:</p>
+<table>
+  <thead><tr><th>Việc</th><th>Phương thức + đường dẫn</th><th>Thành công</th><th>Lỗi thường gặp</th></tr></thead>
+  <tbody>
+    <tr><td>Liệt kê công việc</td><td><code>GET /cong-viec?trang_thai=dang_lam&amp;limit=20</code></td><td>200</td><td>422</td></tr>
+    <tr><td>Tạo công việc</td><td><code>POST /cong-viec</code></td><td>201</td><td>422</td></tr>
+    <tr><td>Xem một công việc</td><td><code>GET /cong-viec/42</code></td><td>200</td><td>404</td></tr>
+    <tr><td>Sửa một phần</td><td><code>PATCH /cong-viec/42</code></td><td>200</td><td>404, 422</td></tr>
+    <tr><td>Xóa</td><td><code>DELETE /cong-viec/42</code></td><td>204</td><td>404</td></tr>
+    <tr><td>Bình luận của công việc</td><td><code>GET /cong-viec/42/binh-luan</code></td><td>200</td><td>404</td></tr>
+  </tbody>
+</table>
+<ul>
+  <li>Tránh động từ trong đường dẫn: <code>POST /tao-cong-viec</code>, <code>GET /xoa-cong-viec?id=42</code> là phong cách sai.</li>
+  <li>Dùng danh từ số nhiều hoặc thống nhất một kiểu, chữ thường, gạch ngang giữa các từ.</li>
+  <li><strong>Path parameter</strong> (<code>/cong-viec/42</code>) xác định <em>tài nguyên nào</em>; <strong>query parameter</strong> (<code>?trang_thai=...</code>) để lọc, sắp xếp, phân trang.</li>
+  <li>Body request và response dùng JSON; tên trường thống nhất một kiểu (bài này dùng <code>chu_thuong_gach_duoi</code>, giống tên biến Python).</li>
+</ul>
+
+<h2>5. Phiên bản và tài liệu</h2>
+<p>Khi đã có người dùng API, đổi tên trường hay xóa endpoint sẽ làm hỏng ứng dụng của họ. Cách phổ biến: đặt tiền tố phiên bản <code>/api/v1/...</code>, thay đổi phá vỡ thì ra <code>/api/v2</code> và giữ v1 một thời gian. API cũng cần tài liệu chính xác; chuẩn <strong>OpenAPI</strong> mô tả mọi endpoint, tham số, kiểu dữ liệu bằng JSON, và FastAPI tự sinh tài liệu này từ code của bạn (bài sau).</p>
+<div class="tip"><strong>Công cụ thử API</strong>Ngoài <code>curl</code>, bạn có thể dùng trang <code>/docs</code> mà FastAPI tự tạo, extension REST Client hoặc Thunder Client trong VS Code, hoặc các ứng dụng như Bruno, Postman, Insomnia. Thử bằng công cụ trước, viết test tự động sau (bài kiểm thử API).</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Request: phương thức, đường dẫn, query, header, body; response: mã trạng thái, header, body. HTTP không trạng thái.</li>
+  <li><code>GET</code> đọc, <code>POST</code> tạo, <code>PUT</code> thay, <code>PATCH</code> sửa một phần, <code>DELETE</code> xóa; chỉ <code>GET</code> là an toàn.</li>
+  <li>2xx thành công, 4xx lỗi client, 5xx lỗi máy chủ; trả đúng mã, đừng trả 200 cho lỗi.</li>
+  <li>REST: đường dẫn là danh từ, hành động là phương thức; path xác định tài nguyên, query để lọc và phân trang.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Thiết kế API quản lý công việc</h3>
+<p>Nhóm 5 người cần API quản lý công việc: người dùng đăng ký, đăng nhập; tạo, xem, sửa, xóa công việc; lọc theo trạng thái; giao việc cho thành viên; thống kê số việc theo trạng thái. Lập bảng endpoint: phương thức, đường dẫn, mã thành công, mã lỗi chính.</p>
+<details><summary>Xem đáp án</summary>
+<table>
+  <thead><tr><th>Việc</th><th>Endpoint</th><th>Thành công</th><th>Lỗi</th></tr></thead>
+  <tbody>
+    <tr><td>Đăng ký</td><td><code>POST /auth/dang-ky</code></td><td>201</td><td>409 (trùng tên), 422</td></tr>
+    <tr><td>Đăng nhập lấy token</td><td><code>POST /auth/token</code></td><td>200</td><td>401</td></tr>
+    <tr><td>Người dùng hiện tại</td><td><code>GET /nguoi-dung/toi</code></td><td>200</td><td>401</td></tr>
+    <tr><td>Liệt kê, lọc</td><td><code>GET /cong-viec?trang_thai=&amp;skip=&amp;limit=</code></td><td>200</td><td>401, 422</td></tr>
+    <tr><td>Tạo</td><td><code>POST /cong-viec</code></td><td>201</td><td>401, 422</td></tr>
+    <tr><td>Xem</td><td><code>GET /cong-viec/{id}</code></td><td>200</td><td>401, 404</td></tr>
+    <tr><td>Sửa (kể cả giao việc, đổi trạng thái)</td><td><code>PATCH /cong-viec/{id}</code></td><td>200</td><td>401, 403, 404, 422</td></tr>
+    <tr><td>Xóa</td><td><code>DELETE /cong-viec/{id}</code></td><td>204</td><td>401, 403, 404</td></tr>
+    <tr><td>Thống kê</td><td><code>GET /cong-viec/thong-ke</code></td><td>200</td><td>401</td></tr>
+  </tbody>
+</table>
+<p>Giao việc là sửa trường <code>nguoi_nhan_id</code> qua <code>PATCH</code>, không cần endpoint riêng kiểu <code>POST /giao-viec</code>. Đây chính là đặc tả của dự án cuối chặng 9.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Đọc response bằng curl</h3>
+<p>Dùng curl gọi <code>https://httpbin.org/status/404</code> và <code>https://api.frankfurter.dev/v2/currencies</code>, đọc mã trạng thái và <code>content-type</code> của mỗi response.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-text">$ curl -s -o /dev/null -w "%{http_code} %{content_type}\n" https://httpbin.org/status/404
+404 text/html; charset=utf-8
+$ curl -s -o /dev/null -w "%{http_code} %{content_type}\n" https://api.frankfurter.dev/v2/currencies
+200 application/json; charset=utf-8</code></pre>
+<p><code>-o /dev/null</code> bỏ body (trên Windows PowerShell dùng <code>-o NUL</code>), <code>-w</code> in các thông tin chọn lọc. Đây là cách nhanh để kiểm tra một endpoint còn sống, rất hay dùng trong script giám sát.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Overview" rel="noopener" target="_blank">MDN: An overview of HTTP</a>; <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Status" rel="noopener" target="_blank">MDN: HTTP response status codes</a>; <a href="https://www.rfc-editor.org/rfc/rfc9110" rel="noopener" target="_blank">RFC 9110: HTTP Semantics</a>; <a href="https://www.openapis.org/" rel="noopener" target="_blank">OpenAPI Initiative</a>.</p>

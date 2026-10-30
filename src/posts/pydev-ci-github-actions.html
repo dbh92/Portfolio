@@ -1,0 +1,114 @@
+<p>Bạn có test, có Ruff, có mypy. Nhưng nếu phải nhớ tự chạy chúng trước mỗi lần đẩy code, sớm muộn sẽ có lúc quên, và đồng nghiệp kéo về một nhánh hỏng. <strong>CI</strong> (Continuous Integration, tích hợp liên tục) là máy chủ tự động chạy toàn bộ kiểm tra mỗi khi có code mới được đẩy lên hoặc có pull request. <strong>GitHub Actions</strong> có sẵn trong mọi kho GitHub, miễn phí cho kho công khai.</p>
+
+<h2>1. Workflow đầu tiên</h2>
+<p>Tạo file <code>.github/workflows/ci.yml</code> trong dự án (dấu chấm ở đầu tên thư mục):</p>
+<pre><code class="language-text">name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  kiem-tra:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Cài uv và Python
+        uses: astral-sh/setup-uv@v9
+        with:
+          python-version: "3.14"
+          enable-cache: true
+
+      - name: Cài thư viện
+        run: uv sync --locked
+
+      - name: Ruff (lint + format)
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: mypy
+        run: uv run mypy app
+
+      - name: pytest
+        run: uv run pytest -q</code></pre>
+<p>Commit và push file này lên GitHub, mở tab <strong>Actions</strong> của kho để xem workflow chạy.</p>
+<ul>
+  <li><code>on</code>: khi nào chạy. Ở đây: mỗi lần push lên <code>main</code> và mỗi pull request.</li>
+  <li><code>jobs</code> → <code>kiem-tra</code>: một công việc chạy trên máy ảo Ubuntu sạch (<code>runs-on</code>) do GitHub cấp, xóa sau khi xong.</li>
+  <li><code>steps</code>: các bước tuần tự. <code>uses</code> dùng một action có sẵn: <code>actions/checkout</code> lấy code về, <code>astral-sh/setup-uv</code> cài uv và Python. <code>run</code> chạy lệnh shell.</li>
+  <li><code>enable-cache: true</code> lưu cache thư viện giữa các lần chạy, lần sau nhanh hơn.</li>
+  <li><code>uv sync --locked</code>: lockfile không khớp thì dừng, đúng như máy bạn và Docker. Nhóm dev (pytest, ruff, mypy) được cài vì mặc định <code>uv sync</code> có kèm.</li>
+  <li>Bất kỳ lệnh nào trả mã thoát khác 0 (chặng 7), job dừng và báo đỏ.</li>
+</ul>
+<div class="tip"><strong>Ghim phiên bản action</strong><code>@v7</code>, <code>@v9</code> là phiên bản chính của action tại thời điểm viết bài. Dự án cần bảo mật cao thường ghim theo mã commit đầy đủ (<code>uses: actions/checkout@&lt;mã SHA&gt; # v7.0.1</code>) như tài liệu của uv, để chắc chắn mã chạy trong CI không bị thay đổi ngầm.</div>
+
+<h2>2. Đọc kết quả, sửa khi đỏ</h2>
+<p>Thử đẩy một thay đổi làm hỏng test (ví dụ đổi mã trạng thái tạo công việc thành 200). Tab Actions hiện dấu ✗ đỏ; bấm vào job, mở bước <strong>pytest</strong> để xem đúng output như khi chạy trên máy:</p>
+<pre><code class="language-text">FAILED tests/test_cong_viec.py::test_tao_va_giao_viec - AssertionError: {"id":1,"tieu_de":"Viết b...
+FAILED tests/test_cong_viec.py::test_ai_thay_viec_nao - AssertionError: {"id":1,"tieu_de":"Việc",...
+...
+6 failed, 5 passed in 2.37s
+Error: Process completed with exit code 1.</code></pre>
+<p>Một thay đổi nhỏ làm hỏng 6 test, vì hàm trợ giúp <code>tao()</code> trong test kiểm tra mã 201 và được dùng ở nhiều nơi. Trên pull request, GitHub hiện trạng thái kiểm tra ngay dưới phần mô tả. Vào <strong>Settings › Branches</strong>, thêm quy tắc bảo vệ nhánh <code>main</code> và bật "Require status checks to pass": không ai gộp được pull request khi CI còn đỏ.</p>
+
+<h2>3. Ma trận: chạy trên nhiều phiên bản Python</h2>
+<p>Thư viện hoặc công cụ cần hỗ trợ nhiều phiên bản Python thì nên test trên tất cả:</p>
+<pre><code class="language-text">jobs:
+  kiem-tra:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v9
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run pytest -q</code></pre>
+<p>Ma trận 2 hệ điều hành × 2 phiên bản tạo 4 job chạy song song. <code>fail-fast: false</code> để một job lỗi không hủy các job khác, bạn thấy đủ bức tranh. Muốn chạy nhiều phiên bản Python, <code>requires-python</code> trong <code>pyproject.toml</code> phải cho phép các phiên bản đó (ví dụ <code>"&gt;=3.13"</code>). Với ứng dụng web chạy trong Docker, chỉ cần test đúng phiên bản Python của image.</p>
+
+<h2>4. Thêm bước build Docker và badge</h2>
+<pre><code class="language-text">  docker:
+    needs: kiem-tra                  # chỉ chạy khi job kiem-tra đã xanh
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build image
+        run: docker build -t quan-ly-cong-viec:${{ github.sha }} .</code></pre>
+<p>Job <code>docker</code> bảo đảm Dockerfile luôn build được. Bước tiếp theo trong thực tế (CD, triển khai liên tục) là đẩy image lên kho image và triển khai lên máy chủ; mỗi nền tảng có cách riêng nên ngoài phạm vi bài này.</p>
+<p>Gắn huy hiệu trạng thái vào đầu <code>README.md</code> để ai mở kho cũng thấy dự án đang xanh:</p>
+<pre><code class="language-text">![CI](https://github.com/ten-ban/quan-ly-cong-viec/actions/workflows/ci.yml/badge.svg)</code></pre>
+<div class="warn"><strong>Bí mật trong CI</strong>Không bao giờ ghi khóa, mật khẩu vào file workflow. Đặt chúng trong <strong>Settings › Secrets and variables › Actions</strong> và dùng qua <code>${{ secrets.TEN_BI_MAT }}</code>; GitHub tự che giá trị trong log. Test của chặng 9 không cần bí mật thật vì <code>SECRET_KEY</code> có giá trị mặc định cho môi trường phát triển.</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Workflow là file YAML trong <code>.github/workflows/</code>; <code>on</code> chọn sự kiện, <code>jobs</code> → <code>steps</code> với <code>uses</code> và <code>run</code>.</li>
+  <li>Dự án uv: <code>actions/checkout</code> → <code>astral-sh/setup-uv</code> (cache) → <code>uv sync --locked</code> → Ruff, mypy, pytest.</li>
+  <li>Lệnh trả mã khác 0 làm job đỏ; bảo vệ nhánh <code>main</code> bằng status check bắt buộc.</li>
+  <li><code>strategy.matrix</code> chạy trên nhiều hệ điều hành, phiên bản Python; <code>needs</code> nối các job; bí mật đặt trong Secrets.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. CI cho dự án API</h3>
+<p>Thêm workflow ở mục 1 vào dự án quản lý công việc trên GitHub. Cố tình đẩy một commit làm hỏng test để thấy CI báo đỏ, đọc log tìm test lỗi, sửa và đẩy lại cho xanh.</p>
+<details><summary>Xem gợi ý</summary>
+<p>Làm trên một nhánh riêng và mở pull request: bạn sẽ thấy dấu ✗ ngay trong pull request, đúng như khi làm việc nhóm. Nếu job hỏng ở bước <code>uv sync --locked</code>, bạn quên commit <code>uv.lock</code> hoặc đã sửa <code>pyproject.toml</code> mà chưa chạy <code>uv lock</code>. Nếu Ruff format báo lỗi, chạy <code>uv run ruff format .</code> trên máy rồi commit.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Ma trận và badge</h3>
+<p>Thêm ma trận chạy test trên Python 3.13 và 3.14, gắn badge trạng thái CI vào README. Kiểm tra trong tab Actions có đủ các job song song.</p>
+<details><summary>Xem gợi ý</summary>
+<p>Dự án dùng <code>enum.StrEnum</code> và <code>datetime.UTC</code> (có từ Python 3.11), nên chạy được cả 3.13 lẫn 3.14; nhớ đặt <code>requires-python = "&gt;=3.13"</code>. Thử thêm <code>"3.10"</code> vào ma trận: job đó sẽ đỏ ở bước cài đặt hoặc import. Đó chính là giá trị của ma trận: phát hiện bạn đã vô tình dùng tính năng mới hơn phiên bản tối thiểu đã cam kết.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.github.com/en/actions/get-started/quickstart" rel="noopener" target="_blank">GitHub Actions: Quickstart</a>; <a href="https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax" rel="noopener" target="_blank">Workflow syntax for GitHub Actions</a>; <a href="https://docs.astral.sh/uv/guides/integration/github/" rel="noopener" target="_blank">uv: Using uv in GitHub Actions</a>; <a href="https://github.com/astral-sh/setup-uv" rel="noopener" target="_blank">astral-sh/setup-uv</a>.</p>

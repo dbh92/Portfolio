@@ -1,0 +1,179 @@
+<p>Script chạy lúc 2 giờ sáng trên máy chủ báo lỗi. Không ai ngồi nhìn màn hình, và mọi dòng <code>print</code> đã biến mất. Thứ duy nhất giúp bạn biết chuyện gì đã xảy ra là <strong>file log</strong>. Module <code>logging</code> có sẵn trong Python làm việc này tốt hơn <code>print</code> ở mọi mặt: có mức độ, có thời gian, ghi ra file, bật tắt mà không sửa code.</p>
+
+<h2>1. Bắt đầu nhanh</h2>
+<pre><code class="language-python">import logging
+import sys
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)-8s %(name)s: %(message)s",
+    stream=sys.stdout,
+)
+log = logging.getLogger("dong_bo")
+
+log.debug("Chi tiết để gỡ lỗi, mặc định không hiện")
+log.info("Bắt đầu đồng bộ %d bản ghi", 120)
+log.warning("Bản ghi %s thiếu email, bỏ qua", "KH042")
+log.error("Không kết nối được máy chủ %s", "10.0.0.5")</code></pre>
+<pre><code class="language-text">INFO     dong_bo: Bắt đầu đồng bộ 120 bản ghi
+WARNING  dong_bo: Bản ghi KH042 thiếu email, bỏ qua
+ERROR    dong_bo: Không kết nối được máy chủ 10.0.0.5</code></pre>
+<ul>
+  <li><code>basicConfig</code> cấu hình một lần ở đầu chương trình: mức tối thiểu, định dạng, nơi ghi. Mặc định log ghi ra <code>stderr</code>; ví dụ chuyển sang <code>stdout</code> cho dễ xem.</li>
+  <li><code>getLogger(ten)</code> lấy logger có tên; trong mỗi module, quy ước viết <code>log = logging.getLogger(__name__)</code> để tên logger chính là tên module, nhìn log biết dòng đó từ đâu.</li>
+  <li>Truyền tham số kiểu <code>log.info("... %d ...", 120)</code> thay vì f-string: chuỗi chỉ được ghép khi dòng log thực sự được ghi, và các công cụ gom log nhóm được những dòng cùng mẫu.</li>
+</ul>
+
+<h2>2. Năm mức log</h2>
+<table>
+  <thead><tr><th>Mức</th><th>Khi nào dùng</th><th>Ví dụ</th></tr></thead>
+  <tbody>
+    <tr><td><code>DEBUG</code></td><td>Chi tiết để gỡ lỗi khi phát triển</td><td>Giá trị biến, nội dung request</td></tr>
+    <tr><td><code>INFO</code></td><td>Mốc bình thường của chương trình</td><td>Bắt đầu, kết thúc, đã xử lý 500 dòng</td></tr>
+    <tr><td><code>WARNING</code></td><td>Bất thường nhưng vẫn chạy tiếp được</td><td>Dòng dữ liệu lỗi bị bỏ qua, dùng giá trị mặc định</td></tr>
+    <tr><td><code>ERROR</code></td><td>Một tác vụ thất bại</td><td>Không gửi được email, không ghi được file</td></tr>
+    <tr><td><code>CRITICAL</code></td><td>Cả chương trình không thể tiếp tục</td><td>Mất kết nối cơ sở dữ liệu</td></tr>
+  </tbody>
+</table>
+<p>Đặt <code>level=logging.INFO</code> thì DEBUG bị ẩn; khi cần điều tra, đổi thành <code>logging.DEBUG</code> mà không sửa dòng log nào. Đây là lợi thế lớn nhất so với việc rải rồi xóa <code>print</code>.</p>
+
+<h2>3. Ghi traceback khi có lỗi</h2>
+<pre><code class="language-python">import logging
+import sys
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s", stream=sys.stdout)
+log = logging.getLogger(__name__)
+
+don_hang = [{"ma": "D1", "so_luong": 2}, {"ma": "D2"}, {"ma": "D3", "so_luong": 1}]
+for don in don_hang:
+    try:
+        tong = don["so_luong"] * 50_000
+    except KeyError:
+        log.exception("Đơn %s lỗi dữ liệu", don["ma"])
+        continue
+    log.info("Đơn %s: %s đ", don["ma"], f"{tong:,}")</code></pre>
+<pre><code class="language-text">INFO: Đơn D1: 100,000 đ
+ERROR: Đơn D2 lỗi dữ liệu
+Traceback (most recent call last):
+  File "bai.py", line 10, in &lt;module&gt;
+    tong = don["so_luong"] * 50_000
+           ~~~^^^^^^^^^^^^
+KeyError: 'so_luong'
+INFO: Đơn D3: 50,000 đ</code></pre>
+<p><code>log.exception(...)</code> (chỉ dùng bên trong khối <code>except</code>) ghi ở mức ERROR <strong>kèm toàn bộ traceback</strong>. Đây là cách đúng để xử lý một lỗi rồi chạy tiếp mà vẫn giữ đủ thông tin điều tra, trái ngược với <code>except: pass</code>.</p>
+
+<h2>4. Ghi ra file và màn hình cùng lúc</h2>
+<p>Chương trình thật thường cần log ra màn hình (để xem khi chạy tay) và ra file (để tra cứu sau). Mỗi đích ghi là một <strong>handler</strong>:</p>
+<pre><code class="language-python">import logging
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
+
+
+def cau_hinh_log(thu_muc: Path, muc=logging.INFO) -&gt; None:
+    thu_muc.mkdir(parents=True, exist_ok=True)
+    dinh_dang = logging.Formatter("%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+                                  datefmt="%Y-%m-%d %H:%M:%S")
+
+    man_hinh = logging.StreamHandler()
+    man_hinh.setFormatter(dinh_dang)
+
+    file_log = RotatingFileHandler(thu_muc / "app.log", maxBytes=1_000_000,
+                                   backupCount=3, encoding="utf-8")
+    file_log.setFormatter(dinh_dang)
+
+    goc = logging.getLogger()          # logger gốc: mọi logger con đều đổ về đây
+    goc.setLevel(muc)
+    goc.addHandler(man_hinh)
+    goc.addHandler(file_log)
+
+
+cau_hinh_log(Path("logs"))
+log = logging.getLogger("bao_cao")
+log.info("Ghi vào cả màn hình lẫn logs/app.log")
+print(Path("logs/app.log").read_text(encoding="utf-8").split(" ", 2)[2].strip())</code></pre>
+<pre><code class="language-text">INFO     bao_cao: Ghi vào cả màn hình lẫn logs/app.log</code></pre>
+<p><code>RotatingFileHandler</code> giới hạn dung lượng: khi <code>app.log</code> vượt 1 MB, nó được đổi tên thành <code>app.log.1</code> và file mới được tạo; giữ tối đa 3 file cũ. Nhờ vậy log không bao giờ làm đầy ổ đĩa. Muốn xoay vòng theo ngày, dùng <code>TimedRotatingFileHandler(..., when="midnight")</code>.</p>
+<div class="warn"><strong>Chỉ cấu hình một lần, ở chương trình chính</strong>Module thư viện chỉ gọi <code>logging.getLogger(__name__)</code> và ghi log, không bao giờ gọi <code>basicConfig</code> hay thêm handler. Việc quyết định log đi đâu thuộc về chương trình chính (hàm <code>main</code>). Gọi hàm cấu hình hai lần sẽ thêm handler hai lần và mỗi dòng log bị in đôi.</div>
+
+<h2>5. Log tốt là log thế nào?</h2>
+<ul>
+  <li>Đủ ngữ cảnh để hiểu mà không cần đọc code: <code>"Không gửi được email tới %s cho đơn %s"</code> tốt hơn <code>"Lỗi gửi email"</code>.</li>
+  <li>Có mốc bắt đầu, kết thúc và con số tổng kết: "Xong: 1.204 dòng, 3 dòng lỗi, 12,4 giây".</li>
+  <li><strong>Không ghi mật khẩu, token, số thẻ</strong> vào log. File log thường được nhiều người đọc hơn bạn nghĩ.</li>
+</ul>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Mỗi module: <code>log = logging.getLogger(__name__)</code>; chương trình chính cấu hình một lần.</li>
+  <li>5 mức: DEBUG, INFO, WARNING, ERROR, CRITICAL; đổi mức mà không sửa code.</li>
+  <li><code>log.exception()</code> trong <code>except</code> để ghi kèm traceback.</li>
+  <li><code>RotatingFileHandler</code>, <code>encoding="utf-8"</code> để log ra file có giới hạn dung lượng.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Thêm log vào script đọc file</h3>
+<p>Viết hàm đọc file số (mỗi dòng một số), ghi INFO khi bắt đầu và kết thúc (kèm tổng, số dòng lỗi), WARNING cho mỗi dòng không đọc được, có số dòng.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import logging
+import sys
+from pathlib import Path
+
+log = logging.getLogger("doc_so")
+
+
+def tong_file(p: Path) -&gt; float:
+    log.info("Bắt đầu đọc %s", p.name)
+    tong, so_loi = 0.0, 0
+    with open(p, encoding="utf-8") as f:
+        for so_dong, dong in enumerate(f, start=1):
+            try:
+                tong += float(dong.replace(",", "."))
+            except ValueError:
+                so_loi += 1
+                log.warning("Dòng %d không phải số: %r", so_dong, dong.strip())
+    log.info("Xong %s: tổng %.2f, %d dòng lỗi", p.name, tong, so_loi)
+    return tong
+
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)-7s %(message)s", stream=sys.stdout)
+Path("so_lieu.txt").write_text("1,5\n2.25\nN/A\n10\n\n", encoding="utf-8")
+tong_file(Path("so_lieu.txt"))</code></pre>
+<pre><code class="language-text">INFO    Bắt đầu đọc so_lieu.txt
+WARNING Dòng 3 không phải số: 'N/A'
+WARNING Dòng 5 không phải số: ''
+INFO    Xong so_lieu.txt: tổng 13.75, 2 dòng lỗi</code></pre>
+<p>Cấu hình log nằm ở phần chạy chính, hàm <code>tong_file</code> chỉ lấy logger và ghi: đúng quy tắc ở mục 4.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. File log xoay vòng</h3>
+<p>Cấu hình <code>RotatingFileHandler</code> giữ tối đa 3 file cũ, mỗi file 1 MB. Ghi 30.000 dòng log rồi liệt kê các file trong thư mục log.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import logging
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
+
+thu_muc = Path("logs_xoay")
+thu_muc.mkdir(exist_ok=True)
+h = RotatingFileHandler(thu_muc / "app.log", maxBytes=1_000_000, backupCount=3, encoding="utf-8")
+h.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+log = logging.getLogger("thu_xoay")
+log.setLevel(logging.INFO)
+log.addHandler(h)
+
+for i in range(30_000):
+    log.info("Dòng log số %05d với một ít nội dung để file to lên nhanh", i)
+h.close()
+
+for p in sorted(thu_muc.iterdir()):
+    print(p.name)</code></pre>
+<pre><code class="language-text">app.log
+app.log.1
+app.log.2
+app.log.3</code></pre>
+<p>Khoảng 30.000 dòng × hơn 100 byte vượt 3 MB, nên handler đã xoay vòng nhiều lần nhưng chỉ giữ lại 3 file cũ. Các dòng cũ nhất đã bị xóa: đó là chủ ý.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/howto/logging.html" rel="noopener" target="_blank">Logging HOWTO</a>; <a href="https://docs.python.org/3/library/logging.handlers.html" rel="noopener" target="_blank">logging.handlers</a>.</p>

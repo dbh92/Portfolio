@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="vi" data-root="../">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SQLAlchemy 2.0 ORM: model, Session, select và quan hệ | HọcFree</title>
+<meta name="description" content="Làm việc với CSDL bằng đối tượng: SQLAlchemy 2.0 với Mapped, mapped_column, Session, select(), quan hệ một nhiều và lazy loading.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://hocfree.vn/hoc/pydev-sqlalchemy-orm.html">
+<meta property="og:site_name" content="HọcFree">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SQLAlchemy 2.0 ORM: model, Session, select và quan hệ">
+<meta property="og:description" content="Làm việc với CSDL bằng đối tượng: SQLAlchemy 2.0 với Mapped, mapped_column, Session, select(), quan hệ một nhiều và lazy loading.">
+<meta property="og:url" content="https://hocfree.vn/hoc/pydev-sqlalchemy-orm.html">
+<meta property="og:image" content="https://hocfree.vn/assets/images/posts/pydev-sqlalchemy-orm.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="SQLAlchemy 2.0 ORM: model, Session, select và quan hệ">
+<meta property="og:locale" content="vi_VN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="SQLAlchemy 2.0 ORM: model, Session, select và quan hệ">
+<meta name="twitter:description" content="Làm việc với CSDL bằng đối tượng: SQLAlchemy 2.0 với Mapped, mapped_column, Session, select(), quan hệ một nhiều và lazy loading.">
+<meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/pydev-sqlalchemy-orm.jpg">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/fonts.css?v=20261029">
+<link rel="stylesheet" href="../assets/css/style.css?v=20261029">
+<script>try{var t=localStorage.getItem('hf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
+<meta property="article:published_time" content="2026-10-29">
+<meta property="article:section" content="Học AI &amp; Lập trình">
+<meta property="article:tag" content="Python">
+<meta property="article:tag" content="Lập trình">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "SQLAlchemy 2.0 ORM: model, Session, select và quan hệ", "description": "Làm việc với CSDL bằng đối tượng: SQLAlchemy 2.0 với Mapped, mapped_column, Session, select(), quan hệ một nhiều và lazy loading.", "image": ["https://hocfree.vn/assets/images/posts/pydev-sqlalchemy-orm.jpg"], "datePublished": "2026-10-29", "dateModified": "2026-10-29", "inLanguage": "vi", "articleSection": "Học AI & Lập trình", "keywords": "Python, Lập trình", "wordCount": 1403, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/hoc/pydev-sqlalchemy-orm.html"}, "isPartOf": {"@type": "Course", "name": "Python Developer", "url": "https://hocfree.vn/lo-trinh/python-developer.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Learning Paths", "item": "https://hocfree.vn/lo-trinh/"}, {"@type": "ListItem", "position": 3, "name": "Python Developer", "item": "https://hocfree.vn/lo-trinh/python-developer.html"}, {"@type": "ListItem", "position": 4, "name": "Chặng 8: Cơ sở dữ liệu và xử lý dữ liệu", "item": "https://hocfree.vn/lo-trinh/python-developer/du-lieu-va-csdl.html"}, {"@type": "ListItem", "position": 5, "name": "SQLAlchemy 2.0 ORM: model, Session, select và quan hệ"}]}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div class="progress" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="container wide header-top">
+    <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="nav-scrim" hidden></div>
+    <a class="logo" href="../" aria-label="HọcFree – Trang chủ"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+    <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
+    <div class="header-actions">
+      <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="login-link" href="../dang-nhap.html">Đăng nhập</a>
+      <a class="btn start-btn" href="../lo-trinh/">Bắt đầu học</a>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="container wide">
+      <nav class="site-nav" id="site-nav" aria-label="Menu chính">
+        <div class="drawer-head">
+          <a class="logo" href="../" tabindex="-1"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+          <button class="icon-btn nav-close" aria-label="Đóng menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <button type="button" class="drawer-search search-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Tìm bài học, chủ đề…</span></button>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="../">Trang chủ</a></li><li class="nav-item has-panel is-mega"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-hoc">Học AI &amp; Lập trình<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel mega" id="nav-panel-hoc">
+  <div class="container wide mega-inner">
+    <div class="mega-groups"><div class="mega-group"><a class="mega-group-title" href="../hoc/#programming">Programming</a><ul><li><a href="../hoc/python.html">Python</a></li><li><a href="../hoc/csharp.html">C#</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#ai-machine-learning">AI &amp; Machine Learning</a><ul><li><a href="../hoc/machine-learning.html">Machine Learning</a></li><li><a href="../hoc/deep-learning.html">Deep Learning</a></li><li><a href="../hoc/pytorch.html">PyTorch</a></li><li><a href="../hoc/generative-ai.html">Generative AI</a></li><li><a href="../hoc/llm-ai-agents.html">LLM / AI Agents</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#computer-vision">Computer Vision</a><ul><li><a href="../hoc/opencv.html">OpenCV</a></li><li><a href="../hoc/image-processing.html">Image Processing</a></li><li><a href="../hoc/computer-vision.html">Computer Vision</a></li><li><a href="../hoc/ocr.html">OCR</a></li><li><a href="../hoc/object-detection.html">Object Detection</a></li><li><a href="../hoc/segmentation.html">Segmentation</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#vision-engineering">Vision Engineering</a><ul><li><a href="../hoc/machine-vision.html">Machine Vision</a></li><li><a href="../hoc/ai-vision.html">AI Vision</a></li><li><a href="../hoc/industrial-vision.html">Industrial Vision</a></li><li><a href="../hoc/camera-lens.html">Camera &amp; Lens</a></li><li><a href="../hoc/lighting.html">Lighting</a></li><li><a href="../hoc/calibration.html">Calibration</a></li><li><a href="../hoc/3d-vision.html">3D Vision</a></li><li><a href="../hoc/plc-robot-mes.html">PLC / Robot / MES</a></li><li><a href="../hoc/vision-deployment.html">Vision Deployment</a></li></ul></div></div>
+    <a class="feature-card" href="../lo-trinh/vision-engineer.html">
+  <span class="feature-eyebrow">⭐ Learning Path nổi bật</span>
+  <span class="feature-title">Trở thành Vision Engineer</span>
+  <span class="feature-sub">Machine Vision + AI Vision + Industrial Automation</span>
+  <span class="feature-desc">Lộ trình thực chiến từ Python, OpenCV và Machine Vision đến 3D Vision, Deep Learning, AI Vision, Camera, PLC, Robot và triển khai hệ thống Vision trong nhà máy.</span>
+  <span class="feature-chain" aria-label="Các chặng chính"><span>Python</span><i aria-hidden="true">→</i><span>OpenCV</span><i aria-hidden="true">→</i><span>Machine Vision</span><i aria-hidden="true">→</i><span>AI Vision</span><i aria-hidden="true">→</i><span class="chain-goal">🎯 Vision Engineer</span></span>
+  <span class="feature-meta">15 chặng · 5 giai đoạn · ~13 tháng</span>
+  <span class="feature-cta">Xem lộ trình →</span>
+</a>
+  </div>
+  <div class="mega-foot"><div class="container wide mega-foot-inner"><ol class="journey compact" aria-label="Học, thực hành, trở thành kỹ sư"><li><a href="../hoc/" aria-current="step"><span class="journey-n">1</span><span class="journey-t"><b>Học</b><small>Học AI &amp; Lập trình</small></span></a></li><li><a href="../projects/"><span class="journey-n">2</span><span class="journey-t"><b>Thực hành</b><small>Projects</small></span></a></li><li><a href="../lo-trinh/"><span class="journey-n">3</span><span class="journey-t"><b>Trở thành kỹ sư</b><small>Learning Paths</small></span></a></li></ol><a class="panel-all" href="../hoc/">Xem tất cả Học AI &amp; Lập trình →</a></div></div>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-projects">Projects<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-projects">
+  <p class="panel-kicker"><span>Bước 2 · Thực hành</span>Áp dụng vào dự án thật</p>
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../projects/ai-projects.html"><span class="drop-label">AI Projects</span><span class="drop-desc">Ứng dụng ML và LLM, từ ý tưởng đến bản demo</span></a></li><li><a class="drop-link" href="../projects/computer-vision-projects.html"><span class="drop-label">Computer Vision Projects</span><span class="drop-desc">Phát hiện, nhận dạng và theo dõi đối tượng</span></a></li><li><a class="drop-link" href="../projects/industrial-vision-projects.html"><span class="drop-label">Industrial Vision Projects</span><span class="drop-desc">Đo kích thước, kiểm tra lỗi, đọc mã trên dây chuyền</span></a></li></ul></div></div>
+  <a class="panel-all" href="../projects/">Xem tất cả Projects →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger is-active" aria-expanded="false" aria-controls="nav-panel-lo-trinh" aria-current="true">Learning Paths<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-lo-trinh">
+  <p class="panel-kicker"><span>Bước 3 · Trở thành kỹ sư</span>Định hướng nghề nghiệp</p>
+  <ul class="drop-list"><li><a class="drop-link is-flagship" href="../lo-trinh/vision-engineer.html"><span class="drop-label">⭐ Trở thành Vision Engineer</span><span class="drop-desc">Machine Vision + AI Vision + Industrial Automation · 15 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/toeic-700.html"><span class="drop-label">700+ TOEIC trong 5 tháng</span><span class="drop-desc">TOEIC Listening &amp; Reading + giao tiếp công sở cho người đi làm · 11 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/hsk3.html"><span class="drop-label">Tiếng Trung từ 0 đến HSK 3 trong 6 tháng</span><span class="drop-desc">Pinyin, chữ Hán, ngữ pháp, giao tiếp và luyện thi HSK 3.0 cho người Việt · 10 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/python-developer.html"><span class="drop-label">Python Developer</span><span class="drop-desc">Python, tự động hóa, dữ liệu và Web API · 10 chặng</span></a></li></ul>
+  <a class="panel-all" href="../lo-trinh/">Xem tất cả lộ trình →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-kien-thuc">Kiến thức<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-kien-thuc">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Lĩnh vực</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/programming.html"><span class="drop-label">Programming</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-machine-learning.html"><span class="drop-label">AI / Machine Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/deep-learning.html"><span class="drop-label">Deep Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/machine-vision.html"><span class="drop-label">Machine Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-vision.html"><span class="drop-label">AI Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/industrial-automation.html"><span class="drop-label">Industrial Automation</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Công cụ &amp; mẹo</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/tools-frameworks.html"><span class="drop-label">Tools &amp; Frameworks</span></a></li><li><a class="drop-link" href="../kien-thuc/tips-tricks.html"><span class="drop-label">Tips &amp; Tricks</span></a></li></ul></div></div>
+  <a class="panel-all" href="../kien-thuc/">Xem tất cả Kiến thức →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tin-tuc-ai">Tin tức AI<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tin-tuc-ai">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tin-tuc-ai/ai-news.html"><span class="drop-label">AI News</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-models.html"><span class="drop-label">AI Models</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/technology.html"><span class="drop-label">Technology</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/robotics.html"><span class="drop-label">Robotics</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-industry.html"><span class="drop-label">AI Industry</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tin-tuc-ai/">Xem tất cả Tin tức AI →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-ngoai-ngu">Ngoại ngữ<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-ngoai-ngu">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Ngôn ngữ</p><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/english.html"><span class="drop-label">English</span><span class="drop-desc">Lộ trình 700 TOEIC, phương pháp học, giáo trình HF-700TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chinese.html"><span class="drop-label">Chinese</span><span class="drop-desc">Lộ trình 0 đến HSK 3 trong 6 tháng, phương pháp học, giáo trình HF-HSK3</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Tiếng Anh theo kỹ năng</p><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/toeic-listening.html"><span class="drop-label">TOEIC Listening</span><span class="drop-desc">Part 1–4: mô tả tranh, hỏi – đáp, hội thoại, bài nói</span></a></li><li><a class="drop-link" href="../ngoai-ngu/toeic-reading.html"><span class="drop-label">TOEIC Reading</span><span class="drop-desc">Part 5–7: điền từ, điền câu, đọc hiểu</span></a></li><li><a class="drop-link" href="../ngoai-ngu/ngu-phap-tieng-anh.html"><span class="drop-label">Ngữ pháp tiếng Anh</span><span class="drop-desc">Từ loại, thì, mệnh đề, liên từ cho TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/tu-vung-tieng-anh.html"><span class="drop-label">Từ vựng tiếng Anh</span><span class="drop-desc">Từ vựng công sở theo chủ đề, collocation</span></a></li><li><a class="drop-link" href="../ngoai-ngu/giao-tiep-tieng-anh.html"><span class="drop-label">Giao tiếp công sở</span><span class="drop-desc">Điện thoại, họp, thuyết trình, email</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Tiếng Trung theo kỹ năng</p><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/pinyin-phat-am.html"><span class="drop-label">Pinyin &amp; phát âm</span><span class="drop-desc">Thanh mẫu, vận mẫu, thanh điệu, biến điệu</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chu-han.html"><span class="drop-label">Chữ Hán</span><span class="drop-desc">Nét, thứ tự nét, bộ thủ, âm Hán Việt</span></a></li><li><a class="drop-link" href="../ngoai-ngu/ngu-phap-tieng-trung.html"><span class="drop-label">Ngữ pháp tiếng Trung</span><span class="drop-desc">Từ 是, 吗, 了 đến bổ ngữ, câu 把, câu 被</span></a></li><li><a class="drop-link" href="../ngoai-ngu/tu-vung-tieng-trung.html"><span class="drop-label">Từ vựng tiếng Trung</span><span class="drop-desc">Từ vựng HSK 1–3 theo chủ đề, Anki</span></a></li><li><a class="drop-link" href="../ngoai-ngu/giao-tiep-tieng-trung.html"><span class="drop-label">Giao tiếp tiếng Trung</span><span class="drop-desc">Chào hỏi, mua sắm, đi lại, công sở</span></a></li><li><a class="drop-link" href="../ngoai-ngu/luyen-thi-hsk.html"><span class="drop-label">Luyện thi HSK</span><span class="drop-desc">Đề HSK 3.0, nghe, đọc, viết, nói, đề thi thử</span></a></li></ul></div></div>
+  <a class="panel-all" href="../ngoai-ngu/">Xem tất cả Ngoại ngữ →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tai-nguyen">Tài nguyên<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tai-nguyen">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tai-nguyen/source-code.html"><span class="drop-label">Source Code</span><span class="drop-desc">Mã nguồn mẫu đi kèm bài học</span></a></li><li><a class="drop-link" href="../tai-nguyen/dataset.html"><span class="drop-label">Dataset</span><span class="drop-desc">Bộ dữ liệu ảnh để luyện tập</span></a></li><li><a class="drop-link" href="../tai-nguyen/cheat-sheets.html"><span class="drop-label">Cheat Sheets</span><span class="drop-desc">Tóm tắt nhanh trong một trang</span></a></li><li><a class="drop-link" href="../tai-nguyen/documentation.html"><span class="drop-label">Documentation</span><span class="drop-desc">Tài liệu tra cứu thư viện, API</span></a></li><li><a class="drop-link" href="../tai-nguyen/ebook.html"><span class="drop-label">Ebook / Tài liệu</span><span class="drop-desc">Sách và tài liệu tham khảo</span></a></li><li><a class="drop-link" href="../tai-nguyen/ai-tools.html"><span class="drop-label">AI Tools</span><span class="drop-desc">Công cụ AI hữu ích cho việc học</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tai-nguyen/">Xem tất cả Tài nguyên →</a>
+</div></li></ul>
+        <div class="drawer-foot">
+          <a class="btn ghost" href="../dang-nhap.html">Đăng nhập</a>
+          <a class="btn" href="../lo-trinh/">Bắt đầu học</a>
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+<div class="search-dialog" hidden>
+  <div class="search-scrim"></div>
+  <div class="search-box" role="dialog" aria-modal="true" aria-label="Tìm kiếm">
+    <form class="search-form" action="../search.html" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" placeholder="Tìm bài học, chủ đề, bài viết…" autocomplete="off" aria-label="Từ khóa tìm kiếm" aria-controls="search-suggest">
+      <button type="button" class="icon-btn search-close" aria-label="Đóng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </form>
+    <div class="search-suggest" id="search-suggest" aria-live="polite">
+      <div class="search-empty">
+        <p class="search-group-title">Chủ đề phổ biến</p>
+        <div class="chips"><a class="chip" href="../hoc/python.html">Python</a><a class="chip" href="../hoc/opencv.html">OpenCV</a><a class="chip" href="../hoc/machine-vision.html">Machine Vision</a><a class="chip" href="../hoc/deep-learning.html">Deep Learning</a><a class="chip" href="../hoc/ai-vision.html">AI Vision</a><a class="chip" href="../hoc/object-detection.html">Object Detection</a><a class="chip" href="../hoc/pytorch.html">PyTorch</a><a class="chip" href="../ngoai-ngu/english.html">English</a></div>
+        <p class="search-group-title">Lộ trình nổi bật</p>
+        <a class="search-item" href="../lo-trinh/vision-engineer.html"><span class="search-ico" aria-hidden="true">⭐</span><span>Trở thành Vision Engineer<small>Learning Path · Machine Vision + AI Vision + Industrial Automation</small></span></a>
+      </div>
+    </div>
+    <div class="search-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> chọn</span><span><kbd>Enter</kbd> mở</span><span><kbd>Esc</kbd> đóng</span></div>
+  </div>
+</div>
+<main id="main">
+  <div class="container layout article-layout">
+    <article class="article">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../lo-trinh/">Learning Paths</a><span>/</span><a href="../lo-trinh/python-developer.html">Python Developer</a><span>/</span><a href="../lo-trinh/python-developer/du-lieu-va-csdl.html">Chặng 8: Cơ sở dữ liệu và xử lý dữ liệu</a></nav>
+      <header class="article-head">
+        <div class="course-bar" data-course="python-developer"><a class="course-chip" href="../lo-trinh/python-developer/du-lieu-va-csdl.html">⭐ Python Developer · Chặng 8</a><span class="lesson-no">Bài 2/4</span><span class="kind kind-lesson">Bài học</span><span class="lesson-min"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></svg>~75 phút</span></div>
+        <h1>SQLAlchemy 2.0 ORM: model, Session, select và quan hệ</h1>
+        <p class="lead">Làm việc với CSDL bằng đối tượng: SQLAlchemy 2.0 với Mapped, mapped_column, Session, select(), quan hệ một nhiều và lazy loading.</p>
+        <div class="article-meta">
+          <span class="avatar" aria-hidden="true">HF</span>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-29">29/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>8 phút đọc</span></div>
+        </div>
+      </header>
+      <figure class="article-cover">
+        <img src="../assets/images/posts/pydev-sqlalchemy-orm.webp" alt="SQLAlchemy 2.0 ORM: model, Session, select và quan hệ" width="1200" height="675" fetchpriority="high" decoding="async">
+      </figure>
+      <section class="lesson-goals" aria-label="Mục tiêu bài học"><h2>Học xong bài này, bạn sẽ</h2><ul><li>Khai báo model bằng Mapped, mapped_column</li><li>Thêm, truy vấn, sửa, xóa bằng Session và select()</li><li>Khai báo quan hệ một – nhiều</li></ul><p class="goals-before">Nên học trước: <a href="../hoc/pydev-sql-voi-sqlite3.html">SQL cơ bản với sqlite3</a></p></section>
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol class="toc-plain"><li><a href="#1-khai-bao-model">1. Khai báo model</a></li><li><a href="#2-them-du-lieu-voi-session">2. Thêm dữ liệu với Session</a></li><li><a href="#3-truy-van-voi-select">3. Truy vấn với select()</a></li><li><a href="#4-sua-va-xoa">4. Sửa và xóa</a></li><li><a href="#5-lazy-loading-va-bay-n-1">5. Lazy loading và bẫy N+1</a></li><li><a href="#tom-tat">Tóm tắt</a></li><li><a href="#bai-tap">Bài tập</a></li></ol></details>
+      <div class="prose">
+<p>Viết SQL bằng chuỗi trong Python hoạt động tốt, nhưng khi ứng dụng lớn lên, bạn phải tự chuyển từng dòng kết quả thành đối tượng, tự ghép câu lệnh theo điều kiện lọc, và gõ sai tên cột thì chỉ biết khi chạy. <strong>ORM</strong> (Object-Relational Mapping) cho phép làm việc với bảng như với class Python. <strong>SQLAlchemy</strong> là ORM phổ biến nhất của Python, và là nền tảng CSDL cho FastAPI ở chặng 9.</p>
+
+<h2 id="1-khai-bao-model">1. Khai báo model</h2>
+<p>Cài: <code>uv add sqlalchemy</code>. Bài dùng cú pháp của SQLAlchemy 2.x (bản 2.0 trở lên), có type hint đầy đủ.</p>
+<pre><code class="language-python">from sqlalchemy import ForeignKey, String, create_engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class TacGia(Base):
+    __tablename__ = "tac_gia"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ten: Mapped[str] = mapped_column(String(100), unique=True)
+    sach: Mapped[list["Sach"]] = relationship(back_populates="tac_gia", cascade="all, delete-orphan")
+
+    def __repr__(self) -&gt; str:
+        return f"TacGia({self.ten!r})"
+
+
+class Sach(Base):
+    __tablename__ = "sach"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ten: Mapped[str] = mapped_column(String(200))
+    nam: Mapped[int]
+    gia: Mapped[int | None]                                   # cho phép NULL
+    tac_gia_id: Mapped[int] = mapped_column(ForeignKey("tac_gia.id"))
+    tac_gia: Mapped[TacGia] = relationship(back_populates="sach")
+
+    def __repr__(self) -&gt; str:
+        return f"Sach({self.ten!r}, {self.nam})"
+
+
+engine = create_engine("sqlite:///thu_vien.db")
+Base.metadata.drop_all(engine)
+Base.metadata.create_all(engine)          # tạo mọi bảng chưa có
+print(list(Base.metadata.tables))</code></pre>
+<pre><code class="language-text">['tac_gia', 'sach']</code></pre>
+<ul>
+  <li>Mỗi class kế thừa <code>Base</code> là một bảng; <code>__tablename__</code> là tên bảng.</li>
+  <li><code>Mapped[int]</code> khai báo cột và kiểu; <code>Mapped[int | None]</code> nghĩa là cột cho phép <code>NULL</code>, không có <code>None</code> thì là <code>NOT NULL</code>. <code>mapped_column(...)</code> thêm chi tiết: khóa chính, độ dài, khóa ngoại, unique.</li>
+  <li><code>relationship</code> không phải cột: nó cho phép đi từ đối tượng này sang đối tượng liên quan (<code>sach.tac_gia</code>, <code>tac_gia.sach</code>). <code>back_populates</code> nối hai chiều với nhau.</li>
+  <li><code>create_engine("sqlite:///thu_vien.db")</code>: đổi sang PostgreSQL chỉ cần đổi chuỗi kết nối, ví dụ <code>"postgresql+psycopg://user:mk@host/db"</code> (cần cài driver).</li>
+</ul>
+
+<h2 id="2-them-du-lieu-voi-session">2. Thêm dữ liệu với Session</h2>
+<pre><code class="language-python"># (minh họa) nối tiếp mục 1
+with Session(engine) as session:
+    to_hoai = TacGia(ten="Tô Hoài")
+    nam_cao = TacGia(ten="Nam Cao", sach=[Sach(ten="Chí Phèo", nam=1941, gia=65_000),
+                                         Sach(ten="Lão Hạc", nam=1943, gia=None)])
+    to_hoai.sach.append(Sach(ten="Dế Mèn phiêu lưu ký", nam=1941, gia=85_000))
+    session.add_all([to_hoai, nam_cao])
+    session.add(Sach(ten="Vợ chồng A Phủ", nam=1952, gia=55_000, tac_gia=to_hoai))
+    session.commit()
+    print(to_hoai.id, nam_cao.id, [s.ten for s in to_hoai.sach])</code></pre>
+<pre><code class="language-text">1 2 ['Dế Mèn phiêu lưu ký', 'Vợ chồng A Phủ']</code></pre>
+<p><strong>Session</strong> là "phiên làm việc" với CSDL: bạn thêm, sửa đối tượng Python, Session theo dõi thay đổi và khi <code>commit()</code> thì gửi đúng các câu <code>INSERT</code>/<code>UPDATE</code> cần thiết trong một transaction. Không cần ghi <code>tac_gia_id</code> bằng tay: gán quan hệ <code>tac_gia=to_hoai</code> hoặc thêm vào list <code>sach</code> là đủ. Sau <code>commit</code>, <code>id</code> do CSDL sinh ra đã có trên đối tượng.</p>
+
+<h2 id="3-truy-van-voi-select">3. Truy vấn với select()</h2>
+<pre><code class="language-python"># (minh họa) nối tiếp mục 1, 2
+from sqlalchemy import func, select
+
+with Session(engine) as session:
+    sach_1941 = session.scalars(select(Sach).where(Sach.nam == 1941).order_by(Sach.ten)).all()
+    print(sach_1941)
+
+    mot = session.scalars(select(Sach).where(Sach.ten.ilike("%hạc%"))).first()
+    print(mot, mot.tac_gia.ten)                      # đi theo quan hệ sang tác giả
+
+    print(session.get(TacGia, 2))                    # lấy theo khóa chính
+
+    re_nhat = session.scalars(select(Sach).where(Sach.gia.is_not(None)).order_by(Sach.gia).limit(1)).one()
+    print(re_nhat, re_nhat.gia)
+
+    thong_ke = session.execute(
+        select(TacGia.ten, func.count(Sach.id), func.min(Sach.nam))
+        .join(TacGia.sach)
+        .group_by(TacGia.id)
+        .order_by(TacGia.ten)
+    ).all()
+    for ten, so_sach, nam_dau in thong_ke:
+        print(f"{ten}: {so_sach} cuốn, từ năm {nam_dau}")</code></pre>
+<pre><code class="language-text">[Sach('Chí Phèo', 1941), Sach('Dế Mèn phiêu lưu ký', 1941)]
+Sach('Lão Hạc', 1943) Nam Cao
+TacGia('Nam Cao')
+Sach('Vợ chồng A Phủ', 1952) 55000
+Nam Cao: 2 cuốn, từ năm 1941
+Tô Hoài: 2 cuốn, từ năm 1941</code></pre>
+<ul>
+  <li><code>select(Sach)</code> tạo câu truy vấn; nối thêm <code>.where()</code>, <code>.order_by()</code>, <code>.limit()</code>, <code>.join()</code>, <code>.group_by()</code>. Điều kiện viết bằng toán tử Python trên thuộc tính lớp: <code>Sach.nam == 1941</code>, <code>Sach.gia &gt; 50_000</code>, <code>Sach.ten.ilike("%hạc%")</code>, <code>Sach.gia.is_not(None)</code>.</li>
+  <li><code>session.scalars(...)</code> khi chọn một thứ (đối tượng); <code>.all()</code>, <code>.first()</code> (hoặc <code>None</code>), <code>.one()</code> (đúng một, không thì lỗi). <code>session.execute(...)</code> khi chọn nhiều cột, kết quả là các dòng tuple.</li>
+  <li>Gõ sai <code>Sach.nma</code> là <code>AttributeError</code> ngay và VS Code gạch đỏ trước khi chạy: ưu điểm lớn so với chuỗi SQL.</li>
+</ul>
+<p>Muốn xem SQL thật SQLAlchemy sinh ra, tạo engine với <code>echo=True</code>, hoặc <code>print(select(Sach).where(Sach.nam == 1941))</code>.</p>
+
+<h2 id="4-sua-va-xoa">4. Sửa và xóa</h2>
+<pre><code class="language-python"># (minh họa) nối tiếp các mục trên
+with Session(engine) as session:
+    lao_hac = session.scalars(select(Sach).where(Sach.ten == "Lão Hạc")).one()
+    lao_hac.gia = 60_000                            # sửa thuộc tính như đối tượng thường
+    to_hoai = session.scalars(select(TacGia).where(TacGia.ten == "Tô Hoài")).one()
+    session.delete(to_hoai)                         # cascade: xóa luôn sách của Tô Hoài
+    session.commit()
+    print(session.scalar(select(func.count()).select_from(Sach)), lao_hac.gia)</code></pre>
+<pre><code class="language-text">2 60000</code></pre>
+<p>Session tự phát hiện thuộc tính bị đổi và sinh <code>UPDATE</code> khi commit. <code>cascade="all, delete-orphan"</code> khai báo ở <code>TacGia.sach</code> làm xóa tác giả kéo theo xóa sách của họ. Thiếu cascade, xóa tác giả còn sách sẽ bị khóa ngoại chặn (với CSDL có kiểm tra khóa ngoại).</p>
+
+<h2 id="5-lazy-loading-va-bay-n-1">5. Lazy loading và bẫy N+1</h2>
+<pre><code class="language-python"># (minh họa) nối tiếp các mục trên
+from sqlalchemy.orm import selectinload
+
+with Session(engine) as session:
+    # Mỗi lần chạm tac_gia.sach là MỘT câu SELECT mới: 100 tác giả = 101 câu truy vấn
+    for tg in session.scalars(select(TacGia)):
+        print(tg.ten, len(tg.sach))
+
+    # selectinload: nạp sách của mọi tác giả trong 1 câu truy vấn thêm
+    for tg in session.scalars(select(TacGia).options(selectinload(TacGia.sach))):
+        print(tg.ten, [s.ten for s in tg.sach])</code></pre>
+<p>Mặc định quan hệ được nạp <strong>lười</strong> (lazy): chỉ khi bạn truy cập <code>tg.sach</code> mới truy vấn. Trong vòng lặp, điều đó sinh ra N câu truy vấn thêm, gọi là <strong>bài toán N+1</strong>, nguyên nhân số một khiến trang web chậm. Biết trước sẽ dùng quan hệ thì nạp sẵn bằng <code>selectinload</code>.</p>
+<div class="tip"><strong>Thay đổi cấu trúc bảng khi đã có dữ liệu</strong><code>create_all</code> chỉ tạo bảng chưa có, không thêm cột vào bảng cũ. Dự án thật dùng <strong>Alembic</strong> (cùng tác giả SQLAlchemy) để tạo các file "migration" ghi lại từng thay đổi cấu trúc và áp dụng lên CSDL thật một cách an toàn. Bạn nên tìm hiểu Alembic sau khi xong lộ trình.</div>
+
+<h2 id="tom-tat">Tóm tắt</h2>
+<ul>
+  <li>Model: lớp kế thừa <code>DeclarativeBase</code>, <code>Mapped[...]</code>, <code>mapped_column</code>, <code>ForeignKey</code>, <code>relationship(back_populates=...)</code>.</li>
+  <li><code>with Session(engine) as session:</code> → <code>add</code>, <code>delete</code>, sửa thuộc tính → <code>commit()</code>.</li>
+  <li>Truy vấn: <code>session.scalars(select(X).where(...).order_by(...))</code>, <code>session.get(X, id)</code>, <code>session.execute</code> cho nhiều cột.</li>
+  <li>Cẩn thận N+1: dùng <code>selectinload</code>; đổi cấu trúc bảng bằng Alembic.</li>
+</ul>
+
+<h2 id="bai-tap">Bài tập</h2>
+<div class="ex">
+<h3 id="bai-1-tac-gia-kem-so-sach">Bài 1. Tác giả kèm số sách</h3>
+<p>Dựng lại model ở mục 1 trong file mới, thêm 3 tác giả với tổng 6 cuốn, rồi in mỗi tác giả kèm số sách, sắp theo số sách giảm dần, kể cả tác giả chưa có sách nào.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">from sqlalchemy import ForeignKey, create_engine, func, select
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class TacGia(Base):
+    __tablename__ = "tac_gia"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ten: Mapped[str]
+    sach: Mapped[list["Sach"]] = relationship(back_populates="tac_gia")
+
+
+class Sach(Base):
+    __tablename__ = "sach"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ten: Mapped[str]
+    nam: Mapped[int]
+    tac_gia_id: Mapped[int] = mapped_column(ForeignKey("tac_gia.id"))
+    tac_gia: Mapped[TacGia] = relationship(back_populates="sach")
+
+
+engine = create_engine("sqlite://")              # CSDL trong RAM
+Base.metadata.create_all(engine)
+with Session(engine) as s:
+    s.add_all([
+        TacGia(ten="Nguyễn Nhật Ánh", sach=[Sach(ten="Mắt biếc", nam=1990), Sach(ten="Cho tôi xin một vé đi tuổi thơ", nam=2008),
+                                            Sach(ten="Tôi thấy hoa vàng trên cỏ xanh", nam=2010)]),
+        TacGia(ten="Nguyễn Du", sach=[Sach(ten="Truyện Kiều", nam=1820)]),
+        TacGia(ten="Xuân Quỳnh"),
+        TacGia(ten="Vũ Trọng Phụng", sach=[Sach(ten="Số đỏ", nam=1936), Sach(ten="Giông tố", nam=1936)]),
+    ])
+    s.commit()
+    so_sach = func.count(Sach.id).label("so_sach")
+    q = select(TacGia.ten, so_sach).outerjoin(TacGia.sach).group_by(TacGia.id).order_by(so_sach.desc(), TacGia.ten)
+    for ten, n in s.execute(q):
+        print(f"{ten:&lt;16}{n}")</code></pre>
+<pre><code class="language-text">Nguyễn Nhật Ánh 3
+Vũ Trọng Phụng  2
+Nguyễn Du       1
+Xuân Quỳnh      0</code></pre>
+<p><code>outerjoin</code> là <code>LEFT JOIN</code>: giữ tác giả chưa có sách. <code>func.count(Sach.id)</code> đếm sách thật (bỏ <code>NULL</code>), nên Xuân Quỳnh được 0 chứ không phải 1.</p>
+</details>
+</div>
+<div class="ex">
+<h3 id="bai-2-tim-sach-theo-tu-khoa">Bài 2. Tìm sách theo từ khóa</h3>
+<p>Viết hàm <code>tim_sach(session, tu_khoa, tu_nam=None)</code> tìm sách có tên chứa từ khóa (không phân biệt hoa thường), lọc thêm theo năm nếu có, sắp theo năm.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python"># (minh họa) dùng model và dữ liệu của bài 1
+def tim_sach(session: Session, tu_khoa: str, tu_nam: int | None = None) -&gt; list[Sach]:
+    q = select(Sach).where(Sach.ten.ilike(f"%{tu_khoa}%"))
+    if tu_nam is not None:
+        q = q.where(Sach.nam &gt;= tu_nam)              # ghép thêm điều kiện khi cần
+    return list(session.scalars(q.order_by(Sach.nam)))
+
+
+with Session(engine) as s:
+    print([x.ten for x in tim_sach(s, "tôi")])
+    print([x.ten for x in tim_sach(s, "tôi", tu_nam=2009)])</code></pre>
+<pre><code class="language-text">['Cho tôi xin một vé đi tuổi thơ', 'Tôi thấy hoa vàng trên cỏ xanh']
+['Tôi thấy hoa vàng trên cỏ xanh']</code></pre>
+<p>Ghép điều kiện từng bước bằng <code>q = q.where(...)</code> là điểm mạnh của SQLAlchemy so với tự nối chuỗi SQL, và vẫn an toàn trước SQL injection vì từ khóa được truyền dưới dạng tham số. Lưu ý: SQLite chỉ so sánh không phân biệt hoa thường cho chữ cái ASCII, nên <code>"TÔI"</code> viết hoa có dấu sẽ không khớp <code>"tôi"</code>; PostgreSQL thì xử lý đúng với <code>ILIKE</code>.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.sqlalchemy.org/en/20/tutorial/" rel="noopener" target="_blank">SQLAlchemy Unified Tutorial</a>; <a href="https://docs.sqlalchemy.org/en/20/orm/quickstart.html" rel="noopener" target="_blank">ORM Quick Start</a>; <a href="https://docs.sqlalchemy.org/en/20/orm/queryguide/relationships.html" rel="noopener" target="_blank">Relationship Loading Techniques</a>; <a href="https://alembic.sqlalchemy.org/" rel="noopener" target="_blank">Alembic</a>.</p>
+
+      </div>
+      <section class="practice"><h2><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /> <circle cx="12" cy="12" r="6" /> <circle cx="12" cy="12" r="2" /></svg>Bài tập thực hành</h2><ol><li>Viết model TacGia và Sach (một – nhiều), thêm dữ liệu và in mỗi tác giả kèm số sách.</li><li>Viết hàm tìm sách theo từ khóa trong tên, không phân biệt hoa thường, sắp theo năm.</li></ol><p>Làm xong bài tập mới chuyển sang bài tiếp theo: tự viết code là cách duy nhất để nhớ lâu.</p></section><div class="lesson-done" data-course="python-developer"><button type="button" class="lesson-done-btn" data-lesson-done="pydev-sqlalchemy-orm" aria-pressed="false"><span class="box"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></span><span class="off">Đánh dấu đã học xong</span><span class="on">Đã học xong bài này</span></button><a class="btn lg" href="../hoc/pydev-pandas-co-ban.html">Bài tiếp theo<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a></div>
+      <footer class="article-foot">
+        <div class="tags"><a class="tag" href="../search.html?q=Python">#Python</a><a class="tag" href="../search.html?q=Lập trình">#Lập trình</a></div>
+        <div class="share">
+      <span>Chia sẻ:</span>
+      <a class="share-btn fb" href="https://www.facebook.com/sharer/sharer.php?u=https://hocfree.vn/hoc/pydev-sqlalchemy-orm.html" target="_blank" rel="noopener" aria-label="Chia sẻ Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8z"/></svg></a>
+      <a class="share-btn x" href="https://twitter.com/intent/tweet?url=https://hocfree.vn/hoc/pydev-sqlalchemy-orm.html" target="_blank" rel="noopener" aria-label="Chia sẻ X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+      <button class="share-btn copy-link" data-url="https://hocfree.vn/hoc/pydev-sqlalchemy-orm.html" aria-label="Sao chép liên kết"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+    </div>
+      </footer>
+      <div class="author-box">
+        <span class="avatar lg" aria-hidden="true">HF</span>
+        <div>
+          <strong>Ban biên tập HọcFree</strong>
+          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và ngoại ngữ, hoàn toàn miễn phí.</p>
+        </div>
+      </div>
+      <nav class="pager lesson-pager" aria-label="Bài học trước/sau"><a class="prev" href="../hoc/pydev-sql-voi-sqlite3.html"><span>← Bài trước · Bài 1</span>SQL cơ bản với sqlite3</a><a class="next" href="../hoc/pydev-pandas-co-ban.html"><span>Bài tiếp → · Bài 3</span>pandas cơ bản cho lập trình viên</a></nav>
+    </article>
+    <aside class="sidebar course-side" data-course="python-developer">
+      <section class="widget course-toc">
+        <p class="widget-title">Chặng 8/10 · Python Developer</p>
+        <a class="course-toc-title" href="../lo-trinh/python-developer/du-lieu-va-csdl.html">Cơ sở dữ liệu và xử lý dữ liệu</a>
+        <div class="lc" data-lesson-count="pydev-sql-voi-sqlite3 pydev-sqlalchemy-orm pydev-pandas-co-ban pydev-lab-phan-tich-ban-hang"><div class="lc-bar"><span data-lc-bar></span></div><span data-lc-text>0/4 bài</span></div>
+        <ol class="toc-lessons"><li data-lesson="pydev-sql-voi-sqlite3"><a href="../hoc/pydev-sql-voi-sqlite3.html"><span class="tn">1</span><span class="tt">SQL cơ bản với sqlite3</span></a></li><li data-lesson="pydev-sqlalchemy-orm" class="is-current"><a href="../hoc/pydev-sqlalchemy-orm.html" aria-current="page"><span class="tn">2</span><span class="tt">SQLAlchemy 2.0 ORM</span></a></li><li data-lesson="pydev-pandas-co-ban"><a href="../hoc/pydev-pandas-co-ban.html"><span class="tn">3</span><span class="tt">pandas cơ bản cho lập trình viên</span></a></li><li data-lesson="pydev-lab-phan-tich-ban-hang"><a href="../hoc/pydev-lab-phan-tich-ban-hang.html"><span class="tn">4</span><span class="tt">Thực hành: phân tích dữ liệu bán hàng từ SQLite</span></a></li></ol>
+        <a class="more" href="../lo-trinh/python-developer.html">Xem toàn bộ lộ trình<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></svg></a>
+      </section>
+    </aside>
+  </div>
+  <section class="band">
+    <div class="container">
+      <div class="section-title"><h2>Có thể bạn quan tâm</h2></div>
+      <div class="card-grid"><article class="card">
+  <a class="thumb" href="../hoc/pydev-cai-dat-python-va-vs-code.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/pydev-cai-dat-python-va-vs-code.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/pydev-cai-dat-python-va-vs-code.html">Cài Python, VS Code và chạy chương trình Python đầu tiên</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-29">29/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>7 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/pydev-bien-kieu-du-lieu-toan-tu.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/pydev-bien-kieu-du-lieu-toan-tu.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/pydev-bien-kieu-du-lieu-toan-tu.html">Biến, kiểu dữ liệu, toán tử và input() trong Python</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-29">29/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>7 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../hoc/pydev-chuoi-va-f-string.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/pydev-chuoi-va-f-string.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-hoc" href="../hoc/">Học AI &amp; Lập trình</a>
+  <h3><a href="../hoc/pydev-chuoi-va-f-string.html">Chuỗi trong Python: slicing, phương thức và f-string</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-29">29/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>6 phút đọc</span></div>
+</article></div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <a class="logo" href="../"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+      <p>HọcFree.vn – nền tảng học miễn phí về AI, lập trình, Computer Vision, Machine Vision, tin tức AI và ngoại ngữ dành cho người Việt.</p>
+    </div>
+    <div><h3>Học &amp; thực hành</h3><ul><li><a href="../hoc/">Học AI &amp; Lập trình</a></li><li><a href="../projects/">Projects</a></li><li><a href="../lo-trinh/">Learning Paths</a></li></ul></div>
+    <div><h3>Khám phá</h3><ul><li><a href="../kien-thuc/">Kiến thức</a></li><li><a href="../tin-tuc-ai/">Tin tức AI</a></li><li><a href="../ngoai-ngu/">Ngoại ngữ</a></li><li><a href="../tai-nguyen/">Tài nguyên</a></li></ul></div>
+    <div><h3>Bài mới</h3><ul><li><a href="../hoc/pydev-cai-dat-python-va-vs-code.html">Cài Python, VS Code và chạy chương trình Python đầu tiên</a></li><li><a href="../hoc/pydev-bien-kieu-du-lieu-toan-tu.html">Biến, kiểu dữ liệu, toán tử và input() trong Python</a></li><li><a href="../hoc/pydev-chuoi-va-f-string.html">Chuỗi trong Python: slicing, phương thức và f-string</a></li><li><a href="../hoc/pydev-re-nhanh-va-vong-lap.html">Rẽ nhánh và vòng lặp trong Python: if, match, for, while</a></li></ul></div>
+    <div>
+      <h3>HọcFree</h3>
+      <ul>
+        <li><a href="../gioi-thieu.html">Giới thiệu</a></li>
+        <li><a href="../search.html">Tìm kiếm</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">© 2026 HọcFree.vn · Kiến thức là để chia sẻ.</div>
+  </div>
+</footer>
+<button class="to-top" aria-label="Lên đầu trang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<script src="../assets/js/search-data.js?v=20261029" defer></script>
+<script src="../assets/js/main.js?v=20261029" defer></script>
+</body>
+</html>

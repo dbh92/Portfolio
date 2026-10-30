@@ -1,0 +1,202 @@
+<p>Mở file thì phải đóng, lấy khóa thì phải nhả, mở kết nối CSDL thì phải ngắt, kể cả khi giữa chừng có lỗi. Câu lệnh <code>with</code> bảo đảm việc "dọn dẹp" luôn xảy ra. Bạn đã dùng <code>with open(...)</code> từ chặng 3; bài này giải thích cơ chế bên dưới và dạy bạn tự viết context manager cho tài nguyên của riêng mình.</p>
+
+<h2>1. with làm gì</h2>
+<pre><code class="language-python"># (minh họa) hai đoạn tương đương
+with open("a.txt", encoding="utf-8") as f:
+    xu_ly(f)
+
+f = open("a.txt", encoding="utf-8")
+try:
+    xu_ly(f)
+finally:
+    f.close()</code></pre>
+<p>Đối tượng dùng được sau <code>with</code> là <strong>context manager</strong>: có phương thức <code>__enter__</code> (chạy khi vào khối, giá trị trả về gán cho biến sau <code>as</code>) và <code>__exit__</code> (chạy khi ra khỏi khối, dù bình thường, <code>return</code>, <code>break</code> hay có ngoại lệ).</p>
+
+<h2>2. Tự viết bằng class</h2>
+<pre><code class="language-python">import time
+
+
+class DemGio:
+    def __init__(self, ten):
+        self.ten = ten
+
+    def __enter__(self):
+        self.bat_dau = time.perf_counter()
+        return self                              # gán cho biến sau "as"
+
+    def __exit__(self, loai_loi, loi, traceback):
+        self.giay = time.perf_counter() - self.bat_dau
+        trang_thai = "lỗi " + loai_loi.__name__ if loai_loi else "xong"
+        print(f"[{self.ten}] {trang_thai} sau {self.giay:.1f}s")
+        return False                             # False: không nuốt ngoại lệ
+
+
+with DemGio("nhập dữ liệu") as dg:
+    time.sleep(0.2)
+print(round(dg.giay, 1))
+
+try:
+    with DemGio("tính toán"):
+        1 / 0
+except ZeroDivisionError:
+    print("Ngoại lệ vẫn bay ra ngoài")</code></pre>
+<pre><code class="language-text">[nhập dữ liệu] xong sau 0.2s
+0.2
+[tính toán] lỗi ZeroDivisionError sau 0.0s
+Ngoại lệ vẫn bay ra ngoài</code></pre>
+<p><code>__exit__</code> nhận ba thông tin về ngoại lệ (đều là <code>None</code> nếu không có lỗi). Trả <code>True</code> thì ngoại lệ bị nuốt, trả <code>False</code> hoặc <code>None</code> thì ngoại lệ tiếp tục bay ra. Gần như lúc nào bạn cũng nên để ngoại lệ bay ra.</p>
+
+<h2>3. Cách ngắn hơn: contextlib.contextmanager</h2>
+<pre><code class="language-python">import os
+from contextlib import contextmanager
+from pathlib import Path
+
+
+@contextmanager
+def tam_doi_thu_muc(duong_dan):
+    cu = Path.cwd()
+    os.chdir(duong_dan)          # phần trước yield = __enter__
+    try:
+        yield Path.cwd()         # giá trị cho "as"; khối with chạy tại đây
+    finally:
+        os.chdir(cu)             # phần sau yield = __exit__, đặt trong finally
+
+
+Path("du_lieu").mkdir(exist_ok=True)
+goc = Path.cwd()
+with tam_doi_thu_muc("du_lieu") as hien_tai:
+    print(hien_tai.name)
+print(Path.cwd() == goc)</code></pre>
+<pre><code class="language-text">du_lieu
+True</code></pre>
+<p>Một generator có đúng một <code>yield</code> + decorator <code>@contextmanager</code> là đủ. <strong>Bắt buộc</strong> bọc <code>yield</code> trong <code>try/finally</code>: nếu khối <code>with</code> ném lỗi, lỗi xuất hiện tại dòng <code>yield</code>, và không có <code>finally</code> thì phần dọn dẹp không chạy. (Từ Python 3.11 thư viện chuẩn đã có sẵn <code>contextlib.chdir</code>; tự viết ở đây để hiểu cơ chế.)</p>
+
+<h2>4. Ví dụ thực tế: giao dịch ghi file an toàn</h2>
+<p>Ghi đè file cấu hình mà chương trình bị tắt giữa chừng thì file hỏng, mất cả bản cũ. Cách an toàn: ghi vào file tạm, xong xuôi mới thay thế file thật.</p>
+<pre><code class="language-python">import json
+import os
+from contextlib import contextmanager
+from pathlib import Path
+
+
+@contextmanager
+def ghi_an_toan(p: Path):
+    tam = p.with_suffix(p.suffix + ".tmp")
+    f = open(tam, "w", encoding="utf-8")
+    try:
+        yield f
+        f.close()
+        os.replace(tam, p)            # thay thế nguyên tử: hoặc file mới, hoặc file cũ
+    except BaseException:
+        f.close()
+        tam.unlink(missing_ok=True)   # có lỗi: bỏ file tạm, file thật giữ nguyên
+        raise
+
+
+p = Path("cau_hinh.json")
+p.write_text('{"phien_ban": 1}', encoding="utf-8")
+try:
+    with ghi_an_toan(p) as f:
+        f.write('{"phien_ban": 2, ')
+        raise RuntimeError("mất điện giữa chừng")
+except RuntimeError:
+    pass
+print(json.loads(p.read_text(encoding="utf-8")))
+
+with ghi_an_toan(p) as f:
+    json.dump({"phien_ban": 2}, f)
+print(json.loads(p.read_text(encoding="utf-8")), list(Path(".").glob("*.tmp")))</code></pre>
+<pre><code class="language-text">{'phien_ban': 1}
+{'phien_ban': 2} []</code></pre>
+<p><code>os.replace</code> đổi tên trong một bước duy nhất ở mức hệ điều hành, nên file cấu hình không bao giờ ở trạng thái "ghi được một nửa". Người dùng chỉ cần viết <code>with ghi_an_toan(p) as f:</code>, mọi chi tiết khó nằm gọn trong context manager.</p>
+
+<h2>5. Công cụ có sẵn trong contextlib</h2>
+<pre><code class="language-python">from contextlib import ExitStack, suppress
+from pathlib import Path
+
+with suppress(FileNotFoundError):       # bỏ qua đúng một loại lỗi, gọn hơn try/except/pass
+    Path("khong_ton_tai.txt").unlink()
+
+for ten in ("a.txt", "b.txt", "c.txt"):
+    Path(ten).write_text(ten[0] * 3, encoding="utf-8")
+
+with ExitStack() as stack:              # mở số lượng file không biết trước
+    cac_file = [stack.enter_context(open(t, encoding="utf-8")) for t in ("a.txt", "b.txt", "c.txt")]
+    print([f.read() for f in cac_file])
+print(all(f.closed for f in cac_file))</code></pre>
+<pre><code class="language-text">['aaa', 'bbb', 'ccc']
+True</code></pre>
+<p>Bạn sẽ gặp context manager ở khắp nơi: <code>sqlite3</code> và Session của SQLAlchemy (chặng 8), <code>httpx.Client</code> (chặng 7, 10), <code>threading.Lock</code> (chặng 10), <code>pytest.raises</code> (chặng 6). Nhìn thấy tài nguyên cần "mở – đóng", hãy nghĩ ngay đến <code>with</code>.</p>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li><code>with</code> = <code>__enter__</code> khi vào, <code>__exit__</code> khi ra, kể cả khi lỗi.</li>
+  <li>Viết bằng class (<code>__enter__</code>/<code>__exit__</code>) hoặc <code>@contextmanager</code> + một <code>yield</code> trong <code>try/finally</code>.</li>
+  <li><code>__exit__</code> trả <code>False</code> để không nuốt ngoại lệ.</li>
+  <li><code>suppress</code>, <code>ExitStack</code>, <code>chdir</code> (3.11+) có sẵn trong <code>contextlib</code>.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Đếm giờ bằng contextmanager</h3>
+<p>Viết lại <code>DemGio</code> ở mục 2 bằng <code>@contextmanager</code>: in thời gian chạy khối lệnh kèm trạng thái, kể cả khi có lỗi.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import time
+from contextlib import contextmanager
+
+
+@contextmanager
+def dem_gio(ten):
+    bat_dau = time.perf_counter()
+    trang_thai = "xong"
+    try:
+        yield
+    except BaseException as e:
+        trang_thai = f"lỗi {type(e).__name__}"
+        raise
+    finally:
+        print(f"[{ten}] {trang_thai} sau {time.perf_counter() - bat_dau:.1f}s")
+
+
+with dem_gio("ngủ"):
+    time.sleep(0.1)
+try:
+    with dem_gio("chia"):
+        1 / 0
+except ZeroDivisionError:
+    pass</code></pre>
+<pre><code class="language-text">[ngủ] xong sau 0.1s
+[chia] lỗi ZeroDivisionError sau 0.0s</code></pre>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Tạm đổi biến môi trường</h3>
+<p>Viết context manager <code>tam_dat_env(ten, gia_tri)</code> đặt biến môi trường trong khối <code>with</code>, ra khỏi khối thì khôi phục giá trị cũ (hoặc xóa nếu trước đó chưa có). Rất hữu ích khi kiểm thử.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import os
+from contextlib import contextmanager
+
+
+@contextmanager
+def tam_dat_env(ten: str, gia_tri: str):
+    cu = os.environ.get(ten)
+    os.environ[ten] = gia_tri
+    try:
+        yield
+    finally:
+        if cu is None:
+            del os.environ[ten]
+        else:
+            os.environ[ten] = cu
+
+
+with tam_dat_env("CHE_DO", "kiem_thu"):
+    print(os.environ["CHE_DO"])
+print(os.environ.get("CHE_DO"))</code></pre>
+<pre><code class="language-text">kiem_thu
+None</code></pre>
+<p>pytest có sẵn fixture <code>monkeypatch.setenv</code> làm đúng việc này; bạn sẽ dùng ở chặng 6.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/reference/compound_stmts.html#the-with-statement" rel="noopener" target="_blank">The with statement</a>; <a href="https://docs.python.org/3/library/contextlib.html" rel="noopener" target="_blank">contextlib</a>; <a href="https://docs.python.org/3/library/os.html#os.replace" rel="noopener" target="_blank">os.replace</a>.</p>

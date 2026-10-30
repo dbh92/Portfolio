@@ -1,0 +1,333 @@
+<p>API sổ ghi chú hiện ai cũng đọc, sửa, xóa được mọi ghi chú. Ứng dụng thật cần biết <strong>ai đang gọi</strong> (xác thực, authentication) và <strong>người đó được làm gì</strong> (phân quyền, authorization). Bài này thêm đăng ký, đăng nhập bằng mật khẩu băm Argon2, cấp token JWT, và giới hạn mỗi người chỉ thấy ghi chú của mình, theo đúng cách tài liệu FastAPI khuyến nghị.</p>
+<div class="warn"><strong>Bảo mật: dùng thư viện, không tự chế</strong>Tự viết thuật toán băm, tự chế định dạng token là con đường ngắn nhất dẫn đến lỗ hổng. Bài dùng <code>pwdlib</code> (băm mật khẩu) và <code>PyJWT</code> (token), hai thư viện mà tài liệu FastAPI hiện dùng. Mọi quyết định bảo mật trong bài đều có lý do, hãy đọc kỹ phần giải thích.</div>
+
+<h2>1. Cài thêm thư viện và cấu trúc mới</h2>
+<pre><code class="language-text">$ uv add pyjwt "pwdlib[argon2]"
+
+app/
+├── database.py   (giữ nguyên bài trước)
+├── models.py     ← thêm bảng nguoi_dung, ghi_chu có chu_id
+├── schemas.py    ← thêm NguoiDungTao, NguoiDungDoc, Token
+├── security.py   ← MỚI: băm mật khẩu, tạo và đọc JWT
+├── auth.py       ← MỚI: dependency lấy người dùng hiện tại
+└── main.py       ← thêm /auth/dang-ky, /auth/token, /nguoi-dung/toi</code></pre>
+
+<h2>2. Băm mật khẩu: không bao giờ lưu mật khẩu gốc</h2>
+<pre><code class="language-python"># (minh họa) app/security.py
+"""Băm mật khẩu và cấp, kiểm tra JWT."""
+
+import os
+from datetime import UTC, datetime, timedelta
+
+import jwt
+from pwdlib import PasswordHash
+
+SECRET_KEY = os.environ.get("SECRET_KEY", "chi-dung-khi-phat-trien-doi-khi-trien-khai")
+ALGORITHM = "HS256"
+THOI_HAN_PHUT = 30
+
+password_hash = PasswordHash.recommended()  # Argon2 với tham số khuyến nghị
+HASH_GIA = password_hash.hash("mat-khau-gia")  # dùng khi tên đăng nhập không tồn tại
+
+
+def bam_mat_khau(mat_khau: str) -&gt; str:
+    return password_hash.hash(mat_khau)
+
+
+def kiem_tra_mat_khau(mat_khau: str, da_bam: str) -&gt; bool:
+    return password_hash.verify(mat_khau, da_bam)
+
+
+def tao_token(ten_dang_nhap: str) -&gt; str:
+    het_han = datetime.now(UTC) + timedelta(minutes=THOI_HAN_PHUT)
+    return jwt.encode({"sub": ten_dang_nhap, "exp": het_han}, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def doc_token(token: str) -&gt; str | None:
+    """Trả tên đăng nhập nếu token hợp lệ và chưa hết hạn, ngược lại None."""
+    try:
+        du_lieu = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except jwt.InvalidTokenError:
+        return None
+    return du_lieu.get("sub")</code></pre>
+<p><strong>Băm</strong> (hash) là biến đổi một chiều: từ mật khẩu tính ra chuỗi băm dễ, nhưng từ chuỗi băm không tính ngược ra mật khẩu. Khi đăng nhập, ta băm mật khẩu người dùng gõ rồi so với chuỗi đã lưu (<code>verify</code>). Nếu CSDL bị lộ, kẻ tấn công chỉ có chuỗi băm. Đây là hai dòng thật trong bảng sau khi đăng ký:</p>
+<pre><code class="language-text">('an_nguyen', '$argon2id$v=19$m=65536,t=3,p=4$hLd5BjGEU...')
+('binh',      '$argon2id$v=19$m=65536,t=3,p=4$SpO9zFYMG...')</code></pre>
+<ul>
+  <li><strong>Argon2id</strong> là thuật toán băm mật khẩu được khuyến nghị hiện nay: cố tình chậm và tốn bộ nhớ (<code>m=65536</code> KB) để việc thử hàng tỷ mật khẩu trở nên quá đắt. Không bao giờ dùng MD5, SHA-256 trần cho mật khẩu: chúng quá nhanh.</li>
+  <li>Mỗi chuỗi băm có <strong>muối</strong> (salt) ngẫu nhiên riêng (phần sau dấu <code>$</code> cuối), nên hai người cùng mật khẩu vẫn có chuỗi băm khác nhau.</li>
+  <li><code>HASH_GIA</code> dùng ở endpoint đăng nhập (mục 4) để chống đoán tên đăng nhập qua thời gian phản hồi.</li>
+</ul>
+
+<h2>3. JWT: tấm vé có chữ ký</h2>
+<p>HTTP không trạng thái, nên sau khi đăng nhập, client phải chứng minh danh tính ở <em>mỗi</em> request. Máy chủ cấp một <strong>JWT</strong> (JSON Web Token): chuỗi gồm ba phần cách nhau bằng dấu chấm: header, payload (dữ liệu), chữ ký.</p>
+<pre><code class="language-text">eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhbl9uZ3V5ZW4iLCJleHAiOjE3OTMyNjg3MDZ9.HANJbZWy6fPCuO9fDWdlBKCBN9bcOqkD7Hr9PfUOSgc
+           header (thuật toán)       .           payload                  .          chữ ký</code></pre>
+<pre><code class="language-python">import jwt
+
+token = ("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhbl9uZ3V5ZW4iLCJleHAiOjE3OTMyNjg3MDZ9"
+         ".HANJbZWy6fPCuO9fDWdlBKCBN9bcOqkD7Hr9PfUOSgc")
+print(jwt.decode(token, options={"verify_signature": False}))   # ai cũng đọc được payload!</code></pre>
+<pre><code class="language-text">{'sub': 'an_nguyen', 'exp': 1793268706}</code></pre>
+<ul>
+  <li>Payload chỉ được <strong>mã hóa base64</strong>, không được mã hóa bí mật: ai có token cũng đọc được nội dung. <strong>Không bao giờ</strong> đặt mật khẩu, số thẻ hay dữ liệu nhạy cảm vào payload.</li>
+  <li><strong>Chữ ký</strong> được tính từ header + payload + <code>SECRET_KEY</code>. Sửa một ký tự payload (đổi <code>sub</code> thành người khác) thì chữ ký không còn khớp và <code>jwt.decode</code> ném lỗi. Chỉ máy chủ biết <code>SECRET_KEY</code> nên chỉ máy chủ tạo được token hợp lệ.</li>
+  <li><code>sub</code> (subject) là người dùng; <code>exp</code> là thời điểm hết hạn (giây tính từ 1/1/1970, giờ UTC); PyJWT tự kiểm tra <code>exp</code> khi decode. Token sống 30 phút: bị lộ thì thiệt hại có giới hạn.</li>
+  <li><code>SECRET_KEY</code> đọc từ biến môi trường. Khi triển khai, tạo khóa ngẫu nhiên đủ dài: <code>python -c "import secrets; print(secrets.token_hex(32))"</code>. Lộ khóa này là kẻ xấu tạo được token cho bất kỳ ai.</li>
+</ul>
+
+<h2>4. Model, schema và các endpoint tài khoản</h2>
+<pre><code class="language-python"># (minh họa) app/models.py
+"""Model SQLAlchemy: cấu trúc bảng trong CSDL."""
+
+from datetime import datetime
+
+from sqlalchemy import JSON, ForeignKey, String, func
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.database import Base
+
+
+class NguoiDung(Base):
+    __tablename__ = "nguoi_dung"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ten_dang_nhap: Mapped[str] = mapped_column(String(50), unique=True)
+    mat_khau_bam: Mapped[str]  # KHÔNG BAO GIỜ lưu mật khẩu gốc
+
+
+class GhiChu(Base):
+    __tablename__ = "ghi_chu"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    chu_id: Mapped[int] = mapped_column(ForeignKey("nguoi_dung.id"), index=True)
+    tieu_de: Mapped[str] = mapped_column(String(100))
+    noi_dung: Mapped[str] = mapped_column(default="")
+    the: Mapped[list[str]] = mapped_column(JSON, default=list)
+    tao_luc: Mapped[datetime] = mapped_column(server_default=func.now())</code></pre>
+<pre><code class="language-python"># (minh họa) app/auth.py
+"""Dependency lấy người dùng hiện tại từ header Authorization: Bearer &lt;token&gt;."""
+
+from typing import Annotated
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy import select
+
+from app.database import SessionDep
+from app.models import NguoiDung
+from app.security import doc_token
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
+
+
+def lay_nguoi_dung_hien_tai(
+    token: Annotated[str, Depends(oauth2_scheme)], session: SessionDep
+) -&gt; NguoiDung:
+    loi_401 = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Token không hợp lệ hoặc đã hết hạn",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    ten = doc_token(token)
+    if ten is None:
+        raise loi_401
+    nguoi_dung = session.scalar(select(NguoiDung).where(NguoiDung.ten_dang_nhap == ten))
+    if nguoi_dung is None:
+        raise loi_401
+    return nguoi_dung
+
+
+NguoiDungHienTai = Annotated[NguoiDung, Depends(lay_nguoi_dung_hien_tai)]</code></pre>
+<p><code>OAuth2PasswordBearer(tokenUrl="auth/token")</code> là dependency đọc header <code>Authorization: Bearer &lt;token&gt;</code>; thiếu header thì tự trả 401 <code>"Not authenticated"</code>. <code>lay_nguoi_dung_hien_tai</code> phụ thuộc vào nó và vào <code>SessionDep</code>: dependency có thể phụ thuộc dependency khác, FastAPI tự giải quyết cả chuỗi. Endpoint nào khai báo tham số kiểu <code>NguoiDungHienTai</code> thì endpoint đó bắt buộc đăng nhập.</p>
+<p>File <code>app/main.py</code> đầy đủ:</p>
+<pre><code class="language-python"># (minh họa) app/main.py
+"""API sổ ghi chú có đăng ký, đăng nhập; mỗi người chỉ thấy ghi chú của mình."""
+
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from typing import Annotated
+
+from fastapi import Depends, FastAPI, HTTPException, Query, status
+from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import or_, select
+
+from app.auth import NguoiDungHienTai
+from app.database import Base, SessionDep, engine
+from app.models import GhiChu, NguoiDung
+from app.schemas import GhiChuCapNhat, GhiChuDoc, GhiChuTao, NguoiDungDoc, NguoiDungTao, Token
+from app.security import HASH_GIA, bam_mat_khau, kiem_tra_mat_khau, tao_token
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -&gt; AsyncIterator[None]:
+    Base.metadata.create_all(engine)
+    yield
+
+
+app = FastAPI(title="Sổ ghi chú", version="0.3.0", lifespan=lifespan)
+
+
+# ---------------------------------------------------------------- tài khoản
+@app.post("/auth/dang-ky", status_code=status.HTTP_201_CREATED)
+def dang_ky(du_lieu: NguoiDungTao, session: SessionDep) -&gt; NguoiDungDoc:
+    if session.scalar(select(NguoiDung).where(NguoiDung.ten_dang_nhap == du_lieu.ten_dang_nhap)):
+        raise HTTPException(status_code=409, detail="Tên đăng nhập đã được dùng")
+    nd = NguoiDung(ten_dang_nhap=du_lieu.ten_dang_nhap, mat_khau_bam=bam_mat_khau(du_lieu.mat_khau))
+    session.add(nd)
+    session.commit()
+    session.refresh(nd)
+    return NguoiDungDoc.model_validate(nd)
+
+
+@app.post("/auth/token")
+def dang_nhap(form: Annotated[OAuth2PasswordRequestForm, Depends()], session: SessionDep) -&gt; Token:
+    nd = session.scalar(select(NguoiDung).where(NguoiDung.ten_dang_nhap == form.username))
+    # Luôn kiểm tra một hash để thời gian phản hồi như nhau, kẻ xấu không đoán được tên nào tồn tại
+    hop_le = kiem_tra_mat_khau(form.password, nd.mat_khau_bam if nd else HASH_GIA)
+    if nd is None or not hop_le:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sai tên đăng nhập hoặc mật khẩu",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return Token(access_token=tao_token(nd.ten_dang_nhap))
+
+
+@app.get("/nguoi-dung/toi")
+def toi(nguoi_dung: NguoiDungHienTai) -&gt; NguoiDungDoc:
+    return NguoiDungDoc.model_validate(nguoi_dung)
+
+
+# ---------------------------------------------------------------- ghi chú
+def lay_cua_toi(session: SessionDep, ghi_chu_id: int, nguoi_dung: NguoiDung) -&gt; GhiChu:
+    gc = session.get(GhiChu, ghi_chu_id)
+    if (
+        gc is None or gc.chu_id != nguoi_dung.id
+    ):  # của người khác cũng trả 404, không lộ là có tồn tại
+        raise HTTPException(status_code=404, detail="Không tìm thấy ghi chú")
+    return gc
+
+
+@app.post("/ghi-chu", status_code=status.HTTP_201_CREATED)
+def tao(du_lieu: GhiChuTao, session: SessionDep, nguoi_dung: NguoiDungHienTai) -&gt; GhiChuDoc:
+    gc = GhiChu(chu_id=nguoi_dung.id, **du_lieu.model_dump())
+    session.add(gc)
+    session.commit()
+    session.refresh(gc)
+    return GhiChuDoc.model_validate(gc)
+
+
+@app.get("/ghi-chu")
+def liet_ke(
+    session: SessionDep,
+    nguoi_dung: NguoiDungHienTai,
+    tu_khoa: str | None = None,
+    skip: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -&gt; list[GhiChuDoc]:
+    q = select(GhiChu).where(GhiChu.chu_id == nguoi_dung.id).order_by(GhiChu.id)
+    if tu_khoa:
+        q = q.where(
+            or_(GhiChu.tieu_de.ilike(f"%{tu_khoa}%"), GhiChu.noi_dung.ilike(f"%{tu_khoa}%"))
+        )
+    return [GhiChuDoc.model_validate(gc) for gc in session.scalars(q.offset(skip).limit(limit))]
+
+
+@app.get("/ghi-chu/{ghi_chu_id}")
+def xem(ghi_chu_id: int, session: SessionDep, nguoi_dung: NguoiDungHienTai) -&gt; GhiChuDoc:
+    return GhiChuDoc.model_validate(lay_cua_toi(session, ghi_chu_id, nguoi_dung))
+
+
+@app.patch("/ghi-chu/{ghi_chu_id}")
+def cap_nhat(
+    ghi_chu_id: int, du_lieu: GhiChuCapNhat, session: SessionDep, nguoi_dung: NguoiDungHienTai
+) -&gt; GhiChuDoc:
+    gc = lay_cua_toi(session, ghi_chu_id, nguoi_dung)
+    for truong, gia_tri in du_lieu.model_dump(exclude_unset=True).items():
+        setattr(gc, truong, gia_tri)
+    session.commit()
+    session.refresh(gc)
+    return GhiChuDoc.model_validate(gc)
+
+
+@app.delete("/ghi-chu/{ghi_chu_id}", status_code=status.HTTP_204_NO_CONTENT)
+def xoa(ghi_chu_id: int, session: SessionDep, nguoi_dung: NguoiDungHienTai) -&gt; None:
+    session.delete(lay_cua_toi(session, ghi_chu_id, nguoi_dung))
+    session.commit()</code></pre>
+<ul>
+  <li><strong>Đăng ký</strong> trả <code>NguoiDungDoc</code>, không có trường <code>mat_khau_bam</code>: kiểu trả về lọc nó đi. Tên trùng trả 409.</li>
+  <li><strong>Đăng nhập</strong> nhận form <code>username</code>, <code>password</code> theo chuẩn OAuth2 (<code>OAuth2PasswordRequestForm</code>), nên nút <strong>Authorize</strong> trên <code>/docs</code> dùng được ngay. Sai tên hay sai mật khẩu đều trả cùng một thông báo, và luôn chạy <code>verify</code> (với <code>HASH_GIA</code> khi tên không tồn tại) để thời gian phản hồi như nhau: kẻ xấu không phân biệt được "tên không có" với "sai mật khẩu".</li>
+  <li><strong>Phân quyền</strong>: mọi truy vấn ghi chú đều lọc <code>chu_id == nguoi_dung.id</code>. Ghi chú của người khác trả <strong>404</strong> chứ không phải 403, để không tiết lộ ghi chú đó có tồn tại.</li>
+</ul>
+
+<h2>5. Chạy thử luồng đầy đủ</h2>
+<pre><code class="language-text">POST /auth/dang-ky  {"ten_dang_nhap":"an_nguyen","mat_khau":"matkhau-an-123"}
+201 {"id":1,"ten_dang_nhap":"an_nguyen"}
+POST /auth/dang-ky  (trùng tên)
+409 {"detail":"Tên đăng nhập đã được dùng"}
+POST /auth/token    username=an_nguyen&amp;password=sai-mat-khau
+401 {"detail":"Sai tên đăng nhập hoặc mật khẩu"}
+POST /auth/token    username=an_nguyen&amp;password=matkhau-an-123
+200 {"access_token":"eyJhbGciOiJIUzI1NiIs...","token_type":"bearer"}
+GET  /nguoi-dung/toi               Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+200 {"id":1,"ten_dang_nhap":"an_nguyen"}
+GET  /ghi-chu                      (không có header)
+401 {"detail":"Not authenticated"}
+GET  /ghi-chu                      Authorization: Bearer abc.def.ghi
+401 {"detail":"Token không hợp lệ hoặc đã hết hạn"}
+POST /ghi-chu  {"tieu_de":"Bí mật của An"}        (token của An)
+201 {"tieu_de":"Bí mật của An","noi_dung":"","the":[],"id":1,"tao_luc":"2026-10-29T09:41:46"}
+GET  /ghi-chu/1                    (token của Bình)
+404 {"detail":"Không tìm thấy ghi chú"}</code></pre>
+<p>Trên <code>/docs</code>, bấm nút <strong>Authorize</strong>, nhập tên và mật khẩu: Swagger UI tự gọi <code>/auth/token</code> và gắn token vào mọi request sau đó.</p>
+<div class="tip"><strong>Những thứ còn thiếu cho hệ thống thật</strong>Luôn chạy qua HTTPS (token gửi qua HTTP thường có thể bị nghe lén). Giới hạn số lần đăng nhập sai để chống dò mật khẩu. Thêm refresh token nếu không muốn người dùng đăng nhập lại mỗi 30 phút. Với ứng dụng lớn, cân nhắc dịch vụ xác thực có sẵn thay vì tự quản lý mật khẩu.</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Băm mật khẩu bằng Argon2 qua <code>pwdlib</code>; chỉ lưu chuỗi băm; so khớp bằng <code>verify</code>.</li>
+  <li>JWT = header.payload.chữ ký; payload ai cũng đọc được; chữ ký chống giả mạo; có <code>exp</code>; <code>SECRET_KEY</code> từ biến môi trường.</li>
+  <li><code>OAuth2PasswordBearer</code> + dependency <code>lay_nguoi_dung_hien_tai</code>; endpoint cần đăng nhập thì nhận <code>NguoiDungHienTai</code>.</li>
+  <li>Lọc dữ liệu theo chủ sở hữu; của người khác trả 404; thông báo đăng nhập sai chung chung.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Hai người dùng</h3>
+<p>Dựng API theo bài, tạo hai tài khoản trên <code>/docs</code>, mỗi người tạo 2 ghi chú. Đăng nhập bằng từng tài khoản (nút Authorize) và xác nhận mỗi người chỉ thấy ghi chú của mình; thử xem, sửa, xóa ghi chú của người kia.</p>
+<details><summary>Xem gợi ý</summary>
+<p>Mọi thao tác lên ghi chú của người kia phải trả 404. Mở <code>so_ghi_chu.db</code> để thấy cột <code>chu_id</code> và chuỗi băm Argon2 trong bảng <code>nguoi_dung</code>. Bạn sẽ tự động hóa đúng kịch bản này thành test ở bài sau.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Thử giả mạo token</h3>
+<p>Lấy token của tài khoản A, giải mã payload, sửa <code>sub</code> thành tên tài khoản B, ghép lại với chữ ký cũ và gửi lên API. Giải thích kết quả.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import base64
+import json
+from datetime import UTC, datetime, timedelta
+
+import jwt
+
+SECRET_KEY = "chi-dung-khi-phat-trien-doi-khi-trien-khai"
+het_han = datetime.now(UTC) + timedelta(minutes=30)
+that = jwt.encode({"sub": "an_nguyen", "exp": het_han}, SECRET_KEY, algorithm="HS256")
+header, payload, chu_ky = that.split(".")
+
+du_lieu = json.loads(base64.urlsafe_b64decode(payload + "=="))
+du_lieu["sub"] = "binh"                                          # giả làm Bình
+payload_gia = base64.urlsafe_b64encode(json.dumps(du_lieu).encode()).rstrip(b"=").decode()
+gia = f"{header}.{payload_gia}.{chu_ky}"
+
+try:
+    jwt.decode(gia, SECRET_KEY, algorithms=["HS256"])
+except jwt.InvalidSignatureError as loi:
+    print("Bị từ chối:", loi)
+print(jwt.decode(that, SECRET_KEY, algorithms=["HS256"])["sub"])</code></pre>
+<pre><code class="language-text">Bị từ chối: Signature verification failed
+an_nguyen</code></pre>
+<p>Đọc và sửa payload thì dễ, nhưng chữ ký cũ được tính cho payload cũ. Muốn có chữ ký đúng cho payload mới phải biết <code>SECRET_KEY</code>. API trả 401 cho token giả. Đây là lý do <code>SECRET_KEY</code> phải bí mật, dài, ngẫu nhiên, và khác nhau giữa máy phát triển và máy chủ thật.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://fastapi.tiangolo.com/tutorial/security/oauth2-jwt/" rel="noopener" target="_blank">FastAPI: OAuth2 with Password (and hashing), Bearer with JWT tokens</a>; <a href="https://pyjwt.readthedocs.io/" rel="noopener" target="_blank">PyJWT</a>; <a href="https://frankie567.github.io/pwdlib/" rel="noopener" target="_blank">pwdlib</a>; <a href="https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html" rel="noopener" target="_blank">OWASP: Password Storage Cheat Sheet</a>; <a href="https://www.rfc-editor.org/rfc/rfc7519" rel="noopener" target="_blank">RFC 7519: JSON Web Token</a>.</p>

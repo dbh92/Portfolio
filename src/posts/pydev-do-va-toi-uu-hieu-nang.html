@@ -1,0 +1,153 @@
+<p>"Python chậm" là câu bạn sẽ nghe nhiều. Thực tế, phần lớn chương trình chậm không phải vì Python mà vì chọn sai cấu trúc dữ liệu, lặp lại công việc thừa, hoặc tối ưu nhầm chỗ. Bài này dạy quy trình chuẩn: <strong>đo trước, tìm điểm nghẽn, sửa đúng chỗ, đo lại</strong>. Bạn sẽ thấy một chương trình chạy 6,4 giây xuống còn 0,03 giây chỉ nhờ đổi một kiểu dữ liệu.</p>
+<div class="tip"><strong>Quy tắc vàng</strong>Đừng tối ưu khi chưa đo. Trực giác về "chỗ nào chậm" sai rất thường xuyên, kể cả với lập trình viên lâu năm. Code dễ đọc, đúng trước; nhanh sau, và chỉ ở chỗ số liệu chỉ ra.</div>
+
+<h2>1. Đo thời gian đúng cách</h2>
+<pre><code class="language-python">import time
+import timeit
+
+bat_dau = time.perf_counter()               # đồng hồ chính xác cao, dùng để đo khoảng thời gian
+tong = sum(i * i for i in range(1_000_000))
+print(f"Một lần chạy: {time.perf_counter() - bat_dau:.3f} s")   # kết quả thay đổi theo máy
+
+ds = list(range(100_000))
+tap = set(ds)
+for ten, ham in [("list", lambda: 99_999 in ds), ("set", lambda: 99_999 in tap)]:
+    lan = timeit.repeat(ham, number=1_000, repeat=5)               # 5 đợt × 1.000 lần
+    print(f"{ten:&lt;5} {min(lan) / 1_000 * 1e6:10.3f} µs mỗi lần tìm")</code></pre>
+<pre><code class="language-text">Một lần chạy: 0.071 s
+list    1074.477 µs mỗi lần tìm
+set        0.052 µs mỗi lần tìm</code></pre>
+<ul>
+  <li><code>time.perf_counter()</code> cho khoảng thời gian; không dùng <code>time.time()</code> (có thể nhảy khi đồng bộ đồng hồ hệ thống).</li>
+  <li>Đoạn code nhỏ chạy quá nhanh để đo một lần: <code>timeit</code> chạy hàng nghìn lần, lặp nhiều đợt, lấy <code>min</code> (đợt ít bị nhiễu nhất). Trong terminal có thể dùng nhanh: <code>python -m timeit "99_999 in set(range(100_000))"</code>.</li>
+  <li>Kết quả đo phụ thuộc máy và thời điểm; so sánh tương đối giữa các cách quan trọng hơn con số tuyệt đối.</li>
+</ul>
+<p>Tìm trong set nhanh hơn list khoảng <strong>20.000 lần</strong> ở 100.000 phần tử. Đó là khác biệt giữa thuật toán, không phải giữa các dòng code.</p>
+
+<h2>2. Độ phức tạp: vì sao set nhanh hơn list</h2>
+<table>
+  <thead><tr><th>Thao tác</th><th>list</th><th>dict, set</th></tr></thead>
+  <tbody>
+    <tr><td><code>x in ...</code></td><td>O(n): so lần lượt</td><td>O(1): tra bảng băm</td></tr>
+    <tr><td>Lấy theo chỉ số <code>ds[i]</code> / theo khóa <code>d[k]</code></td><td>O(1)</td><td>O(1)</td></tr>
+    <tr><td>Thêm cuối <code>append</code> / thêm khóa</td><td>O(1)</td><td>O(1)</td></tr>
+    <tr><td>Chèn, xóa ở đầu <code>insert(0, x)</code>, <code>pop(0)</code></td><td>O(n)</td><td>(dùng <code>deque</code>: O(1))</td></tr>
+    <tr><td>Sắp xếp <code>sorted</code></td><td colspan="2">O(n log n)</td></tr>
+  </tbody>
+</table>
+<p>Ký hiệu O lớn mô tả thời gian tăng thế nào khi dữ liệu tăng. O(n) trong một vòng lặp n lần thành O(n²): 1.000 phần tử là 1 triệu phép so sánh, 100.000 phần tử là 10 tỷ. Mẫu lỗi phổ biến nhất: <strong><code>if x in danh_sach</code> bên trong vòng <code>for</code></strong>.</p>
+
+<h2>3. Tìm điểm nghẽn bằng cProfile</h2>
+<p>Chương trình báo cáo dưới đây chạy hơn 6 giây với 200.000 đơn hàng. Đoán xem chậm ở đâu trước khi đọc kết quả profiler:</p>
+<pre><code class="language-python">import cProfile
+import pstats
+import random
+
+random.seed(1)
+DON = [{"ma": f"D{i}", "khach": f"K{random.randint(1, 20_000)}", "tien": random.randint(1, 500) * 1000}
+       for i in range(200_000)]
+KHACH_VIP = [f"K{i}" for i in range(1, 20_001, 7)]
+
+
+def la_vip(ma_khach):
+    return ma_khach in KHACH_VIP                 # tìm trong list
+
+
+def chuan_hoa(don):
+    return {**don, "tien_trieu": round(don["tien"] / 1e6, 3)}
+
+
+def bao_cao():
+    tong_vip = 0
+    ket_qua = ""
+    for don in DON:
+        d = chuan_hoa(don)
+        if la_vip(d["khach"]):
+            tong_vip += d["tien"]
+            ket_qua += d["ma"] + ","            # nối chuỗi trong vòng lặp
+    return tong_vip, ket_qua.count(",")
+
+
+cProfile.run("print(bao_cao())", "thong_ke.prof")    # kết quả thay đổi theo máy
+pstats.Stats("thong_ke.prof").sort_stats("cumulative").print_stats(6)</code></pre>
+<pre><code class="language-text">(7148848000, 28598)
+         600006 function calls in 6.440 seconds
+
+   Ordered by: cumulative time
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000    6.440    6.440 {built-in method builtins.exec}
+        1    0.000    0.000    6.440    6.440 &lt;string&gt;:1(&lt;module&gt;)
+        1    0.131    0.131    6.440    6.440 bao_cao.py:19(bao_cao)
+   200000    6.082    0.000    6.082    0.000 bao_cao.py:11(la_vip)
+   200000    0.110    0.000    0.228    0.000 bao_cao.py:15(chuan_hoa)
+   200000    0.117    0.000    0.117    0.000 {built-in method builtins.round}</code></pre>
+<p>Đọc bảng: <code>ncalls</code> số lần gọi, <code>tottime</code> thời gian trong chính hàm đó (không tính hàm con), <code>cumtime</code> tính cả hàm con. <strong><code>la_vip</code> chiếm 6,08 trên 6,44 giây (94%)</strong>: mỗi lần gọi tìm tuần tự trong list 2.858 mã VIP. Hàm <code>chuan_hoa</code> tạo dict mới mà nhiều người nghi ngờ chỉ tốn 0,2 giây; tối ưu nó gần như vô ích. Chạy profiler cho cả script từ terminal: <code>python -m cProfile -s cumulative bao_cao.py</code>.</p>
+
+<h2>4. Sửa đúng chỗ, đo lại</h2>
+<pre><code class="language-python">import random
+import time
+
+random.seed(1)
+DON = [{"ma": f"D{i}", "khach": f"K{random.randint(1, 20_000)}", "tien": random.randint(1, 500) * 1000}
+       for i in range(200_000)]
+KHACH_VIP = {f"K{i}" for i in range(1, 20_001, 7)}     # set thay cho list
+
+
+def bao_cao():
+    don_vip = [d for d in DON if d["khach"] in KHACH_VIP]
+    return sum(d["tien"] for d in don_vip), len(don_vip)
+
+
+t = time.perf_counter()
+print(bao_cao(), f"{time.perf_counter() - t:.3f} s")   # kết quả thay đổi theo máy</code></pre>
+<pre><code class="language-text">(7148848000, 28598) 0.030 s</code></pre>
+<p>Từ 6,44 giây xuống 0,03 giây, <strong>nhanh hơn khoảng 200 lần</strong>, cùng kết quả. Thay đổi quyết định là một ký tự: <code>[...]</code> thành <code>{...}</code>. Cùng lúc, code còn ngắn và dễ đọc hơn: bỏ hàm <code>chuan_hoa</code> không cần thiết, và không còn nối chuỗi trong vòng lặp (mỗi lần <code>+=</code> trên chuỗi có thể tạo chuỗi mới; ghép nhiều chuỗi hãy dùng <code>",".join(...)</code>).</p>
+<p>Luôn kiểm tra <strong>kết quả không đổi</strong> sau khi tối ưu. Tốt nhất là có test (chặng 6) chạy trước và sau.</p>
+
+<h2>5. Danh sách kỹ thuật theo thứ tự nên thử</h2>
+<ol>
+  <li><strong>Cấu trúc dữ liệu đúng</strong>: set, dict cho tra cứu; <code>collections.deque</code> cho hàng đợi; <code>Counter</code> để đếm.</li>
+  <li><strong>Bớt việc thừa</strong>: đưa phép tính không đổi ra khỏi vòng lặp; dùng <code>functools.cache</code> cho hàm thuần gọi lặp với cùng tham số (chặng 5); dùng generator thay vì tạo list trung gian khổng lồ.</li>
+  <li><strong>Để thư viện viết bằng C làm việc</strong>: hàm dựng sẵn (<code>sum</code>, <code>sorted</code>, <code>max</code>), comprehension, pandas và NumPy với phép toán vector hóa (chặng 8) thay cho vòng lặp Python trên từng phần tử.</li>
+  <li><strong>Giảm I/O</strong>: gom truy vấn CSDL (tránh N+1), gửi theo lô, đọc file một lần. Chương trình chờ mạng, chờ đĩa thì tối ưu CPU vô ích; bài sau và bài asyncio giải quyết việc chờ.</li>
+  <li><strong>Chạy song song</strong> khi việc thật sự nặng CPU và chia được (bài sau).</li>
+  <li>Cuối cùng mới đến công cụ đặc biệt: Cython, mypyc, viết phần lõi bằng Rust (PyO3)...</li>
+</ol>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Đo bằng <code>time.perf_counter</code>; đoạn nhỏ dùng <code>timeit</code> lặp nhiều lần, lấy min.</li>
+  <li>Hiểu O lớn: <code>in</code> trên list là O(n), trên set, dict là O(1); tránh O(n²) ẩn trong vòng lặp.</li>
+  <li><code>cProfile</code> + <code>pstats</code> (hoặc <code>python -m cProfile -s cumulative</code>) để tìm hàm chiếm thời gian; sửa hàm đứng đầu.</li>
+  <li>Sau khi tối ưu: đo lại và kiểm tra kết quả không đổi.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. list và set ở các kích thước</h3>
+<p>Đo thời gian tìm phần tử cuối trong list và set với 1.000, 10.000 và 100.000 phần tử. Thời gian của mỗi loại tăng thế nào khi dữ liệu tăng 10 lần?</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import timeit
+
+for n in (1_000, 10_000, 100_000):
+    ds = list(range(n))
+    tap = set(ds)
+    t_list = min(timeit.repeat(lambda: n - 1 in ds, number=200, repeat=5)) / 200
+    t_set = min(timeit.repeat(lambda: n - 1 in tap, number=200, repeat=5)) / 200
+    print(f"n={n:&gt;7,}: list {t_list * 1e6:8.2f} µs, set {t_set * 1e6:5.3f} µs")   # kết quả thay đổi theo máy</code></pre>
+<pre><code class="language-text">n=  1,000: list    10.71 µs, set 0.051 µs
+n= 10,000: list   107.30 µs, set 0.050 µs
+n=100,000: list  1076.15 µs, set 0.052 µs</code></pre>
+<p>List tăng khoảng 10 lần mỗi khi dữ liệu tăng 10 lần: đúng là O(n). Set gần như không đổi: O(1). Với dữ liệu nhỏ (vài chục phần tử) khác biệt không đáng kể; với dữ liệu lớn và nằm trong vòng lặp, đó là khác biệt giữa vài mili giây và vài phút.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Profile chương trình của bạn</h3>
+<p>Chạy <code>python -m cProfile -s cumulative</code> trên dự án phân tích bán hàng (chặng 8) hoặc dự án báo cáo tỷ giá (chặng 7). Hàm nào chiếm nhiều thời gian nhất? Có đáng tối ưu không?</p>
+<details><summary>Xem gợi ý</summary>
+<p>Với dự án tỷ giá, gần như toàn bộ thời gian nằm trong lời gọi mạng (các hàm của <code>requests</code>, <code>socket</code>, <code>ssl</code>) và trong <code>openpyxl</code> khi lưu file: code của bạn chỉ chiếm phần rất nhỏ. Kết luận đúng là "không cần tối ưu", và đó cũng là một kết quả có giá trị của việc đo: bạn không mất thời gian sửa thứ không phải vấn đề.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/library/timeit.html" rel="noopener" target="_blank">timeit</a>; <a href="https://docs.python.org/3/library/profile.html" rel="noopener" target="_blank">The Python Profilers (cProfile, pstats)</a>; <a href="https://wiki.python.org/moin/TimeComplexity" rel="noopener" target="_blank">Python Wiki: TimeComplexity</a>.</p>

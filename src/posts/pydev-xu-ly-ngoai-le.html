@@ -1,0 +1,217 @@
+<p>Người dùng gõ chữ vào ô số, file cấu hình bị xóa, mạng rớt giữa chừng: chương trình thật luôn gặp tình huống bất thường. Python báo các tình huống đó bằng <strong>ngoại lệ</strong> (exception). Bài này dạy cách đọc, bắt và tự tạo ngoại lệ đúng cách, để chương trình không chết vô cớ mà cũng không "nuốt" lỗi khiến bạn mất dấu.</p>
+
+<h2>1. Ngoại lệ là gì</h2>
+<p>Khi một lệnh không thể thực hiện, Python <strong>ném</strong> (raise) một đối tượng ngoại lệ. Nếu không ai bắt, chương trình dừng và in traceback. Các loại hay gặp:</p>
+<table>
+  <thead><tr><th>Ngoại lệ</th><th>Ví dụ gây ra</th></tr></thead>
+  <tbody>
+    <tr><td><code>ValueError</code></td><td><code>int("abc")</code>: đúng kiểu nhưng giá trị không hợp lệ</td></tr>
+    <tr><td><code>TypeError</code></td><td><code>"a" + 1</code>: sai kiểu</td></tr>
+    <tr><td><code>KeyError</code></td><td><code>{"a": 1}["b"]</code>: dict không có khóa</td></tr>
+    <tr><td><code>IndexError</code></td><td><code>[1, 2][5]</code>: chỉ số vượt phạm vi</td></tr>
+    <tr><td><code>ZeroDivisionError</code></td><td><code>1 / 0</code></td></tr>
+    <tr><td><code>FileNotFoundError</code></td><td><code>open("khong_co.txt")</code></td></tr>
+    <tr><td><code>AttributeError</code></td><td><code>None.upper()</code>: đối tượng không có thuộc tính đó</td></tr>
+  </tbody>
+</table>
+
+<h2>2. try / except</h2>
+<pre><code class="language-python">def chia(a, b):
+    try:
+        return a / b
+    except ZeroDivisionError:
+        print("Không chia được cho 0")
+        return None
+
+
+print(chia(10, 4))
+print(chia(10, 0))</code></pre>
+<pre><code class="language-text">2.5
+Không chia được cho 0
+None</code></pre>
+<p>Python chạy khối <code>try</code>; nếu một lệnh ném ngoại lệ khớp loại ghi sau <code>except</code>, phần còn lại của <code>try</code> bị bỏ qua và khối <code>except</code> chạy. Ngoại lệ khác loại vẫn bay ra ngoài như bình thường.</p>
+<pre><code class="language-python">def doc_tuoi(chuoi):
+    try:
+        tuoi = int(chuoi)
+    except ValueError as loi:                 # "as loi" để lấy đối tượng ngoại lệ
+        print(f"Không đọc được {chuoi!r}: {loi}")
+        return None
+    if not 0 &lt; tuoi &lt; 150:
+        print("Tuổi không hợp lý:", tuoi)
+        return None
+    return tuoi
+
+
+for s in ["25", "hai mươi", "-3"]:
+    print("→", doc_tuoi(s))</code></pre>
+<pre><code class="language-text">→ 25
+Không đọc được 'hai mươi': invalid literal for int() with base 10: 'hai mươi'
+→ None
+Tuổi không hợp lý: -3
+→ None</code></pre>
+<p>Bắt nhiều loại cùng cách xử lý: <code>except (ValueError, TypeError):</code>. Nhiều loại xử lý khác nhau: viết nhiều khối <code>except</code> liên tiếp, Python thử từ trên xuống.</p>
+
+<h2>3. else và finally</h2>
+<pre><code class="language-python">from pathlib import Path
+
+Path("so.txt").write_text("12\n7\nx\n", encoding="utf-8")
+
+
+def tong_file(p):
+    try:
+        f = open(p, encoding="utf-8")
+    except FileNotFoundError:
+        print("Không thấy file", p)
+        return 0
+    else:                       # chạy khi try KHÔNG có ngoại lệ
+        try:
+            tong = 0
+            for dong in f:
+                try:
+                    tong += int(dong)
+                except ValueError:
+                    print("Bỏ qua dòng:", dong.strip())
+            return tong
+        finally:                # LUÔN chạy, kể cả khi đã return
+            f.close()
+            print("Đã đóng file")
+
+
+print(tong_file("so.txt"))
+print(tong_file("mat.txt"))</code></pre>
+<pre><code class="language-text">Bỏ qua dòng: x
+Đã đóng file
+19
+Không thấy file mat.txt
+0</code></pre>
+<ul>
+  <li><code>else</code>: phần code chỉ chạy khi <code>try</code> thành công. Đặt nó ở <code>else</code> thay vì trong <code>try</code> để không vô tình bắt nhầm lỗi của phần đó.</li>
+  <li><code>finally</code>: dọn dẹp (đóng file, ngắt kết nối) dù thành công hay lỗi. Thực tế, với file bạn dùng <code>with</code> là đủ, vì <code>with</code> chính là <code>try/finally</code> được đóng gói sẵn.</li>
+</ul>
+
+<h2>4. raise: tự ném ngoại lệ</h2>
+<p>Khi hàm nhận dữ liệu không hợp lệ, đừng âm thầm trả về giá trị "lạ" như <code>-1</code> hay <code>None</code>. Hãy <strong>ném ngoại lệ</strong> để nơi gọi buộc phải xử lý:</p>
+<pre><code class="language-python">def tinh_lai(so_tien: float, lai_suat_nam: float, so_thang: int) -&gt; float:
+    if so_tien &lt;= 0:
+        raise ValueError(f"so_tien phải dương, nhận {so_tien}")
+    if not 0 &lt;= lai_suat_nam &lt; 1:
+        raise ValueError("lai_suat_nam là tỉ lệ 0–1, ví dụ 0.055 cho 5,5%/năm")
+    return so_tien * lai_suat_nam * so_thang / 12
+
+
+print(tinh_lai(100_000_000, 0.055, 6))
+try:
+    tinh_lai(100_000_000, 5.5, 6)
+except ValueError as loi:
+    print("Lỗi:", loi)</code></pre>
+<pre><code class="language-text">2750000.0
+Lỗi: lai_suat_nam là tỉ lệ 0–1, ví dụ 0.055 cho 5,5%/năm</code></pre>
+
+<h2>5. Ngoại lệ tự định nghĩa</h2>
+<p>Với lỗi nghiệp vụ (số dư không đủ, sách đã được mượn), tạo lớp ngoại lệ riêng kế thừa <code>Exception</code>. Nơi gọi bắt đúng loại đó mà không lẫn với lỗi lập trình:</p>
+<pre><code class="language-python">class LoiNganHang(Exception):
+    """Lỗi gốc của module ngân hàng."""
+
+
+class SoDuKhongDu(LoiNganHang):
+    def __init__(self, so_du: int, can_rut: int):
+        super().__init__(f"Số dư {so_du:,}đ không đủ để rút {can_rut:,}đ")
+        self.thieu = can_rut - so_du
+
+
+def rut_tien(so_du: int, so_tien: int) -&gt; int:
+    if so_tien &gt; so_du:
+        raise SoDuKhongDu(so_du, so_tien)
+    return so_du - so_tien
+
+
+try:
+    rut_tien(500_000, 800_000)
+except SoDuKhongDu as loi:
+    print(loi, f"(thiếu {loi.thieu:,}đ)")</code></pre>
+<pre><code class="language-text">Số dư 500,000đ không đủ để rút 800,000đ (thiếu 300,000đ)</code></pre>
+<p>Bạn sẽ hiểu rõ <code>class</code>, kế thừa và <code>super()</code> ở chặng 4; tạm thời có thể dùng mẫu này như công thức. Có lớp gốc <code>LoiNganHang</code> thì nơi gọi có thể bắt mọi lỗi nghiệp vụ của module bằng một <code>except LoiNganHang</code>.</p>
+
+<h2>6. Những điều không nên làm</h2>
+<pre><code class="language-python"># (minh họa) ĐỪNG viết như thế này
+try:
+    xu_ly_don_hang()
+except:                     # bắt mọi thứ, kể cả Ctrl+C và lỗi gõ sai tên biến
+    pass                    # rồi im lặng: lỗi biến mất, không ai biết</code></pre>
+<ul>
+  <li><strong>Không dùng <code>except:</code> trơn</strong> hay <code>except Exception: pass</code>. Lỗi đánh máy <code>NameError</code> cũng bị nuốt, và bạn sẽ mất hàng giờ tìm vì sao chương trình "không làm gì".</li>
+  <li><strong>Bắt loại cụ thể nhất có thể</strong> và chỉ bọc đúng dòng có thể lỗi trong <code>try</code>, không bọc cả trăm dòng.</li>
+  <li><strong>Chỉ bắt khi biết xử lý</strong> (hỏi lại, bỏ qua dòng lỗi, dùng giá trị mặc định). Không biết xử lý thì để ngoại lệ bay lên nơi biết. Ở tầng ngoài cùng của ứng dụng, bắt rộng hơn là chấp nhận được, nhưng phải <strong>ghi log</strong> đầy đủ (bài sau).</li>
+  <li>Bắt rồi ném tiếp loại khác: <code>raise LoiCauHinh("...") from loi</code> giữ lại nguyên nhân gốc trong traceback.</li>
+</ul>
+<div class="tip"><strong>EAFP và LBYL</strong>Python khuyến khích phong cách EAFP ("làm trước, xin lỗi sau"): cứ <code>open()</code> rồi bắt <code>FileNotFoundError</code>, thay vì LBYL ("nhìn trước khi nhảy"): kiểm tra <code>exists()</code> rồi mới mở. Lý do: giữa lúc kiểm tra và lúc mở, file vẫn có thể bị xóa.</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Đọc dòng cuối traceback để biết loại ngoại lệ.</li>
+  <li><code>try/except LoaiCuThe as loi</code>; <code>else</code> khi thành công; <code>finally</code> luôn chạy.</li>
+  <li><code>raise ValueError("thông điệp rõ ràng")</code> khi dữ liệu vào không hợp lệ.</li>
+  <li>Lỗi nghiệp vụ: lớp riêng kế thừa <code>Exception</code>.</li>
+  <li>Không <code>except: pass</code>; bọc ít code nhất có thể.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Nhập số nguyên an toàn</h3>
+<p>Viết <code>nhap_so_nguyen(loi_nhac, nho_nhat, lon_nhat)</code> hỏi lại đến khi người dùng nhập số nguyên trong khoảng cho phép.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">def nhap_so_nguyen(loi_nhac: str, nho_nhat: int, lon_nhat: int) -&gt; int:
+    while True:
+        chuoi = input(loi_nhac)
+        try:
+            so = int(chuoi)
+        except ValueError:
+            print(f"  '{chuoi}' không phải số nguyên.")
+            continue
+        if nho_nhat &lt;= so &lt;= lon_nhat:
+            return so
+        print(f"  Hãy nhập từ {nho_nhat} đến {lon_nhat}.")
+
+
+thang = nhap_so_nguyen("Tháng (1-12): ", 1, 12)
+print("Bạn chọn tháng", thang)</code></pre>
+<pre><code class="language-text">Tháng (1-12): mười
+  'mười' không phải số nguyên.
+Tháng (1-12): 13
+  Hãy nhập từ 1 đến 12.
+Tháng (1-12): 10
+Bạn chọn tháng 10</code></pre>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Rút tiền nhiều lần</h3>
+<p>Dùng <code>rut_tien</code> và <code>SoDuKhongDu</code> ở mục 5. Với số dư 1.000.000đ, lần lượt rút 300.000, 900.000, 200.000; lần nào không đủ thì báo và bỏ qua, cuối cùng in số dư.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">class SoDuKhongDu(Exception):
+    pass
+
+
+def rut_tien(so_du: int, so_tien: int) -&gt; int:
+    if so_tien &gt; so_du:
+        raise SoDuKhongDu(f"Không đủ: còn {so_du:,}đ, cần {so_tien:,}đ")
+    return so_du - so_tien
+
+
+so_du = 1_000_000
+for can_rut in [300_000, 900_000, 200_000]:
+    try:
+        so_du = rut_tien(so_du, can_rut)
+    except SoDuKhongDu as loi:
+        print("Bỏ qua:", loi)
+    else:
+        print(f"Rút {can_rut:,}đ, còn {so_du:,}đ")
+print(f"Số dư cuối: {so_du:,}đ")</code></pre>
+<pre><code class="language-text">Rút 300,000đ, còn 700,000đ
+Bỏ qua: Không đủ: còn 700,000đ, cần 900,000đ
+Rút 200,000đ, còn 500,000đ
+Số dư cuối: 500,000đ</code></pre>
+<p>Khi rút lỗi, phép gán <code>so_du = ...</code> không xảy ra nên số dư giữ nguyên: ngoại lệ ngắt lệnh ngay trước khi gán.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/tutorial/errors.html" rel="noopener" target="_blank">Python Tutorial: Errors and Exceptions</a>; <a href="https://docs.python.org/3/library/exceptions.html" rel="noopener" target="_blank">Built-in Exceptions</a>; <a href="https://docs.python.org/3/glossary.html#term-EAFP" rel="noopener" target="_blank">Glossary: EAFP</a>.</p>

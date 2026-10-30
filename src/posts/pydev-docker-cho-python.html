@@ -1,0 +1,130 @@
+<p>"Máy em chạy được mà!" là câu nói quen thuộc khi code chạy tốt trên máy lập trình viên nhưng lỗi trên máy chủ: khác phiên bản Python, thiếu thư viện hệ thống, khác hệ điều hành. <strong>Docker</strong> đóng gói ứng dụng cùng mọi thứ nó cần (Python, thư viện, cấu hình) thành một <strong>image</strong>, chạy giống hệt nhau ở mọi nơi. Bài này đóng gói API quản lý công việc ở chặng 9 theo cách được khuyến nghị cho dự án dùng uv.</p>
+
+<h2>1. Khái niệm cơ bản</h2>
+<ul>
+  <li><strong>Image</strong>: bản đóng gói chỉ đọc, gồm hệ điều hành tối giản, Python, thư viện và code. Giống "bản thiết kế".</li>
+  <li><strong>Container</strong>: một phiên bản đang chạy của image, có hệ thống file và mạng riêng. Từ một image có thể chạy nhiều container.</li>
+  <li><strong>Dockerfile</strong>: công thức từng bước để tạo image. Mỗi lệnh tạo một <strong>layer</strong> (lớp); layer không đổi được dùng lại từ cache ở lần build sau.</li>
+  <li><strong>Volume</strong>: vùng lưu trữ nằm ngoài container, dữ liệu còn nguyên khi container bị xóa và tạo lại.</li>
+</ul>
+<p>Cài <a href="https://docs.docker.com/get-started/get-docker/" rel="noopener" target="_blank">Docker Desktop</a> (Windows, macOS) hoặc Docker Engine (Linux), kiểm tra bằng <code>docker --version</code> và <code>docker run hello-world</code>.</p>
+
+<h2>2. Dockerfile cho dự án uv</h2>
+<p>Đặt file <code>Dockerfile</code> ở thư mục gốc dự án <code>quan-ly-cong-viec</code> (cạnh <code>pyproject.toml</code> và <code>uv.lock</code>):</p>
+<pre><code class="language-text"># syntax=docker/dockerfile:1
+FROM python:3.14-slim
+
+# Lấy uv từ image chính thức, ghim phiên bản để build lặp lại được
+COPY --from=ghcr.io/astral-sh/uv:0.13.6 /uv /uvx /bin/
+
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# Layer 1: chỉ cài thư viện. Chỉ build lại khi pyproject.toml hoặc uv.lock đổi
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --locked --no-install-project --no-dev
+
+# Layer 2: chép code. Sửa code chỉ build lại từ đây, rất nhanh
+COPY . /app
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-dev
+
+# Chạy bằng người dùng thường, không dùng root
+RUN useradd --create-home --uid 10001 app &amp;&amp; mkdir /data &amp;&amp; chown app /data
+USER app
+
+ENV PATH="/app/.venv/bin:$PATH" \
+    DATABASE_URL="sqlite:////data/cong_viec.db"
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=3s \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/suc-khoe')"
+CMD ["fastapi", "run", "app/main.py", "--port", "8000"]</code></pre>
+<p>Giải thích những quyết định quan trọng:</p>
+<ul>
+  <li><strong><code>python:3.14-slim</code></strong>: image Python chính thức bản rút gọn (Debian tối giản), nhỏ hơn nhiều so với bản đầy đủ. Ghim phiên bản Python cụ thể, không dùng <code>latest</code>.</li>
+  <li><strong>Hai lần <code>uv sync</code></strong>: thư viện thay đổi ít, code thay đổi liên tục. Cài thư viện ở layer riêng trước khi chép code, nên mỗi lần sửa code Docker dùng lại layer thư viện từ cache, build chỉ mất vài giây. <code>--mount=type=cache</code> giữ cache tải về của uv giữa các lần build.</li>
+  <li><strong><code>--locked</code></strong>: dừng build nếu <code>uv.lock</code> không khớp <code>pyproject.toml</code>, bảo đảm image chứa đúng phiên bản đã test. <strong><code>--no-dev</code></strong>: không cài pytest, ruff, mypy vào image chạy thật.</li>
+  <li><strong>Người dùng không phải root</strong>: nếu ứng dụng bị khai thác lỗ hổng, kẻ tấn công không có quyền root trong container. Thư mục <code>/data</code> chứa file SQLite được giao cho người dùng <code>app</code>.</li>
+  <li><strong><code>fastapi run</code></strong> chạy chế độ production (không tự nạp lại) và mặc định lắng nghe <code>0.0.0.0</code>, nhận được kết nối từ ngoài container. <code>PYTHONUNBUFFERED=1</code> cho log hiện ngay lập tức.</li>
+  <li><strong><code>HEALTHCHECK</code></strong> gọi endpoint <code>/suc-khoe</code> của dự án; image slim không có <code>curl</code> nên dùng chính Python để gọi.</li>
+</ul>
+
+<h2>3. .dockerignore</h2>
+<p>Những gì không được chép vào image (giảm kích thước, tránh lộ bí mật, tránh ghi đè môi trường ảo dựng sẵn trong image):</p>
+<pre><code class="language-text">.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.git/
+*.db
+.env
+tests/</code></pre>
+<p><code>.venv</code> của máy bạn phụ thuộc hệ điều hành (Windows), không chạy được trong container Linux; image tự tạo môi trường ảo riêng. <code>.env</code> chứa bí mật, không bao giờ đóng vào image.</p>
+
+<h2>4. Build và chạy</h2>
+<pre><code class="language-text">$ docker build -t quan-ly-cong-viec:1.0 .
+$ docker run --rm -p 8000:8000 -e SECRET_KEY=thu-nghiem -v du_lieu_cv:/data quan-ly-cong-viec:1.0
+$ docker ps                                    # xem container đang chạy, cột STATUS có (healthy)
+$ docker logs &lt;id_container&gt;                  # xem log
+$ docker exec -it &lt;id_container&gt; bash         # vào bên trong container để kiểm tra</code></pre>
+<ul>
+  <li><code>-t ten:phien_ban</code> đặt tên và nhãn cho image.</li>
+  <li><code>-p 8000:8000</code> nối cổng 8000 của máy bạn với cổng 8000 trong container. Mở <code>http://localhost:8000/docs</code>.</li>
+  <li><code>-e</code> truyền biến môi trường: bí mật đưa vào lúc chạy, không ghi vào Dockerfile.</li>
+  <li><code>-v du_lieu_cv:/data</code> gắn volume tên <code>du_lieu_cv</code> vào <code>/data</code>: xóa container rồi chạy lại, dữ liệu vẫn còn.</li>
+</ul>
+
+<h2>5. docker compose: cấu hình bằng file</h2>
+<p>Gõ lệnh <code>docker run</code> dài mỗi lần rất dễ sai. Ghi cấu hình vào <code>compose.yaml</code>:</p>
+<pre><code class="language-text">services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      SECRET_KEY: ${SECRET_KEY:?Hãy đặt SECRET_KEY trong file .env}
+    volumes:
+      - du_lieu:/data
+    restart: unless-stopped
+
+volumes:
+  du_lieu:</code></pre>
+<pre><code class="language-text">$ python -c "import secrets; print('SECRET_KEY=' + secrets.token_hex(32))" &gt; .env
+$ docker compose up -d --build          # build và chạy nền
+$ docker compose logs -f api            # theo dõi log
+$ docker compose down                   # dừng và xóa container (volume vẫn giữ)</code></pre>
+<p>Docker Compose tự đọc file <code>.env</code> cùng thư mục để thay biến <code>${SECRET_KEY}</code>; cú pháp <code>:?</code> làm lệnh báo lỗi ngay nếu quên đặt biến. <code>restart: unless-stopped</code> tự khởi động lại container khi ứng dụng sập hoặc máy khởi động lại. Khi cần PostgreSQL thay cho SQLite, chỉ cần thêm một service <code>db</code> vào file này và đổi <code>DATABASE_URL</code>.</p>
+<div class="warn"><strong>SQLite trong container</strong>SQLite phù hợp khi chạy đúng một container. Muốn chạy nhiều bản sao ứng dụng song song (nhiều container, nhiều máy), chuyển sang PostgreSQL hoặc MySQL: nhiều tiến trình cùng ghi một file SQLite qua volume mạng sẽ gặp lỗi khóa và có thể hỏng dữ liệu.</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Image là bản đóng gói, container là bản đang chạy; Dockerfile gồm các layer được cache.</li>
+  <li>Dự án uv: cài thư viện (<code>uv sync --locked --no-install-project --no-dev</code>) trước khi chép code để tận dụng cache.</li>
+  <li>Ghim phiên bản image; chạy bằng người dùng không phải root; <code>.dockerignore</code> loại <code>.venv</code>, <code>.env</code>.</li>
+  <li>Bí mật truyền bằng biến môi trường lúc chạy; dữ liệu nằm trong volume; dùng <code>compose.yaml</code> cho cấu hình lặp lại.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Đóng gói API quản lý công việc</h3>
+<p>Thêm <code>Dockerfile</code> và <code>.dockerignore</code> vào dự án chặng 9, build image, chạy container, đăng ký tài khoản và tạo công việc qua <code>/docs</code>. Sau đó xóa container, chạy lại với cùng volume và xác nhận dữ liệu còn.</p>
+<details><summary>Xem gợi ý</summary>
+<p>Trước khi build, chạy <code>uv lock</code> để có <code>uv.lock</code> (bước <code>--locked</code> cần nó). Xem kích thước image bằng <code>docker images quan-ly-cong-viec</code>. Nếu build lỗi ở bước <code>uv sync --locked</code> với thông báo lockfile cần cập nhật, chạy lại <code>uv lock</code> trên máy rồi build. Sửa một dòng code rồi build lại: các bước cài thư viện hiện <code>CACHED</code>, build xong trong vài giây.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. compose với biến môi trường</h3>
+<p>Viết <code>compose.yaml</code> như mục 5, tạo <code>.env</code> chứa <code>SECRET_KEY</code> ngẫu nhiên, chạy <code>docker compose up -d --build</code>. Thử xóa dòng trong <code>.env</code> và chạy lại để thấy thông báo lỗi.</p>
+<details><summary>Xem gợi ý</summary>
+<p>Khi thiếu biến, Compose dừng ngay với thông báo có chứa câu "Hãy đặt SECRET_KEY trong file .env" bạn đã viết. Kiểm tra trạng thái sức khỏe bằng <code>docker compose ps</code>: sau khoảng 30 giây cột trạng thái chuyển sang <code>healthy</code> nhờ <code>HEALTHCHECK</code>. Nhớ thêm <code>.env</code> vào <code>.gitignore</code> nếu chưa có.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.astral.sh/uv/guides/integration/docker/" rel="noopener" target="_blank">uv: Using uv in Docker</a>; <a href="https://fastapi.tiangolo.com/deployment/docker/" rel="noopener" target="_blank">FastAPI in Containers - Docker</a>; <a href="https://docs.docker.com/build/building/best-practices/" rel="noopener" target="_blank">Docker: Building best practices</a>; <a href="https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/" rel="noopener" target="_blank">Docker Compose: Variable interpolation</a>; <a href="https://hub.docker.com/_/python" rel="noopener" target="_blank">Docker Hub: python</a>.</p>

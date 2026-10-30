@@ -1,0 +1,165 @@
+<p>Chương trình ở chặng 2 mất sạch dữ liệu khi tắt. Muốn lưu lại, đọc dữ liệu người khác gửi, hay dọn một thư mục hàng nghìn file, bạn cần làm việc với <strong>file</strong> và <strong>đường dẫn</strong>. Bài này dạy cách đọc ghi file văn bản an toàn với tiếng Việt và dùng <code>pathlib</code>, cách xử lý đường dẫn hiện đại chạy giống nhau trên Windows, macOS và Linux.</p>
+
+<h2>1. Ghi và đọc file với with</h2>
+<pre><code class="language-python">with open("ghi_chu.txt", "w", encoding="utf-8") as f:
+    f.write("Dòng 1: Học Python\n")
+    f.write("Dòng 2: Đọc ghi file\n")
+
+with open("ghi_chu.txt", "a", encoding="utf-8") as f:   # "a": ghi nối vào cuối
+    print("Dòng 3: thêm bằng print", file=f)
+
+with open("ghi_chu.txt", encoding="utf-8") as f:        # mặc định "r": đọc
+    noi_dung = f.read()
+print(noi_dung)</code></pre>
+<pre><code class="language-text">Dòng 1: Học Python
+Dòng 2: Đọc ghi file
+Dòng 3: thêm bằng print</code></pre>
+<ul>
+  <li><code>with</code> tự đóng file khi ra khỏi khối, kể cả khi có lỗi. Không dùng <code>with</code> mà quên <code>close()</code> có thể làm mất dữ liệu chưa ghi.</li>
+  <li>Chế độ: <code>"r"</code> đọc, <code>"w"</code> ghi mới (<strong>xóa nội dung cũ</strong>), <code>"a"</code> ghi nối, <code>"x"</code> chỉ tạo mới (báo lỗi nếu file đã có). Thêm <code>"b"</code> cho file nhị phân như ảnh: <code>"rb"</code>, <code>"wb"</code>.</li>
+  <li><code>write()</code> không tự xuống dòng, phải thêm <code>"\n"</code>; <code>print(..., file=f)</code> thì có.</li>
+</ul>
+
+<h2>2. Luôn ghi rõ encoding="utf-8"</h2>
+<p>Trước Python 3.15, nếu không ghi <code>encoding</code>, Python dùng bảng mã mặc định của hệ điều hành. Trên nhiều máy Windows đó là <code>cp1252</code>, nên file tiếng Việt viết trên Linux đọc trên Windows bị lỗi <code>UnicodeDecodeError</code> hoặc ra chữ lạ. Từ Python 3.15, UTF-8 đã thành mặc định trên mọi hệ điều hành, nhưng tài liệu chính thức vẫn khuyên <strong>ghi rõ</strong> <code>encoding="utf-8"</code> để code chạy đúng trên mọi phiên bản. Hãy coi nó là một phần bắt buộc của <code>open()</code>.</p>
+
+<h2>3. Đọc từng dòng</h2>
+<pre><code class="language-python">with open("diem.txt", "w", encoding="utf-8") as f:
+    f.write("An,8.5\nBình,7\n\nChi,9.25\n")
+
+with open("diem.txt", encoding="utf-8") as f:
+    for so_dong, dong in enumerate(f, start=1):   # duyệt file theo dòng
+        dong = dong.strip()                        # bỏ "\n" cuối dòng
+        if not dong:
+            continue
+        ten, diem = dong.split(",")
+        print(so_dong, ten, float(diem))
+
+with open("diem.txt", encoding="utf-8") as f:
+    cac_dong = f.read().splitlines()               # list các dòng, không kèm "\n"
+print(cac_dong)</code></pre>
+<pre><code class="language-text">1 An 8.5
+2 Bình 7.0
+4 Chi 9.25
+['An,8.5', 'Bình,7', '', 'Chi,9.25']</code></pre>
+<p>Duyệt thẳng đối tượng file bằng <code>for</code> đọc <strong>từng dòng một</strong>, nên xử lý được file vài GB mà không tốn bộ nhớ. <code>read()</code> nạp cả file vào bộ nhớ, chỉ dùng cho file nhỏ.</p>
+
+<h2>4. pathlib: đường dẫn là đối tượng</h2>
+<pre><code class="language-python">from pathlib import Path
+
+goc = Path("du_an")
+file_cfg = goc / "cau_hinh" / "app.json"     # nối đường dẫn bằng dấu /
+print(file_cfg)                               # tự dùng \ trên Windows, / trên Linux
+print(file_cfg.name, file_cfg.stem, file_cfg.suffix)
+print(file_cfg.parent, file_cfg.with_suffix(".bak").name)
+
+file_cfg.parent.mkdir(parents=True, exist_ok=True)   # tạo thư mục, kể cả thư mục cha
+file_cfg.write_text('{"debug": true}', encoding="utf-8")
+print(file_cfg.exists(), file_cfg.is_file(), file_cfg.parent.is_dir())
+print(file_cfg.read_text(encoding="utf-8"))
+print(file_cfg.stat().st_size, "byte")</code></pre>
+<pre><code class="language-text">du_an/cau_hinh/app.json
+app.json app .json
+du_an/cau_hinh app.bak
+True True True
+{"debug": true}
+15 byte</code></pre>
+<p>(Trên Windows, dòng đầu in <code>du_an\cau_hinh\app.json</code>.) Các thuộc tính hay dùng: <code>name</code> (tên file), <code>stem</code> (tên không đuôi), <code>suffix</code> (đuôi), <code>parent</code> (thư mục chứa). <code>write_text</code>, <code>read_text</code> là cách ngắn gọn cho file nhỏ.</p>
+<div class="tip"><strong>Thư mục của chính script</strong>Đường dẫn tương đối như <code>Path("du_lieu.txt")</code> tính từ thư mục bạn đang đứng khi chạy lệnh, không phải thư mục chứa script. Muốn luôn tìm file nằm cạnh script, dùng <code>Path(__file__).parent / "du_lieu.txt"</code>. Điều này rất quan trọng khi script chạy theo lịch (chặng 7).</div>
+
+<h2>5. Duyệt thư mục, tìm file theo mẫu</h2>
+<pre><code class="language-python">from pathlib import Path
+
+thu_muc = Path("kho")
+for ten in ["a.txt", "b.csv", "nhom/c.txt", "nhom/sau/d.TXT", "nhom/e.jpg"]:
+    p = thu_muc / ten
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text("x" * len(ten), encoding="utf-8")
+
+print(sorted(p.name for p in thu_muc.iterdir()))          # chỉ cấp đầu
+print(sorted(p.name for p in thu_muc.glob("*.txt")))      # theo mẫu, cấp đầu
+print(sorted(p.name for p in thu_muc.rglob("*.txt")))     # mọi cấp con
+txt = [p for p in thu_muc.rglob("*") if p.is_file() and p.suffix.lower() == ".txt"]
+print(sorted(p.relative_to(thu_muc).as_posix() for p in txt))</code></pre>
+<pre><code class="language-text">['a.txt', 'b.csv', 'nhom']
+['a.txt']
+['a.txt', 'c.txt']
+['a.txt', 'nhom/c.txt', 'nhom/sau/d.TXT']</code></pre>
+<p><code>glob("*.txt")</code> tìm ở cấp hiện tại, <code>rglob</code> tìm đệ quy mọi cấp con. Mẫu phân biệt hoa thường tùy hệ điều hành: kết quả trên là của Linux; trên Windows, dòng thứ ba có thêm <code>'d.TXT'</code> vì hệ thống file Windows không phân biệt hoa thường. Muốn kết quả giống nhau mọi nơi, so sánh <code>p.suffix.lower()</code> như dòng cuối. Thứ tự file trả về không cố định, nên dùng <code>sorted()</code> khi cần ổn định.</p>
+
+<h2>6. Đổi tên, di chuyển, xóa</h2>
+<pre><code class="language-python">import shutil
+from pathlib import Path
+
+p = Path("tam.txt")
+p.write_text("tạm", encoding="utf-8")
+moi = p.rename("tam_cu.txt")          # đổi tên; trả về Path mới
+Path("luu_tru").mkdir(exist_ok=True)
+shutil.move(moi, "luu_tru/tam_cu.txt")    # di chuyển (kể cả khác ổ đĩa)
+shutil.copy("luu_tru/tam_cu.txt", "ban_sao.txt")
+Path("ban_sao.txt").unlink()          # xóa file
+shutil.rmtree("luu_tru")              # xóa cả thư mục và mọi thứ bên trong
+print(Path("luu_tru").exists())</code></pre>
+<pre><code class="language-text">False</code></pre>
+<div class="warn"><strong>Xóa là mất luôn</strong><code>unlink()</code> và <code>shutil.rmtree()</code> không đưa file vào thùng rác. Script xóa hoặc di chuyển hàng loạt nên có chế độ "chạy thử" chỉ in ra sẽ làm gì; bạn sẽ làm điều này ở bài thực hành cuối chặng.</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li><code>with open(p, mode, encoding="utf-8") as f</code>; <code>"w"</code> xóa nội dung cũ.</li>
+  <li>Duyệt file theo dòng bằng <code>for dong in f</code>; nhớ <code>strip()</code>.</li>
+  <li><code>Path</code>: nối bằng <code>/</code>, <code>name</code>, <code>stem</code>, <code>suffix</code>, <code>parent</code>, <code>mkdir(parents=True, exist_ok=True)</code>.</li>
+  <li><code>glob</code>, <code>rglob</code>, <code>iterdir</code> để duyệt; <code>shutil</code> để chép, di chuyển, xóa thư mục.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Đếm dòng, từ, ký tự</h3>
+<p>Viết hàm <code>thong_ke_file(duong_dan)</code> trả về tuple (số dòng, số từ, số ký tự) của một file văn bản UTF-8.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">from pathlib import Path
+
+
+def thong_ke_file(duong_dan: str | Path) -&gt; tuple[int, int, int]:
+    so_dong = so_tu = so_ky_tu = 0
+    with open(duong_dan, encoding="utf-8") as f:
+        for dong in f:
+            so_dong += 1
+            so_tu += len(dong.split())
+            so_ky_tu += len(dong.rstrip("\n"))
+    return so_dong, so_tu, so_ky_tu
+
+
+Path("bai.txt").write_text("Xin chào Việt Nam\nHọc Python mỗi ngày\n", encoding="utf-8")
+print(thong_ke_file("bai.txt"))</code></pre>
+<pre><code class="language-text">(2, 8, 36)</code></pre>
+<p><code>str | Path</code> trong type hint nghĩa là "chuỗi hoặc Path"; <code>open()</code> nhận được cả hai.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Mười file lớn nhất</h3>
+<p>Liệt kê 10 file lớn nhất trong một thư mục và mọi thư mục con, in đường dẫn tương đối và kích thước KB.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">from pathlib import Path
+
+
+def file_lon_nhat(thu_muc: Path, n: int = 10) -&gt; list[tuple[Path, int]]:
+    cac_file = [(p, p.stat().st_size) for p in thu_muc.rglob("*") if p.is_file()]
+    return sorted(cac_file, key=lambda cap: cap[1], reverse=True)[:n]
+
+
+goc = Path("thu_nghiem")
+for i, kb in enumerate([3, 120, 45, 7]):
+    f = goc / f"nhom{i % 2}" / f"file{i}.bin"
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_bytes(b"\0" * kb * 1024)
+
+for p, kich_thuoc in file_lon_nhat(goc, 3):
+    print(f"{kich_thuoc / 1024:8.1f} KB  {p.relative_to(goc).as_posix()}")</code></pre>
+<pre><code class="language-text">   120.0 KB  nhom1/file1.bin
+    45.0 KB  nhom0/file2.bin
+     7.0 KB  nhom1/file3.bin</code></pre>
+<p>Thay <code>goc</code> bằng <code>Path.home() / "Downloads"</code> để chạy trên thư mục thật của bạn.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/tutorial/inputoutput.html#reading-and-writing-files" rel="noopener" target="_blank">Python Tutorial: Reading and Writing Files</a>; <a href="https://docs.python.org/3/library/pathlib.html" rel="noopener" target="_blank">pathlib</a>; <a href="https://peps.python.org/pep-0686/" rel="noopener" target="_blank">PEP 686: Make UTF-8 mode default</a>; <a href="https://docs.python.org/3.15/whatsnew/3.15.html" rel="noopener" target="_blank">What's New in Python 3.15</a>.</p>

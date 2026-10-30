@@ -1,0 +1,153 @@
+<p>Một biến chứa một giá trị. Nhưng chương trình thật làm việc với <strong>nhiều</strong> giá trị: danh sách đơn hàng, điểm của cả lớp, các dòng trong file. <code>list</code> là cấu trúc dữ liệu bạn sẽ dùng nhiều nhất trong Python; <code>tuple</code> là "người anh em" không thay đổi được của nó.</p>
+
+<h2>1. Tạo và truy cập list</h2>
+<pre><code class="language-python">diem = [7.5, 8.0, 6.5, 9.0, 5.5]
+ten = ["An", "Bình", "Chi"]
+tron = [1, "hai", 3.0, True, None]   # chứa được nhiều kiểu, nhưng nên tránh
+rong = []
+
+print(diem[0], diem[-1])     # phần tử đầu, cuối
+print(diem[1:3])             # slicing giống chuỗi
+print(len(diem), sum(diem), max(diem), min(diem))
+print(8.0 in diem)</code></pre>
+<pre><code class="language-text">7.5 5.5
+[8.0, 6.5]
+5 36.5 9.0 5.5
+True</code></pre>
+<p>Chỉ số, slicing, <code>len</code>, <code>in</code> hoạt động y như với chuỗi. Khác biệt lớn: list <strong>thay đổi được</strong> (mutable).</p>
+
+<h2>2. Thêm, sửa, xóa</h2>
+<pre><code class="language-python">gio = ["táo", "cam"]
+gio.append("xoài")           # thêm vào cuối
+gio.insert(0, "dưa")         # chèn vào vị trí 0
+gio.extend(["nho", "lê"])    # nối thêm nhiều phần tử
+gio[1] = "táo xanh"          # sửa phần tử
+print(gio)
+
+cuoi = gio.pop()             # lấy ra và xóa phần tử cuối
+dau = gio.pop(0)             # lấy ra và xóa phần tử ở vị trí 0
+gio.remove("cam")            # xóa theo giá trị (lần xuất hiện đầu tiên)
+print(cuoi, dau, gio)
+print(gio.index("nho"), gio.count("xoài"))</code></pre>
+<pre><code class="language-text">['dưa', 'táo xanh', 'cam', 'xoài', 'nho', 'lê']
+lê dưa ['táo xanh', 'xoài', 'nho']
+2 1</code></pre>
+<p><code>remove</code> và <code>index</code> báo <code>ValueError</code> nếu không có giá trị cần tìm; kiểm tra bằng <code>in</code> trước nếu không chắc. <code>append</code> và <code>pop()</code> ở cuối list rất nhanh; <code>insert(0, ...)</code> và <code>pop(0)</code> chậm với list lớn vì phải dời mọi phần tử (cần hàng đợi hai đầu thì dùng <code>collections.deque</code>).</p>
+
+<h2>3. Sắp xếp: sort và sorted</h2>
+<pre><code class="language-python">diem = [7.5, 8.0, 6.5, 9.0, 5.5]
+moi = sorted(diem)                 # trả list mới, list gốc giữ nguyên
+print(moi, diem)
+diem.sort(reverse=True)            # sắp xếp tại chỗ, trả về None
+print(diem)
+
+ten = ["bình", "An", "chi", "Đức"]
+print(sorted(ten))                 # chữ hoa đứng trước chữ thường
+print(sorted(ten, key=str.lower))  # không phân biệt hoa thường
+print(sorted(ten, key=len))        # theo độ dài</code></pre>
+<pre><code class="language-text">[5.5, 6.5, 7.5, 8.0, 9.0] [7.5, 8.0, 6.5, 9.0, 5.5]
+[9.0, 8.0, 7.5, 6.5, 5.5]
+['An', 'bình', 'chi', 'Đức']
+['An', 'bình', 'chi', 'Đức']
+['An', 'chi', 'Đức', 'bình']</code></pre>
+<div class="warn"><strong>Bẫy kinh điển</strong><code>diem = diem.sort()</code> làm mất dữ liệu: <code>sort()</code> trả về <code>None</code>, nên <code>diem</code> trở thành <code>None</code>. Muốn list mới thì dùng <code>sorted()</code>, muốn sửa tại chỗ thì gọi <code>diem.sort()</code> và không gán.</div>
+<p>Python so sánh chuỗi theo mã Unicode, nên chữ có dấu như "Đ" có thể đứng sau "b" hay "c" (như ví dụ trên). Sắp xếp tiếng Việt chuẩn từ điển cần thư viện chuyên dụng như PyICU; với đa số bài toán hằng ngày, <code>key=str.lower</code> là đủ.</p>
+<p>Tham số <code>key</code> nhận một hàm, Python gọi hàm đó cho mỗi phần tử và sắp theo kết quả. Bạn sẽ dùng <code>key</code> với <code>lambda</code> rất nhiều ở bài về hàm.</p>
+
+<h2>4. Biến là tham chiếu: bẫy sao chép</h2>
+<pre><code class="language-python">a = [1, 2, 3]
+b = a            # b và a cùng trỏ tới MỘT list
+b.append(4)
+print(a)         # a cũng thay đổi!
+
+c = a.copy()     # hoặc a[:] hoặc list(a): tạo list mới
+c.append(5)
+print(a, c)</code></pre>
+<pre><code class="language-text">[1, 2, 3, 4]
+[1, 2, 3, 4] [1, 2, 3, 4, 5]</code></pre>
+<p>Nhớ lại: biến là nhãn dán. <code>b = a</code> chỉ dán thêm nhãn <code>b</code> lên cùng một list, không sao chép. Điều này cũng đúng khi truyền list vào hàm: hàm sửa list thì bên ngoài thấy ngay.</p>
+<p><code>copy()</code> là <strong>sao chép nông</strong>: chỉ tạo list ngoài mới, các phần tử bên trong vẫn dùng chung. Với list lồng nhau phải dùng <code>copy.deepcopy</code>:</p>
+<pre><code class="language-python">import copy
+
+bang = [[1, 2], [3, 4]]
+nong = bang.copy()
+sau = copy.deepcopy(bang)
+bang[0][0] = 99
+print(nong)   # list con bị ảnh hưởng
+print(sau)    # độc lập hoàn toàn
+
+luoi_sai = [[0] * 3] * 2      # 2 tham chiếu tới CÙNG một list con
+luoi_sai[0][0] = 1
+luoi_dung = [[0] * 3 for _ in range(2)]
+luoi_dung[0][0] = 1
+print(luoi_sai, luoi_dung)</code></pre>
+<pre><code class="language-text">[[99, 2], [3, 4]]
+[[1, 2], [3, 4]]
+[[1, 0, 0], [1, 0, 0]] [[1, 0, 0], [0, 0, 0]]</code></pre>
+<p>Dòng <code>[[0] * 3 for _ in range(2)]</code> là <strong>list comprehension</strong>: tạo list con mới ở mỗi vòng. Bạn sẽ học kỹ ở chặng 5; tạm thời hãy nhớ đây là cách đúng để tạo bảng hai chiều.</p>
+
+<h2>5. Tuple: list không đổi được</h2>
+<pre><code class="language-python">toa_do = (21.0285, 105.8542)     # vĩ độ, kinh độ Hà Nội
+mau_rgb = 255, 128, 0            # ngoặc có thể bỏ
+mot_phan_tu = (42,)              # cần dấu phẩy, (42) chỉ là số 42
+
+vi_do, kinh_do = toa_do          # mở gói (unpacking)
+print(vi_do, kinh_do, len(mau_rgb), type(mot_phan_tu))
+
+a, b = 1, 2
+a, b = b, a                      # hoán đổi không cần biến tạm
+print(a, b)</code></pre>
+<pre><code class="language-text">21.0285 105.8542 3 &lt;class 'tuple'&gt;
+2 1</code></pre>
+<p>Tuple không thể thêm, xóa, sửa phần tử. Khi nào dùng tuple thay list?</p>
+<ul>
+  <li><strong>Bản ghi cố định</strong>: một điểm <code>(x, y)</code>, một màu <code>(r, g, b)</code>, một dòng dữ liệu. Mỗi vị trí có ý nghĩa riêng.</li>
+  <li><strong>Hàm trả nhiều giá trị</strong>: <code>return nho_nhat, lon_nhat</code> thực chất trả tuple.</li>
+  <li><strong>Làm khóa của dict</strong> (bài sau): list không làm khóa được vì thay đổi được.</li>
+</ul>
+<p>Quy tắc dễ nhớ: list cho <em>tập hợp nhiều thứ cùng loại</em> có thể thêm bớt, tuple cho <em>một thứ gồm nhiều thành phần</em>.</p>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>List: <code>append</code>, <code>insert</code>, <code>extend</code>, <code>pop</code>, <code>remove</code>, <code>index</code>, <code>count</code>.</li>
+  <li><code>sorted()</code> trả list mới; <code>.sort()</code> sửa tại chỗ và trả <code>None</code>; dùng <code>key=</code>, <code>reverse=</code>.</li>
+  <li>Gán không sao chép; dùng <code>.copy()</code> (nông) hoặc <code>copy.deepcopy</code> (sâu).</li>
+  <li>Tuple bất biến, dùng cho bản ghi cố định; mở gói bằng <code>a, b = t</code>.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Thống kê điểm</h3>
+<p>Cho <code>diem = [6.5, 8.0, 7.5, 9.5, 5.0, 8.5, 7.0, 9.0, 4.5, 8.0]</code>. In điểm cao nhất, thấp nhất, trung bình (2 chữ số) và 3 điểm cao nhất.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">diem = [6.5, 8.0, 7.5, 9.5, 5.0, 8.5, 7.0, 9.0, 4.5, 8.0]
+print("Cao nhất:", max(diem))
+print("Thấp nhất:", min(diem))
+print(f"Trung bình: {sum(diem) / len(diem):.2f}")
+print("Top 3:", sorted(diem, reverse=True)[:3])</code></pre>
+<pre><code class="language-text">Cao nhất: 9.5
+Thấp nhất: 4.5
+Trung bình: 7.35
+Top 3: [9.5, 9.0, 8.5]</code></pre>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Loại trùng, giữ thứ tự</h3>
+<p>Cho <code>ma = ["A3", "B1", "A3", "C2", "B1", "D4"]</code>, tạo list không trùng nhưng giữ thứ tự xuất hiện đầu tiên: <code>["A3", "B1", "C2", "D4"]</code>.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">ma = ["A3", "B1", "A3", "C2", "B1", "D4"]
+khong_trung = []
+for m in ma:
+    if m not in khong_trung:
+        khong_trung.append(m)
+print(khong_trung)
+
+# Cách ngắn hơn (học ở bài sau): khóa của dict giữ thứ tự chèn và không trùng
+print(list(dict.fromkeys(ma)))</code></pre>
+<pre><code class="language-text">['A3', 'B1', 'C2', 'D4']
+['A3', 'B1', 'C2', 'D4']</code></pre>
+<p>Cách thứ nhất chậm khi list lớn vì <code>not in</code> trên list phải duyệt từ đầu mỗi lần. Cách thứ hai nhanh hơn nhiều; <code>set(ma)</code> cũng loại trùng nhưng <strong>không</strong> giữ thứ tự.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/tutorial/datastructures.html" rel="noopener" target="_blank">Python Tutorial: Data Structures</a>; <a href="https://docs.python.org/3/howto/sorting.html" rel="noopener" target="_blank">Sorting Techniques</a>; <a href="https://docs.python.org/3/library/copy.html" rel="noopener" target="_blank">copy: Shallow and deep copy operations</a>.</p>

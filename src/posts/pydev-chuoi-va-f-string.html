@@ -1,0 +1,143 @@
+<p>Phần lớn dữ liệu bạn xử lý khi đi làm là văn bản: tên khách hàng, địa chỉ, mã đơn hàng, dòng log, nội dung file CSV. Bài này dạy cách cắt, tìm, thay, tách, ghép và định dạng chuỗi trong Python, kể cả chuỗi tiếng Việt có dấu.</p>
+
+<h2>1. Tạo chuỗi</h2>
+<pre><code class="language-python">a = "Hà Nội"
+b = 'Sài Gòn'
+c = """Dòng 1
+Dòng 2"""                       # chuỗi nhiều dòng
+d = "Anh ấy nói: \"Chào!\""     # \" là dấu nháy bên trong chuỗi
+e = r"C:\new\thu_muc"          # chuỗi thô: \ không còn là ký tự đặc biệt
+print(c)
+print(d)
+print(e, len(a))</code></pre>
+<pre><code class="language-text">Dòng 1
+Dòng 2
+Anh ấy nói: "Chào!"
+C:\new\thu_muc 6</code></pre>
+<p>Python 3 lưu chuỗi dạng Unicode, nên <code>len("Hà Nội")</code> là 6 ký tự đúng như mắt nhìn. Ký tự đặc biệt hay gặp: <code>\n</code> xuống dòng, <code>\t</code> tab. Viết đường dẫn Windows nên dùng chuỗi thô <code>r"..."</code>, nếu không <code>"\n"</code> trong <code>C:\new</code> sẽ thành ký tự xuống dòng.</p>
+
+<h2>2. Chỉ số và slicing</h2>
+<pre><code class="language-python">ma = "DH2026-00157"
+print(ma[0], ma[1], ma[-1])   # ký tự đầu, thứ hai, cuối
+print(ma[2:6])                # từ vị trí 2 đến trước 6: 2026
+print(ma[:2], ma[7:])         # đầu chuỗi đến trước 2; từ 7 đến hết
+print(ma[::-1])               # đảo ngược</code></pre>
+<pre><code class="language-text">D H 7
+2026
+DH 00157
+75100-6202HD</code></pre>
+<p>Chỉ số bắt đầu từ 0; chỉ số âm đếm từ cuối. Slicing <code>[bat_dau:ket_thuc:buoc]</code> lấy từ <code>bat_dau</code> đến <strong>trước</strong> <code>ket_thuc</code>. Quy tắc "không lấy điểm cuối" giúp <code>s[:k] + s[k:]</code> luôn bằng <code>s</code>.</p>
+<p>Chuỗi là <strong>bất biến</strong>: không thể sửa một ký tự bằng <code>ma[0] = "X"</code> (báo <code>TypeError</code>). Mọi phương thức "sửa" chuỗi đều trả về chuỗi mới.</p>
+
+<h2>3. Các phương thức hay dùng</h2>
+<pre><code class="language-python">s = "  nguyễn   văn AN  "
+print(repr(s.strip()))          # bỏ khoảng trắng hai đầu
+print(s.upper(), "|", s.lower())
+print(s.strip().title())        # viết hoa chữ cái đầu mỗi từ
+print("an" in s.lower())        # kiểm tra chứa: True
+print("a,b,,c".split(","))      # tách theo dấu phẩy
+print(s.split())                # tách theo khoảng trắng, bỏ khoảng trắng thừa
+print("-".join(["2026", "10", "29"]))
+print("0912.345.678".replace(".", ""))
+print("bao_cao.xlsx".endswith((".xlsx", ".xls")))
+print("Hà Nội".find("Nội"), "Hà Nội".find("Huế"))</code></pre>
+<pre><code class="language-text">'nguyễn   văn AN'
+  NGUYỄN   VĂN AN   |   nguyễn   văn an
+Nguyễn   Văn An
+True
+['a', 'b', '', 'c']
+['nguyễn', 'văn', 'AN']
+2026-10-29
+0912345678
+True
+3 -1</code></pre>
+<p>Vài điểm cần nhớ:</p>
+<ul>
+  <li><code>split()</code> không tham số tách theo mọi khoảng trắng liên tiếp; <code>split(",")</code> giữ nguyên phần rỗng.</li>
+  <li><code>"-".join(danh_sach)</code> là cách ghép nhiều chuỗi nhanh và gọn nhất; các phần tử phải là chuỗi.</li>
+  <li><code>find()</code> trả <code>-1</code> nếu không thấy; <code>index()</code> thì báo lỗi. Chỉ cần biết có hay không, dùng <code>in</code>.</li>
+  <li><code>startswith</code>, <code>endswith</code> nhận được cả tuple nhiều lựa chọn.</li>
+</ul>
+<div class="tip"><strong>So sánh không phân biệt hoa thường</strong>Dùng <code>a.casefold() == b.casefold()</code>. <code>casefold()</code> mạnh hơn <code>lower()</code> với một số ngôn ngữ (ví dụ chữ ß của tiếng Đức), còn với tiếng Việt hai cách cho kết quả như nhau.</div>
+
+<h2>4. Định dạng bằng f-string</h2>
+<p>f-string (chuỗi có chữ <code>f</code> phía trước) là cách định dạng hiện đại, dễ đọc nhất. Trong <code>{}</code> đặt biểu thức bất kỳ, sau dấu <code>:</code> là quy cách định dạng.</p>
+<pre><code class="language-python">gia = 1234567.891
+ty_le = 0.0825
+n = 42
+print(f"{gia:,.0f} đ")        # phân cách hàng nghìn, 0 chữ số thập phân
+print(f"{gia:.2f}")            # 2 chữ số thập phân
+print(f"{ty_le:.1%}")          # phần trăm
+print(f"{n:05d}")              # đệm số 0 cho đủ 5 chữ số
+print(f"[{'trái':&lt;8}][{'giữa':^8}][{'phải':&gt;8}]")
+print(f"{n = }, {n * 2 = }")   # in cả biểu thức, tiện khi gỡ lỗi</code></pre>
+<pre><code class="language-text">1,234,568 đ
+1234567.89
+8.2%
+00042
+[trái    ][  giữa  ][    phải]
+n = 42, n * 2 = 84</code></pre>
+<p>Người Việt quen viết <code>1.234.568</code>. Cách đơn giản: định dạng kiểu Mỹ rồi đổi dấu: <code>f"{gia:,.0f}".replace(",", ".")</code>.</p>
+<p>Quy cách <code>{gia_tri:&lt;8}</code>, <code>^8</code>, <code>&gt;8</code> căn trái, giữa, phải trong ô rộng 8 ký tự: dùng để in bảng thẳng cột.</p>
+
+<h2>5. Ví dụ: chuẩn hóa dữ liệu nhập</h2>
+<pre><code class="language-python">raw = ["  trần thị  BÌNH ", "LÊ văn   cường", "phạm  minh"]
+for ho_ten in raw:
+    chuan = " ".join(ho_ten.split()).title()
+    ho, *_, ten = chuan.split()
+    print(f"{chuan:&lt;18} họ: {ho:&lt;5} tên: {ten}")</code></pre>
+<pre><code class="language-text">Trần Thị Bình      họ: Trần  tên: Bình
+Lê Văn Cường       họ: Lê    tên: Cường
+Phạm Minh          họ: Phạm  tên: Minh</code></pre>
+<p><code>" ".join(s.split())</code> là mẹo kinh điển để gộp mọi khoảng trắng thừa thành một. <code>ho, *_, ten = ...</code> lấy phần tử đầu và cuối, bỏ phần giữa; bạn sẽ học kỹ cú pháp này ở chặng 5.</p>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li>Chuỗi Unicode, bất biến; chỉ số từ 0, âm đếm từ cuối; slicing không lấy điểm cuối.</li>
+  <li><code>strip</code>, <code>split</code>, <code>join</code>, <code>replace</code>, <code>upper/lower/title</code>, <code>startswith/endswith</code>, <code>in</code>.</li>
+  <li>f-string: <code>{x:,.0f}</code>, <code>{x:.2f}</code>, <code>{x:.1%}</code>, <code>{n:05d}</code>, <code>{s:&lt;10}</code>, <code>{x = }</code>.</li>
+  <li>Đường dẫn Windows dùng chuỗi thô <code>r"..."</code>.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Chuẩn hóa họ tên</h3>
+<p>Viết chương trình nhận họ tên nhập vào (có thể thừa khoảng trắng, lẫn hoa thường), in ra dạng chuẩn và số từ.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">ho_ten = input("Họ tên: ")
+chuan = " ".join(ho_ten.split()).title()
+print(f"Chuẩn hóa: {chuan} ({len(chuan.split())} từ)")</code></pre>
+<pre><code class="language-text">Họ tên:    đỗ   hoàng  NAM
+Chuẩn hóa: Đỗ Hoàng Nam (3 từ)</code></pre>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. In bảng giá thẳng cột</h3>
+<p>In bảng 3 mặt hàng với tên căn trái, số lượng căn phải, giá có dấu chấm phân cách hàng nghìn, và dòng tổng.</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">def vnd(so):
+    return f"{so:,.0f}".replace(",", ".")
+
+
+hang = [("Bàn phím cơ", 2, 1250000), ("Chuột không dây", 3, 349000), ("Lót chuột", 5, 89000)]
+print(f"{'Mặt hàng':&lt;18}{'SL':&gt;4}{'Thành tiền':&gt;14}")
+print("-" * 36)
+tong = 0
+for ten, sl, gia in hang:
+    tien = sl * gia
+    tong += tien
+    print(f"{ten:&lt;18}{sl:&gt;4}{vnd(tien):&gt;14}")
+print("-" * 36)
+print(f"{'Tổng':&lt;22}{vnd(tong):&gt;14}")</code></pre>
+<pre><code class="language-text">Mặt hàng            SL    Thành tiền
+------------------------------------
+Bàn phím cơ          2     2.500.000
+Chuột không dây      3     1.047.000
+Lót chuột            5       445.000
+------------------------------------
+Tổng                       3.992.000</code></pre>
+<p>Hàm <code>vnd()</code> gói việc định dạng tiền để dùng lại; bạn sẽ học kỹ về hàm ở chặng 2.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/library/stdtypes.html#string-methods" rel="noopener" target="_blank">Python docs: String Methods</a>; <a href="https://docs.python.org/3/library/string.html#format-specification-mini-language" rel="noopener" target="_blank">Format Specification Mini-Language</a>.</p>

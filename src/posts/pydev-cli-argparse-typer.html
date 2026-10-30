@@ -1,0 +1,192 @@
+<p>Script hỏi bằng <code>input()</code> thì không chạy tự động được: không ai ngồi gõ trả lời lúc 2 giờ sáng. Công cụ chuyên nghiệp nhận mọi thứ qua <strong>tham số dòng lệnh</strong>: <code>dem_tu bao_cao.txt --top 5</code>. Cách này chạy được trong lịch tự động, trong script khác, trong CI, và có sẵn trang trợ giúp <code>--help</code>. Bài này dạy <code>argparse</code> (có sẵn trong Python) và <strong>Typer</strong> (thư viện viết CLI bằng type hint).</p>
+
+<h2>1. sys.argv: tham số thô</h2>
+<pre><code class="language-python">import sys
+
+print(sys.argv)</code></pre>
+<pre><code class="language-text">$ python tham_so.py bao_cao.txt --top 5
+['tham_so.py', 'bao_cao.txt', '--top', '5']</code></pre>
+<p><code>sys.argv</code> là list chuỗi: phần tử đầu là tên script, sau đó là các tham số tách theo dấu cách. Tự phân tích list này nhanh chóng trở nên rối: tham số tùy chọn, giá trị mặc định, kiểm tra kiểu, thông báo lỗi, trang trợ giúp. <code>argparse</code> làm hết những việc đó.</p>
+
+<h2>2. argparse cơ bản</h2>
+<pre><code class="language-python">import argparse
+import re
+from collections import Counter
+from pathlib import Path
+
+
+def tao_parser() -&gt; argparse.ArgumentParser:
+    p = argparse.ArgumentParser(prog="dem-tu", description="Đếm từ xuất hiện nhiều nhất trong file văn bản.")
+    p.add_argument("file", type=Path, help="file văn bản UTF-8")                     # bắt buộc, theo vị trí
+    p.add_argument("-n", "--top", type=int, default=10, help="số từ in ra (mặc định: %(default)s)")
+    p.add_argument("--phan-biet-hoa", action="store_true", help="phân biệt chữ hoa, thường")   # cờ
+    p.add_argument("--dinh-dang", choices=["bang", "csv"], default="bang")
+    return p
+
+
+def main(argv: list[str] | None = None) -&gt; int:
+    args = tao_parser().parse_args(argv)
+    if not args.file.is_file():
+        print(f"Không tìm thấy file: {args.file}")
+        return 1
+    van_ban = args.file.read_text(encoding="utf-8")
+    if not args.phan_biet_hoa:
+        van_ban = van_ban.lower()
+    dem = Counter(re.findall(r"\w+", van_ban))
+    for tu, so in dem.most_common(args.top):
+        print(f"{tu},{so}" if args.dinh_dang == "csv" else f"{tu:&lt;10}{so:&gt;4}")
+    return 0
+
+
+Path("bai.txt").write_text("Python dễ học. Học Python, dùng Python mỗi ngày!", encoding="utf-8")
+main(["bai.txt", "--top", "2"])
+main(["bai.txt", "-n", "2", "--phan-biet-hoa", "--dinh-dang", "csv"])</code></pre>
+<pre><code class="language-text">python       3
+học          2
+Python,3
+dễ,1</code></pre>
+<ul>
+  <li>Tham số không có dấu gạch (<code>"file"</code>) là <strong>bắt buộc</strong>, xác định theo vị trí.</li>
+  <li>Tham số bắt đầu bằng <code>-</code>/<code>--</code> là <strong>tùy chọn</strong>; có thể có tên ngắn (<code>-n</code>) và tên dài (<code>--top</code>).</li>
+  <li><code>type=int</code>, <code>type=Path</code> tự chuyển kiểu và báo lỗi nếu sai; <code>choices</code> giới hạn giá trị; <code>action="store_true"</code> tạo cờ bật/tắt.</li>
+  <li>Tên có gạch ngang <code>--phan-biet-hoa</code> thành thuộc tính <code>args.phan_biet_hoa</code>.</li>
+  <li><code>main(argv=None)</code>: khi chạy thật, <code>parse_args(None)</code> đọc <code>sys.argv</code>; khi test, truyền list tham số vào. Cùng mẫu với dự án dọn thư mục ở chặng 3.</li>
+</ul>
+<p>Thêm ở cuối file <code>if __name__ == "__main__": sys.exit(main())</code>, và argparse tặng bạn trang trợ giúp cùng thông báo lỗi miễn phí:</p>
+<pre><code class="language-text">$ python dem_tu.py --help
+usage: dem-tu [-h] [-n TOP] [--phan-biet-hoa] [--dinh-dang {bang,csv}] file
+
+Đếm từ xuất hiện nhiều nhất trong file văn bản.
+
+positional arguments:
+  file                  file văn bản UTF-8
+
+options:
+  -h, --help            show this help message and exit
+  -n, --top TOP         số từ in ra (mặc định: 10)
+  --phan-biet-hoa       phân biệt chữ hoa, thường
+  --dinh-dang {bang,csv}
+
+$ python dem_tu.py bai.txt --top muoi
+usage: dem-tu [-h] [-n TOP] [--phan-biet-hoa] [--dinh-dang {bang,csv}] file
+dem-tu: error: argument -n/--top: invalid int value: 'muoi'</code></pre>
+
+<h2>3. Mã thoát</h2>
+<p>Mọi chương trình dòng lệnh trả về một <strong>mã thoát</strong> (exit code): 0 là thành công, khác 0 là lỗi. argparse thoát với mã 2 khi tham số sai. Trả mã đúng giúp script khác, lịch chạy tự động và CI biết lần chạy có thành công không:</p>
+<pre><code class="language-text">$ python dem_tu.py khong_co.txt; echo $?        (PowerShell: echo $LASTEXITCODE)
+Không tìm thấy file: khong_co.txt
+1</code></pre>
+<p>Thông báo lỗi nên in ra <code>stderr</code> (<code>print(..., file=sys.stderr)</code>) để không lẫn với kết quả khi người dùng chuyển hướng output vào file bằng <code>&gt;</code>.</p>
+
+<h2>4. Lệnh con</h2>
+<p>Công cụ lớn như <code>git</code> có lệnh con: <code>git commit</code>, <code>git push</code>. argparse làm được bằng <code>add_subparsers</code>:</p>
+<pre><code class="language-python">import argparse
+
+p = argparse.ArgumentParser(prog="chi-tieu")
+lenh = p.add_subparsers(dest="lenh", required=True)
+them = lenh.add_parser("them", help="thêm khoản chi")
+them.add_argument("so_tien", type=int)
+them.add_argument("-d", "--danh-muc", default="khác")
+lenh.add_parser("bao-cao", help="in báo cáo")
+
+for argv in (["them", "45000", "-d", "ăn uống"], ["bao-cao"]):
+    args = p.parse_args(argv)
+    print(vars(args))</code></pre>
+<pre><code class="language-text">{'lenh': 'them', 'so_tien': 45000, 'danh_muc': 'ăn uống'}
+{'lenh': 'bao-cao'}</code></pre>
+
+<h2>5. Typer: CLI từ type hint</h2>
+<p><a href="https://typer.tiangolo.com/" rel="noopener" target="_blank">Typer</a> (cùng tác giả với FastAPI) đọc type hint của hàm để tự sinh tham số, kiểm tra kiểu và trang trợ giúp có màu. Cài: <code>uv add typer</code>.</p>
+<pre><code class="language-python"># (minh họa) dem_tu_typer.py, cần: uv add typer
+import re
+from collections import Counter
+from pathlib import Path
+from typing import Annotated
+
+import typer
+
+app = typer.Typer(help="Công cụ xử lý văn bản.")
+
+
+def _dem(file: Path, phan_biet_hoa: bool) -&gt; Counter:
+    van_ban = file.read_text(encoding="utf-8")
+    return Counter(re.findall(r"\w+", van_ban if phan_biet_hoa else van_ban.lower()))
+
+
+@app.command()
+def dem(
+    file: Annotated[Path, typer.Argument(exists=True, dir_okay=False, help="File văn bản UTF-8")],
+    top: Annotated[int, typer.Option("--top", "-n", min=1, help="Số từ in ra")] = 10,
+    phan_biet_hoa: bool = False,
+) -&gt; None:
+    """Đếm từ xuất hiện nhiều nhất."""
+    for tu, so in _dem(file, phan_biet_hoa).most_common(top):
+        typer.echo(f"{tu:&lt;10}{so:&gt;4}")
+
+
+@app.command()
+def tim(file: Path, tu_khoa: str) -&gt; None:
+    """In các dòng chứa từ khóa, kèm số dòng."""
+    for i, dong in enumerate(file.read_text(encoding="utf-8").splitlines(), 1):
+        if tu_khoa.lower() in dong.lower():
+            typer.echo(f"{i}: {dong}")
+
+
+if __name__ == "__main__":
+    app()</code></pre>
+<pre><code class="language-text">$ python dem_tu_typer.py dem bai.txt -n 2
+python       3
+học          2
+$ python dem_tu_typer.py tim bai.txt "mỗi ngày"
+1: Python dễ học. Học Python, dùng Python mỗi ngày!
+$ python dem_tu_typer.py dem bai.txt --top 0
+Usage: dem_tu_typer.py dem [OPTIONS] {file}
+Try 'dem_tu_typer.py dem --help' for help.
+┌─ Error ────────────────────────────────────────────────────────────────┐
+│ Invalid value for '--top' / '-n': 0 is not in the range x&gt;=1.          │
+└────────────────────────────────────────────────────────────────────────┘</code></pre>
+<ul>
+  <li>Tham số không có giá trị mặc định thành tham số bắt buộc; có mặc định thành tùy chọn <code>--ten</code>. Kiểu <code>bool</code> thành cặp cờ <code>--phan-biet-hoa/--no-phan-biet-hoa</code>.</li>
+  <li><code>Annotated[...]</code> gắn thêm kiểm tra (<code>exists=True</code>, <code>min=1</code>) và lời trợ giúp; docstring thành mô tả lệnh.</li>
+  <li>Mỗi hàm có <code>@app.command()</code> là một lệnh con.</li>
+</ul>
+<div class="tip"><strong>Chọn argparse hay Typer?</strong>argparse có sẵn, không cần cài, hợp cho script nhỏ và công cụ cần chạy ở nơi không cài được thư viện. Typer gọn hơn nhiều khi CLI có nhiều lệnh con, và cách viết bằng type hint giống hệt FastAPI ở chặng 9. Biết cả hai là tốt nhất, vì bạn sẽ gặp cả hai trong dự án thật.</div>
+
+<h2>Tóm tắt</h2>
+<ul>
+  <li><code>argparse</code>: tham số vị trí, tùy chọn <code>-n/--top</code>, <code>type</code>, <code>default</code>, <code>choices</code>, <code>store_true</code>, lệnh con.</li>
+  <li><code>main(argv=None)</code> trả mã thoát; <code>sys.exit(main())</code>; lỗi in ra <code>stderr</code>.</li>
+  <li>Typer: hàm + type hint thành lệnh; <code>Annotated</code> + <code>typer.Option/Argument</code> để kiểm tra, trợ giúp.</li>
+</ul>
+
+<h2>Bài tập</h2>
+<div class="ex">
+<h3>Bài 1. Công cụ đếm từ</h3>
+<p>Hoàn thiện <code>dem_tu.py</code> ở mục 2 thành file chạy được từ terminal, thêm tùy chọn <code>--bo-qua</code> nhận nhiều từ cần bỏ qua (ví dụ <code>--bo-qua và là của</code>).</p>
+<details><summary>Xem đáp án</summary>
+<pre><code class="language-python">import argparse
+import re
+from collections import Counter
+
+p = argparse.ArgumentParser(prog="dem-tu")
+p.add_argument("--bo-qua", nargs="*", default=[], help="các từ bỏ qua")
+p.add_argument("-n", "--top", type=int, default=3)
+args = p.parse_args(["--bo-qua", "và", "là", "-n", "2"])
+
+van_ban = "Python là ngôn ngữ dễ học và mạnh. Python và Go là hai ngôn ngữ phổ biến."
+bo_qua = {t.lower() for t in args.bo_qua}
+dem = Counter(t for t in re.findall(r"\w+", van_ban.lower()) if t not in bo_qua)
+print(dem.most_common(args.top))</code></pre>
+<pre><code class="language-text">[('python', 2), ('ngôn', 2)]</code></pre>
+<p><code>nargs="*"</code> nhận 0 hoặc nhiều giá trị thành list; <code>nargs="+"</code> bắt buộc ít nhất một. Khi dùng thật, thay list trong <code>parse_args([...])</code> bằng <code>parse_args()</code>.</p>
+</details>
+</div>
+<div class="ex">
+<h3>Bài 2. Viết lại bằng Typer</h3>
+<p>Viết lại công cụ bằng Typer với hai lệnh con <code>dem</code> và <code>tim</code> như mục 5, chạy thử cả hai lệnh và <code>--help</code>.</p>
+<details><summary>Xem gợi ý</summary>
+<p>Dùng nguyên mã ở mục 5. Chạy <code>python dem_tu_typer.py --help</code> để thấy danh sách lệnh con kèm mô tả lấy từ docstring, và <code>python dem_tu_typer.py dem --help</code> để thấy trợ giúp của từng tham số. Thử truyền một file không tồn tại: <code>exists=True</code> làm Typer báo lỗi trước khi hàm của bạn chạy.</p>
+</details>
+</div>
+
+<p class="note">Nguồn tham khảo: <a href="https://docs.python.org/3/library/argparse.html" rel="noopener" target="_blank">argparse</a>; <a href="https://docs.python.org/3/howto/argparse.html" rel="noopener" target="_blank">Argparse Tutorial</a>; <a href="https://typer.tiangolo.com/tutorial/" rel="noopener" target="_blank">Typer: Tutorial</a>.</p>
