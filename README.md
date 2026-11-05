@@ -2,6 +2,8 @@
 
 Website tĩnh (HTML + CSS + JavaScript thuần) chia sẻ kiến thức lập trình, ngoại ngữ và blog, chạy trên **GitHub Pages** với tên miền **hocfree.vn**.
 
+> Tài liệu đầy đủ (kiến trúc, dữ liệu, viết bài, lộ trình, build, giao diện, xử lý lỗi): xem [`docs/`](docs/README.md).
+
 ## Cấu trúc
 
 ```
@@ -16,14 +18,16 @@ assets/js/search-data.js   Chỉ mục tìm kiếm (tự sinh)
 assets/images/posts/       Ảnh đại diện bài viết 1200x675: .webp hiển thị trên trang, .jpg cho og:image
 site.webmanifest           Thông tin ứng dụng web (tên, icon)
 src/posts.json             Thông tin website, danh sách bài viết, bài "đọc nhiều"
-src/posts/<slug>.html      Nội dung từng bài (tạo thư mục khi viết bài đầu tiên)
+src/posts/<slug>.html      Nội dung từng bài (chỉ phần thân)
 src/nav.json               Menu chính: mục → nhóm → chủ đề
 src/learning-paths.json    Learning Paths (lộ trình Vision Engineer…)
 src/icons.json             Icon Lucide dùng trong trang (SVG nội tuyến)
 tools/build.py             Sinh toàn bộ trang HTML từ src/
 tools/make_thumbs.py       Vẽ ảnh đại diện tự động (JPG + WebP)
+tools/check_site.py        Kiểm tra site sau khi build (link, SEO, HTML thân bài, code Python)
 tools/fonts/               Font Be Vietnam Pro (TTF) để vẽ ảnh đại diện
-CNAME                      Tên miền riêng: hocfree.vn
+CNAME                      Tên miền riêng: hocfree.vn (hiện chưa có trong repo, xem docs/02)
+docs/                      Tài liệu dự án
 ```
 
 > Các file `.html` ở thư mục gốc và trong các mục được **sinh tự động**, hãy sửa trong `src/` rồi build lại.
@@ -49,7 +53,8 @@ CNAME                      Tên miền riêng: hocfree.vn
 3. Ảnh đại diện: chép ảnh thật vào `assets/images/posts/<slug>.jpg` (tỉ lệ 16:9), hoặc chạy
    `python tools/make_thumbs.py` để vẽ tự động.
 4. `python tools/build.py`
-5. `git add . && git commit -m "Thêm bài ..." && git push`
+5. `python tools/check_site.py` (phải in `OK: không có lỗi`)
+6. `git add . && git commit -m "Thêm bài ..." && git push`
 
 ## Menu & kiến trúc thông tin
 
@@ -68,8 +73,9 @@ Menu được sinh từ `src/nav.json`, theo hành trình **Học → Thực hà
 - Thêm chủ đề: thêm một `item` vào nhóm trong `src/nav.json` rồi build. Chủ đề chưa có bài
   hiển thị "Đang biên soạn" và được đặt `noindex`, không đưa vào sitemap.
 - Ô tìm kiếm (`Ctrl K` hoặc `/`) tìm cả chủ đề, lộ trình và bài viết.
-- Lộ trình **Vision Engineer** (`lo-trinh/vision-engineer.html`): 14 chặng, 5 giai đoạn; người học
-  đánh dấu chặng đã xong, tiến độ lưu trên trình duyệt (localStorage).
+- Lộ trình **Vision Engineer** (`lo-trinh/vision-engineer.html`): 15 chặng, 5 giai đoạn; ngoài ra có
+  Python Developer, 700+ TOEIC và HSK 3. Người học đánh dấu chặng và bài đã học, tiến độ lưu trên
+  trình duyệt (localStorage). Xem [docs/05-lo-trinh-hoc.md](docs/05-lo-trinh-hoc.md).
 - "Đăng nhập" hiện là trang giới thiệu (`dang-nhap.html`) vì website tĩnh chưa có tài khoản.
 
 ## Xem thử trên máy

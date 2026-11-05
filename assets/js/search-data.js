@@ -1,6 +1,21 @@
 /* Tự động sinh bởi tools/build.py – không sửa tay */
 window.HF_POSTS = [
  {
+  "t": "Lỗi thường gặp khi huấn luyện mô hình: chẩn đoán và cách sửa",
+  "u": "kien-thuc/loi-thuong-gap-khi-huan-luyen-mo-hinh.html",
+  "e": "Bảng tra theo triệu chứng: loss không giảm, NaN, overfitting, dữ liệu lệch lớp, chạy thật kém, lỗi PyTorch. Có thí nghiệm đo hiệu quả từng cách sửa.",
+  "c": "kien-thuc",
+  "cn": "Kiến thức",
+  "d": "05/11/2026",
+  "m": 43,
+  "img": "assets/images/posts/loi-thuong-gap-khi-huan-luyen-mo-hinh.webp",
+  "tags": [
+   "Deep Learning",
+   "Machine Learning",
+   "PyTorch"
+  ]
+ },
+ {
   "t": "Cài Python, VS Code và chạy chương trình Python đầu tiên",
   "u": "hoc/pydev-cai-dat-python-va-vs-code.html",
   "e": "Cài Python 3 bản ổn định mới, VS Code và extension Python, chạy code trong REPL, file .py, terminal và đọc traceback để tự sửa lỗi.",
@@ -5800,21 +5815,21 @@ window.HF_TOPICS = [
   "u": "hoc/machine-learning.html",
   "s": "Học AI & Lập trình",
   "g": "AI & Machine Learning",
-  "n": 9
+  "n": 10
  },
  {
   "t": "Deep Learning",
   "u": "hoc/deep-learning.html",
   "s": "Học AI & Lập trình",
   "g": "AI & Machine Learning",
-  "n": 32
+  "n": 33
  },
  {
   "t": "PyTorch",
   "u": "hoc/pytorch.html",
   "s": "Học AI & Lập trình",
   "g": "AI & Machine Learning",
-  "n": 24
+  "n": 25
  },
  {
   "t": "Generative AI",
@@ -5968,14 +5983,14 @@ window.HF_TOPICS = [
   "u": "kien-thuc/ai-machine-learning.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 9
+  "n": 10
  },
  {
   "t": "Deep Learning",
   "u": "kien-thuc/deep-learning.html",
   "s": "Kiến thức",
   "g": "Lĩnh vực",
-  "n": 32
+  "n": 33
  },
  {
   "t": "Computer Vision",

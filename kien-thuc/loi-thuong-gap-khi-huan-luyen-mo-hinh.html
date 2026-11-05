@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="vi" data-root="../">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lỗi thường gặp khi huấn luyện mô hình: chẩn đoán và cách sửa</title>
+<meta name="description" content="Bảng tra theo triệu chứng: loss không giảm, NaN, overfitting, dữ liệu lệch lớp, chạy thật kém, lỗi PyTorch. Có thí nghiệm đo hiệu quả từng cách sửa.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://hocfree.vn/kien-thuc/loi-thuong-gap-khi-huan-luyen-mo-hinh.html">
+<meta property="og:site_name" content="HọcFree">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Lỗi thường gặp khi huấn luyện mô hình: chẩn đoán và cách sửa">
+<meta property="og:description" content="Bảng tra theo triệu chứng: loss không giảm, NaN, overfitting, dữ liệu lệch lớp, chạy thật kém, lỗi PyTorch. Có thí nghiệm đo hiệu quả từng cách sửa.">
+<meta property="og:url" content="https://hocfree.vn/kien-thuc/loi-thuong-gap-khi-huan-luyen-mo-hinh.html">
+<meta property="og:image" content="https://hocfree.vn/assets/images/posts/loi-thuong-gap-khi-huan-luyen-mo-hinh.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="Lỗi thường gặp khi huấn luyện mô hình: chẩn đoán và cách sửa">
+<meta property="og:locale" content="vi_VN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Lỗi thường gặp khi huấn luyện mô hình: chẩn đoán và cách sửa">
+<meta name="twitter:description" content="Bảng tra theo triệu chứng: loss không giảm, NaN, overfitting, dữ liệu lệch lớp, chạy thật kém, lỗi PyTorch. Có thí nghiệm đo hiệu quả từng cách sửa.">
+<meta name="twitter:image" content="https://hocfree.vn/assets/images/posts/loi-thuong-gap-khi-huan-luyen-mo-hinh.jpg">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-vietnamese-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/be-vietnam-pro-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/css/fonts.css?v=20261105">
+<link rel="stylesheet" href="../assets/css/style.css?v=20261105">
+<script>try{var t=localStorage.getItem('hf-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
+<meta property="article:published_time" content="2026-11-05">
+<meta property="article:section" content="Kiến thức">
+<meta property="article:tag" content="Deep Learning">
+<meta property="article:tag" content="Machine Learning">
+<meta property="article:tag" content="PyTorch">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "Lỗi thường gặp khi huấn luyện mô hình: chẩn đoán và cách sửa", "description": "Bảng tra theo triệu chứng: loss không giảm, NaN, overfitting, dữ liệu lệch lớp, chạy thật kém, lỗi PyTorch. Có thí nghiệm đo hiệu quả từng cách sửa.", "image": ["https://hocfree.vn/assets/images/posts/loi-thuong-gap-khi-huan-luyen-mo-hinh.jpg"], "datePublished": "2026-11-05", "dateModified": "2026-11-05", "inLanguage": "vi", "articleSection": "Kiến thức", "keywords": "Deep Learning, Machine Learning, PyTorch", "wordCount": 7597, "author": {"@type": "Organization", "name": "Ban biên tập HọcFree", "url": "https://hocfree.vn/gioi-thieu.html"}, "publisher": {"@type": "Organization", "name": "HọcFree", "url": "https://hocfree.vn/", "logo": {"@type": "ImageObject", "url": "https://hocfree.vn/assets/images/icon-512.png", "width": 512, "height": 512}}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://hocfree.vn/kien-thuc/loi-thuong-gap-khi-huan-luyen-mo-hinh.html"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Trang chủ", "item": "https://hocfree.vn/"}, {"@type": "ListItem", "position": 2, "name": "Kiến thức", "item": "https://hocfree.vn/kien-thuc/"}, {"@type": "ListItem", "position": 3, "name": "Lỗi thường gặp khi huấn luyện mô hình: chẩn đoán và cách sửa"}]}</script>
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<script defer src="../assets/vendor/katex/katex.min.js"></script>
+<script defer src="../assets/vendor/katex/contrib/auto-render.min.js" onload="renderMathInElement(document.querySelector('.prose'),{delimiters:[{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}],throwOnError:false})"></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Bỏ qua đến nội dung</a>
+<div class="progress" aria-hidden="true"></div>
+<header class="site-header">
+  <div class="container wide header-top">
+    <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="nav-scrim" hidden></div>
+    <a class="logo" href="../" aria-label="HọcFree – Trang chủ"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+    <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
+    <div class="header-actions">
+      <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <a class="login-link" href="../dang-nhap.html">Đăng nhập</a>
+      <a class="btn start-btn" href="../lo-trinh/">Bắt đầu học</a>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="container wide">
+      <nav class="site-nav" id="site-nav" aria-label="Menu chính">
+        <div class="drawer-head">
+          <a class="logo" href="../" tabindex="-1"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+          <button class="icon-btn nav-close" aria-label="Đóng menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <button type="button" class="drawer-search search-open"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span>Tìm bài học, chủ đề…</span></button>
+        <ul class="nav-list"><li class="nav-item"><a class="nav-link" href="../">Trang chủ</a></li><li class="nav-item has-panel is-mega"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-hoc">Học AI &amp; Lập trình<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel mega" id="nav-panel-hoc">
+  <div class="container wide mega-inner">
+    <div class="mega-groups"><div class="mega-group"><a class="mega-group-title" href="../hoc/#programming">Programming</a><ul><li><a href="../hoc/python.html">Python</a></li><li><a href="../hoc/csharp.html">C#</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#ai-machine-learning">AI &amp; Machine Learning</a><ul><li><a href="../hoc/machine-learning.html">Machine Learning</a></li><li><a href="../hoc/deep-learning.html">Deep Learning</a></li><li><a href="../hoc/pytorch.html">PyTorch</a></li><li><a href="../hoc/generative-ai.html">Generative AI</a></li><li><a href="../hoc/llm-ai-agents.html">LLM / AI Agents</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#computer-vision">Computer Vision</a><ul><li><a href="../hoc/opencv.html">OpenCV</a></li><li><a href="../hoc/image-processing.html">Image Processing</a></li><li><a href="../hoc/computer-vision.html">Computer Vision</a></li><li><a href="../hoc/ocr.html">OCR</a></li><li><a href="../hoc/object-detection.html">Object Detection</a></li><li><a href="../hoc/segmentation.html">Segmentation</a></li></ul></div><div class="mega-group"><a class="mega-group-title" href="../hoc/#vision-engineering">Vision Engineering</a><ul><li><a href="../hoc/machine-vision.html">Machine Vision</a></li><li><a href="../hoc/ai-vision.html">AI Vision</a></li><li><a href="../hoc/industrial-vision.html">Industrial Vision</a></li><li><a href="../hoc/camera-lens.html">Camera &amp; Lens</a></li><li><a href="../hoc/lighting.html">Lighting</a></li><li><a href="../hoc/calibration.html">Calibration</a></li><li><a href="../hoc/3d-vision.html">3D Vision</a></li><li><a href="../hoc/plc-robot-mes.html">PLC / Robot / MES</a></li><li><a href="../hoc/vision-deployment.html">Vision Deployment</a></li></ul></div></div>
+    <a class="feature-card" href="../lo-trinh/vision-engineer.html">
+  <span class="feature-eyebrow">⭐ Learning Path nổi bật</span>
+  <span class="feature-title">Trở thành Vision Engineer</span>
+  <span class="feature-sub">Machine Vision + AI Vision + Industrial Automation</span>
+  <span class="feature-desc">Lộ trình thực chiến từ Python, OpenCV và Machine Vision đến 3D Vision, Deep Learning, AI Vision, Camera, PLC, Robot và triển khai hệ thống Vision trong nhà máy.</span>
+  <span class="feature-chain" aria-label="Các chặng chính"><span>Python</span><i aria-hidden="true">→</i><span>OpenCV</span><i aria-hidden="true">→</i><span>Machine Vision</span><i aria-hidden="true">→</i><span>AI Vision</span><i aria-hidden="true">→</i><span class="chain-goal">🎯 Vision Engineer</span></span>
+  <span class="feature-meta">15 chặng · 5 giai đoạn · ~13 tháng</span>
+  <span class="feature-cta">Xem lộ trình →</span>
+</a>
+  </div>
+  <div class="mega-foot"><div class="container wide mega-foot-inner"><ol class="journey compact" aria-label="Học, thực hành, trở thành kỹ sư"><li><a href="../hoc/" aria-current="step"><span class="journey-n">1</span><span class="journey-t"><b>Học</b><small>Học AI &amp; Lập trình</small></span></a></li><li><a href="../projects/"><span class="journey-n">2</span><span class="journey-t"><b>Thực hành</b><small>Projects</small></span></a></li><li><a href="../lo-trinh/"><span class="journey-n">3</span><span class="journey-t"><b>Trở thành kỹ sư</b><small>Learning Paths</small></span></a></li></ol><a class="panel-all" href="../hoc/">Xem tất cả Học AI &amp; Lập trình →</a></div></div>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-projects">Projects<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-projects">
+  <p class="panel-kicker"><span>Bước 2 · Thực hành</span>Áp dụng vào dự án thật</p>
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../projects/ai-projects.html"><span class="drop-label">AI Projects</span><span class="drop-desc">Ứng dụng ML và LLM, từ ý tưởng đến bản demo</span></a></li><li><a class="drop-link" href="../projects/computer-vision-projects.html"><span class="drop-label">Computer Vision Projects</span><span class="drop-desc">Phát hiện, nhận dạng và theo dõi đối tượng</span></a></li><li><a class="drop-link" href="../projects/industrial-vision-projects.html"><span class="drop-label">Industrial Vision Projects</span><span class="drop-desc">Đo kích thước, kiểm tra lỗi, đọc mã trên dây chuyền</span></a></li></ul></div></div>
+  <a class="panel-all" href="../projects/">Xem tất cả Projects →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-lo-trinh">Learning Paths<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-lo-trinh">
+  <p class="panel-kicker"><span>Bước 3 · Trở thành kỹ sư</span>Định hướng nghề nghiệp</p>
+  <ul class="drop-list"><li><a class="drop-link is-flagship" href="../lo-trinh/vision-engineer.html"><span class="drop-label">⭐ Trở thành Vision Engineer</span><span class="drop-desc">Machine Vision + AI Vision + Industrial Automation · 15 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/toeic-700.html"><span class="drop-label">700+ TOEIC trong 5 tháng</span><span class="drop-desc">TOEIC Listening &amp; Reading + giao tiếp công sở cho người đi làm · 11 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/hsk3.html"><span class="drop-label">Tiếng Trung từ 0 đến HSK 3 trong 6 tháng</span><span class="drop-desc">Pinyin, chữ Hán, ngữ pháp, giao tiếp và luyện thi HSK 3.0 cho người Việt · 10 chặng</span></a></li><li><a class="drop-link" href="../lo-trinh/python-developer.html"><span class="drop-label">Python Developer</span><span class="drop-desc">Python, tự động hóa, dữ liệu và Web API · 10 chặng</span></a></li></ul>
+  <a class="panel-all" href="../lo-trinh/">Xem tất cả lộ trình →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger is-active" aria-expanded="false" aria-controls="nav-panel-kien-thuc" aria-current="true">Kiến thức<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-kien-thuc">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Lĩnh vực</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/programming.html"><span class="drop-label">Programming</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-machine-learning.html"><span class="drop-label">AI / Machine Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/deep-learning.html"><span class="drop-label">Deep Learning</span></a></li><li><a class="drop-link" href="../kien-thuc/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/machine-vision.html"><span class="drop-label">Machine Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/ai-vision.html"><span class="drop-label">AI Vision</span></a></li><li><a class="drop-link" href="../kien-thuc/industrial-automation.html"><span class="drop-label">Industrial Automation</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Công cụ &amp; mẹo</p><ul class="drop-list"><li><a class="drop-link" href="../kien-thuc/tools-frameworks.html"><span class="drop-label">Tools &amp; Frameworks</span></a></li><li><a class="drop-link" href="../kien-thuc/tips-tricks.html"><span class="drop-label">Tips &amp; Tricks</span></a></li></ul></div></div>
+  <a class="panel-all" href="../kien-thuc/">Xem tất cả Kiến thức →</a>
+</div></li><li class="nav-item has-panel"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tin-tuc-ai">Tin tức AI<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tin-tuc-ai">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tin-tuc-ai/ai-news.html"><span class="drop-label">AI News</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-models.html"><span class="drop-label">AI Models</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/technology.html"><span class="drop-label">Technology</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/computer-vision.html"><span class="drop-label">Computer Vision</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/robotics.html"><span class="drop-label">Robotics</span></a></li><li><a class="drop-link" href="../tin-tuc-ai/ai-industry.html"><span class="drop-label">AI Industry</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tin-tuc-ai/">Xem tất cả Tin tức AI →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-ngoai-ngu">Ngoại ngữ<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop wide" id="nav-panel-ngoai-ngu">
+  
+  <div class="drop-cols"><div class="drop-col"><p class="drop-group-title">Ngôn ngữ</p><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/english.html"><span class="drop-label">English</span><span class="drop-desc">Lộ trình 700 TOEIC, phương pháp học, giáo trình HF-700TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chinese.html"><span class="drop-label">Chinese</span><span class="drop-desc">Lộ trình 0 đến HSK 3 trong 6 tháng, phương pháp học, giáo trình HF-HSK3</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Tiếng Anh theo kỹ năng</p><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/toeic-listening.html"><span class="drop-label">TOEIC Listening</span><span class="drop-desc">Part 1–4: mô tả tranh, hỏi – đáp, hội thoại, bài nói</span></a></li><li><a class="drop-link" href="../ngoai-ngu/toeic-reading.html"><span class="drop-label">TOEIC Reading</span><span class="drop-desc">Part 5–7: điền từ, điền câu, đọc hiểu</span></a></li><li><a class="drop-link" href="../ngoai-ngu/ngu-phap-tieng-anh.html"><span class="drop-label">Ngữ pháp tiếng Anh</span><span class="drop-desc">Từ loại, thì, mệnh đề, liên từ cho TOEIC</span></a></li><li><a class="drop-link" href="../ngoai-ngu/tu-vung-tieng-anh.html"><span class="drop-label">Từ vựng tiếng Anh</span><span class="drop-desc">Từ vựng công sở theo chủ đề, collocation</span></a></li><li><a class="drop-link" href="../ngoai-ngu/giao-tiep-tieng-anh.html"><span class="drop-label">Giao tiếp công sở</span><span class="drop-desc">Điện thoại, họp, thuyết trình, email</span></a></li></ul></div><div class="drop-col"><p class="drop-group-title">Tiếng Trung theo kỹ năng</p><ul class="drop-list"><li><a class="drop-link" href="../ngoai-ngu/pinyin-phat-am.html"><span class="drop-label">Pinyin &amp; phát âm</span><span class="drop-desc">Thanh mẫu, vận mẫu, thanh điệu, biến điệu</span></a></li><li><a class="drop-link" href="../ngoai-ngu/chu-han.html"><span class="drop-label">Chữ Hán</span><span class="drop-desc">Nét, thứ tự nét, bộ thủ, âm Hán Việt</span></a></li><li><a class="drop-link" href="../ngoai-ngu/ngu-phap-tieng-trung.html"><span class="drop-label">Ngữ pháp tiếng Trung</span><span class="drop-desc">Từ 是, 吗, 了 đến bổ ngữ, câu 把, câu 被</span></a></li><li><a class="drop-link" href="../ngoai-ngu/tu-vung-tieng-trung.html"><span class="drop-label">Từ vựng tiếng Trung</span><span class="drop-desc">Từ vựng HSK 1–3 theo chủ đề, Anki</span></a></li><li><a class="drop-link" href="../ngoai-ngu/giao-tiep-tieng-trung.html"><span class="drop-label">Giao tiếp tiếng Trung</span><span class="drop-desc">Chào hỏi, mua sắm, đi lại, công sở</span></a></li><li><a class="drop-link" href="../ngoai-ngu/luyen-thi-hsk.html"><span class="drop-label">Luyện thi HSK</span><span class="drop-desc">Đề HSK 3.0, nghe, đọc, viết, nói, đề thi thử</span></a></li></ul></div></div>
+  <a class="panel-all" href="../ngoai-ngu/">Xem tất cả Ngoại ngữ →</a>
+</div></li><li class="nav-item has-panel align-end"><button type="button" class="nav-link nav-trigger" aria-expanded="false" aria-controls="nav-panel-tai-nguyen">Tài nguyên<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="nav-panel drop" id="nav-panel-tai-nguyen">
+  
+  <div class="drop-cols"><div class="drop-col"><ul class="drop-list"><li><a class="drop-link" href="../tai-nguyen/source-code.html"><span class="drop-label">Source Code</span><span class="drop-desc">Mã nguồn mẫu đi kèm bài học</span></a></li><li><a class="drop-link" href="../tai-nguyen/dataset.html"><span class="drop-label">Dataset</span><span class="drop-desc">Bộ dữ liệu ảnh để luyện tập</span></a></li><li><a class="drop-link" href="../tai-nguyen/cheat-sheets.html"><span class="drop-label">Cheat Sheets</span><span class="drop-desc">Tóm tắt nhanh trong một trang</span></a></li><li><a class="drop-link" href="../tai-nguyen/documentation.html"><span class="drop-label">Documentation</span><span class="drop-desc">Tài liệu tra cứu thư viện, API</span></a></li><li><a class="drop-link" href="../tai-nguyen/ebook.html"><span class="drop-label">Ebook / Tài liệu</span><span class="drop-desc">Sách và tài liệu tham khảo</span></a></li><li><a class="drop-link" href="../tai-nguyen/ai-tools.html"><span class="drop-label">AI Tools</span><span class="drop-desc">Công cụ AI hữu ích cho việc học</span></a></li></ul></div></div>
+  <a class="panel-all" href="../tai-nguyen/">Xem tất cả Tài nguyên →</a>
+</div></li></ul>
+        <div class="drawer-foot">
+          <a class="btn ghost" href="../dang-nhap.html">Đăng nhập</a>
+          <a class="btn" href="../lo-trinh/">Bắt đầu học</a>
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>
+<div class="search-dialog" hidden>
+  <div class="search-scrim"></div>
+  <div class="search-box" role="dialog" aria-modal="true" aria-label="Tìm kiếm">
+    <form class="search-form" action="../search.html" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" name="q" placeholder="Tìm bài học, chủ đề, bài viết…" autocomplete="off" aria-label="Từ khóa tìm kiếm" aria-controls="search-suggest">
+      <button type="button" class="icon-btn search-close" aria-label="Đóng"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </form>
+    <div class="search-suggest" id="search-suggest" aria-live="polite">
+      <div class="search-empty">
+        <p class="search-group-title">Chủ đề phổ biến</p>
+        <div class="chips"><a class="chip" href="../hoc/python.html">Python</a><a class="chip" href="../hoc/opencv.html">OpenCV</a><a class="chip" href="../hoc/machine-vision.html">Machine Vision</a><a class="chip" href="../hoc/deep-learning.html">Deep Learning</a><a class="chip" href="../hoc/ai-vision.html">AI Vision</a><a class="chip" href="../hoc/object-detection.html">Object Detection</a><a class="chip" href="../hoc/pytorch.html">PyTorch</a><a class="chip" href="../ngoai-ngu/english.html">English</a></div>
+        <p class="search-group-title">Lộ trình nổi bật</p>
+        <a class="search-item" href="../lo-trinh/vision-engineer.html"><span class="search-ico" aria-hidden="true">⭐</span><span>Trở thành Vision Engineer<small>Learning Path · Machine Vision + AI Vision + Industrial Automation</small></span></a>
+      </div>
+    </div>
+    <div class="search-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> chọn</span><span><kbd>Enter</kbd> mở</span><span><kbd>Esc</kbd> đóng</span></div>
+  </div>
+</div>
+<main id="main">
+  <div class="container layout article-layout">
+    <article class="article">
+      <nav class="breadcrumb" aria-label="Breadcrumb"><a href="../">Trang chủ</a><span>/</span><a href="../kien-thuc/">Kiến thức</a></nav>
+      <header class="article-head">
+        <a class="pill cat-kien-thuc" href="../kien-thuc/">Kiến thức</a>
+        <h1>Lỗi thường gặp khi huấn luyện mô hình: chẩn đoán và cách sửa</h1>
+        <p class="lead">Bảng tra theo triệu chứng: loss không giảm, NaN, overfitting, dữ liệu lệch lớp, chạy thật kém, lỗi PyTorch. Có thí nghiệm đo hiệu quả từng cách sửa.</p>
+        <div class="article-meta">
+          <span class="avatar" aria-hidden="true">HF</span>
+          <div class="meta"><span class="by">Ban biên tập HọcFree</span><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-11-05">05/11/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>43 phút đọc</span></div>
+        </div>
+      </header>
+      <figure class="article-cover">
+        <img src="../assets/images/posts/loi-thuong-gap-khi-huan-luyen-mo-hinh.webp" alt="Lỗi thường gặp khi huấn luyện mô hình: chẩn đoán và cách sửa" width="1200" height="675" fetchpriority="high" decoding="async">
+      </figure>
+      
+      <details class="toc" open><summary>Nội dung bài viết</summary><ol class="toc-plain"><li><a href="#1-bang-tra-nhanh-theo-trieu-chung">1. Bảng tra nhanh theo triệu chứng</a></li><li><a href="#2-bon-phep-thu-truoc-khi-huan-luyen-dai">2. Bốn phép thử trước khi huấn luyện dài</a></li><li><a href="#3-loss-khong-giam-cac-loi-code-kinh-dien">3. Loss không giảm: các lỗi code kinh điển</a></li><li><a href="#4-loss-thanh-nan-hoac-inf">4. Loss thành NaN hoặc inf</a></li><li><a href="#5-loss-dao-dong-chon-learning-rate">5. Loss dao động, chọn learning rate</a></li><li><a href="#6-underfitting-mo-hinh-hoc-chua-toi">6. Underfitting: mô hình học chưa tới</a></li><li><a href="#7-overfitting-hoc-thuoc-thay-vi-hoc-quy-luat">7. Overfitting: học thuộc thay vì học quy luật</a></li><li><a href="#8-val-tot-hon-train-va-val-dep-qua">8. Val tốt hơn train, và val &quot;đẹp quá&quot;</a></li><li><a href="#9-accuracy-cao-nhung-bo-sot-lop-hiem">9. Accuracy cao nhưng bỏ sót lớp hiếm</a></li><li><a href="#10-danh-gia-tot-chay-that-lai-kem">10. Đánh giá tốt, chạy thật lại kém</a></li><li><a href="#11-thong-bao-loi-thuong-gap">11. Thông báo lỗi thường gặp</a></li><li><a href="#12-ket-qua-khong-lap-lai-duoc">12. Kết quả không lặp lại được</a></li><li><a href="#13-checklist-khi-huan-luyen-co-van-de">13. Checklist khi huấn luyện &quot;có vấn đề&quot;</a></li><li><a href="#14-bai-tap">14. Bài tập</a></li><li><a href="#tom-tat">Tóm tắt</a></li></ol></details>
+      <div class="prose">
+<p>Bạn bấm chạy, đợi vài giờ, và nhận về một trong những cảnh quen thuộc: loss đứng yên, loss thành <code>nan</code>, accuracy train 100% nhưng ảnh mới đoán sai, hoặc mô hình chấm 97% trên máy mà xuống dây chuyền bỏ sót gần nửa số sản phẩm lỗi. Hầu hết các tình huống này có nguyên nhân rất cụ thể và có cách kiểm tra trong vài phút. Bài này là một cẩm nang chẩn đoán: đi từ <strong>triệu chứng</strong> (nhìn vào đường loss, thông báo lỗi, con số đánh giá) đến <strong>nguyên nhân</strong> và <strong>cách sửa</strong>, kèm thí nghiệm nhỏ bằng PyTorch để bạn thấy tận mắt từng lỗi và đo được hiệu quả của từng cách sửa.</p>
+<div class="tip"><strong>Cách đọc bài</strong>Mục 1 là bảng tra theo triệu chứng: tìm dòng giống tình huống của bạn rồi nhảy tới mục tương ứng. Mọi đoạn code tự tạo dữ liệu, chạy trên CPU trong vài giây đến vài chục giây, đã chạy thử với Python 3.10 và PyTorch 2.14 (các API dùng ở đây không đổi trong PyTorch 2.15, bản mới nhất ra ngày 28/10/2026). Kết quả in ra trong bài là kết quả chạy thật; máy bạn có thể lệch ở chữ số cuối.</div>
+
+<h2 id="1-bang-tra-nhanh-theo-trieu-chung">1. Bảng tra nhanh theo triệu chứng</h2>
+<p>Thói quen quan trọng nhất khi huấn luyện là <strong>ghi lại loss của cả tập train và tập validation sau mỗi epoch</strong>, rồi nhìn hai đường đó cùng nhau. Phần lớn chẩn đoán dưới đây dựa vào hình dạng của hai đường này.</p>
+<table>
+  <tr><th>Triệu chứng</th><th>Nguyên nhân hay gặp</th><th>Xem mục</th></tr>
+  <tr><td>Loss train gần như không giảm ngay từ đầu</td><td>Lỗi code (softmax thừa, quên <code>zero_grad</code>, nhãn lệch), learning rate sai, dữ liệu chưa chuẩn hóa</td><td>2, 3</td></tr>
+  <tr><td>Loss thành <code>nan</code> hoặc <code>inf</code></td><td>Learning rate quá lớn, dữ liệu chưa chuẩn hóa, <code>log(0)</code>, tràn số float16, dữ liệu có NaN</td><td>4</td></tr>
+  <tr><td>Loss dao động mạnh, thỉnh thoảng vọt lên</td><td>Learning rate quá lớn, batch quá nhỏ, thiếu warmup, vài mẫu nhãn sai</td><td>5</td></tr>
+  <tr><td>Loss train và val cùng cao, gần nhau</td><td>Underfitting: mô hình quá yếu, học chưa đủ lâu, đặc trưng không chứa thông tin</td><td>6</td></tr>
+  <tr><td>Loss train tiến về 0, loss val giảm rồi tăng lại</td><td>Overfitting</td><td>7</td></tr>
+  <tr><td>Loss val thấp hơn loss train</td><td>Thường không phải lỗi: dropout và augmentation chỉ chạy lúc train</td><td>8</td></tr>
+  <tr><td>Kết quả val đẹp bất thường</td><td>Rò rỉ dữ liệu: ảnh "họ hàng" nằm ở cả train và val</td><td>8</td></tr>
+  <tr><td>Accuracy cao nhưng bỏ sót lớp hiếm (ảnh NG)</td><td>Dữ liệu mất cân bằng, đo sai chỉ số</td><td>9</td></tr>
+  <tr><td>Đánh giá tốt, chạy thật kém</td><td>Quên <code>model.eval()</code>, tiền xử lý lúc chạy khác lúc train, dữ liệu thật khác dữ liệu train</td><td>10</td></tr>
+  <tr><td>Chương trình dừng với <code>RuntimeError</code>, <code>ValueError</code></td><td>Sai kiểu dữ liệu, sai kích thước, khác thiết bị, hết bộ nhớ GPU</td><td>11</td></tr>
+  <tr><td>Chạy lại cùng code ra kết quả khác</td><td>Chưa cố định seed, thuật toán không tất định</td><td>12</td></tr>
+</table>
+
+<h2 id="2-bon-phep-thu-truoc-khi-huan-luyen-dai">2. Bốn phép thử trước khi huấn luyện dài</h2>
+<p>Đừng bắt đầu bằng một lần huấn luyện 100 epoch. Andrej Karpathy, trong bài "A Recipe for Training Neural Networks", khuyên làm một loạt kiểm tra nhỏ trước, vì lỗi trong mạng neural thường <strong>im lặng</strong>: code vẫn chạy, loss vẫn giảm một chút, chỉ là kết quả tệ hơn mức đáng có. Bốn phép thử dưới đây mất vài phút nhưng bắt được phần lớn lỗi code.</p>
+<h3 id="phep-thu-1-loss-luc-khoi-tao">Phép thử 1: loss lúc khởi tạo</h3>
+<p>Với bài toán phân loại \(C\) lớp và cross-entropy, mô hình vừa khởi tạo gần như đoán đều cho mọi lớp, xác suất mỗi lớp khoảng \(1/C\). Loss lúc đó phải gần \(-\ln(1/C) = \ln C\): khoảng 0,69 với 2 lớp, 1,10 với 3 lớp, 2,30 với 10 lớp. Lệch vài phần mười là bình thường (trọng số khởi tạo ngẫu nhiên nên logits không đúng bằng 0). Nếu loss ban đầu là 10 hay 50 với bài 3 lớp, có gì đó sai: nhãn không đúng dạng, loss function không hợp, đầu vào có giá trị khổng lồ vì chưa chuẩn hóa.</p>
+<h3 id="phep-thu-2-hoc-thuoc-mot-batch">Phép thử 2: học thuộc một batch</h3>
+<p>Lấy một batch nhỏ cố định (vài ảnh) và huấn luyện lặp lại trên đúng batch đó. Mô hình đủ lớn phải học thuộc được, loss phải tiến về gần 0. Nếu không, lỗi nằm trong code (forward, loss, optimizer), không phải trong dữ liệu hay siêu tham số: không cần huấn luyện dài để biết.</p>
+<pre><code class="language-python">import math
+
+import torch
+from torch import nn
+
+torch.manual_seed(0)
+SO_LOP = 3
+
+# Mạng nhỏ cho ảnh xám 32x32, 3 lớp: OK, xước, móp
+model = nn.Sequential(
+    nn.Conv2d(1, 16, 3, padding=1), nn.BatchNorm2d(16), nn.ReLU(), nn.MaxPool2d(2),
+    nn.Conv2d(16, 32, 3, padding=1), nn.BatchNorm2d(32), nn.ReLU(), nn.MaxPool2d(2),
+    nn.Flatten(), nn.Linear(32 * 8 * 8, SO_LOP),
+)
+loss_fn = nn.CrossEntropyLoss()
+
+# Một batch nhỏ cố định: 8 ảnh, nhãn ngẫu nhiên
+x = torch.randn(8, 1, 32, 32)
+y = torch.randint(0, SO_LOP, (8,))
+
+# Phép thử 1: loss lúc khởi tạo phải gần ln(số lớp), đo trên nhiều ảnh cho ổn định
+with torch.no_grad():
+    x_nhieu = torch.randn(512, 1, 32, 32)
+    y_nhieu = torch.randint(0, SO_LOP, (512,))
+    loss0 = loss_fn(model(x_nhieu), y_nhieu).item()
+print(f"Loss khởi tạo: {loss0:.3f} (kỳ vọng khoảng {math.log(SO_LOP):.3f})")
+
+# Phép thử 2: học thuộc một batch, loss phải tiến về 0
+opt = torch.optim.Adam(model.parameters(), lr=1e-3)
+model.train()
+for buoc in range(1, 201):
+    opt.zero_grad()
+    loss = loss_fn(model(x), y)
+    loss.backward()
+    opt.step()
+    if buoc in (1, 50, 100, 200):
+        print(f"Bước {buoc:3d}: loss = {loss.item():.4f}")</code></pre>
+<pre><code class="language-text">Loss khởi tạo: 1.353 (kỳ vọng khoảng 1.099)
+Bước   1: loss = 1.3598
+Bước  50: loss = 0.0006
+Bước 100: loss = 0.0003
+Bước 200: loss = 0.0002</code></pre>
+<p>Loss khởi tạo 1,35 so với kỳ vọng 1,10: cùng cỡ, chấp nhận được. Sau 50 bước, mô hình đã thuộc lòng 8 ảnh. Code huấn luyện cơ bản đúng.</p>
+<h3 id="phep-thu-3-xem-du-lieu-ngay-truoc-khi-vao-mo-hinh">Phép thử 3: xem dữ liệu ngay trước khi vào mô hình</h3>
+<p>Lưu hoặc hiển thị vài ảnh lấy từ <strong>DataLoader</strong> (không phải từ thư mục gốc), kèm nhãn. Đây là chỗ hay phát hiện: augmentation xoay mất vùng lỗi, ảnh bị lật màu BGR/RGB, ảnh toàn đen do chia 255 hai lần, nhãn lệch so với ảnh do sắp xếp tên file khác nhau. Kiểm tra thêm <code>x.min()</code>, <code>x.max()</code>, <code>x.mean()</code>, <code>x.dtype</code>, <code>y.unique()</code> của một batch.</p>
+<h3 id="phep-thu-4-moc-so-sanh-don-gian">Phép thử 4: mốc so sánh đơn giản</h3>
+<p>Tính trước kết quả của cách đơn giản nhất: luôn đoán lớp đông nhất, hoặc một mô hình nhỏ như logistic regression. Với dữ liệu 95% OK, đoán "OK" cho mọi ảnh đã được 95% accuracy. Mô hình của bạn chỉ có giá trị khi vượt rõ mốc này, đo bằng đúng chỉ số bài toán cần (mục 9).</p>
+
+<h2 id="3-loss-khong-giam-cac-loi-code-kinh-dien">3. Loss không giảm: các lỗi code kinh điển</h2>
+<p>Khi phép thử 2 thất bại, rà lần lượt danh sách dưới đây. Mỗi lỗi đều đã làm mất nhiều ngày của rất nhiều người.</p>
+<table>
+  <tr><th>Lỗi</th><th>Hậu quả</th><th>Cách sửa</th></tr>
+  <tr><td>Áp <code>softmax</code> trước <code>nn.CrossEntropyLoss</code></td><td>Loss giảm rất chậm và kẹt ở một mức sàn, không bao giờ về 0</td><td>Đưa thẳng <strong>logits</strong> (đầu ra lớp Linear cuối) vào loss. <code>CrossEntropyLoss</code> đã gồm <code>LogSoftmax</code> + <code>NLLLoss</code>. Chỉ dùng softmax khi cần xác suất lúc dự đoán.</td></tr>
+  <tr><td>Áp <code>sigmoid</code> trước <code>nn.BCEWithLogitsLoss</code></td><td>Như trên, với bài nhị phân</td><td>Dùng logits; hoặc dùng <code>nn.BCELoss</code> nếu thật sự muốn tự áp sigmoid (kém ổn định số hơn)</td></tr>
+  <tr><td>Quên <code>optimizer.zero_grad()</code></td><td>Gradient cộng dồn qua các bước, bước cập nhật ngày càng lớn, loss dao động hoặc phân kỳ</td><td>Gọi <code>zero_grad()</code> mỗi bước, trước <code>backward()</code> (trừ khi cố ý tích lũy gradient, mục 11)</td></tr>
+  <tr><td>Quên <code>loss.backward()</code> hoặc <code>optimizer.step()</code></td><td>Trọng số không đổi, loss đứng yên</td><td>Đủ bốn dòng: <code>zero_grad</code>, forward + loss, <code>backward</code>, <code>step</code></td></tr>
+  <tr><td>Tạo optimizer trước khi thay lớp cuối của mô hình pretrained</td><td>Optimizer giữ tham số của lớp cũ, lớp mới không bao giờ được cập nhật</td><td>Sửa kiến trúc xong mới tạo optimizer</td></tr>
+  <tr><td>Đóng băng nhầm (<code>requires_grad = False</code> cho cả mô hình)</td><td>Không lớp nào học</td><td>Kiểm tra <code>sum(p.numel() for p in model.parameters() if p.requires_grad)</code> phải lớn hơn 0</td></tr>
+  <tr><td>Nhãn lệch so với ảnh</td><td>Loss giảm tới mức đoán theo tỉ lệ lớp rồi dừng, val ngang mức ngẫu nhiên</td><td>Phép thử 3: in tên file và nhãn của vài mẫu từ DataLoader</td></tr>
+  <tr><td>Learning rate quá nhỏ (ví dụ 1e-7) hoặc quá lớn</td><td>Quá nhỏ: loss giảm cực chậm. Quá lớn: dao động, NaN</td><td>Bắt đầu với Adam/AdamW lr = 1e-3 (huấn luyện từ đầu) hoặc 1e-4 (fine-tune), hoặc tìm bằng LR range test (mục 5)</td></tr>
+  <tr><td>Đầu vào chưa chuẩn hóa (ảnh 0–255, đặc trưng cỡ hàng nghìn)</td><td>Gradient rất lớn hoặc rất lệch giữa các chiều, khó hội tụ</td><td>Chia 255 rồi chuẩn hóa theo mean/std; với dữ liệu bảng, chuẩn hóa từng cột theo mean/std <strong>của tập train</strong></td></tr>
+</table>
+<p>Thí nghiệm sau cho thấy lỗi đầu tiên tai hại thế nào. Cùng mô hình, cùng dữ liệu, chỉ khác một dòng <code>softmax</code>:</p>
+<pre><code class="language-python">import torch
+from torch import nn
+
+torch.manual_seed(0)
+x = torch.randn(64, 20)
+y = torch.randint(0, 3, (64,))
+
+
+def huan_luyen(softmax_thua):
+    torch.manual_seed(1)
+    model = nn.Sequential(nn.Linear(20, 64), nn.ReLU(), nn.Linear(64, 3))
+    opt = torch.optim.Adam(model.parameters(), lr=1e-2)
+    loss_fn = nn.CrossEntropyLoss()
+    for _ in range(500):
+        opt.zero_grad()
+        out = model(x)
+        if softmax_thua:
+            out = torch.softmax(out, dim=1)  # SAI: CrossEntropyLoss đã tự làm softmax
+        loss = loss_fn(out, y)
+        loss.backward()
+        opt.step()
+    return loss.item()
+
+
+print(f"Đúng (logits):        loss cuối = {huan_luyen(False):.4f}")
+print(f"Sai (softmax 2 lần):  loss cuối = {huan_luyen(True):.4f}")</code></pre>
+<pre><code class="language-text">Đúng (logits):        loss cuối = 0.0001
+Sai (softmax 2 lần):  loss cuối = 0.5657</code></pre>
+<p>Bản lỗi kẹt ở 0,566. Lý do: sau softmax, mọi giá trị nằm trong [0, 1]; <code>CrossEntropyLoss</code> lại softmax lần nữa trên các giá trị đó, nên trường hợp tốt nhất (lớp đúng bằng 1, hai lớp kia bằng 0) vẫn chỉ cho xác suất \(e/(e+2)\), loss tối thiểu \(-\ln\frac{e}{e+2} \approx 0{,}551\). Mô hình đúng là đúng, nhưng tín hiệu học bị bóp nghẹt, và với dữ liệu thật bạn sẽ chỉ thấy "mô hình học kém" mà không có thông báo lỗi nào.</p>
+<p>Chi tiết về loss và optimizer: <a href="../hoc/loss-function-gradient-descent-optimizer.html">Loss function và optimizer: SGD, Momentum, RMSProp, Adam</a>.</p>
+
+<h2 id="4-loss-thanh-nan-hoac-inf">4. Loss thành NaN hoặc inf</h2>
+<p>Một khi loss là <code>nan</code>, mọi trọng số nhận gradient <code>nan</code> và mô hình hỏng vĩnh viễn: huấn luyện tiếp là vô ích. Nguyên nhân thường gặp, theo thứ tự nên kiểm tra:</p>
+<ol>
+  <li><strong>Learning rate quá lớn</strong> làm trọng số tăng vọt qua vài bước (exploding). Giảm lr 10 lần và thử lại.</li>
+  <li><strong>Đầu vào hoặc nhãn chưa chuẩn hóa</strong>, giá trị lớn làm loss và gradient khổng lồ (đặc biệt với hồi quy và MSE).</li>
+  <li><strong>Phép toán không xác định</strong>: <code>torch.log(0)</code> cho <code>-inf</code>, <code>0 * -inf</code> cho <code>nan</code>, chia cho 0, <code>sqrt</code> của số âm. Hay gặp trong loss tự viết. Dùng hàm ổn định có sẵn (<code>log_softmax</code>, <code>BCEWithLogitsLoss</code>), hoặc kẹp giá trị: <code>torch.log(p.clamp(min=1e-7))</code>.</li>
+  <li><strong>Tràn số float16</strong> khi dùng mixed precision: float16 chỉ biểu diễn tới 65504. Dùng <code>torch.amp.GradScaler</code> đúng cách (mục 11), hoặc <code>bfloat16</code> nếu GPU hỗ trợ (dải giá trị như float32).</li>
+  <li><strong>Dữ liệu có sẵn NaN</strong>: file CSV có ô trống, ảnh hỏng, bản đồ độ sâu có điểm không đo được. Kiểm tra <code>torch.isfinite(x).all()</code> trên dữ liệu.</li>
+</ol>
+<p>Thí nghiệm hồi quy với đầu vào chưa chuẩn hóa (giá trị cỡ ±150) và nhãn rất lớn:</p>
+<pre><code class="language-python">import torch
+from torch import nn
+
+torch.manual_seed(0)
+x = torch.randn(256, 10) * 50          # đặc trưng chưa chuẩn hóa: giá trị cỡ hàng chục, hàng trăm
+y = x.sum(dim=1, keepdim=True)         # nhãn cũng rất lớn
+
+
+def chay(x, y, lr, clip=None):
+    torch.manual_seed(1)
+    m = nn.Sequential(nn.Linear(10, 64), nn.ReLU(), nn.Linear(64, 1))
+    opt = torch.optim.SGD(m.parameters(), lr=lr)
+    for buoc in range(1, 201):
+        opt.zero_grad()
+        loss = nn.functional.mse_loss(m(x), y)
+        if not torch.isfinite(loss):
+            return f"loss = {loss.item()} ở bước {buoc}, dừng"
+        loss.backward()
+        if clip is not None:
+            nn.utils.clip_grad_norm_(m.parameters(), max_norm=clip)
+        opt.step()
+    return f"loss cuối = {loss.item():.4f}"
+
+
+print("Dữ liệu thô, không clip:", chay(x, y, lr=1e-3))
+print("Dữ liệu thô, clip=1.0  :", chay(x, y, lr=1e-3, clip=1.0))
+
+# Cách sửa gốc: chuẩn hóa đầu vào và nhãn (dùng mean/std của tập train)
+x_tb, x_dl = x.mean(dim=0), x.std(dim=0)
+y_tb, y_dl = y.mean(), y.std()
+x_c = (x - x_tb) / x_dl
+y_c = (y - y_tb) / y_dl
+print("Đã chuẩn hóa, không clip:", chay(x_c, y_c, lr=1e-2))</code></pre>
+<pre><code class="language-text">Dữ liệu thô, không clip: loss = inf ở bước 5, dừng
+Dữ liệu thô, clip=1.0  : loss cuối = 19113.4805
+Đã chuẩn hóa, không clip: loss cuối = 0.0271</code></pre>
+<p>Ba dòng kết quả cho ba bài học. Không làm gì: loss thành <code>inf</code> sau 5 bước. <strong>Gradient clipping</strong> (giới hạn chuẩn của vector gradient, ở đây là 1,0) chặn được bùng nổ nhưng không chữa bệnh: loss vẫn ở mức 19 nghìn vì mô hình bước quá ngắn so với độ lớn của bài toán. <strong>Chuẩn hóa dữ liệu</strong> mới là cách sửa gốc: cùng mô hình, loss về 0,027 (trên thang đã chuẩn hóa, phương sai của nhãn là 1, tức mô hình giải thích được khoảng 97% biến thiên). Clipping là lưới an toàn nên giữ, nhưng đừng dùng nó để che một learning rate sai hay dữ liệu chưa chuẩn hóa.</p>
+<div class="tip"><strong>Tìm chỗ sinh ra NaN</strong>Bọc vài bước huấn luyện trong <code>with torch.autograd.detect_anomaly():</code>. Khi backward gặp NaN, PyTorch báo lỗi kèm traceback của phép toán forward đã tạo ra nó. Chế độ này làm chậm huấn luyện nhiều, chỉ bật khi gỡ lỗi. Song song, in chuẩn gradient mà <code>clip_grad_norm_</code> trả về mỗi bước: nó thường tăng vọt vài bước trước khi loss thành NaN.</div>
+<p>Vanishing và exploding gradient trong mạng sâu được giải thích kỹ ở <a href="../hoc/vanishing-exploding-gradient-weight-init.html">Vanishing/Exploding gradient và khởi tạo trọng số</a>.</p>
+
+<h2 id="5-loss-dao-dong-chon-learning-rate">5. Loss dao động, chọn learning rate</h2>
+<p>Loss của từng batch luôn nhấp nhô vì mỗi batch khác nhau; điều cần nhìn là <strong>trung bình theo epoch</strong>. Nếu trung bình đó dao động lớn hoặc thỉnh thoảng vọt lên rồi mới giảm lại, nghi ngờ theo thứ tự: learning rate quá lớn, batch quá nhỏ (gradient nhiễu), thiếu giai đoạn warmup cho mô hình lớn, vài mẫu nhãn sai có loss khổng lồ.</p>
+<p>Cách tìm learning rate có hệ thống là <strong>LR range test</strong> (Leslie Smith, 2015): tăng lr theo cấp số nhân từ rất nhỏ đến rất lớn trong một lượt ngắn, ghi loss ở mỗi bước. Loss sẽ đứng yên (lr quá nhỏ), rồi giảm nhanh, rồi bùng nổ (lr quá lớn). Quy tắc kinh nghiệm phổ biến: chọn lr nhỏ hơn khoảng 10 lần so với điểm loss thấp nhất, nằm trong đoạn loss đang giảm dốc.</p>
+<pre><code class="language-python">import math
+
+import torch
+from torch import nn
+
+torch.manual_seed(0)
+x = torch.randn(2048, 20)
+y = (x[:, :3].sum(dim=1) &gt; 0).long()
+
+model = nn.Sequential(nn.Linear(20, 64), nn.ReLU(), nn.Linear(64, 2))
+opt = torch.optim.SGD(model.parameters(), lr=1e-6, momentum=0.9)
+loss_fn = nn.CrossEntropyLoss()
+
+lr_dau, lr_cuoi, so_buoc = 1e-6, 10.0, 100
+he_so = (lr_cuoi / lr_dau) ** (1 / so_buoc)    # tăng lr theo cấp số nhân mỗi bước
+lr, loss_muot, tot_nhat, ket_qua = lr_dau, 0.0, float("inf"), []
+for buoc in range(1, so_buoc + 1):
+    idx = torch.randint(0, len(x), (64,))
+    for g in opt.param_groups:
+        g["lr"] = lr
+    opt.zero_grad()
+    loss = loss_fn(model(x[idx]), y[idx])
+    loss.backward()
+    opt.step()
+    loss_muot = 0.9 * loss_muot + 0.1 * loss.item()          # làm mượt cho dễ đọc
+    loss_hien = loss_muot / (1 - 0.9 ** buoc)
+    ket_qua.append((lr, loss_hien))
+    tot_nhat = min(tot_nhat, loss_hien)
+    if not math.isfinite(loss_hien) or loss_hien &gt; 4 * tot_nhat:   # loss bùng nổ: dừng
+        break
+    lr *= he_so
+
+for lr, l in ket_qua[::10]:
+    print(f"lr = {lr:.1e}  loss = {l:.3f}")
+lr_min = min(ket_qua, key=lambda t: t[1])[0]
+print(f"Loss thấp nhất ở lr ≈ {lr_min:.1e}; chọn lr khoảng {lr_min / 10:.1e}")</code></pre>
+<pre><code class="language-text">lr = 1.0e-06  loss = 0.689
+lr = 5.0e-06  loss = 0.703
+lr = 2.5e-05  loss = 0.707
+lr = 1.3e-04  loss = 0.708
+lr = 6.3e-04  loss = 0.709
+lr = 3.2e-03  loss = 0.698
+lr = 1.6e-02  loss = 0.670
+lr = 7.9e-02  loss = 0.560
+lr = 4.0e-01  loss = 0.302
+lr = 2.0e+00  loss = 0.623
+Loss thấp nhất ở lr ≈ 7.6e-01; chọn lr khoảng 7.6e-02</code></pre>
+<p>Với bài này, vùng lr từ 1e-2 đến 4e-1 cho loss giảm nhanh nhất; lr khoảng 8e-2 là điểm xuất phát tốt cho SGD momentum. Lưu ý: phép thử đã làm thay đổi trọng số, nên <strong>khởi tạo lại mô hình</strong> trước khi huấn luyện thật.</p>
+<p>Sau khi chọn lr, dùng một bộ lập lịch để giảm dần lr theo thời gian: <code>torch.optim.lr_scheduler.OneCycleLR</code> hoặc <code>CosineAnnealingLR</code> (thường kèm vài trăm bước warmup cho Transformer và mô hình lớn), hoặc <code>ReduceLROnPlateau</code> (giảm lr khi val loss không cải thiện sau một số epoch).</p>
+
+<h2 id="6-underfitting-mo-hinh-hoc-chua-toi">6. Underfitting: mô hình học chưa tới</h2>
+<p>Dấu hiệu: loss train và loss val cùng cao và gần nhau; accuracy train cũng thấp. Mô hình chưa nắm được quy luật, chưa nói đến chuyện học thuộc. Trước khi làm mô hình phức tạp hơn, hãy chắc phép thử 2 ở mục 2 đã qua (nếu không học thuộc nổi một batch thì đó là lỗi code, không phải underfitting).</p>
+<ul>
+  <li><strong>Huấn luyện lâu hơn</strong>: loss train còn đang giảm đều thì chưa nên dừng.</li>
+  <li><strong>Mô hình lớn hơn</strong> hoặc phù hợp hơn: thêm lớp, thêm kênh; với ảnh, dùng CNN hoặc mô hình pretrained thay vì MLP trên pixel.</li>
+  <li><strong>Giảm regularization</strong> đang quá tay: weight decay quá lớn, dropout 0,7, augmentation phá hủy chi tiết (làm mờ mất vết xước nhỏ).</li>
+  <li><strong>Kiểm tra thông tin trong dữ liệu</strong>: ảnh resize về 64×64 có còn thấy vết lỗi 3 pixel không? ROI cắt có chứa vùng lỗi không? Người nhìn ảnh đầu vào (đúng kích thước mô hình thấy) có tự phân biệt được không? Nếu người còn không phân biệt được, mô hình cũng khó.</li>
+  <li><strong>Chọn lại learning rate</strong> (mục 5): lr quá nhỏ trông rất giống underfitting.</li>
+</ul>
+
+<h2 id="7-overfitting-hoc-thuoc-thay-vi-hoc-quy-luat">7. Overfitting: học thuộc thay vì học quy luật</h2>
+<p>Dấu hiệu kinh điển: loss train tiếp tục giảm về gần 0, accuracy train lên 100%, trong khi loss val giảm đến một lúc rồi <strong>tăng trở lại</strong>. Điểm val loss thấp nhất là lúc mô hình tổng quát hóa tốt nhất; sau đó nó bắt đầu học thuộc cả nhiễu và chi tiết riêng của từng ảnh train.</p>
+<p>Có nhiều biện pháp, nhưng hiệu quả của chúng rất khác nhau và phụ thuộc bài toán. Thí nghiệm dưới đây đo từng biện pháp trên cùng một bài: phân loại hai lớp, 40 đặc trưng nhưng chỉ 5 đặc trưng có ích, 10% nhãn bị gán sai (nên độ chính xác tối đa có thể đạt là khoảng 90%), chỉ có 400 mẫu train cho một mạng 77 nghìn tham số. Mọi cấu hình được đánh giá trên cùng 4000 mẫu val, đo bằng cross-entropy gốc.</p>
+<pre><code class="language-python">import copy
+
+import torch
+from torch import nn
+
+torch.manual_seed(0)
+
+
+def tao_du_lieu(n, ti_le_nhieu=0.1):
+    """40 đặc trưng, chỉ 5 đặc trưng đầu quyết định nhãn; 10% nhãn bị gán sai."""
+    x = torch.randn(n, 40)
+    y = (x[:, :5].sum(dim=1) &gt; 0).long()
+    lat = torch.rand(n) &lt; ti_le_nhieu
+    y[lat] = 1 - y[lat]
+    return x, y
+
+
+X_TR, Y_TR = tao_du_lieu(400)       # tập train nhỏ: rất dễ quá khớp
+X_THEM, Y_THEM = tao_du_lieu(3600)  # dữ liệu "thu thập thêm"
+X_VA, Y_VA = tao_du_lieu(4000)
+
+
+def do_chinh_xac(model, x, y):
+    model.eval()
+    with torch.no_grad():
+        return (model(x).argmax(dim=1) == y).float().mean().item()
+
+
+def huan_luyen(x_tr, y_tr, dropout=0.0, weight_decay=0.0, label_smoothing=0.0,
+               early_stopping=False, so_epoch=100, kien_nhan=15):
+    torch.manual_seed(1)
+    model = nn.Sequential(
+        nn.Linear(40, 256), nn.ReLU(), nn.Dropout(dropout),
+        nn.Linear(256, 256), nn.ReLU(), nn.Dropout(dropout),
+        nn.Linear(256, 2),
+    )
+    opt = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=weight_decay)
+    loss_fn = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
+    loss_val_fn = nn.CrossEntropyLoss()  # val luôn đo bằng loss gốc để so sánh công bằng
+
+    tot_nhat, trang_thai_tot, cho = float("inf"), None, 0
+    for epoch in range(1, so_epoch + 1):
+        model.train()
+        hoan_vi = torch.randperm(len(x_tr))
+        for i in range(0, len(x_tr), 32):
+            idx = hoan_vi[i:i + 32]
+            opt.zero_grad()
+            loss_fn(model(x_tr[idx]), y_tr[idx]).backward()
+            opt.step()
+
+        model.eval()
+        with torch.no_grad():
+            loss_val = loss_val_fn(model(X_VA), Y_VA).item()
+        if loss_val &lt; tot_nhat - 1e-4:
+            tot_nhat, cho = loss_val, 0
+            trang_thai_tot = copy.deepcopy(model.state_dict())
+        else:
+            cho += 1
+            if early_stopping and cho &gt;= kien_nhan:
+                break
+
+    if early_stopping:  # quay về checkpoint có val loss thấp nhất
+        model.load_state_dict(trang_thai_tot)
+    model.eval()
+    with torch.no_grad():
+        loss_val = loss_val_fn(model(X_VA), Y_VA).item()
+    return epoch, do_chinh_xac(model, x_tr, y_tr), loss_val, do_chinh_xac(model, X_VA, Y_VA)
+
+
+x_nhieu = torch.cat([X_TR, X_THEM])
+y_nhieu = torch.cat([Y_TR, Y_THEM])
+cau_hinh = [
+    ("Gốc, 400 mẫu", X_TR, Y_TR, {}),
+    ("+ early stopping", X_TR, Y_TR, dict(early_stopping=True)),
+    ("+ weight decay 1.0", X_TR, Y_TR, dict(weight_decay=1.0)),
+    ("+ dropout 0.5", X_TR, Y_TR, dict(dropout=0.5)),
+    ("+ label smoothing 0.1", X_TR, Y_TR, dict(label_smoothing=0.1)),
+    ("+ cả bốn", X_TR, Y_TR, dict(dropout=0.5, weight_decay=1.0, label_smoothing=0.1, early_stopping=True)),
+    ("Gốc, 4000 mẫu", x_nhieu, y_nhieu, {}),
+    ("4000 mẫu + early stopping", x_nhieu, y_nhieu, dict(early_stopping=True)),
+]
+print(f"{'Cấu hình':27s} {'epoch':&gt;5s} {'acc train':&gt;9s} {'loss val':&gt;8s} {'acc val':&gt;7s}")
+for ten, x, y, tham_so in cau_hinh:
+    epoch, acc_tr, loss_va, acc_va = huan_luyen(x, y, **tham_so)
+    print(f"{ten:27s} {epoch:5d} {acc_tr:9.1%} {loss_va:8.3f} {acc_va:7.1%}")</code></pre>
+<pre><code class="language-text">Cấu hình                    epoch acc train loss val acc val
+Gốc, 400 mẫu                  100    100.0%    1.818   73.8%
++ early stopping               18     87.7%    0.520   76.5%
++ weight decay 1.0            100    100.0%    1.135   73.6%
++ dropout 0.5                 100    100.0%    1.584   73.9%
++ label smoothing 0.1         100    100.0%    0.627   71.6%
++ cả bốn                       25     92.5%    0.501   78.4%
+Gốc, 4000 mẫu                 100    100.0%    2.377   79.8%
+4000 mẫu + early stopping      17     88.0%    0.432   84.9%</code></pre>
+<p>Đọc bảng (một lần chạy, một seed: chênh lệch dưới 1 điểm phần trăm chưa có ý nghĩa):</p>
+<ul>
+  <li><strong>Mô hình gốc</strong> thuộc lòng 100% tập train, val chỉ 73,8%, val loss 1,82 (mô hình "tự tin sai" rất nhiều).</li>
+  <li><strong>Early stopping</strong> (giữ checkpoint có val loss thấp nhất, dừng sau 15 epoch không cải thiện) là cách rẻ nhất mà hiệu quả nhất trong nhóm: +2,7 điểm, val loss về 0,52, tiết kiệm 80% thời gian huấn luyện.</li>
+  <li><strong>Weight decay, dropout, label smoothing dùng riêng lẻ</strong> làm val loss tốt lên (mô hình bớt tự tin thái quá) nhưng <strong>không</strong> tăng độ chính xác ở đây, vì sau 100 epoch mô hình vẫn đủ sức học thuộc 400 mẫu. Đừng kỳ vọng một biện pháp đơn lẻ cứu được tập dữ liệu quá nhỏ.</li>
+  <li><strong>Kết hợp cả bốn</strong> cho kết quả tốt nhất với 400 mẫu: 78,4%.</li>
+  <li><strong>Thêm dữ liệu</strong> thắng tất cả: 4000 mẫu không cần mẹo gì đã được 79,8%, thêm early stopping lên 84,9%, gần mức trần khoảng 90%.</li>
+</ul>
+<p>Thứ tự nên thử với bài toán ảnh thực tế:</p>
+<ol>
+  <li><strong>Kiểm tra rò rỉ dữ liệu trước</strong> (mục 8): đôi khi "overfitting" thật ra là val quá dễ hoặc quá khó so với thực tế.</li>
+  <li><strong>Thêm dữ liệu thật</strong>, đặc biệt dữ liệu đa dạng: nhiều lô, nhiều ca, nhiều ngày, nhiều điều kiện chiếu sáng. Đây gần như luôn là cách hiệu quả nhất.</li>
+  <li><strong>Transfer learning</strong>: dùng mô hình pretrained thay vì huấn luyện từ đầu khi chỉ có vài trăm đến vài nghìn ảnh.</li>
+  <li><strong>Augmentation</strong> hợp lý với vật lý của bài toán: lật, xoay nhẹ, đổi độ sáng trong dải đèn thật có thể dao động. Augmentation sai (lật ảnh có chữ, đổi màu khi màu là dấu hiệu lỗi) làm hại mô hình.</li>
+  <li><strong>Early stopping</strong> và luôn lưu checkpoint tốt nhất theo val.</li>
+  <li><strong>Weight decay</strong> với AdamW (0,01 đến 0,1 là dải thường dùng), <strong>dropout</strong> trước lớp phân loại (0,2 đến 0,5), <strong>label smoothing</strong> 0,05 đến 0,1 khi nhãn có thể không chắc chắn.</li>
+  <li><strong>Mô hình nhỏ hơn</strong> nếu mọi cách trên chưa đủ.</li>
+</ol>
+<div class="warn"><strong>Adam và weight decay</strong>Trong <code>torch.optim.Adam</code>, tham số <code>weight_decay</code> được cộng vào gradient (L2 cổ điển) rồi đi qua cơ chế thích nghi của Adam, nên tác dụng yếu và khó dự đoán. <code>torch.optim.AdamW</code> tách riêng phần giảm trọng số (Loshchilov và Hutter, "Decoupled Weight Decay Regularization"). Khi cần weight decay, dùng AdamW.</div>
+<p>Cách chia train/val/test không rò rỉ, tìm ảnh trùng bằng hash và đo các biện pháp trên dữ liệu ảnh: <a href="overfitting-chia-train-val-test.html">Overfitting, chia train/val/test không rò rỉ</a>. Augmentation và transfer learning: <a href="../hoc/transfer-learning-data-augmentation.html">Transfer Learning và Data Augmentation khi có ít dữ liệu</a>. Khi thiếu ảnh lỗi: <a href="../hoc/du-lieu-tong-hop-synthetic-data-ai-vision.html">augmentation, cắt dán lỗi và dữ liệu tổng hợp</a>.</p>
+
+<h2 id="8-val-tot-hon-train-va-val-dep-qua">8. Val tốt hơn train, và val "đẹp quá"</h2>
+<h3 id="loss-val-thap-hon-loss-train">Loss val thấp hơn loss train</h3>
+<p>Thường <strong>không</strong> phải lỗi. Ba lý do phổ biến:</p>
+<ul>
+  <li>Dropout và augmentation chỉ chạy lúc train (khi gọi <code>model.train()</code>), làm bài train khó hơn bài val.</li>
+  <li>Loss train của một epoch là trung bình trong suốt epoch, khi mô hình còn đang học; loss val đo ở cuối epoch, khi mô hình đã tốt hơn.</li>
+  <li>Label smoothing làm loss train không thể về 0, trong khi bạn đo val bằng loss gốc.</li>
+</ul>
+<p>Muốn so sánh công bằng, đo lại loss trên tập train ở chế độ <code>model.eval()</code>, cùng cách đo với val.</p>
+<h3 id="ro-ri-du-lieu">Rò rỉ dữ liệu</h3>
+<p>Nếu val đạt 99,9% trong khi bài toán nổi tiếng là khó, hoặc kết quả val đẹp nhưng mang ra dây chuyền giảm mạnh, nghi ngờ đầu tiên là <strong>rò rỉ</strong>: thông tin của tập val đã lọt vào quá trình huấn luyện. Dạng hay gặp:</p>
+<ul>
+  <li>Chia ngẫu nhiên theo ảnh, trong khi nhiều ảnh chụp cùng một sản phẩm, cùng lô, cùng phút: ảnh "anh em" nằm ở cả train và val. Chia theo <strong>nhóm</strong> (mã sản phẩm, lô, ngày).</li>
+  <li>Ảnh trùng hoặc gần trùng (chụp lặp, file sao chép) giữa các tập.</li>
+  <li>Tính mean/std chuẩn hóa, chọn đặc trưng, cân bằng lớp (oversampling) trên <strong>toàn bộ</strong> dữ liệu trước khi chia. Mọi thống kê phải tính trên tập train.</li>
+  <li>Chỉnh siêu tham số nhiều vòng theo tập test: tập test dần dần trở thành tập val. Giữ một tập test chỉ dùng một lần ở cuối.</li>
+</ul>
+
+<h2 id="9-accuracy-cao-nhung-bo-sot-lop-hiem">9. Accuracy cao nhưng bỏ sót lớp hiếm</h2>
+<p>Trong kiểm tra chất lượng, ảnh NG thường chỉ chiếm 1–5%. Mô hình có thể đạt accuracy rất cao chỉ bằng cách gần như luôn đoán OK. Thí nghiệm với dữ liệu 95% OK, 5% NG:</p>
+<pre><code class="language-python">import torch
+from torch import nn
+from torch.utils.data import DataLoader, TensorDataset, WeightedRandomSampler
+
+torch.manual_seed(0)
+
+
+def tao_du_lieu(n_ok, n_ng):
+    """Lớp 0 = OK, lớp 1 = NG. Hai lớp chồng lấn một phần."""
+    x_ok = torch.randn(n_ok, 8)
+    x_ng = torch.randn(n_ng, 8) + 1.0
+    x = torch.cat([x_ok, x_ng])
+    y = torch.cat([torch.zeros(n_ok), torch.ones(n_ng)]).long()
+    return x, y
+
+
+x_tr, y_tr = tao_du_lieu(1900, 100)   # 95% OK, 5% NG
+x_te, y_te = tao_du_lieu(1900, 100)
+
+
+def danh_gia(model):
+    model.eval()
+    with torch.no_grad():
+        du_doan = model(x_te).argmax(dim=1)
+    acc = (du_doan == y_te).float().mean().item()
+    tp = ((du_doan == 1) &amp; (y_te == 1)).sum().item()
+    fn = ((du_doan == 0) &amp; (y_te == 1)).sum().item()
+    fp = ((du_doan == 1) &amp; (y_te == 0)).sum().item()
+    return acc, tp / (tp + fn), fp
+
+
+def huan_luyen(cach):
+    torch.manual_seed(1)
+    model = nn.Sequential(nn.Linear(8, 32), nn.ReLU(), nn.Linear(32, 2))
+    opt = torch.optim.Adam(model.parameters(), lr=1e-3)
+    ds = TensorDataset(x_tr, y_tr)
+    dem = torch.bincount(y_tr)                      # [1900, 100]
+
+    if cach == "class weight":
+        trong_so = len(y_tr) / (2 * dem.float())      # lớp hiếm có trọng số lớn hơn
+        loss_fn = nn.CrossEntropyLoss(weight=trong_so)
+    else:
+        loss_fn = nn.CrossEntropyLoss()
+
+    if cach == "sampler":
+        w_mau = (1.0 / dem.float())[y_tr]             # mỗi mẫu NG được bốc thường hơn
+        sampler = WeightedRandomSampler(w_mau, num_samples=len(y_tr), replacement=True)
+        loader = DataLoader(ds, batch_size=64, sampler=sampler)
+    else:
+        loader = DataLoader(ds, batch_size=64, shuffle=True)
+
+    for _ in range(30):
+        model.train()
+        for xb, yb in loader:
+            opt.zero_grad()
+            loss_fn(model(xb), yb).backward()
+            opt.step()
+    return danh_gia(model)
+
+
+for cach in ("không xử lý", "class weight", "sampler"):
+    acc, recall_ng, fp = huan_luyen(cach)
+    print(f"{cach:13s}: accuracy {acc:.1%} | bắt được {recall_ng:.0%} ảnh NG | báo nhầm {fp} ảnh OK thành NG")</code></pre>
+<pre><code class="language-text">không xử lý  : accuracy 97.0% | bắt được 57% ảnh NG | báo nhầm 16 ảnh OK thành NG
+class weight : accuracy 93.4% | bắt được 89% ảnh NG | báo nhầm 120 ảnh OK thành NG
+sampler      : accuracy 93.4% | bắt được 86% ảnh NG | báo nhầm 118 ảnh OK thành NG</code></pre>
+<p>Mô hình không xử lý có accuracy cao nhất (97%) nhưng <strong>bỏ lọt 43% sản phẩm lỗi</strong>, điều tệ nhất có thể xảy ra trong kiểm tra chất lượng. Trọng số lớp (<code>weight</code> trong <code>CrossEntropyLoss</code>) hoặc lấy mẫu cân bằng (<code>WeightedRandomSampler</code>) nâng tỉ lệ bắt lỗi lên 86–89%, đổi lại nhiều ảnh OK bị báo nhầm hơn (accuracy giảm còn 93,4%). Đây là đánh đổi thật, không có bữa trưa miễn phí: điểm cân bằng do bài toán quyết định (một sản phẩm lỗi lọt ra ngoài thiệt hại bao nhiêu so với một sản phẩm tốt bị loại nhầm).</p>
+<p>Cách làm đúng:</p>
+<ul>
+  <li><strong>Đo bằng chỉ số đúng</strong>: ma trận nhầm lẫn, recall (tỉ lệ bắt được) và precision của lớp hiếm, F1; trong nhà máy thường gọi là tỉ lệ lọt (escape) và tỉ lệ loại nhầm (overkill). Không dùng accuracy làm chỉ số chính khi dữ liệu lệch.</li>
+  <li><strong>Chọn ngưỡng</strong>: thay vì <code>argmax</code>, lấy xác suất NG và chọn ngưỡng trên tập val theo ràng buộc, ví dụ "recall NG ≥ 99%, rồi tối thiểu báo nhầm". Đây thường là đòn bẩy mạnh nhất và không cần huấn luyện lại.</li>
+  <li><strong>Trọng số lớp, lấy mẫu cân bằng, focal loss</strong>: dùng một trong các cách, không chồng tất cả (dễ bù quá tay).</li>
+  <li><strong>Thu thập thêm mẫu lớp hiếm</strong>, hoặc tạo dữ liệu tổng hợp có kiểm soát.</li>
+</ul>
+<p>Cross-entropy có trọng số, focal loss và <code>pos_weight</code> cho bài nhị phân: <a href="../hoc/ham-mat-mat-cross-entropy-focal-loss.html">Hàm mất mát cho phân loại: cross-entropy, class weight, focal loss</a>.</p>
+
+<h2 id="10-danh-gia-tot-chay-that-lai-kem">10. Đánh giá tốt, chạy thật lại kém</h2>
+<h3 id="quen-chuyen-che-do-eval">Quên chuyển chế độ eval</h3>
+<p>Dropout và BatchNorm hoạt động khác nhau giữa hai chế độ. Ở <code>model.train()</code>, dropout tắt ngẫu nhiên nơ-ron và BatchNorm dùng thống kê của chính batch đang chạy; ở <code>model.eval()</code>, dropout tắt hẳn và BatchNorm dùng thống kê tích lũy lúc huấn luyện. Quên <code>model.eval()</code> khi dự đoán thì kết quả nhảy lung tung giữa các lần gọi, phụ thuộc vào ảnh khác trong batch, và với một ảnh duy nhất thì báo lỗi:</p>
+<pre><code class="language-python">import torch
+from torch import nn
+
+torch.manual_seed(0)
+model = nn.Sequential(nn.Linear(4, 16), nn.BatchNorm1d(16), nn.ReLU(), nn.Dropout(0.5), nn.Linear(16, 2))
+x = torch.randn(1, 4)
+
+# Giả lập vài bước huấn luyện để BatchNorm có thống kê chạy (running mean/var)
+model.train()
+for _ in range(20):
+    model(torch.randn(32, 4))
+
+with torch.no_grad():
+    model.train()
+    try:
+        model(x)
+    except ValueError as loi:
+        print("Chế độ train, 1 ảnh:", loi)
+    model.eval()
+    a, b = model(x), model(x)
+    print("Chế độ eval, 2 lần gọi ra cùng kết quả:", torch.equal(a, b))</code></pre>
+<pre><code class="language-text">Chế độ train, 1 ảnh: Expected more than 1 value per channel when training, got input size torch.Size([1, 16])
+Chế độ eval, 2 lần gọi ra cùng kết quả: True</code></pre>
+<p>Quy tắc: gọi <code>model.train()</code> đầu mỗi epoch huấn luyện, <code>model.eval()</code> trước mọi lần đánh giá hay dự đoán, kèm <code>torch.no_grad()</code> (hoặc <code>torch.inference_mode()</code>) để không tốn bộ nhớ lưu đồ thị tính gradient. Đánh giá giữa các epoch xong nhớ chuyển lại <code>model.train()</code>.</p>
+<h3 id="tien-xu-ly-luc-chay-khac-luc-huan-luyen">Tiền xử lý lúc chạy khác lúc huấn luyện</h3>
+<p>Lỗi rất phổ biến khi đưa mô hình xuống máy trạm: lúc huấn luyện ảnh được đọc bằng PIL (thứ tự kênh RGB), lúc chạy đọc từ camera bằng OpenCV (BGR); resize bằng phép nội suy khác; quên chia 255; dùng mean/std khác; cắt ROI lệch vài pixel. Mô hình vẫn cho ra kết quả, chỉ là sai hơn, và không có thông báo lỗi. Cách phòng: viết <strong>một hàm tiền xử lý duy nhất</strong> và dùng nó ở cả ba nơi (train, val, chạy thật), kiểm tra bằng một ảnh mẫu: đầu ra của pipeline huấn luyện và pipeline triển khai phải giống nhau đến từng giá trị.</p>
+<pre><code class="language-python">import cv2
+import numpy as np
+import torch
+
+# Một nguồn sự thật duy nhất cho tiền xử lý, dùng chung cho train, val và lúc chạy thật
+KICH_THUOC = 224
+MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)   # mean/std ImageNet khi dùng mô hình pretrained
+STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+
+
+def tien_xu_ly(anh_bgr):
+    """Ảnh BGR uint8 từ cv2.imread hoặc camera -&gt; tensor 1x3x224x224 float32."""
+    anh = cv2.cvtColor(anh_bgr, cv2.COLOR_BGR2RGB)          # OpenCV đọc BGR, mô hình học bằng RGB
+    anh = cv2.resize(anh, (KICH_THUOC, KICH_THUOC), interpolation=cv2.INTER_AREA)
+    anh = anh.astype(np.float32) / 255.0
+    anh = (anh - MEAN) / STD
+    return torch.from_numpy(anh.transpose(2, 0, 1)).unsqueeze(0)
+
+
+anh = np.zeros((480, 640, 3), dtype=np.uint8)
+anh[:, :, 2] = 255                                        # ảnh đỏ thuần theo thứ tự BGR
+t = tien_xu_ly(anh)
+print(t.shape, t.dtype, [round(t[0, c].mean().item(), 2) for c in range(3)])</code></pre>
+<pre><code class="language-text">torch.Size([1, 3, 224, 224]) torch.float32 [2.25, -2.04, -1.8]</code></pre>
+<p>Ảnh đỏ thuần cho kênh đầu tiên (R) giá trị cao nhất sau chuẩn hóa: đúng thứ tự RGB. Nếu bạn thấy kênh thứ ba cao nhất, ảnh đã bị đảo kênh.</p>
+<h3 id="du-lieu-that-khac-du-lieu-huan-luyen">Dữ liệu thật khác dữ liệu huấn luyện</h3>
+<p>Đèn già đi, camera bị chỉnh lại tiêu cự, nhà cung cấp linh kiện đổi màu nhựa, ca đêm có ánh sáng khác: phân phối dữ liệu thay đổi (domain shift, drift) và mô hình xuống cấp dần. Cách xử lý: đưa dữ liệu từ nhiều điều kiện vào train ngay từ đầu, giữ một "golden set" ảnh chuẩn để kiểm tra định kỳ, theo dõi phân phối điểm tin cậy của mô hình trên dây chuyền, và định kỳ thu ảnh mới để huấn luyện lại.</p>
+
+<h2 id="11-thong-bao-loi-thuong-gap">11. Thông báo lỗi thường gặp</h2>
+<p>Các thông báo dưới đây được tái hiện với PyTorch 2.14; nội dung có thể thay đổi nhẹ giữa các phiên bản, nhưng từ khóa chính giữ nguyên.</p>
+<table>
+  <tr><th>Thông báo</th><th>Nguyên nhân</th><th>Cách sửa</th></tr>
+  <tr><td><code>expected target dtype to be Long or Byte, but got Float</code></td><td>Nhãn của <code>CrossEntropyLoss</code> là số thực</td><td>Nhãn chỉ số lớp phải là số nguyên: <code>y.long()</code></td></tr>
+  <tr><td><code>Target 3 is out of bounds.</code></td><td>Có nhãn ≥ số lớp đầu ra (nhãn đánh số từ 1, hoặc lớp cuối khai thiếu)</td><td>Nhãn phải từ 0 đến C−1; kiểm tra <code>y.unique()</code> và số đầu ra của lớp cuối</td></tr>
+  <tr><td><code>Target size (torch.Size([4])) must be the same as input size (torch.Size([4, 1]))</code></td><td><code>BCEWithLogitsLoss</code> cần nhãn cùng kích thước với đầu ra</td><td><code>y.float().unsqueeze(1)</code>, hoặc <code>model(x).squeeze(1)</code></td></tr>
+  <tr><td><code>mat1 and mat2 shapes cannot be multiplied (4x2048 and 1024x3)</code></td><td>Số đặc trưng sau <code>Flatten</code> khác <code>in_features</code> của lớp Linear (thường do đổi kích thước ảnh)</td><td>In <code>x.shape</code> ngay trước lớp Linear; hoặc dùng <code>nn.AdaptiveAvgPool2d(1)</code> để không phụ thuộc kích thước ảnh</td></tr>
+  <tr><td><code>Given groups=1, weight of size [8, 3, 3, 3], expected input[1, 32, 32, 3] to have 3 channels, but got 32 channels instead</code></td><td>Ảnh ở dạng HWC (NumPy, OpenCV) trong khi PyTorch cần CHW</td><td><code>torch.from_numpy(anh).permute(2, 0, 1)</code>, thêm chiều batch bằng <code>unsqueeze(0)</code></td></tr>
+  <tr><td><code>mat1 and mat2 must have the same dtype, but got Double and Float</code>; <code>Input type (unsigned char) and bias type (float) should be the same</code></td><td>Dữ liệu là float64 (mặc định của NumPy) hoặc uint8 (ảnh thô)</td><td><code>x.float()</code>; với ảnh, <code>x.float() / 255</code> rồi chuẩn hóa</td></tr>
+  <tr><td><code>Expected more than 1 value per channel when training</code></td><td>BatchNorm ở chế độ train nhận batch 1 mẫu: hay gặp ở batch cuối của epoch, hoặc khi quên <code>model.eval()</code></td><td>Dự đoán thì gọi <code>model.eval()</code>; huấn luyện thì <code>DataLoader(..., drop_last=True)</code></td></tr>
+  <tr><td><code>Expected all tensors to be on the same device</code></td><td>Mô hình trên GPU, dữ liệu trên CPU (hoặc ngược lại); tensor tạo mới trong <code>forward</code> mà quên chuyển thiết bị</td><td><code>xb, yb = xb.to(thiet_bi), yb.to(thiet_bi)</code> trong mỗi bước; tensor mới tạo theo <code>device=x.device</code></td></tr>
+  <tr><td><code>CUDA out of memory</code></td><td>Batch, ảnh hoặc mô hình quá lớn so với bộ nhớ GPU; giữ đồ thị tính toán ngoài ý muốn</td><td>Xem bên dưới</td></tr>
+  <tr><td>Chương trình treo hoặc chạy lại từ đầu nhiều lần khi <code>num_workers &gt; 0</code> trên Windows</td><td>Windows (và macOS) khởi động worker bằng cách chạy lại script chính</td><td>Đặt code chính trong <code>if __name__ == "__main__":</code> (ví dụ ở mục 12)</td></tr>
+</table>
+<h3 id="het-bo-nho-gpu">Hết bộ nhớ GPU</h3>
+<p>Theo thứ tự ít ảnh hưởng đến kết quả nhất:</p>
+<ol>
+  <li><strong>Không giữ đồ thị tính toán</strong>: ghi log bằng <code>loss.item()</code> chứ không cộng dồn <code>tong += loss</code> (cách sau giữ toàn bộ đồ thị của mọi bước trong bộ nhớ); đánh giá trong <code>torch.no_grad()</code>.</li>
+  <li><strong>Mixed precision</strong> (<code>torch.autocast</code> + <code>torch.amp.GradScaler</code>): giảm bộ nhớ kích hoạt và thường tăng tốc trên GPU có Tensor Core.</li>
+  <li><strong>Giảm batch và tích lũy gradient</strong>: chạy 4 batch 8 ảnh rồi mới cập nhật trọng số một lần, tương đương về gradient với batch 32 (trừ các lớp phụ thuộc kích thước batch như BatchNorm).</li>
+  <li><strong>Gradient checkpointing</strong> (<code>torch.utils.checkpoint</code>): tính lại kích hoạt khi backward thay vì lưu, đổi thời gian lấy bộ nhớ.</li>
+  <li>Giảm kích thước ảnh hoặc dùng mô hình nhỏ hơn: ảnh hưởng đến độ chính xác, nên để cuối.</li>
+</ol>
+<p>Đoạn sau kết hợp mixed precision, tích lũy gradient và gradient clipping theo đúng thứ tự mà tài liệu PyTorch hướng dẫn (phải <code>unscale_</code> trước khi clip). Code tự tắt AMP khi không có GPU, nên chạy được cả trên CPU:</p>
+<pre><code class="language-python">import torch
+from torch import nn
+
+thiet_bi = "cuda" if torch.cuda.is_available() else "cpu"
+dung_amp = thiet_bi == "cuda"          # float16 chỉ có lợi trên GPU
+
+model = nn.Sequential(nn.Linear(100, 256), nn.ReLU(), nn.Linear(256, 10)).to(thiet_bi)
+opt = torch.optim.AdamW(model.parameters(), lr=1e-3)
+loss_fn = nn.CrossEntropyLoss()
+scaler = torch.amp.GradScaler(thiet_bi, enabled=dung_amp)
+
+BATCH_NHO = 8          # batch vừa bộ nhớ GPU
+TICH_LUY = 4           # 4 batch nhỏ = 1 batch hiệu dụng 32
+du_lieu = [(torch.randn(BATCH_NHO, 100), torch.randint(0, 10, (BATCH_NHO,))) for _ in range(16)]
+
+model.train()
+opt.zero_grad(set_to_none=True)
+for i, (xb, yb) in enumerate(du_lieu, start=1):
+    xb, yb = xb.to(thiet_bi), yb.to(thiet_bi)
+    with torch.autocast(device_type=thiet_bi, dtype=torch.float16, enabled=dung_amp):
+        loss = loss_fn(model(xb), yb) / TICH_LUY   # chia để gradient bằng trung bình của batch lớn
+    scaler.scale(loss).backward()
+    if i % TICH_LUY == 0:
+        scaler.unscale_(opt)                                   # bỏ hệ số scale trước khi clip
+        chuan = nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        scaler.step(opt)                                       # tự bỏ qua bước nếu gradient có inf/NaN
+        scaler.update()
+        opt.zero_grad(set_to_none=True)
+        print(f"Cập nhật trọng số sau batch {i:2d}, chuẩn gradient {chuan.item():.3f}")</code></pre>
+<pre><code class="language-text">Cập nhật trọng số sau batch  4, chuẩn gradient 1.370
+Cập nhật trọng số sau batch  8, chuẩn gradient 1.292
+Cập nhật trọng số sau batch 12, chuẩn gradient 1.257
+Cập nhật trọng số sau batch 16, chuẩn gradient 1.188</code></pre>
+<p><code>torch.cuda.empty_cache()</code> không giải phóng được tensor bạn vẫn còn giữ tham chiếu; nó chỉ trả lại bộ nhớ đệm không dùng cho các chương trình khác. Đừng dựa vào nó để sửa lỗi hết bộ nhớ.</p>
+
+<h2 id="12-ket-qua-khong-lap-lai-duoc">12. Kết quả không lặp lại được</h2>
+<p>Chạy lại cùng code ra kết quả lệch vài điểm phần trăm là bình thường nếu chưa cố định nguồn ngẫu nhiên: khởi tạo trọng số, thứ tự xáo trộn dữ liệu, augmentation, dropout, và một số thuật toán GPU không tất định. Khi cần so sánh hai cấu hình một cách công bằng, hoặc cần tái hiện một lỗi, cố định seed theo hướng dẫn trong tài liệu PyTorch:</p>
+<pre><code class="language-python">import random
+
+import numpy as np
+import torch
+from torch.utils.data import DataLoader, TensorDataset
+
+
+def dat_hat_giong(seed=42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)               # gieo cho cả CPU và mọi GPU
+    torch.backends.cudnn.benchmark = False
+    torch.use_deterministic_algorithms(True, warn_only=True)
+
+
+def seed_worker(worker_id):
+    worker_seed = torch.initial_seed() % 2**32
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
+
+
+if __name__ == "__main__":                # bắt buộc trên Windows khi num_workers &gt; 0
+    dat_hat_giong(42)
+    g = torch.Generator()
+    g.manual_seed(42)
+    ds = TensorDataset(torch.arange(10.0))
+    loader = DataLoader(ds, batch_size=4, shuffle=True, num_workers=2,
+                        worker_init_fn=seed_worker, generator=g)
+    print([b[0].tolist() for b in loader])</code></pre>
+<pre><code class="language-text">[[6.0, 5.0, 4.0, 0.0], [8.0, 9.0, 2.0, 1.0], [3.0, 7.0]]</code></pre>
+<p>Chạy script bao nhiêu lần cũng in ra đúng dòng trên: cùng thứ tự batch, kể cả khi dùng 2 worker. Lưu ý:</p>
+<ul>
+  <li>Tài liệu PyTorch nói rõ: kết quả tái lập hoàn toàn không được đảm bảo giữa các phiên bản PyTorch, giữa CPU và GPU, giữa các loại GPU. Mục tiêu thực tế là lặp lại trên cùng máy, cùng môi trường.</li>
+  <li><code>use_deterministic_algorithms(True)</code> có thể làm chậm và báo lỗi với phép toán không có bản tất định; <code>warn_only=True</code> chỉ cảnh báo thay vì dừng.</li>
+  <li>Ngay cả khi đã cố định seed, <strong>đừng kết luận từ một lần chạy</strong>: chạy 3 đến 5 seed khác nhau và so sánh trung bình, nhất là khi chênh lệch chỉ một hai điểm phần trăm.</li>
+</ul>
+
+<h2 id="13-checklist-khi-huan-luyen-co-van-de">13. Checklist khi huấn luyện "có vấn đề"</h2>
+<ol>
+  <li>Loss khởi tạo có gần \(\ln C\) không?</li>
+  <li>Mô hình có học thuộc được một batch nhỏ không?</li>
+  <li>Ảnh và nhãn lấy ra từ DataLoader có đúng không (màu, hướng, giá trị, dtype, khớp nhãn)?</li>
+  <li>Đầu vào đã chuẩn hóa theo thống kê của tập train chưa?</li>
+  <li>Loss nhận logits (không softmax/sigmoid thừa), có đủ <code>zero_grad</code>, <code>backward</code>, <code>step</code>?</li>
+  <li>Learning rate đã chọn có cơ sở (LR range test, giá trị chuẩn cho optimizer) chưa?</li>
+  <li>Có ghi loss train và val mỗi epoch, lưu checkpoint tốt nhất theo val không?</li>
+  <li>Đã chia dữ liệu theo nhóm, kiểm tra ảnh trùng giữa các tập chưa?</li>
+  <li>Dữ liệu có lệch lớp không? Đang đo bằng recall/precision và đã chọn ngưỡng trên val chưa?</li>
+  <li>Đánh giá và dự đoán có <code>model.eval()</code> và <code>torch.no_grad()</code> không?</li>
+  <li>Tiền xử lý lúc chạy thật có dùng đúng hàm của lúc huấn luyện không?</li>
+  <li>Kết luận có dựa trên nhiều seed không?</li>
+</ol>
+
+<h2 id="14-bai-tap">14. Bài tập</h2>
+<div class="ex">
+<h3 id="bai-1-doc-nhat-ky-huan-luyen">Bài 1. Đọc nhật ký huấn luyện</h3>
+<p>Phân loại 10 lớp. Nhật ký sau 4 lần huấn luyện khác nhau (loss train / loss val):</p>
+<ul>
+  <li>A: epoch 1: 2,31 / 2,30; epoch 20: 2,30 / 2,30; epoch 50: 2,30 / 2,30.</li>
+  <li>B: epoch 1: 1,90 / 1,85; epoch 20: 0,45 / 0,62; epoch 50: 0,02 / 1,40.</li>
+  <li>C: epoch 1: 27,6 / nan.</li>
+  <li>D: epoch 1: 1,20 / 1,05; epoch 20: 0,60 / 0,48; epoch 50: 0,41 / 0,35.</li>
+</ul>
+<p>Chẩn đoán từng trường hợp và nêu việc đầu tiên nên làm.</p>
+<details><summary>Xem đáp án</summary>
+<ul>
+  <li><strong>A</strong>: loss đứng yên ở \(\ln 10 \approx 2{,}30\), tức mô hình vẫn đoán đều như lúc khởi tạo. Gần như chắc chắn là lỗi code hoặc lr: trọng số không được cập nhật (quên <code>step</code>, optimizer giữ tham số cũ, đóng băng nhầm), lr quá nhỏ, hoặc nhãn không khớp ảnh. Việc đầu tiên: phép thử học thuộc một batch.</li>
+  <li><strong>B</strong>: overfitting rõ ràng. Val tốt nhất quanh epoch 20, sau đó tăng mạnh. Việc đầu tiên: lưu checkpoint tốt nhất theo val (early stopping); sau đó kiểm tra rò rỉ, thêm dữ liệu, augmentation, weight decay.</li>
+  <li><strong>C</strong>: loss ban đầu 27,6 gấp hơn 10 lần \(\ln 10\), rồi NaN. Đầu vào chưa chuẩn hóa hoặc có giá trị khổng lồ, có thể kèm lr quá lớn. Việc đầu tiên: in min/max/mean của một batch, kiểm tra <code>torch.isfinite</code>, chuẩn hóa dữ liệu.</li>
+  <li><strong>D</strong>: bình thường. Val thấp hơn train do dropout/augmentation, và cả hai vẫn đang giảm: có thể huấn luyện thêm.</li>
+</ul>
+</details>
+</div>
+<div class="ex">
+<h3 id="bai-2-tim-loi-trong-vong-lap-huan-luyen">Bài 2. Tìm lỗi trong vòng lặp huấn luyện</h3>
+<p>Đoạn code sau chạy không báo lỗi nhưng mô hình học rất kém và kết quả đánh giá thay đổi mỗi lần chạy. Tìm ít nhất 4 lỗi.</p>
+<pre><code class="language-python"># Vòng lặp có lỗi (minh họa)
+opt = torch.optim.Adam(model.parameters(), lr=1e-3)
+model.fc = nn.Linear(512, 2)
+tong_loss = 0
+for xb, yb in train_loader:
+    out = torch.softmax(model(xb), dim=1)
+    loss = nn.CrossEntropyLoss()(out, yb)
+    loss.backward()
+    opt.step()
+    tong_loss += loss
+
+dung = 0
+for xb, yb in val_loader:
+    dung += (model(xb).argmax(1) == yb).sum().item()</code></pre>
+<details><summary>Xem đáp án</summary>
+<ol>
+  <li>Optimizer được tạo <strong>trước</strong> khi thay <code>model.fc</code>: lớp phân loại mới không bao giờ được cập nhật. Thay lớp trước rồi mới tạo optimizer.</li>
+  <li><code>torch.softmax</code> trước <code>CrossEntropyLoss</code>: bỏ softmax, đưa logits vào loss.</li>
+  <li>Thiếu <code>opt.zero_grad()</code>: gradient cộng dồn qua mọi bước.</li>
+  <li><code>tong_loss += loss</code> giữ đồ thị tính toán của mọi bước (tốn bộ nhớ, có thể hết bộ nhớ GPU): dùng <code>loss.item()</code>.</li>
+  <li>Đánh giá thiếu <code>model.eval()</code> và <code>torch.no_grad()</code>: dropout và BatchNorm còn ở chế độ train nên kết quả thay đổi mỗi lần, lại tốn bộ nhớ. Thiếu cả <code>model.train()</code> ở đầu vòng huấn luyện (cần thiết khi vòng lặp chạy nhiều epoch xen kẽ đánh giá).</li>
+</ol>
+</details>
+</div>
+<div class="ex">
+<h3 id="bai-3-chon-chi-so-cho-tram-kiem-tra">Bài 3. Chọn chỉ số cho trạm kiểm tra</h3>
+<p>Trạm kiểm tra vỏ hộp: trung bình 2 sản phẩm lỗi trên 1000. Mô hình A: accuracy 99,8%, recall NG 10%. Mô hình B: accuracy 97,0%, recall NG 99%. Khách hàng phạt rất nặng khi nhận hàng lỗi. Chọn mô hình nào, và mô hình B còn cần gì trước khi đưa vào chạy?</p>
+<details><summary>Xem đáp án</summary>
+<p>Chọn <strong>B</strong>. Mô hình A gần như chỉ đoán OK: accuracy 99,8% ngang mức "luôn đoán OK", bỏ lọt 90% hàng lỗi. Mô hình B bắt 99% lỗi, đổi lại khoảng 3% sản phẩm bị loại nhầm (gần như toàn bộ 3% accuracy mất đi là báo nhầm hàng tốt, vì hàng lỗi chỉ chiếm 0,2%). Trước khi chạy: chọn lại ngưỡng trên tập val để giảm loại nhầm mà vẫn giữ recall theo yêu cầu, ước lượng số sản phẩm phải kiểm tra lại bằng tay mỗi ca (khoảng 30 trên 1000), kiểm tra trên một tập test chụp ở ngày, lô khác với dữ liệu huấn luyện.</p>
+</details>
+</div>
+
+<h2 id="tom-tat">Tóm tắt</h2>
+<ul>
+  <li>Luôn ghi và nhìn <strong>hai đường loss train và val</strong>; hình dạng của chúng chỉ thẳng tới nhóm nguyên nhân.</li>
+  <li>Trước khi huấn luyện dài: kiểm tra loss khởi tạo ≈ \(\ln C\), học thuộc một batch, xem dữ liệu ngay trước mô hình, tính mốc đơn giản.</li>
+  <li>Lỗi code hay gặp nhất: softmax thừa trước <code>CrossEntropyLoss</code>, quên <code>zero_grad</code>, optimizer tạo trước khi sửa mô hình, dữ liệu chưa chuẩn hóa.</li>
+  <li>NaN: giảm lr, chuẩn hóa dữ liệu, dùng hàm loss ổn định số; clipping là lưới an toàn, không phải cách chữa.</li>
+  <li>Overfitting: thêm dữ liệu đa dạng là mạnh nhất, early stopping là rẻ nhất; weight decay (AdamW), dropout, label smoothing hỗ trợ khi kết hợp.</li>
+  <li>Dữ liệu lệch: đo recall/precision của lớp hiếm, chọn ngưỡng trên val, không tin accuracy.</li>
+  <li>Triển khai: <code>model.eval()</code>, <code>torch.no_grad()</code>, một hàm tiền xử lý dùng chung, theo dõi drift.</li>
+</ul>
+<p class="note">Nguồn tham khảo: <a href="http://karpathy.github.io/2019/04/25/recipe/" rel="noopener" target="_blank">Andrej Karpathy: A Recipe for Training Neural Networks</a>, <a href="https://docs.pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html" rel="noopener" target="_blank">PyTorch: CrossEntropyLoss</a>, <a href="https://docs.pytorch.org/docs/stable/notes/amp_examples.html" rel="noopener" target="_blank">PyTorch: CUDA Automatic Mixed Precision examples</a>, <a href="https://docs.pytorch.org/docs/stable/notes/randomness.html" rel="noopener" target="_blank">PyTorch: Reproducibility</a>, <a href="https://docs.pytorch.org/docs/stable/data.html" rel="noopener" target="_blank">PyTorch: torch.utils.data (multi-process loading trên Windows)</a>, <a href="https://arxiv.org/abs/1506.01186" rel="noopener" target="_blank">Leslie N. Smith: Cyclical Learning Rates for Training Neural Networks (LR range test)</a>, <a href="https://arxiv.org/abs/1711.05101" rel="noopener" target="_blank">Loshchilov, Hutter: Decoupled Weight Decay Regularization (AdamW)</a>, <a href="https://arxiv.org/abs/1512.00567" rel="noopener" target="_blank">Szegedy và cộng sự: Rethinking the Inception Architecture (label smoothing)</a>.</p>
+
+      </div>
+      
+      <footer class="article-foot">
+        <div class="tags"><a class="tag" href="../search.html?q=Deep Learning">#Deep Learning</a><a class="tag" href="../search.html?q=Machine Learning">#Machine Learning</a><a class="tag" href="../search.html?q=PyTorch">#PyTorch</a></div>
+        <div class="share">
+      <span>Chia sẻ:</span>
+      <a class="share-btn fb" href="https://www.facebook.com/sharer/sharer.php?u=https://hocfree.vn/kien-thuc/loi-thuong-gap-khi-huan-luyen-mo-hinh.html" target="_blank" rel="noopener" aria-label="Chia sẻ Facebook"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8z"/></svg></a>
+      <a class="share-btn x" href="https://twitter.com/intent/tweet?url=https://hocfree.vn/kien-thuc/loi-thuong-gap-khi-huan-luyen-mo-hinh.html" target="_blank" rel="noopener" aria-label="Chia sẻ X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg></a>
+      <button class="share-btn copy-link" data-url="https://hocfree.vn/kien-thuc/loi-thuong-gap-khi-huan-luyen-mo-hinh.html" aria-label="Sao chép liên kết"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></button>
+    </div>
+      </footer>
+      <div class="author-box">
+        <span class="avatar lg" aria-hidden="true">HF</span>
+        <div>
+          <strong>Ban biên tập HọcFree</strong>
+          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và ngoại ngữ, hoàn toàn miễn phí.</p>
+        </div>
+      </div>
+      <nav class="pager" aria-label="Bài trước/sau"><a class="prev" href="../hoc/pydev-cai-dat-python-va-vs-code.html"><span>← Bài trước</span>Cài Python, VS Code và chạy chương trình Python đầu tiên</a><span></span></nav>
+    </article>
+    <aside class="sidebar">
+  <section class="widget"><h2 class="widget-title">Đọc nhiều nhất</h2><ol class="popular"><li><a href="../hoc/yolo26-object-detection-nhap-mon.html"><span class="num">1</span><span class="t">Object Detection với YOLO26: dữ liệu, huấn luyện và xuất mô hình</span></a></li><li><a href="../kien-thuc/chon-camera-ong-kinh-machine-vision.html"><span class="num">2</span><span class="t">Chọn camera và ống kính Machine Vision: độ phân giải, FOV, tiêu cự</span></a></li><li><a href="../projects/phat-hien-loi-be-mat-anomaly-detection.html"><span class="num">3</span><span class="t">Dự án: phát hiện lỗi bề mặt bằng PatchCore, chỉ học từ ảnh OK</span></a></li><li><a href="../hoc/opencv-co-ban-anh-video-camera.html"><span class="num">4</span><span class="t">OpenCV cơ bản: đọc, hiển thị, ghi ảnh, video và camera</span></a></li><li><a href="../kien-thuc/7-kieu-chieu-sang-machine-vision.html"><span class="num">5</span><span class="t">7 kiểu chiếu sáng Machine Vision: chọn đèn theo bề mặt và loại lỗi</span></a></li></ol></section>
+  <section class="widget">
+    <h2 class="widget-title">Chuyên mục</h2>
+    <ul class="cat-list"><li><a href="../hoc/"><span>Học AI &amp; Lập trình</span><span class="count">243 bài</span></a></li><li><a href="../projects/"><span>Projects</span><span class="count">31 bài</span></a></li><li><a href="../kien-thuc/"><span>Kiến thức</span><span class="count">203 bài</span></a></li><li><a href="../tin-tuc-ai/"><span>Tin tức AI</span><span class="count">16 bài</span></a></li><li><a href="../ngoai-ngu/"><span>Ngoại ngữ</span><span class="count">127 bài</span></a></li><li><a href="../tai-nguyen/"><span>Tài nguyên</span><span class="count">41 bài</span></a></li></ul>
+  </section>
+  <section class="widget widget-about">
+    <h2 class="widget-title">Về HọcFree</h2>
+    <p>Nơi học <strong>miễn phí</strong> AI, lập trình, Computer Vision và ngoại ngữ dành cho người Việt. Không quảng cáo, không thu phí.</p>
+    <a class="btn" href="../gioi-thieu.html">Tìm hiểu thêm</a>
+  </section>
+  <section class="widget"><h2 class="widget-title">Thẻ</h2><div class="tags"><a class="tag" href="../search.html?q=.NET">.NET</a><a class="tag" href="../search.html?q=3D Vision">3D Vision</a><a class="tag" href="../search.html?q=AI Agents">AI Agents</a><a class="tag" href="../search.html?q=AI Industry">AI Industry</a><a class="tag" href="../search.html?q=AI Models">AI Models</a><a class="tag" href="../search.html?q=AI News">AI News</a><a class="tag" href="../search.html?q=AI Project">AI Project</a><a class="tag" href="../search.html?q=AI Tools">AI Tools</a><a class="tag" href="../search.html?q=AI Vision">AI Vision</a><a class="tag" href="../search.html?q=C#">C#</a><a class="tag" href="../search.html?q=Calibration">Calibration</a><a class="tag" href="../search.html?q=Camera">Camera</a><a class="tag" href="../search.html?q=Cheat Sheet">Cheat Sheet</a><a class="tag" href="../search.html?q=Chiếu sáng">Chiếu sáng</a><a class="tag" href="../search.html?q=Chữ Hán">Chữ Hán</a><a class="tag" href="../search.html?q=Computer Vision">Computer Vision</a><a class="tag" href="../search.html?q=CV News">CV News</a><a class="tag" href="../search.html?q=CV Project">CV Project</a><a class="tag" href="../search.html?q=Công cụ">Công cụ</a><a class="tag" href="../search.html?q=Dataset">Dataset</a><a class="tag" href="../search.html?q=Deep Learning">Deep Learning</a><a class="tag" href="../search.html?q=Deployment">Deployment</a><a class="tag" href="../search.html?q=Documentation">Documentation</a><a class="tag" href="../search.html?q=Ebook">Ebook</a><a class="tag" href="../search.html?q=Generative AI">Generative AI</a><a class="tag" href="../search.html?q=Giao tiếp tiếng Anh">Giao tiếp tiếng Anh</a><a class="tag" href="../search.html?q=Giao tiếp tiếng Trung">Giao tiếp tiếng Trung</a><a class="tag" href="../search.html?q=Git">Git</a><a class="tag" href="../search.html?q=GitHub">GitHub</a><a class="tag" href="../search.html?q=HSK">HSK</a><a class="tag" href="../search.html?q=Image Processing">Image Processing</a><a class="tag" href="../search.html?q=Industrial Automation">Industrial Automation</a><a class="tag" href="../search.html?q=Industrial Project">Industrial Project</a><a class="tag" href="../search.html?q=Industrial Vision">Industrial Vision</a><a class="tag" href="../search.html?q=Kinh nghiệm">Kinh nghiệm</a><a class="tag" href="../search.html?q=Lens">Lens</a><a class="tag" href="../search.html?q=Lighting">Lighting</a><a class="tag" href="../search.html?q=LLM">LLM</a><a class="tag" href="../search.html?q=Luyện thi HSK">Luyện thi HSK</a><a class="tag" href="../search.html?q=Lập trình">Lập trình</a><a class="tag" href="../search.html?q=Machine Learning">Machine Learning</a><a class="tag" href="../search.html?q=Machine Vision">Machine Vision</a><a class="tag" href="../search.html?q=MES">MES</a><a class="tag" href="../search.html?q=Ngữ pháp tiếng Anh">Ngữ pháp tiếng Anh</a><a class="tag" href="../search.html?q=Ngữ pháp tiếng Trung">Ngữ pháp tiếng Trung</a><a class="tag" href="../search.html?q=NumPy">NumPy</a><a class="tag" href="../search.html?q=Object Detection">Object Detection</a><a class="tag" href="../search.html?q=OCR">OCR</a><a class="tag" href="../search.html?q=OpenCV">OpenCV</a><a class="tag" href="../search.html?q=Phát âm">Phát âm</a><a class="tag" href="../search.html?q=Pinyin">Pinyin</a><a class="tag" href="../search.html?q=PLC">PLC</a><a class="tag" href="../search.html?q=Python">Python</a><a class="tag" href="../search.html?q=PyTorch">PyTorch</a><a class="tag" href="../search.html?q=Robot">Robot</a><a class="tag" href="../search.html?q=Robotics">Robotics</a><a class="tag" href="../search.html?q=Segmentation">Segmentation</a><a class="tag" href="../search.html?q=Source Code">Source Code</a><a class="tag" href="../search.html?q=Technology">Technology</a><a class="tag" href="../search.html?q=Tips">Tips</a><a class="tag" href="../search.html?q=Tiếng Anh">Tiếng Anh</a><a class="tag" href="../search.html?q=Tiếng Trung">Tiếng Trung</a><a class="tag" href="../search.html?q=TOEIC">TOEIC</a><a class="tag" href="../search.html?q=TOEIC Listening">TOEIC Listening</a><a class="tag" href="../search.html?q=TOEIC Reading">TOEIC Reading</a><a class="tag" href="../search.html?q=Từ vựng tiếng Anh">Từ vựng tiếng Anh</a><a class="tag" href="../search.html?q=Từ vựng tiếng Trung">Từ vựng tiếng Trung</a><a class="tag" href="../search.html?q=Tự học">Tự học</a><a class="tag" href="../search.html?q=VS Code">VS Code</a><a class="tag" href="../search.html?q=YOLO">YOLO</a><a class="tag" href="../search.html?q=Đo lường">Đo lường</a></div></section>
+</aside>
+  </div>
+  <section class="band">
+    <div class="container">
+      <div class="section-title"><h2>Có thể bạn quan tâm</h2></div>
+      <div class="card-grid"><article class="card">
+  <a class="thumb" href="../kien-thuc/3d-vision-1-cam-bien-3d-chon-cong-nghe.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/3d-vision-1-cam-bien-3d-chon-cong-nghe.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-kien-thuc" href="../kien-thuc/">Kiến thức</a>
+  <h3><a href="../kien-thuc/3d-vision-1-cam-bien-3d-chon-cong-nghe.html">Cảm biến 3D: laser, ánh sáng cấu trúc, stereo, ToF và cách chọn</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-21">21/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>20 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../kien-thuc/chay-thu-xu-ly-su-co-tram-vision.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/chay-thu-xu-ly-su-co-tram-vision.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-kien-thuc" href="../kien-thuc/">Kiến thức</a>
+  <h3><a href="../kien-thuc/chay-thu-xu-ly-su-co-tram-vision.html">Chạy thử và xử lý sự cố trạm vision tại hiện trường</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-21">21/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>20 phút đọc</span></div>
+</article><article class="card">
+  <a class="thumb" href="../kien-thuc/nhieu-snr-flat-field-chat-luong-anh.html" tabindex="-1" aria-hidden="true"><img src="../assets/images/posts/nhieu-snr-flat-field-chat-luong-anh.webp" alt="" width="1200" height="675" loading="lazy"></a>
+  <a class="kicker cat-kien-thuc" href="../kien-thuc/">Kiến thức</a>
+  <h3><a href="../kien-thuc/nhieu-snr-flat-field-chat-luong-anh.html">Nhiễu, SNR và flat-field: đo chất lượng ảnh camera bằng số</a></h3>
+  <div class="meta"><span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><time datetime="2026-10-21">21/10/2026</time></span><span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>22 phút đọc</span></div>
+</article></div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div class="footer-about">
+      <a class="logo" href="../"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="var(--accent)"/><path d="M11 13l-5 7 5 7M29 13l5 7-5 7M23 10l-6 20" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Học<b>Free</b></span></a>
+      <p>HọcFree.vn – nền tảng học miễn phí về AI, lập trình, Computer Vision, Machine Vision, tin tức AI và ngoại ngữ dành cho người Việt.</p>
+    </div>
+    <div><h3>Học &amp; thực hành</h3><ul><li><a href="../hoc/">Học AI &amp; Lập trình</a></li><li><a href="../projects/">Projects</a></li><li><a href="../lo-trinh/">Learning Paths</a></li></ul></div>
+    <div><h3>Khám phá</h3><ul><li><a href="../kien-thuc/">Kiến thức</a></li><li><a href="../tin-tuc-ai/">Tin tức AI</a></li><li><a href="../ngoai-ngu/">Ngoại ngữ</a></li><li><a href="../tai-nguyen/">Tài nguyên</a></li></ul></div>
+    <div><h3>Bài mới</h3><ul><li><a href="../kien-thuc/loi-thuong-gap-khi-huan-luyen-mo-hinh.html">Lỗi thường gặp khi huấn luyện mô hình: chẩn đoán và cách sửa</a></li><li><a href="../hoc/pydev-cai-dat-python-va-vs-code.html">Cài Python, VS Code và chạy chương trình Python đầu tiên</a></li><li><a href="../hoc/pydev-bien-kieu-du-lieu-toan-tu.html">Biến, kiểu dữ liệu, toán tử và input() trong Python</a></li><li><a href="../hoc/pydev-chuoi-va-f-string.html">Chuỗi trong Python: slicing, phương thức và f-string</a></li></ul></div>
+    <div>
+      <h3>HọcFree</h3>
+      <ul>
+        <li><a href="../gioi-thieu.html">Giới thiệu</a></li>
+        <li><a href="../search.html">Tìm kiếm</a></li>
+        <li><a href="../sitemap.xml">Sitemap</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="container">© 2026 HọcFree.vn · Kiến thức là để chia sẻ.</div>
+  </div>
+</footer>
+<button class="to-top" aria-label="Lên đầu trang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<script src="../assets/js/search-data.js?v=20261105" defer></script>
+<script src="../assets/js/main.js?v=20261105" defer></script>
+</body>
+</html>
