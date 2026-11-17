@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-HọcFree (hocfree.vn): a static, Vietnamese-language learning site (AI, Computer Vision, Machine Vision, programming, languages) served by GitHub Pages from the repo root of `main` (`CNAME`, `.nojekyll`). Plain HTML/CSS/JS, no bundler, no npm. A single Python script generates every page from JSON + HTML fragments in `src/`.
+HocFree (hocfree.vn): a static, Vietnamese-language learning site (AI, Computer Vision, Machine Vision, programming, languages) served by GitHub Pages from the repo root of `main` (`CNAME`, `.nojekyll`). Plain HTML/CSS/JS, no bundler, no npm. A single Python script generates every page from JSON + HTML fragments in `src/`.
 
 All site content, commit messages and code comments are in Vietnamese with full diacritics. Keep it that way.
 
@@ -43,6 +43,6 @@ There is no test suite; `check_site.py` is the test. Run it after every build. I
 
 A single IIFE that handles dark mode (`localStorage` key `hf-theme`), the mega menu and mobile drawer, search (`Ctrl K` or `/`, over `window.HF_POSTS` and topics from `search-data.js`), copy-code buttons, and learning-path/lesson progress stored in `localStorage`. No framework.
 
-## Automated daily publishing
+## Content rules for new posts
 
-`docs/auto-publish.md` is the spec for a scheduled Claude Code routine that publishes 10 posts per day, driven by `src/editorial-plan.json`: `topics` maps refs to category/tags, and `days[]` holds `date`, `topics`, `status: pending|published` and `posts`. When running as that routine, follow that file exactly, including its restriction to touching only `src/posts.json`, `src/posts/*.html`, `src/editorial-plan.json`, thumbnails and generated HTML, and never editing or deleting existing posts. Its content rules apply to any new post: verify facts and API names with web search, never invent numbers or sources, cover only real events from roughly the last 10 days in `tin-tuc-ai`, make code runnable, keep bodies at about 700–1500 words, titles at 70 characters or fewer, excerpts at 120–170 characters, and end with a `<p class="note">Nguồn tham khảo: …</p>` when external facts are used.
+Full rules are in `docs/04-viet-bai.md`. Verify facts and API names with web search, never invent numbers or sources, cover only real events from roughly the last 10 days in `tin-tuc-ai`, make code runnable, keep bodies at about 700–1500 words, and end with a `<p class="note">Nguồn tham khảo: …</p>` when external facts are used. Titles must be 70 characters or fewer and excerpts 120–170 characters; `check_site.py` enforces both.

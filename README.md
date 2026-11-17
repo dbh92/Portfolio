@@ -1,4 +1,4 @@
-# HọcFree.vn
+# HocFree.vn
 
 Website tĩnh (HTML + CSS + JavaScript thuần) chia sẻ kiến thức lập trình, ngoại ngữ và blog, chạy trên **GitHub Pages** với tên miền **hocfree.vn**.
 
@@ -103,7 +103,7 @@ Sau khi DNS cập nhật: GitHub repo → Settings → Pages → Custom domain `
 
 ## Font, icon, SEO
 
-- **Font**: Be Vietnam Pro và JetBrains Mono tự host trong `assets/fonts/` (lấy từ Fontsource, giấy phép SIL OFL 1.1),
+- **Font**: Inter (nội dung), Plus Jakarta Sans (tiêu đề) và JetBrains Mono (code) tự host trong `assets/fonts/` (lấy từ Fontsource, giấy phép SIL OFL 1.1),
   chỉ gồm các subset vietnamese, latin, latin-ext. Không gọi Google Fonts nên tải nhanh hơn.
 - **Icon**: [Lucide](https://lucide.dev) (ISC), lưu trong `src/icons.json`. Thêm icon: chép phần bên trong `<svg>`
   từ gói npm `lucide-static` vào file này, rồi dùng `icon("tên")` trong `tools/build.py`.

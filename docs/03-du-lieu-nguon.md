@@ -27,11 +27,11 @@ trong file).
 
 | Trường | Ví dụ | Dùng ở |
 |---|---|---|
-| `name` | `HọcFree` | `<title>`, `og:site_name`, JSON-LD Organization, logo |
+| `name` | `HocFree` | `<title>`, `og:site_name`, JSON-LD Organization, logo |
 | `domain` | `https://hocfree.vn` | Mọi URL tuyệt đối: canonical, `og:url`, `og:image`, sitemap, robots, JSON-LD, nút chia sẻ. **Không có `/` ở cuối.** |
-| `tagline` | `Học AI, lập trình & Computer Vision miễn phí` | Tiêu đề trang chủ: `HọcFree – <tagline>` |
-| `description` | `HọcFree.vn – nền tảng học miễn phí…` | Meta description trang chủ, chân trang |
-| `author` | `Ban biên tập HọcFree` | Dòng tác giả trong bài, hộp tác giả, JSON-LD `author` |
+| `tagline` | `Học AI, lập trình & Computer Vision miễn phí` | Tiêu đề trang chủ: `HocFree – <tagline>` |
+| `description` | `HocFree.vn – nền tảng học miễn phí…` | Meta description trang chủ, chân trang |
+| `author` | `Ban biên tập HocFree` | Dòng tác giả trong bài, hộp tác giả, JSON-LD `author` |
 
 ### `downloads`
 
@@ -74,7 +74,7 @@ này do người biên tập tự chọn.
 |---|---|---|---|
 | `slug` | có | Chữ thường không dấu, số, `-`. Duy nhất trong mọi bài. Không trùng URL một trang chủ đề cùng mục. **Không đổi sau khi đăng.** | URL `<category>/<slug>.html`, tên file thân bài và ảnh |
 | `category` | có | Một trong `hoc`, `projects`, `kien-thuc`, `tin-tuc-ai`, `ngoai-ngu`, `tai-nguyen` (các mục có `groups` trong `nav.json`) | Thư mục chứa bài, nhãn chuyên mục, breadcrumb, mục menu được tô sáng |
-| `title` | có | Nên ≤ 70 ký tự. Từ 59 ký tự trở lên, `<title>` không kèm hậu tố ` \| HọcFree` | `<h1>`, `<title>`, `og:title`, thẻ bài, tìm kiếm |
+| `title` | có | Nên ≤ 70 ký tự. Từ 59 ký tự trở lên, `<title>` không kèm hậu tố ` \| HocFree` | `<h1>`, `<title>`, `og:title`, thẻ bài, tìm kiếm |
 | `excerpt` | có | 120–170 ký tự, một câu tóm tắt có nội dung (không phải "Bài này nói về…") | Meta description, đoạn dẫn dưới `<h1>`, danh sách bài, tìm kiếm |
 | `date` | có | `YYYY-MM-DD` | Sắp xếp, ngày hiển thị (`DD/MM/YYYY`), `datePublished`, `lastmod` trong sitemap, nút bài trước/sau |
 | `tags` | có | Mảng chuỗi. Phải chứa ít nhất một tag của chủ đề muốn bài xuất hiện. Dùng lại tag có sẵn, viết đúng hoa/thường như nơi khác dù so khớp không phân biệt hoa thường. | Trang chủ đề, mây thẻ ở sidebar (link `search.html?q=<tag>`), `article:tag`, `keywords`, tìm kiếm |
@@ -216,16 +216,3 @@ Mỗi giá trị là phần **bên trong** thẻ `<svg viewBox="0 0 24 24">` c�
 
 Một vài icon nhỏ dùng ở khung trang (search, moon, menu, close…) nằm trong từ điển `ICON` ngay trong
 `build.py`, không thuộc `icons.json`.
-
-## `src/editorial-plan.json`
-
-Kế hoạch cho quy trình đăng bài tự động ([auto-publish.md](auto-publish.md)). `build.py` **không** đọc file này.
-
-| Trường | Ý nghĩa |
-|---|---|
-| `timezone`, `publish_time`, `posts_per_day` | `Asia/Ho_Chi_Minh`, `05:00`, `10` |
-| `topics` | `ref` → `{category, menu, tags}`: chuyên mục cho bài mới, đường dẫn menu (để báo cáo), tag của chủ đề. 45 chủ đề (không gồm English, Chinese). |
-| `days[]` | `day` (1–20), `date`, `topics[]` (10 ref), `status` (`pending`/`published`), `posts[]` (slug đã đăng) |
-
-Ngày 05/11/2026: kế hoạch chạy từ 10/10 đến 29/10/2026, mới ngày 1 có `status: published`, 19 ngày còn
-`pending` đã qua hạn. Muốn chạy tiếp cần đặt lại `date` cho các ngày còn lại.

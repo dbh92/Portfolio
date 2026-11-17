@@ -3043,7 +3043,7 @@ window.HF_POSTS = [
  {
   "t": "Học theo slide Deep Learning – Computer Vision: bản đồ bài học",
   "u": "tai-nguyen/slide-deep-learning-computer-vision-ban-do-bai-hoc.html",
-  "e": "Học theo slide Deep Learning – Computer Vision – NLP? Bảng đối chiếu từng nhóm trang với bài học trên HọcFree, kèm các chỗ slide sai đã đính chính.",
+  "e": "Học theo slide Deep Learning – Computer Vision – NLP? Bảng đối chiếu từng nhóm trang với bài học trên HocFree, kèm các chỗ slide sai đã đính chính.",
   "c": "tai-nguyen",
   "cn": "Tài nguyên",
   "d": "14/10/2026",
@@ -3421,7 +3421,7 @@ window.HF_POSTS = [
  {
   "t": "Python cơ bản: biến, kiểu dữ liệu và toán tử",
   "u": "hoc/python-2-bien-kieu-du-lieu-toan-tu.html",
-  "e": "int, float, str, bool qua ví dụ đo lường và OK/NG, f-string định dạng số, ép kiểu và hai cái bẫy về số thực.",
+  "e": "int, float, str, bool qua ví dụ đo lường và OK/NG: toán tử số học, so sánh, logic, f-string định dạng số, ép kiểu, nhập dữ liệu và hai cái bẫy về số thực.",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "09/10/2026",
@@ -3435,7 +3435,7 @@ window.HF_POSTS = [
  {
   "t": "Python cơ bản: rẽ nhánh và vòng lặp",
   "u": "hoc/python-3-re-nhanh-va-vong-lap.html",
-  "e": "if/elif/else cho tiêu chí OK/NG, for, range, enumerate, while có giới hạn, break, continue và bài tập dừng dây chuyền.",
+  "e": "Thụt lề trong Python, if/elif/else cho tiêu chí OK/NG, for với range và enumerate, while có giới hạn, break, continue, kèm tóm tắt và bài tập dừng dây chuyền.",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "09/10/2026",
@@ -3449,7 +3449,7 @@ window.HF_POSTS = [
  {
   "t": "Python cơ bản: list, tuple, dict và set",
   "u": "hoc/python-4-list-tuple-dict-set.html",
-  "e": "Lưu và thống kê dữ liệu sản xuất: slicing, list comprehension, dict cấu hình, đếm lỗi Pareto, set phát hiện mã trùng.",
+  "e": "Lưu và thống kê dữ liệu sản xuất bằng list, tuple, dict, set: slicing, list comprehension, dict cấu hình, đếm lỗi Pareto, set phát hiện mã trùng.",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "09/10/2026",
@@ -3463,7 +3463,7 @@ window.HF_POSTS = [
  {
   "t": "Python cơ bản: hàm và module",
   "u": "hoc/python-5-ham-va-module.html",
-  "e": "Viết hàm có tham số mặc định, trả nhiều giá trị, type hint, docstring, tách module và khối if __name__ == \"__main__\".",
+  "e": "Viết hàm có tham số mặc định và theo tên, trả nhiều giá trị, phạm vi biến, type hint, docstring, tách module và khối if __name__ == \"__main__\".",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "09/10/2026",
@@ -3477,7 +3477,7 @@ window.HF_POSTS = [
  {
   "t": "Python cơ bản: đọc ghi file, pathlib và xử lý lỗi",
   "u": "hoc/python-6-doc-ghi-file-va-xu-ly-loi.html",
-  "e": "Đọc ghi file UTF-8 với with, đường dẫn bằng pathlib, try/except đúng cách và hàm đọc cấu hình JSON an toàn.",
+  "e": "Đọc ghi file văn bản UTF-8 với with, xử lý đường dẫn bằng pathlib, bắt ngoại lệ bằng try/except đúng cách và viết hàm đọc file cấu hình JSON an toàn.",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "09/10/2026",
@@ -3822,7 +3822,7 @@ window.HF_POSTS = [
  {
   "t": "Chọn công cụ Machine Vision: Halcon, VisionPro, OpenCV, smart camera",
   "u": "hoc/machine-vision-3-thu-vien-va-phan-mem.html",
-  "e": "So sánh thư viện thương mại và mã nguồn mở, khi nào dùng smart camera, tính chi phí theo số trạm và các bẫy bản quyền.",
+  "e": "So sánh thư viện thương mại và mã nguồn mở, khi nào dùng smart camera, ma trận quyết định có trọng số, tính chi phí theo số trạm và các bẫy bản quyền.",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "09/10/2026",
@@ -3880,7 +3880,7 @@ window.HF_POSTS = [
  {
   "t": "Đặc tả kỹ thuật trạm vision và nghiệm thu FAT/SAT",
   "u": "hoc/industrial-vision-5-dac-ta-va-nghiem-thu-fat-sat.html",
-  "e": "Mẫu đặc tả 12 mục, bộ mẫu chuẩn, bài thử độ lặp lại (%GRR, Cg/Cgk) và phát hiện lỗi, phân biệt FAT và SAT.",
+  "e": "Mẫu đặc tả 12 mục, bộ mẫu chuẩn, bài thử độ lặp lại (%GRR, Cg/Cgk), thử phát hiện lỗi và loại nhầm, phân biệt FAT và SAT khi nghiệm thu hệ thống.",
   "c": "hoc",
   "cn": "Học AI & Lập trình",
   "d": "09/10/2026",
@@ -4120,7 +4120,7 @@ window.HF_POSTS = [
  {
   "t": "Lộ trình HSK3 từ con số 0 trong 8 tháng",
   "u": "ngoai-ngu/lo-trinh-hsk3.html",
-  "e": "HSK 2.0 hay HSK 3.0, ba giai đoạn từ pinyin đến cấp 3, lịch học 60 phút mỗi ngày và lợi thế âm Hán Việt của người Việt.",
+  "e": "HSK 2.0 hay HSK 3.0, ba giai đoạn từ pinyin đến cấp 3 và luyện đề, lịch học 60 phút mỗi ngày, tài liệu đi kèm và lợi thế âm Hán Việt của người Việt.",
   "c": "ngoai-ngu",
   "cn": "Ngoại ngữ",
   "d": "09/10/2026",
@@ -4134,7 +4134,7 @@ window.HF_POSTS = [
  {
   "t": "Cách học tiếng Trung hiệu quả: 7 nguyên tắc cho người Việt",
   "u": "ngoai-ngu/cach-hoc-tieng-trung-hieu-qua.html",
-  "e": "Pinyin và thanh điệu, chữ Hán qua bộ thủ, tận dụng âm Hán Việt, học theo mẫu câu, shadowing và thẻ ghi nhớ có audio.",
+  "e": "Pinyin và thanh điệu, chữ Hán qua bộ thủ, tận dụng âm Hán Việt, học theo mẫu câu, shadowing, thẻ ghi nhớ có audio, lịch học tuần mẫu và sai lầm thường gặp.",
   "c": "ngoai-ngu",
   "cn": "Ngoại ngữ",
   "d": "09/10/2026",
@@ -4162,7 +4162,7 @@ window.HF_POSTS = [
  {
   "t": "Sierra và Meta đề xuất Personal Agent Protocol cho agent cá nhân",
   "u": "tin-tuc-ai/sierra-meta-personal-agent-protocol.html",
-  "e": "Chuẩn mở về cách agent của người dùng tương tác với doanh nghiệp, với Walmart, Shopify, Stripe là đối tác sáng lập.",
+  "e": "Chuẩn mở về cách agent của người dùng tương tác với doanh nghiệp, với Walmart, Shopify, Stripe là đối tác sáng lập; những điểm chưa rõ và cuộc đua chuẩn hóa.",
   "c": "tin-tuc-ai",
   "cn": "Tin tức AI",
   "d": "08/10/2026",
@@ -4178,7 +4178,7 @@ window.HF_POSTS = [
  {
   "t": "Cách tra cứu tài liệu OpenCV, PyTorch, Ultralytics hiệu quả",
   "u": "tai-nguyen/cach-tra-cuu-tai-lieu-opencv-pytorch-ultralytics.html",
-  "e": "Kiểm tra phiên bản, đọc tài liệu API đúng cách, tra cứu ngay trong Python và quy trình xử lý lỗi khi code không chạy.",
+  "e": "Kiểm tra phiên bản, tài liệu chính thức nên đánh dấu, tra cứu ngay trong Python, đọc tài liệu API đúng cách, xử lý lỗi khi code không chạy và dùng AI đúng cách.",
   "c": "tai-nguyen",
   "cn": "Tài nguyên",
   "d": "08/10/2026",
@@ -4207,7 +4207,7 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Mistral Large 4 ra mắt bản xem trước: MoE 1 nghìn tỷ tham số, hứa mở trọng số",
+  "t": "Mistral Large 4 bản xem trước: MoE 1 nghìn tỷ tham số, hứa mở trọng số",
   "u": "tin-tuc-ai/mistral-large-4-ra-mat-ban-xem-truoc.html",
   "e": "Mô hình đa phương thức lớn nhất của Mistral với 49 tỷ tham số hoạt động, ngữ cảnh 1 triệu token, trọng số mở dự kiến cuối tháng 10.",
   "c": "tin-tuc-ai",
@@ -4222,9 +4222,9 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Google ký thỏa thuận điện 3,6 GW với Constellation, 890 MW là công suất mới",
+  "t": "Google ký thỏa thuận điện 3,6 GW với Constellation, 890 MW là mới",
   "u": "tin-tuc-ai/google-constellation-hop-dong-dien-hat-nhan.html",
-  "e": "AI đói điện: chi tiết hai phần của thỏa thuận và góc nhìn phản biện về con số hạt nhân mới.",
+  "e": "AI đói điện: chi tiết hai phần của thỏa thuận giữa Google và Constellation, góc nhìn phản biện về con số hạt nhân mới và ý nghĩa với người học công nghệ.",
   "c": "tin-tuc-ai",
   "cn": "Tin tức AI",
   "d": "07/10/2026",
@@ -4253,7 +4253,7 @@ window.HF_POSTS = [
  {
   "t": "Wikimedia phát hiện AI agent hoạt động không được phép trên hệ thống",
   "u": "tin-tuc-ai/wikimedia-phat-hien-agent-openai.html",
-  "e": "Chỉnh sửa thử nghiệm, dò thử công cụ và hàng triệu yêu cầu tự động: bài học về trách nhiệm khi triển khai agent.",
+  "e": "Chỉnh sửa thử nghiệm, dò thử công cụ và hàng triệu yêu cầu tự động: Wikimedia phát hiện gì, phản ứng ra sao và bài học về trách nhiệm khi triển khai agent.",
   "c": "tin-tuc-ai",
   "cn": "Tin tức AI",
   "d": "06/10/2026",
@@ -4267,7 +4267,7 @@ window.HF_POSTS = [
  {
   "t": "Đọc tài liệu SDK camera công nghiệp và chuẩn GenICam",
   "u": "tai-nguyen/doc-tai-lieu-sdk-camera-genicam.html",
-  "e": "GenICam, SFNC và các tính năng chuẩn hay dùng, cách đọc tài liệu SDK và thiết kế phần mềm ít phụ thuộc hãng.",
+  "e": "GenICam, SFNC và các tính năng chuẩn hay dùng, cách đọc tài liệu SDK camera công nghiệp hiệu quả và thiết kế phần mềm Vision ít phụ thuộc vào một hãng.",
   "c": "tai-nguyen",
   "cn": "Tài nguyên",
   "d": "06/10/2026",
@@ -4298,7 +4298,7 @@ window.HF_POSTS = [
  {
   "t": "Dùng công cụ AI hỗ trợ tự học kỹ thuật và ngoại ngữ",
   "u": "tai-nguyen/cong-cu-ai-ho-tro-tu-hoc.html",
-  "e": "Giải thích nhiều cấp độ, tạo câu hỏi ôn tập, luyện ngoại ngữ, tóm tắt tài liệu và lập kế hoạch học với AI.",
+  "e": "Giải thích khái niệm nhiều cấp độ, tạo câu hỏi ôn tập và thẻ ghi nhớ, luyện ngoại ngữ, tóm tắt tài liệu dài và lập kế hoạch học với AI, kèm điều cần nhớ.",
   "c": "tai-nguyen",
   "cn": "Tài nguyên",
   "d": "05/10/2026",
@@ -4327,7 +4327,7 @@ window.HF_POSTS = [
  {
   "t": "Dự án AI: agent chẩn đoán sự cố và soạn phiếu sửa chữa",
   "u": "projects/agent-tra-cuu-tai-lieu-tao-phieu-sua-chua.html",
-  "e": "Thiết kế công cụ có giới hạn, vòng lặp agent, prompt hệ thống và kiểm soát rủi ro: agent chỉ đọc và soạn nháp.",
+  "e": "Agent hỗ trợ kỹ thuật viên bảo trì: thiết kế công cụ có giới hạn, vòng lặp agent, prompt hệ thống và kiểm soát rủi ro, agent chỉ đọc dữ liệu và soạn nháp phiếu.",
   "c": "projects",
   "cn": "Projects",
   "d": "04/10/2026",
@@ -4339,9 +4339,9 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Apple được cho là phát triển camera gia đình chỉ gửi mô tả văn bản, không ghi video",
+  "t": "Apple được cho là làm camera gia đình chỉ gửi mô tả văn bản",
   "u": "tin-tuc-ai/apple-camera-gia-dinh-mo-ta-van-ban.html",
-  "e": "Thông tin rò rỉ về thiết bị J450 và xu hướng Computer Vision xử lý tại chỗ, chỉ giữ lại thông tin cần thiết.",
+  "e": "Thông tin rò rỉ về thiết bị J450, quyền riêng tư làm điểm bán hàng và xu hướng Computer Vision xử lý tại chỗ, chỉ giữ lại thông tin cần thiết.",
   "c": "tin-tuc-ai",
   "cn": "Tin tức AI",
   "d": "04/10/2026",
@@ -4370,7 +4370,7 @@ window.HF_POSTS = [
  {
   "t": "Dự án CV: phát hiện tư thế làm việc có nguy cơ bằng pose estimation",
   "u": "projects/canh-bao-sai-tu-the-lam-viec-pose-estimation.html",
-  "e": "Tính góc cúi lưng, tay trên vai từ keypoint, tổng hợp theo trạm làm việc để cải thiện công thái học.",
+  "e": "Chạy mô hình pose, tính góc cúi lưng và tay trên vai từ keypoint, tổng hợp theo trạm làm việc để cải thiện công thái học, kèm giới hạn kỹ thuật và quyền riêng tư.",
   "c": "projects",
   "cn": "Projects",
   "d": "03/10/2026",
@@ -4384,7 +4384,7 @@ window.HF_POSTS = [
  {
   "t": "Robot hình người nửa đầu 2026: lượng giao tăng mạnh, Trung Quốc áp đảo",
   "u": "tin-tuc-ai/robot-hinh-nguoi-nua-dau-2026.html",
-  "e": "Số liệu từ các hãng nghiên cứu thị trường, AgiBot dẫn đầu và cách đọc số liệu cho đúng.",
+  "e": "Số liệu robot hình người nửa đầu 2026 từ các hãng nghiên cứu thị trường, AgiBot dẫn đầu, cách đọc số liệu cho đúng và ý nghĩa với kỹ sư tại Việt Nam.",
   "c": "tin-tuc-ai",
   "cn": "Tin tức AI",
   "d": "03/10/2026",
@@ -4443,7 +4443,7 @@ window.HF_POSTS = [
  {
   "t": "Tài liệu ôn TOEIC miễn phí, chính thống",
   "u": "tai-nguyen/tai-lieu-on-toeic-mien-phi-chinh-thong.html",
-  "e": "Nguồn chính thức, công cụ bổ trợ miễn phí, cách kết hợp tài liệu và cảnh giác với tài liệu không rõ nguồn gốc.",
+  "e": "Nguồn ôn TOEIC chính thức, công cụ bổ trợ kỹ năng nền miễn phí, cách kết hợp tài liệu, kế hoạch tiết kiệm và cảnh giác với tài liệu không rõ nguồn gốc.",
   "c": "tai-nguyen",
   "cn": "Tài nguyên",
   "d": "02/10/2026",
@@ -4472,7 +4472,7 @@ window.HF_POSTS = [
  {
   "t": "Dự án: đếm người qua cửa với YOLO26 và tracking",
   "u": "projects/dem-nguoi-qua-cua-yolo-tracking.html",
-  "e": "Kết hợp phát hiện đối tượng và theo dõi để đếm lượt vào, ra theo hai chiều; đánh giá sai số và tăng tốc trên máy yếu.",
+  "e": "Kết hợp phát hiện đối tượng và tracking để đếm lượt vào, ra theo hai chiều qua cửa; đánh giá sai số, tăng tốc trên máy yếu và lưu ý về quyền riêng tư.",
   "c": "projects",
   "cn": "Projects",
   "d": "01/10/2026",
@@ -4489,7 +4489,7 @@ window.HF_POSTS = [
  {
   "t": "Bản đồ tài liệu Ultralytics: sáu mode và cách tìm tham số",
   "u": "tai-nguyen/tai-lieu-ultralytics-cac-mode.html",
-  "e": "Cấu trúc tài liệu Ultralytics, các mode train, val, predict, export, track, benchmark và cách đọc đối tượng kết quả.",
+  "e": "Cấu trúc tài liệu Ultralytics, các mode train, val, predict, export, track, benchmark, cách tìm tham số đúng và đọc đối tượng kết quả.",
   "c": "tai-nguyen",
   "cn": "Tài nguyên",
   "d": "01/10/2026",
@@ -4518,7 +4518,7 @@ window.HF_POSTS = [
  {
   "t": "PyTorch, TensorFlow, ONNX, OpenVINO, TensorRT: học gì trước?",
   "u": "kien-thuc/so-sanh-pytorch-tensorflow-onnx.html",
-  "e": "Vai trò của framework huấn luyện và runtime triển khai trong vòng đời một dự án AI Vision, cùng gợi ý thứ tự học.",
+  "e": "PyTorch, TensorFlow/Keras để huấn luyện, ONNX làm định dạng chung và các runtime triển khai: vai trò từng công cụ trong một dự án AI Vision và gợi ý thứ tự học.",
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "30/09/2026",
@@ -4563,7 +4563,7 @@ window.HF_POSTS = [
  {
   "t": "Sách và khóa học Computer Vision, Deep Learning miễn phí, hợp pháp",
   "u": "tai-nguyen/sach-khoa-hoc-computer-vision-mien-phi.html",
-  "e": "Dive into Deep Learning, Understanding Deep Learning, Szeliski, CS231n và thứ tự học gợi ý từ nền tảng đến chuyên sâu.",
+  "e": "Dive into Deep Learning, Understanding Deep Learning, Szeliski, CS231n, thứ tự học từ nền tảng đến chuyên sâu và cách đọc sách kỹ thuật không bỏ cuộc.",
   "c": "tai-nguyen",
   "cn": "Tài nguyên",
   "d": "29/09/2026",
@@ -4624,7 +4624,7 @@ window.HF_POSTS = [
  {
   "t": "Tài liệu và khóa học LLM miễn phí",
   "u": "tai-nguyen/tai-lieu-hoc-llm-mien-phi.html",
-  "e": "Khóa học Hugging Face, sách có chương Transformer, tài liệu của nhà cung cấp và lộ trình từ khái niệm đến agent.",
+  "e": "Khóa học Hugging Face, sách miễn phí có chương Transformer, tài liệu của nhà cung cấp, lộ trình từ khái niệm đến agent và lưu ý khi tự học LLM.",
   "c": "tai-nguyen",
   "cn": "Tài nguyên",
   "d": "27/09/2026",
@@ -4668,7 +4668,7 @@ window.HF_POSTS = [
  {
   "t": "Dự án CV: nhận diện biển số xe ở cổng bãi xe",
   "u": "projects/nhan-dien-bien-so-xe-yolo-ocr.html",
-  "e": "Kiến trúc hai tầng phát hiện biển số và đọc ký tự, bỏ phiếu qua nhiều khung hình và lưu ý về dữ liệu cá nhân.",
+  "e": "Kiến trúc hai tầng: YOLO phát hiện biển số, OCR đọc ký tự, bỏ phiếu qua nhiều khung hình để kết quả ổn định hơn, lưu ý triển khai và bảo vệ dữ liệu cá nhân.",
   "c": "projects",
   "cn": "Projects",
   "d": "26/09/2026",
@@ -4697,7 +4697,7 @@ window.HF_POSTS = [
  {
   "t": "Cheat sheet công thức quang học cho Machine Vision",
   "u": "tai-nguyen/cheat-sheet-cong-thuc-quang-hoc-machine-vision.html",
-  "e": "Độ phân giải, tiêu cự, độ phóng đại, nhòe chuyển động, line scan và băng thông dữ liệu, kèm ví dụ tính toán.",
+  "e": "Độ phân giải, tiêu cự, độ phóng đại, nhòe chuyển động, line scan, băng thông dữ liệu, khẩu độ và ánh sáng, kèm ví dụ tính toán cho từng công thức.",
   "c": "tai-nguyen",
   "cn": "Tài nguyên",
   "d": "25/09/2026",
@@ -4770,9 +4770,9 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Cognex mua RealSense khoảng 500 triệu USD, mở rộng sang thị giác cho robot",
+  "t": "Cognex mua RealSense khoảng 500 triệu USD, mở rộng sang robot",
   "u": "tin-tuc-ai/cognex-mua-realsense.html",
-  "e": "Hãng Machine Vision lớn mua nhà sản xuất camera độ sâu, đánh dấu ranh giới vision và robot đang mờ dần.",
+  "e": "Hãng Machine Vision lớn mua nhà sản xuất camera độ sâu, đánh dấu ranh giới vision và robot đang mờ dần; kèm gợi ý bắt đầu học 3D vision từ đâu.",
   "c": "tin-tuc-ai",
   "cn": "Tin tức AI",
   "d": "23/09/2026",
@@ -4788,7 +4788,7 @@ window.HF_POSTS = [
  {
   "t": "OpenAI ra mắt GPT-6 Sol và Luna, giá API giảm khoảng một nửa",
   "u": "tin-tuc-ai/openai-gpt-6-sol-luna.html",
-  "e": "Hai mô hình mới cho tác vụ phức tạp và khối lượng lớn, kế thừa cải tiến của GPT-6 Astra với chi phí thấp hơn.",
+  "e": "Hai mô hình mới cho tác vụ phức tạp và khối lượng lớn, kế thừa GPT-6 Astra với chi phí thấp hơn; giá API, nơi có mặt và vì sao cần thận trọng khi đánh giá.",
   "c": "tin-tuc-ai",
   "cn": "Tin tức AI",
   "d": "23/09/2026",
@@ -4814,9 +4814,9 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Boston Dynamics mở trung tâm huấn luyện robot Atlas tại nhà máy Hyundai",
+  "t": "Boston Dynamics mở trung tâm huấn luyện Atlas tại nhà máy Hyundai",
   "u": "tin-tuc-ai/boston-dynamics-trung-tam-atlas-hyundai.html",
-  "e": "Atlas học sắp xếp linh kiện trên dây chuyền ô tô thật, hướng tới lắp ráp khoảng năm 2030.",
+  "e": "Atlas học sắp xếp linh kiện trên dây chuyền ô tô thật, hướng tới lắp ráp khoảng năm 2030; quy mô kế hoạch, điều chưa công bố và góc nhìn từ nhà máy.",
   "c": "tin-tuc-ai",
   "cn": "Tin tức AI",
   "d": "22/09/2026",
@@ -4830,7 +4830,7 @@ window.HF_POSTS = [
  {
   "t": "Cheat sheet OpenCV-Python: các hàm dùng nhiều nhất",
   "u": "tai-nguyen/cheat-sheet-opencv-python.html",
-  "e": "Trang tra cứu nhanh đọc ghi ảnh, màu sắc, lọc, phân ngưỡng, contour, đo đạc, so khớp mẫu, vẽ kết quả và 5 lỗi hay gặp.",
+  "e": "Tra cứu nhanh OpenCV: đọc ghi ảnh, màu sắc, lọc, phân ngưỡng, hình thái học, contour, đo đạc, so khớp mẫu, vẽ kết quả và 5 lỗi hay gặp với Python.",
   "c": "tai-nguyen",
   "cn": "Tài nguyên",
   "d": "22/09/2026",
@@ -4876,7 +4876,7 @@ window.HF_POSTS = [
  {
   "t": "Đọc paper AI hiệu quả: phương pháp 3 lượt cho kỹ sư",
   "u": "tai-nguyen/doc-paper-ai-hieu-qua.html",
-  "e": "Tìm paper ở đâu, đọc 3 lượt từ lướt đến hiểu sâu, đọc với con mắt phản biện và công cụ hỗ trợ.",
+  "e": "Tìm paper AI ở đâu, phương pháp đọc 3 lượt từ lướt đến hiểu sâu, đọc với con mắt phản biện, công cụ hỗ trợ và người mới nên bắt đầu từ đâu.",
   "c": "tai-nguyen",
   "cn": "Tài nguyên",
   "d": "21/09/2026",
@@ -4905,7 +4905,7 @@ window.HF_POSTS = [
  {
   "t": "Dự án AI: trợ lý LLM soạn báo cáo ca sản xuất",
   "u": "projects/tro-ly-viet-bao-cao-ca-san-xuat-llm.html",
-  "e": "Số liệu tính bằng code, LLM chỉ diễn đạt; prompt có cấu trúc, kiểm tra tự động con số bịa và giao diện duyệt.",
+  "e": "Số liệu tính bằng code, LLM chỉ diễn đạt: tổng hợp dữ liệu ca, prompt có cấu trúc, kiểm tra tự động con số bịa, giao diện duyệt trước khi gửi và cách đo hiệu quả.",
   "c": "projects",
   "cn": "Projects",
   "d": "20/09/2026",
@@ -4950,7 +4950,7 @@ window.HF_POSTS = [
  {
   "t": "Homography: đo kích thước trên mặt phẳng khi camera đặt nghiêng",
   "u": "kien-thuc/homography-do-tren-mat-phang.html",
-  "e": "Tính homography từ điểm mốc, đổi pixel sang mm, RANSAC, nắn ảnh nhìn thẳng và tính bằng số sai số khi vật có chiều cao.",
+  "e": "Tính homography từ điểm mốc, đổi pixel sang mm, RANSAC, nắn ảnh nhìn thẳng bằng warpPerspective và tính bằng số sai số khi vật có chiều cao.",
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "18/09/2026",
@@ -4980,7 +4980,7 @@ window.HF_POSTS = [
  {
   "t": "Computer Vision 2026: YOLO26, SAM 3.1 và YOLO27 sắp tới",
   "u": "tin-tuc-ai/computer-vision-2026-yolo26-sam-3-1.html",
-  "e": "Tổng hợp các mô hình thị giác máy mã nguồn mở quan trọng năm 2026 và gợi ý nên dùng mô hình nào cho dự án của bạn.",
+  "e": "YOLO26 cho thiết bị biên, SAM 3 và SAM 3.1 phân đoạn theo khái niệm, YOLO27 sắp tới: các mô hình thị giác mã nguồn mở năm 2026 và nên chọn gì cho dự án.",
   "c": "tin-tuc-ai",
   "cn": "Tin tức AI",
   "d": "18/09/2026",
@@ -5010,7 +5010,7 @@ window.HF_POSTS = [
  {
   "t": "Tìm và tải dataset ảnh trên Hugging Face Hub",
   "u": "tai-nguyen/tim-va-tai-dataset-hugging-face.html",
-  "e": "Đọc dataset card, tải bằng thư viện datasets, chế độ streaming, chuyển sang PyTorch và đưa dataset riêng tư lên Hub.",
+  "e": "Đọc dataset card, tải bằng thư viện datasets, chế độ streaming cho dataset lớn, chuyển sang PyTorch, đưa dataset riêng tư lên Hub và lưu ý về giấy phép.",
   "c": "tai-nguyen",
   "cn": "Tài nguyên",
   "d": "17/09/2026",
@@ -5039,7 +5039,7 @@ window.HF_POSTS = [
  {
   "t": "LLM hoạt động thế nào? Token, embedding, attention",
   "u": "kien-thuc/llm-hoat-dong-the-nao.html",
-  "e": "Giải thích các khái niệm cốt lõi của mô hình ngôn ngữ lớn để dùng đúng cách và hiểu vì sao nó đôi khi sai.",
+  "e": "Token, embedding, Transformer và attention, các giai đoạn huấn luyện, sinh từng token, context window: khái niệm cốt lõi của LLM và vì sao nó đôi khi trả lời sai.",
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "16/09/2026",
@@ -5128,7 +5128,7 @@ window.HF_POSTS = [
  {
   "t": "ECCV 2026 tại Malmö: 2.834 bài báo về thị giác máy tính",
   "u": "tin-tuc-ai/eccv-2026-hoi-nghi-thi-giac-may-tinh.html",
-  "e": "Hội nghị hàng đầu về Computer Vision và cách kỹ sư theo dõi nghiên cứu mà không bị ngợp.",
+  "e": "ECCV 2026 tại Malmö: những con số đáng chú ý, vì sao kỹ sư nên quan tâm hội nghị khoa học và cách theo dõi nghiên cứu Computer Vision mà không bị ngợp.",
   "c": "tin-tuc-ai",
   "cn": "Tin tức AI",
   "d": "14/09/2026",
@@ -5157,7 +5157,7 @@ window.HF_POSTS = [
  {
   "t": "Sách và tài liệu Machine Vision công nghiệp nên đọc",
   "u": "tai-nguyen/sach-machine-vision-cong-nghiep-nen-doc.html",
-  "e": "Sách chuyên ngành kinh điển, tài liệu miễn phí từ nhà sản xuất, các tiêu chuẩn và thứ tự đọc gợi ý.",
+  "e": "Sách Machine Vision chuyên ngành kinh điển, tài liệu miễn phí từ nhà sản xuất camera và phần mềm, tài liệu về các tiêu chuẩn và thứ tự đọc gợi ý.",
   "c": "tai-nguyen",
   "cn": "Tài nguyên",
   "d": "13/09/2026",
@@ -5232,7 +5232,7 @@ window.HF_POSTS = [
  {
   "t": "Cheat sheet PyTorch: tensor, lớp mạng, huấn luyện, xuất mô hình",
   "u": "tai-nguyen/cheat-sheet-pytorch.html",
-  "e": "Tra cứu nhanh tensor, GPU, lớp mạng, hàm mất mát, vòng lặp huấn luyện, lưu tải mô hình và các lỗi hay gặp.",
+  "e": "Tra cứu nhanh tensor, GPU, lớp mạng thường dùng, hàm mất mát và bộ tối ưu, vòng lặp huấn luyện tối thiểu, dữ liệu, lưu tải và xuất mô hình, các lỗi hay gặp.",
   "c": "tai-nguyen",
   "cn": "Tài nguyên",
   "d": "11/09/2026",
@@ -5261,7 +5261,7 @@ window.HF_POSTS = [
  {
   "t": "Prompt engineering cho kỹ sư: viết yêu cầu để AI trả lời đúng",
   "u": "kien-thuc/prompt-engineering-cho-ky-su.html",
-  "e": "Bảy nguyên tắc viết prompt cho công việc kỹ thuật, mẫu prompt dùng ngay và những việc không nên làm với trợ lý AI.",
+  "e": "Bảy nguyên tắc viết prompt cho công việc kỹ thuật: đủ bối cảnh, rõ đầu ra, có ví dụ, chia nhỏ việc lớn; kèm mẫu prompt dùng ngay và những việc không nên làm.",
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "10/09/2026",
@@ -5276,7 +5276,7 @@ window.HF_POSTS = [
  {
   "t": "Gán nhãn phân đoạn nhanh với SAM (Segment Anything)",
   "u": "tai-nguyen/sam-gan-nhan-phan-doan-nhanh.html",
-  "e": "Dùng SAM trong công cụ gán nhãn hoặc tự viết script, quy trình bán tự động và lưu ý khi áp dụng cho ảnh công nghiệp.",
+  "e": "Dùng SAM trong công cụ gán nhãn hoặc tự viết script với Ultralytics, quy trình bán tự động hiệu quả và lưu ý khi áp dụng cho ảnh công nghiệp.",
   "c": "tai-nguyen",
   "cn": "Tài nguyên",
   "d": "10/09/2026",
@@ -5364,7 +5364,7 @@ window.HF_POSTS = [
  {
   "t": "Trợ lý lập trình AI: dùng thế nào cho đúng?",
   "u": "tai-nguyen/tro-ly-lap-trinh-ai-dung-dung-cach.html",
-  "e": "Các kiểu trợ lý, việc AI làm tốt, việc cần cẩn thận, quy trình làm việc hiệu quả và chính sách dữ liệu.",
+  "e": "Các kiểu trợ lý lập trình AI, việc AI làm tốt, việc cần cẩn thận, quy trình làm việc hiệu quả, chính sách dữ liệu công ty và người mới học có nên dùng không.",
   "c": "tai-nguyen",
   "cn": "Tài nguyên",
   "d": "07/09/2026",
@@ -5393,7 +5393,7 @@ window.HF_POSTS = [
  {
   "t": "Dự án CV: đếm và phân loại xe qua camera giao thông",
   "u": "projects/dem-phan-loai-xe-camera-giao-thong.html",
-  "e": "Đếm xe máy, ô tô, xe tải, xe buýt qua vạch bằng YOLO26 + tracking, thống kê theo thời gian và đánh giá sai số.",
+  "e": "Đếm xe máy, ô tô, xe tải, xe buýt qua vạch bằng YOLO26 + tracking, thống kê theo thời gian, đánh giá sai số và lưu ý khi lắp đặt camera giao thông.",
   "c": "projects",
   "cn": "Projects",
   "d": "06/09/2026",
@@ -5478,7 +5478,7 @@ window.HF_POSTS = [
   ]
  },
  {
-  "t": "Google ra mắt Gemini 3.8 Flash: suy luận nhiều bước hơn, giá giữ nguyên",
+  "t": "Gemini 3.8 Flash ra mắt: suy luận nhiều bước hơn, giá giữ nguyên",
   "u": "tin-tuc-ai/gemini-3-8-flash-ra-mat.html",
   "e": "Mô hình Flash mạnh nhất của Google cho lập trình và agent, ngữ cảnh 1 triệu token, kèm phiên bản riêng cho an ninh mạng.",
   "c": "tin-tuc-ai",
@@ -5494,7 +5494,7 @@ window.HF_POSTS = [
  {
   "t": "Cheat sheet Git cho kỹ sư",
   "u": "tai-nguyen/cheat-sheet-git-cho-ky-su.html",
-  "e": "Các lệnh Git theo tình huống: làm việc hằng ngày, nhánh, sửa sai, gắn tag phiên bản và .gitignore cho dự án AI.",
+  "e": "Các lệnh Git theo tình huống: cài đặt lần đầu, làm việc hằng ngày, nhánh, sửa sai, gắn tag phiên bản, .gitignore cho dự án AI và các thói quen tốt nên giữ.",
   "c": "tai-nguyen",
   "cn": "Tài nguyên",
   "d": "03/09/2026",
@@ -5524,7 +5524,7 @@ window.HF_POSTS = [
  {
   "t": "Viết code Python sạch cho kỹ sư: dễ đọc, dễ bảo trì",
   "u": "kien-thuc/viet-code-python-sach-cho-ky-su.html",
-  "e": "Đặt tên, gom tham số, hàm nhỏ, type hints, xử lý lỗi, kiểm thử bằng ảnh tổng hợp và công cụ tự động.",
+  "e": "Đặt tên có ý nghĩa, bỏ con số ma thuật, hàm nhỏ, type hints, xử lý lỗi rõ ràng, kiểm thử bằng ảnh tổng hợp, công cụ tự động và tách thử nghiệm khỏi sản xuất.",
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "02/09/2026",
@@ -5582,7 +5582,7 @@ window.HF_POSTS = [
  {
   "t": "Sách Python miễn phí, hợp pháp cho người mới",
   "u": "tai-nguyen/sach-python-mien-phi-cho-nguoi-moi.html",
-  "e": "Automate the Boring Stuff, Think Python, Python Data Science Handbook và lộ trình đọc gợi ý.",
+  "e": "Automate the Boring Stuff, Think Python, Python Data Science Handbook, tài liệu chính thức, lộ trình đọc gợi ý và cách học hiệu quả với sách lập trình.",
   "c": "tai-nguyen",
   "cn": "Tài nguyên",
   "d": "30/08/2026",
@@ -5625,7 +5625,7 @@ window.HF_POSTS = [
  {
   "t": "Dự án AI: dự đoán hỏng hóc máy từ dữ liệu cảm biến",
   "u": "projects/du-doan-hong-hoc-may-predictive-maintenance.html",
-  "e": "Tạo đặc trưng theo thời gian, chia dữ liệu đúng cách, huấn luyện gradient boosting và đánh giá theo góc nhìn bảo trì.",
+  "e": "Tạo đặc trưng theo thời gian, chia dữ liệu đúng cách theo thời gian, huấn luyện gradient boosting, đánh giá theo góc nhìn bảo trì và đưa mô hình vào vận hành.",
   "c": "projects",
   "cn": "Projects",
   "d": "28/08/2026",
@@ -5654,7 +5654,7 @@ window.HF_POSTS = [
  {
   "t": "Cheat sheet NumPy cho xử lý ảnh và AI",
   "u": "tai-nguyen/cheat-sheet-numpy-cho-xu-ly-anh.html",
-  "e": "Tạo mảng, cắt ROI, mặt nạ, đổi hình dạng, tính toán vector hóa: các thao tác NumPy dùng nhiều nhất.",
+  "e": "Tạo mảng, cắt ROI, mặt nạ và điều kiện, đổi hình dạng và kiểu, tính toán vector hóa, lưu và đọc file: các thao tác NumPy dùng nhiều nhất khi xử lý ảnh.",
   "c": "tai-nguyen",
   "cn": "Tài nguyên",
   "d": "27/08/2026",
@@ -5668,7 +5668,7 @@ window.HF_POSTS = [
  {
   "t": "Generative AI là gì? GAN, diffusion, LLM và ứng dụng cho kỹ sư",
   "u": "kien-thuc/generative-ai-la-gi.html",
-  "e": "Các họ mô hình tạo sinh chính, ứng dụng thực tế trong Vision và tự động hóa, cùng những giới hạn cần biết.",
+  "e": "Generative AI khác AI phân tích thế nào, các họ mô hình tạo sinh chính, ứng dụng thực tế trong Vision và tự động hóa, cùng những giới hạn cần biết trước khi dùng.",
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "26/08/2026",
@@ -5682,7 +5682,7 @@ window.HF_POSTS = [
  {
   "t": "XPENG huy động hơn 900 triệu USD cho robot hình người IRON",
   "u": "tin-tuc-ai/xpeng-iron-huy-dong-900-trieu-usd.html",
-  "e": "Mảng robot của hãng xe điện được định giá trên 6,3 tỷ USD, nhắm sản xuất hàng loạt IRON cuối năm 2026.",
+  "e": "Mảng robot của hãng xe điện được định giá trên 6,3 tỷ USD, nhắm sản xuất hàng loạt IRON cuối năm 2026; chi tiết vòng gọi vốn và góc nhìn thận trọng.",
   "c": "tin-tuc-ai",
   "cn": "Tin tức AI",
   "d": "26/08/2026",
@@ -5740,7 +5740,7 @@ window.HF_POSTS = [
  {
   "t": "Git cho dự án AI và Vision: quản lý code, dữ liệu và mô hình",
   "u": "kien-thuc/git-cho-du-an-ai-vision.html",
-  "e": "Nên và không nên commit gì, quy trình nhánh, Git LFS, DVC và gắn tag phiên bản mô hình triển khai.",
+  "e": "Nên và không nên commit gì, file .gitignore mẫu, quy trình nhánh, quản lý dữ liệu và mô hình bằng Git LFS, DVC, gắn tag phiên bản mô hình và làm việc nhóm.",
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "23/08/2026",
@@ -5783,7 +5783,7 @@ window.HF_POSTS = [
  {
   "t": "Tự học AI khi đi làm: kế hoạch 6 tháng, 7–8 giờ mỗi tuần",
   "u": "kien-thuc/tu-hoc-ai-khi-di-lam-ke-hoach-6-thang.html",
-  "e": "Nguyên tắc học bền vững, lịch tuần mẫu và kế hoạch từng tháng từ Python đến triển khai mô hình.",
+  "e": "Nguyên tắc học bền vững khi vừa đi làm, lịch tuần mẫu, kế hoạch từng tháng từ Python đến triển khai mô hình, cách vượt qua lúc mất động lực và ghi chép học tập.",
   "c": "kien-thuc",
   "cn": "Kiến thức",
   "d": "20/08/2026",

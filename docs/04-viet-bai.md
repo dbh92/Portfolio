@@ -264,7 +264,6 @@ vẽ đè tất cả.
 - **Độ dài:** bài thường khoảng 700–1500 từ. Bài học trong giáo trình có thể dài hơn (trung vị toàn site
   khoảng 1.170 từ; nhiều bài học có bài tập vượt 3.000 từ). Thời gian đọc tự tính ở ~180 từ/phút.
 - **Nguồn:** bài dùng dữ kiện bên ngoài kết bằng `<p class="note">Nguồn tham khảo: …</p>` với URL thật.
-- Quy trình đăng tự động có thêm các ràng buộc riêng: xem [auto-publish.md](auto-publish.md).
 
 ## Danh sách kiểm tra trước khi commit
 

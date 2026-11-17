@@ -71,18 +71,12 @@ Cần tự xem bằng mắt hoặc kiểm tra tay:
 
 **`UnicodeEncodeError: 'charmap' codec can't encode character …`** (Windows)
 
-Console Windows dùng bảng mã cp1252 nên không in được chữ tiếng Việt mà các script in ra. Lỗi xảy ra **khi in**,
-không phải khi đọc dữ liệu: `check_site.py` có thể dừng trước khi báo kết quả; `build.py` có thể đã ghi xong mọi
-trang rồi mới lỗi ở dòng "Xong: …". Chạy ở chế độ UTF-8:
+Console Windows dùng bảng mã cp1252 nên không in được chữ tiếng Việt. Từ 18/11/2026 cả ba script đã tự chuyển
+`sys.stdout` sang UTF-8 nên lỗi này không còn xảy ra. Nếu vẫn gặp (Python cũ hơn 3.7), chạy `python -X utf8 tools/…`
+hoặc đặt `$env:PYTHONIOENCODING = "utf-8"` (PowerShell).
 
-```bash
-python -X utf8 tools/build.py
-python -X utf8 tools/check_site.py
-```
-
-hoặc đặt biến môi trường một lần cho cả phiên: `set PYTHONIOENCODING=utf-8` (cmd),
-`$env:PYTHONIOENCODING = "utf-8"` (PowerShell), `export PYTHONIOENCODING=utf-8` (Git Bash). Terminal của VS Code
-thường đã là UTF-8.
+**`'python' is not recognized` / `python: command not found`** (Windows): dùng trình khởi chạy `py -3` thay cho
+`python`, ví dụ `py -3 tools/build.py`.
 
 **`ModuleNotFoundError: No module named 'PIL'`** khi chạy `make_thumbs.py`: `pip install Pillow`.
 
@@ -130,8 +124,8 @@ phần tử cuối, thiếu dấu phẩy giữa hai bài, dấu nháy kép trong
 ## Trước khi đẩy lên `main`
 
 ```bash
-python -X utf8 tools/build.py
-python -X utf8 tools/check_site.py     # OK: không có lỗi
+python tools/build.py
+python tools/check_site.py             # OK: không có lỗi
 git status                             # có cả nguồn và file sinh ra?
 git diff --stat
 ```

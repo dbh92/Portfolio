@@ -62,7 +62,7 @@ Lưu ý khi build:
 - CSS và JS được gắn `?v=YYYYMMDD` theo ngày build để trình duyệt tải bản mới. Vì vậy build vào một ngày
   mới làm **mọi trang** đổi một dòng. Diff đó là bình thường, cứ commit.
 - `sitemap.xml` ghi `lastmod` là ngày build cho các trang không phải bài viết; bài viết dùng `date` của bài.
-- Năm trong chân trang (`© 2026 HọcFree.vn`) lấy theo năm hiện tại.
+- Năm trong chân trang (`© 2026 HocFree.vn`) lấy theo năm hiện tại.
 
 ### `python tools/check_site.py`
 

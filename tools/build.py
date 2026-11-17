@@ -1,4 +1,4 @@
-"""Sinh toàn bộ website tĩnh HọcFree từ src/.
+"""Sinh toàn bộ website tĩnh HocFree từ src/.
 
   src/posts.json            bài viết, chuyên mục
   src/nav.json              menu chính (mục → nhóm → chủ đề)
@@ -17,8 +17,13 @@ import html
 import json
 import os
 import re
+import sys
 import unicodedata
 from datetime import date
+
+# Console Windows mặc định dùng cp1252, không in được tiếng Việt
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "src")
@@ -250,8 +255,9 @@ def breadcrumb_ld(items):
 ORG = {"@type": "Organization", "name": SITE["name"], "url": SITE["domain"] + "/",
        "logo": {"@type": "ImageObject", "url": f"{SITE['domain']}/assets/images/icon-512.png", "width": 512, "height": 512}}
 
-# Font chính (Be Vietnam Pro 400 + 800, latin + vietnamese) tải sớm để chữ không nhảy
-PRELOAD_FONTS = ["be-vietnam-pro-latin-400-normal", "be-vietnam-pro-vietnamese-400-normal", "be-vietnam-pro-latin-800-normal"]
+# Font chính (Inter cho nội dung, Plus Jakarta Sans cho tiêu đề; variable font) tải sớm để chữ không nhảy
+PRELOAD_FONTS = ["inter-latin-wght-normal", "inter-vietnamese-wght-normal",
+                 "plus-jakarta-sans-latin-wght-normal", "plus-jakarta-sans-vietnamese-wght-normal"]
 
 
 def math_head(root):
@@ -424,7 +430,7 @@ def header(root, active=""):
   <div class="container wide header-top">
     <button class="icon-btn burger" aria-label="Mở menu" aria-expanded="false" aria-controls="site-nav">{ICON['menu']}</button>
     <div class="nav-scrim" hidden></div>
-    <a class="logo" href="{link(root)}" aria-label="{e(SITE['name'])} – Trang chủ">{LOGO}<span>Học<b>Free</b></span></a>
+    <a class="logo" href="{link(root)}" aria-label="{e(SITE['name'])} – Trang chủ">{LOGO}<span>Hoc<b>Free</b></span></a>
     <button type="button" class="search-trigger search-open" aria-label="Tìm kiếm (Ctrl + K)">{ICON['search']}<span class="search-trigger-text">Tìm bài học, chủ đề, bài viết…</span><kbd>Ctrl K</kbd></button>
     <div class="header-actions">
       <button class="icon-btn theme-toggle" aria-label="Đổi giao diện sáng/tối">{ICON['moon']}</button>
@@ -436,7 +442,7 @@ def header(root, active=""):
     <div class="container wide">
       <nav class="site-nav" id="site-nav" aria-label="Menu chính">
         <div class="drawer-head">
-          <a class="logo" href="{link(root)}" tabindex="-1">{LOGO}<span>Học<b>Free</b></span></a>
+          <a class="logo" href="{link(root)}" tabindex="-1">{LOGO}<span>Hoc<b>Free</b></span></a>
           <button class="icon-btn nav-close" aria-label="Đóng menu">{ICON['close']}</button>
         </div>
         <button type="button" class="drawer-search search-open">{ICON['search']}<span>Tìm bài học, chủ đề…</span></button>
@@ -490,14 +496,14 @@ def footer(root):
     return f"""<footer class="site-footer">
   <div class="container footer-grid">
     <div class="footer-about">
-      <a class="logo" href="{link(root)}">{LOGO}<span>Học<b>Free</b></span></a>
+      <a class="logo" href="{link(root)}">{LOGO}<span>Hoc<b>Free</b></span></a>
       <p>{e(SITE['description'])}</p>
     </div>
     {learn}
     {explore}
     {latest}
     <div>
-      <h3>HọcFree</h3>
+      <h3>HocFree</h3>
       <ul>
         <li><a href="{root}gioi-thieu.html">Giới thiệu</a></li>
         <li><a href="{root}search.html">Tìm kiếm</a></li>
@@ -506,7 +512,7 @@ def footer(root):
     </div>
   </div>
   <div class="footer-bottom">
-    <div class="container">© {year} HọcFree.vn · Kiến thức là để chia sẻ.</div>
+    <div class="container">© {year} HocFree.vn · Kiến thức là để chia sẻ.</div>
   </div>
 </footer>
 <button class="to-top" aria-label="Lên đầu trang">{ICON['up']}</button>
@@ -569,7 +575,7 @@ def sidebar(root, current=None):
     <ul class="cat-list">{secs}</ul>
   </section>
   <section class="widget widget-about">
-    <h2 class="widget-title">Về HọcFree</h2>
+    <h2 class="widget-title">Về HocFree</h2>
     <p>Nơi học <strong>miễn phí</strong> AI, lập trình, Computer Vision và ngoại ngữ dành cho người Việt. Không quảng cáo, không thu phí.</p>
     <a class="btn" href="{root}gioi-thieu.html">Tìm hiểu thêm</a>
   </section>
@@ -620,7 +626,7 @@ def vision_mock():
             '    plc.send(r.verdict)  <span class="c"># OK / NG</span>')
     return f"""<div class="hx-visual" aria-hidden="true">
         <div class="mock">
-          <div class="mock-bar"><i></i><i></i><i></i><span>inspection.py — HọcFree Vision</span><b class="mock-live">LIVE</b></div>
+          <div class="mock-bar"><i></i><i></i><i></i><span>inspection.py — HocFree Vision</span><b class="mock-live">LIVE</b></div>
           <div class="mock-view">{scene}<span class="mock-scan"></span></div>
         </div>
         <pre class="mock-code">{code}</pre>
@@ -731,7 +737,7 @@ def build_home():
 
   <section class="sec" aria-labelledby="flow-t">
     <div class="container">
-      {sec_head("Cách học trên HọcFree", "Học → Thực hành → Trở thành kỹ sư", "Ba bước rõ ràng, đi từ kiến thức đến công việc thật.", center=True, hid="flow-t")}
+      {sec_head("Cách học trên HocFree", "Học → Thực hành → Trở thành kỹ sư", "Ba bước rõ ràng, đi từ kiến thức đến công việc thật.", center=True, hid="flow-t")}
       <ol class="flow">{flow}</ol>
     </div>
   </section>
@@ -981,7 +987,7 @@ def build_post(p):
 # ---------------------------------------------------------------- trang phụ
 def build_search():
     root = ""
-    page = head(root, "Tìm kiếm", "Tìm kiếm bài viết trên HọcFree.", "search.html", "assets/images/og-default.jpg",
+    page = head(root, "Tìm kiếm", "Tìm kiếm bài viết trên HocFree.", "search.html", "assets/images/og-default.jpg",
                 robots="noindex, follow")
     page += header(root)
     page += f"""<main id="main">
@@ -1014,15 +1020,15 @@ def build_about():
     counts = "".join(
         f'<li><a href="{section_url(s)}"><strong>{e(s["label"])}</strong></a>: {e(s["description"])}</li>'
         for s in SECTIONS if s.get("description"))
-    page = head(root, "Giới thiệu", "Giới thiệu về HọcFree.vn – website chia sẻ kiến thức miễn phí.",
+    page = head(root, "Giới thiệu", "Giới thiệu về HocFree.vn – website chia sẻ kiến thức miễn phí.",
                 "gioi-thieu.html", "assets/images/og-default.jpg")
     page += header(root)
     page += f"""<main id="main">
   <div class="container layout article-layout">
     <article class="article">
       <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{link(root)}">Trang chủ</a><span>/</span><span>Giới thiệu</span></nav>
-      <header class="article-head"><h1>Về HọcFree</h1>
-      <p class="lead">Kiến thức là để chia sẻ. HọcFree ra đời với mong muốn ai cũng có thể tự học AI, lập trình, Computer Vision và ngoại ngữ mà không phải lo về chi phí.</p></header>
+      <header class="article-head"><h1>Về HocFree</h1>
+      <p class="lead">Kiến thức là để chia sẻ. HocFree ra đời với mong muốn ai cũng có thể tự học AI, lập trình, Computer Vision và ngoại ngữ mà không phải lo về chi phí.</p></header>
       <div class="prose">
         <h2>Chúng tôi viết về điều gì?</h2>
         <ul>{counts}</ul>
@@ -1093,7 +1099,7 @@ def page_head(root, crumbs, title, desc, kicker="", count=""):
 def auto_desc(label, ps, prefix="", limit=160):
     """Meta description riêng cho từng trang chủ đề: (mô tả) + số bài + tên vài bài tiêu biểu."""
     if not ps:
-        return f"Chủ đề {label} trên HọcFree: nội dung đang được biên soạn, xem vị trí của chủ đề trong lộ trình học."
+        return f"Chủ đề {label} trên HocFree: nội dung đang được biên soạn, xem vị trí của chủ đề trong lộ trình học."
     out = f"{prefix}{len(ps)} bài viết về {label}: "
     for i, p in enumerate(ps):
         add = ("" if i == 0 else "; ") + p["title"]
@@ -1118,7 +1124,7 @@ def build_topic(t):
     root = "../"
     sec, group, item, ps = t["sec"], t["group"], t["item"], t["posts"]
     label = item["label"]
-    desc = item.get("desc") or f"Bài học và bài viết về {label} trên HọcFree."
+    desc = item.get("desc") or f"Bài học và bài viết về {label} trên HocFree."
     crumbs = [(sec["label"], section_url(sec))]
     if len(sec["groups"]) > 1:  # mục chỉ có một nhóm thì trang mục không có anchor nhóm
         crumbs.append((group["label"], f"{section_url(sec)}#{group['slug']}"))
@@ -1147,7 +1153,7 @@ def build_topic(t):
               if paths else f'<a class="btn" href="{root}lo-trinh/">Chọn lộ trình học</a>')
         content = f"""<div class="empty-state">
         <h2>Nội dung đang được biên soạn</h2>
-        <p>Chủ đề <strong>{e(label)}</strong> đã có chỗ trong chương trình học của HọcFree, bài học sẽ được cập nhật sớm.
+        <p>Chủ đề <strong>{e(label)}</strong> đã có chỗ trong chương trình học của HocFree, bài học sẽ được cập nhật sớm.
         Trong lúc chờ, bạn có thể xem chủ đề này nằm ở đâu trong lộ trình hoặc tìm bài liên quan.</p>
         <div class="empty-actions">{go}<a class="btn ghost" href="{root}search.html?q={e(label)}">Tìm “{e(label)}”</a></div>
       </div>"""
@@ -1521,12 +1527,12 @@ def build_step(p, n, st):
 
 def build_login():
     root = ""
-    page = head(root, "Đăng nhập", "Tài khoản HọcFree.", "dang-nhap.html", "assets/images/og-default.jpg",
+    page = head(root, "Đăng nhập", "Tài khoản HocFree.", "dang-nhap.html", "assets/images/og-default.jpg",
                 robots="noindex, follow")
     page += header(root)
     page += f"""<main id="main">
   <div class="container notfound">
-    <h1>Tài khoản HọcFree sắp ra mắt</h1>
+    <h1>Tài khoản HocFree sắp ra mắt</h1>
     <p>Hiện tại mọi bài học đều mở miễn phí, không cần đăng nhập. Tiến độ Learning Path được lưu ngay trên trình duyệt của bạn.</p>
     <a class="btn" href="{root}lo-trinh/">Bắt đầu học</a>
   </div>

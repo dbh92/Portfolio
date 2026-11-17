@@ -1,4 +1,4 @@
-/* HọcFree.vn – main.js */
+/* HocFree.vn – main.js */
 (function () {
   "use strict";
 
@@ -269,7 +269,7 @@
         : topicCount ? "Chưa có bài viết cho “" + q + "”, nhưng có các chủ đề liên quan:"
         : "Không có kết quả cho “" + q + "”. Hãy thử từ khóa khác.")
       : (POSTS.length ? "Tất cả " + POSTS.length + " bài viết" : "Chưa có bài viết nào. Hãy bắt đầu từ các chủ đề trong menu hoặc Learning Paths.");
-    if (q) document.title = "Tìm: " + q + " | HọcFree";
+    if (q) document.title = "Tìm: " + q + " | HocFree";
     var topicHits = q ? searchTopics(q).slice(0, 8) : [];
     if (topicHits.length) {
       var box = document.createElement("div");

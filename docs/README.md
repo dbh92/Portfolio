@@ -1,6 +1,6 @@
-# Tài liệu dự án HọcFree.vn
+# Tài liệu dự án HocFree.vn
 
-Bộ tài liệu dành cho người duy trì và người viết bài cho HọcFree: website tĩnh tiếng Việt dạy AI,
+Bộ tài liệu dành cho người duy trì và người viết bài cho HocFree: website tĩnh tiếng Việt dạy AI,
 Computer Vision, Machine Vision, lập trình và ngoại ngữ, chạy trên GitHub Pages.
 
 Cập nhật lần cuối: 05/11/2026 (388 bài viết, 59 chủ đề, 4 lộ trình, 513 trang HTML).
@@ -17,7 +17,6 @@ Cập nhật lần cuối: 05/11/2026 (388 bài viết, 59 chủ đề, 4 lộ t
 | Sửa trình sinh trang `tools/build.py` | [06. Bên trong build.py](06-build-py.md) |
 | Sửa giao diện, CSS, JavaScript | [07. Giao diện và JavaScript](07-giao-dien-javascript.md) |
 | Build hoặc kiểm tra báo lỗi | [08. Kiểm tra và xử lý lỗi](08-kiem-tra-xu-ly-loi.md) |
-| Chạy quy trình đăng bài tự động | [auto-publish.md](auto-publish.md) |
 
 ## Ba quy tắc không được quên
 
@@ -38,12 +37,12 @@ python -m http.server 8000      # xem thử tại http://localhost:8000
 git add -A && git commit -m "Thêm bài …" && git push
 ```
 
-Trên Windows, nếu terminal báo `UnicodeEncodeError`, chạy `python -X utf8 tools/…` (xem
-[mục 08](08-kiem-tra-xu-ly-loi.md), phần "Lỗi khi chạy công cụ").
+Trên Windows, nếu không có lệnh `python` thì dùng `py -3` (xem [mục 08](08-kiem-tra-xu-ly-loi.md),
+phần "Lỗi khi chạy công cụ").
 
 ## Tài liệu khác trong repo
 
 - [`../README.md`](../README.md): giới thiệu ngắn, cấu hình DNS cho tên miền.
 - [`../CLAUDE.md`](../CLAUDE.md): hướng dẫn rút gọn cho Claude Code khi làm việc trong repo.
-- Các trường `_doc` trong `src/nav.json`, `src/learning-paths.json`, `src/editorial-plan.json`,
-  `src/posts.json`: ghi chú ngay tại chỗ dữ liệu.
+- Các trường `_doc` trong `src/nav.json`, `src/learning-paths.json`, `src/posts.json`: ghi chú ngay
+  tại chỗ dữ liệu.

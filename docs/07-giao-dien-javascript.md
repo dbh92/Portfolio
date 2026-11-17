@@ -31,12 +31,12 @@ Dùng biến thay cho màu cố định để chế độ tối tự đúng:
 | Nền, bề mặt | `--bg`, `--bg-soft`, `--surface`, `--surface-2` |
 | Chữ | `--text`, `--text-2`, `--muted` |
 | Đường kẻ | `--line`, `--line-soft` |
-| Màu nhấn (cam HọcFree `#f04e23`) | `--accent`, `--accent-2`, `--accent-ink` (chữ màu nhấn đủ tương phản), `--accent-soft`, `--accent-line`, `--grad` |
+| Màu nhấn (cam HocFree `#f04e23`) | `--accent`, `--accent-2`, `--accent-ink` (chữ màu nhấn đủ tương phản), `--accent-soft`, `--accent-line`, `--grad` |
 | Khối tối (hero, thẻ lộ trình, footer) | `--ink`, `--ink-2`, `--ink-text`, `--ink-line` |
 | Code | `--code-bg`, `--code-text` |
 | Bóng, bo góc | `--shadow-xs`, `--shadow`, `--shadow-lg`, `--radius-sm` (10px), `--radius` (14px), `--radius-lg` (22px) |
 | Header | `--top-h` (64px), `--nav-h` (48px), `--header-h` |
-| Font | `--font` (Be Vietnam Pro), `--mono` (JetBrains Mono) |
+| Font | `--font` (Inter, chữ nội dung), `--font-display` (Plus Jakarta Sans: h1–h4, logo, số lớn), `--mono` (JetBrains Mono) |
 
 `html.dark` ghi đè các biến trên. Quy tắc riêng cho chế độ tối viết dạng `html.dark .lop { … }`.
 
@@ -55,10 +55,10 @@ Dùng biến thay cho màu cố định để chế độ tối tự đúng:
 
 ### Font
 
-`fonts.css` khai `@font-face` cho Be Vietnam Pro (400, 500, 600, 700, 800) và JetBrains Mono (400), mỗi độ đậm
-3 subset `vietnamese`, `latin`, `latin-ext` với `unicode-range` và `font-display: swap`. Nguồn: Fontsource,
-giấy phép SIL OFL 1.1 (`assets/fonts/OFL.txt`). `build.py` preload 3 file hay dùng nhất (`PRELOAD_FONTS`).
-`tools/fonts/` chứa bản TTF riêng cho `make_thumbs.py`.
+`fonts.css` khai `@font-face` cho Inter và Plus Jakarta Sans (variable font: một file cho mọi độ đậm) và
+JetBrains Mono (400), mỗi font 3 subset `vietnamese`, `latin`, `latin-ext` với `unicode-range` và `font-display: swap`. Nguồn: Fontsource,
+giấy phép SIL OFL 1.1 (`assets/fonts/OFL-*.txt`). `build.py` preload 4 file hay dùng nhất (`PRELOAD_FONTS`).
+`tools/fonts/` chứa bản TTF Be Vietnam Pro riêng cho `make_thumbs.py` (ảnh đại diện vẫn dùng font này).
 
 ### Icon
 

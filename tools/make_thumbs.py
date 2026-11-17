@@ -14,7 +14,14 @@ import json
 import os
 import sys
 
-from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
+# Console Windows mặc định dùng cp1252, không in được tiếng Việt
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+try:
+    from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
+except ImportError:
+    sys.exit("Thiếu Pillow. Cài bằng:  pip install Pillow")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(ROOT, "assets", "images", "posts")
@@ -192,7 +199,7 @@ def main():
             print("  webp", os.path.relpath(webp, ROOT))
     og = os.path.join(ROOT, "assets", "images", "og-default.jpg")
     if force or not os.path.exists(og):
-        save(render("HọcFree", "Học AI, lập trình & Computer Vision", (240, 78, 35), (122, 29, 12)), og, webp=False)
+        save(render("HocFree", "Học AI, lập trình & Computer Vision", (240, 78, 35), (122, 29, 12)), og, webp=False)
         print("  vẽ", os.path.relpath(og, ROOT))
 
 

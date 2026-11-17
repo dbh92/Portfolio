@@ -118,7 +118,7 @@ trang đặt `root` theo độ sâu của trang:
 | `journey(root, current, cls)` | Dải "Học → Thực hành → Trở thành kỹ sư" |
 | `feature_card(root, p, big)` | Thẻ lộ trình (mega menu, trang hub) |
 | `post_row`, `card` | Bài dạng hàng (có excerpt) và dạng thẻ (lưới) |
-| `sidebar(root, current)` | Đọc nhiều nhất, Chuyên mục, Về HọcFree, mây thẻ |
+| `sidebar(root, current)` | Đọc nhiều nhất, Chuyên mục, Về HocFree, mây thẻ |
 | `page_head(...)`, `section_title(...)`, `sec_head(...)` | Đầu trang hub/chủ đề, tiêu đề khối |
 | `lesson_parts(root, p)` | Các khối riêng của trang bài học (xem [05](05-lo-trinh-hoc.md#trang-bài-học)) |
 | `vision_mock()`, `_pcb()`, `_box()` | Hình SVG trang trí ở hero trang chủ (băng tải, 3 bo mạch, khung OK/NG). Số liệu trong hình là minh họa. |
@@ -140,7 +140,7 @@ trang đặt `root` theo độ sâu của trang:
 
 ### Thẻ `<head>`
 
-- `<title>`: trang chủ là `HọcFree – <tagline>`; trang khác là `<tiêu đề> | HọcFree` nếu tiêu đề ≤ 58 ký tự,
+- `<title>`: trang chủ là `HocFree – <tagline>`; trang khác là `<tiêu đề> | HocFree` nếu tiêu đề ≤ 58 ký tự,
   dài hơn thì chỉ tiêu đề (để Google không cắt mất phần chính).
 - `canonical`, `og:url`: URL tuyệt đối từ `site.domain`. Trang hub dùng dạng thư mục (`/hoc/`), trang chủ là `/`.
 - `og:image`: ảnh `.jpg` của bài; trang khác dùng `assets/images/og-default.jpg` (trang chủ đề có bài dùng ảnh
@@ -195,7 +195,7 @@ Các phần sau nằm trong `build.py`, không trong JSON. Sửa trực tiếp h
 | Hero trang chủ (tiêu đề, mô tả, nút), dải "Công cụ bạn sẽ thành thạo", 3 thẻ "Học → Thực hành → Kỹ sư", 4 thẻ "Khám phá", băng CTA cuối | `build_home` (`flow_data`, `explore_data`, `stack`) |
 | Icon của chủ đề phổ biến trên trang chủ | `TOPIC_ICON` |
 | Trang Giới thiệu (nguyên tắc, công nghệ) | `build_about` |
-| Hộp "Về HọcFree" ở sidebar, hộp tác giả cuối bài | `sidebar`, `build_post` |
+| Hộp "Về HocFree" ở sidebar, hộp tác giả cuối bài | `sidebar`, `build_post` |
 | Trang Đăng nhập, 404 | `build_login`, `build_404` |
 | Logo SVG, icon nhỏ của khung trang | `LOGO`, `ICON` |
 | Font được preload | `PRELOAD_FONTS` |

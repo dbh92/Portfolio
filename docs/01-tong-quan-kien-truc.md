@@ -1,8 +1,8 @@
 # 01. Tổng quan và kiến trúc
 
-## HọcFree là gì
+## HocFree là gì
 
-HọcFree (hocfree.vn) là website học miễn phí cho người Việt về AI, Computer Vision, Machine Vision,
+HocFree (hocfree.vn) là website học miễn phí cho người Việt về AI, Computer Vision, Machine Vision,
 lập trình và ngoại ngữ (TOEIC, HSK). Không quảng cáo, không tài khoản: mọi bài đọc được ngay, tiến độ
 học lưu trong trình duyệt của người học.
 
@@ -42,7 +42,7 @@ Số liệu ngày 05/11/2026:
   trong `src/` và ghi ra mọi trang HTML. Không có template engine: HTML được ghép bằng f-string.
 - **Dữ liệu tách khỏi trình bày.** Danh sách bài, menu, lộ trình nằm trong JSON; nội dung bài nằm trong
   các đoạn HTML `src/posts/<slug>.html`; khung trang nằm trong `build.py`.
-- **Tự host mọi tài nguyên.** Font (Be Vietnam Pro, JetBrains Mono), icon (Lucide), KaTeX đều nằm trong
+- **Tự host mọi tài nguyên.** Font (Inter, Plus Jakarta Sans, JetBrains Mono), icon (Lucide), KaTeX đều nằm trong
   repo. Trang không gọi CDN hay dịch vụ bên thứ ba nào khi tải.
 - **Kiểm tra thay cho test.** `tools/check_site.py` là bộ kiểm thử duy nhất: link, anchor, SEO tối thiểu,
   HTML thân bài, cú pháp code Python mẫu.
@@ -89,8 +89,7 @@ hiện tại.
 │   ├── posts/<slug>.html     thân bài (đoạn HTML)
 │   ├── nav.json              menu: mục → nhóm → chủ đề
 │   ├── learning-paths.json   lộ trình → giai đoạn, chặng → bài học
-│   ├── icons.json            icon Lucide (phần trong thẻ <svg>)
-│   └── editorial-plan.json   kế hoạch đăng bài tự động
+│   └── icons.json            icon Lucide (phần trong thẻ <svg>)
 ├── tools/
 │   ├── build.py              sinh site
 │   ├── check_site.py         kiểm tra site
@@ -101,11 +100,11 @@ hiện tại.
 │   ├── css/fonts.css         @font-face cho font tự host
 │   ├── js/main.js            hành vi phía trình duyệt
 │   ├── js/search-data.js     chỉ mục tìm kiếm (sinh ra)
-│   ├── fonts/                woff2: Be Vietnam Pro, JetBrains Mono (SIL OFL 1.1)
+│   ├── fonts/                woff2: Inter, Plus Jakarta Sans, JetBrains Mono (SIL OFL 1.1)
 │   ├── images/               favicon, icon PWA, og-default.jpg
 │   ├── images/posts/         ảnh đại diện bài: <slug>.webp và <slug>.jpg
 │   └── vendor/katex/         KaTeX 0.16.11 tự host
-└── docs/                     tài liệu này và quy trình đăng bài tự động
+└── docs/                     tài liệu này
 ```
 
 ## Các loại trang và URL
@@ -152,6 +151,6 @@ Trang có `"math": true` tải thêm KaTeX. Chi tiết ở [07. Giao diện và 
 ## Lịch sử ngắn
 
 - 02/10/2026: khởi tạo website, 3 chuyên mục, 15 bài mẫu.
-- 10/10/2026: chạy quy trình đăng 10 bài/ngày tự động theo `src/editorial-plan.json` (ngày 1/20 đã đăng).
+- 10/10/2026: thử quy trình đăng 10 bài/ngày tự động (chỉ chạy được ngày đầu).
 - 29/10/2026: thêm lộ trình Python Developer (10 chặng, 53 bài `pydev-*`).
 - Xem đầy đủ bằng `git log --oneline`.

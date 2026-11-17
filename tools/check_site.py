@@ -7,7 +7,8 @@ Kiểm tra:
 - Thân bài viết (src/posts/*.html): thẻ HTML đóng mở cân bằng, không có <h1>,
   ký tự < và & trong <pre><code> đã escape, khối code Python không lỗi cú pháp.
 - Mỗi trang: đúng 1 thẻ h1, có title, description, canonical; JSON-LD parse được.
-- Mỗi bài trong src/posts.json có file thân bài và ảnh đại diện (.jpg + .webp).
+- Mỗi bài trong src/posts.json có file thân bài và ảnh đại diện (.jpg + .webp),
+  tiêu đề tối đa 70 ký tự, excerpt 120–170 ký tự.
 """
 import ast
 import glob
@@ -18,6 +19,10 @@ import re
 import sys
 from html.parser import HTMLParser
 from urllib.parse import unquote
+
+# Console Windows mặc định dùng cp1252, không in được tiếng Việt
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(ROOT)
@@ -130,6 +135,10 @@ for p in data["posts"]:
     for path in (f"src/posts/{p['slug']}.html", f"assets/images/posts/{p['slug']}.jpg", f"assets/images/posts/{p['slug']}.webp"):
         if not os.path.exists(path):
             err("thiếu file:", path)
+    if len(p["title"]) > 70:
+        err(f"tiêu đề dài {len(p['title'])} ký tự (tối đa 70):", p["slug"])
+    if not 120 <= len(p["excerpt"]) <= 170:
+        err(f"excerpt dài {len(p['excerpt'])} ký tự (cần 120–170):", p["slug"])
 
 print(f"{len(pages)} trang, {len(slugs)} bài, {py_blocks} khối code Python")
 if errors:
