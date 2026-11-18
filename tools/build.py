@@ -111,7 +111,7 @@ def featured_paths(sec):
     return [PATH_BY[x] for x in ([f] if isinstance(f, str) else f)]
 
 
-# Chuyên mục của bài viết = một mục menu có chủ đề (hoc, projects, kien-thuc, tin-tuc-ai, ngoai-ngu, tai-nguyen).
+# Chuyên mục của bài viết = một mục menu có chủ đề (hoc, projects, kien-thuc, tin-tuc-ai, tai-nguyen).
 # Bài nằm ở <mục>/<slug>.html, cùng thư mục với trang chủ đề của mục đó.
 CATS = {s["slug"]: {"slug": s["slug"], "name": s["label"], "section": s["key"]} for s in SECTIONS if s.get("groups")}
 
@@ -576,7 +576,7 @@ def sidebar(root, current=None):
   </section>
   <section class="widget widget-about">
     <h2 class="widget-title">Về HocFree</h2>
-    <p>Nơi học <strong>miễn phí</strong> AI, lập trình, Computer Vision và ngoại ngữ dành cho người Việt. Không quảng cáo, không thu phí.</p>
+    <p>Nơi học <strong>miễn phí</strong> AI, lập trình và Computer Vision dành cho người Việt. Không quảng cáo, không thu phí.</p>
     <a class="btn" href="{root}gioi-thieu.html">Tìm hiểu thêm</a>
   </section>
   {tag_w}
@@ -635,7 +635,7 @@ def vision_mock():
 
 
 TOPIC_ICON = {"hoc/python": "code-xml", "hoc/opencv": "scan-eye", "hoc/machine-vision": "camera", "hoc/deep-learning": "brain",
-              "hoc/ai-vision": "scan-search", "hoc/object-detection": "box-select", "hoc/pytorch": "flame", "ngoai-ngu/english": "languages"}
+              "hoc/ai-vision": "scan-search", "hoc/object-detection": "box-select", "hoc/pytorch": "flame", "hoc/industrial-vision": "factory"}
 
 
 def sec_head(eyebrow, title, sub="", more=None, center=False, hid=""):
@@ -693,7 +693,6 @@ def build_home():
 
     explore_data = [("kien-thuc", "library", "Giải thích khái niệm, công cụ và mẹo hay."),
                     ("tin-tuc-ai", "newspaper", "Tin AI, mô hình mới và Robotics chọn lọc."),
-                    ("ngoai-ngu", "languages", "Lộ trình 700 TOEIC và HSK3 cho người đi làm."),
                     ("tai-nguyen", "folder-open", "Cheat sheet, dataset, mã nguồn và sách hay.")]
     explore = "".join(f"""<a class="ex-card" href="{section_url(SEC[k])}"><span class="ico-tile">{icon(ic)}</span>
         <h3>{e(SEC[k]['label'])}</h3><p>{e(desc)}</p><span class="count">{len(section_posts(SEC[k]))} bài viết →</span></a>"""
@@ -774,7 +773,7 @@ def build_home():
 
   <section class="sec" aria-labelledby="ex-t">
     <div class="container">
-      {sec_head("Khám phá", "Không chỉ có lập trình", "Kiến thức nền, tin tức, ngoại ngữ và tài nguyên để học nhanh hơn.", hid="ex-t")}
+      {sec_head("Khám phá", "Không chỉ có lập trình", "Kiến thức nền, tin tức và tài nguyên để học nhanh hơn.", hid="ex-t")}
       <div class="explore">{explore}</div>
     </div>
   </section>
@@ -965,7 +964,7 @@ def build_post(p):
         <span class="avatar lg" aria-hidden="true">HF</span>
         <div>
           <strong>{e(SITE['author'])}</strong>
-          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và ngoại ngữ, hoàn toàn miễn phí.</p>
+          <p>Chúng tôi viết những bài hướng dẫn dễ hiểu, thực tế để ai cũng có thể tự học lập trình và AI, hoàn toàn miễn phí.</p>
         </div>
       </div>
       {pager}
@@ -1028,7 +1027,7 @@ def build_about():
     <article class="article">
       <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{link(root)}">Trang chủ</a><span>/</span><span>Giới thiệu</span></nav>
       <header class="article-head"><h1>Về HocFree</h1>
-      <p class="lead">Kiến thức là để chia sẻ. HocFree ra đời với mong muốn ai cũng có thể tự học AI, lập trình, Computer Vision và ngoại ngữ mà không phải lo về chi phí.</p></header>
+      <p class="lead">Kiến thức là để chia sẻ. HocFree ra đời với mong muốn ai cũng có thể tự học AI, lập trình và Computer Vision mà không phải lo về chi phí.</p></header>
       <div class="prose">
         <h2>Chúng tôi viết về điều gì?</h2>
         <ul>{counts}</ul>

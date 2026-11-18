@@ -15,14 +15,12 @@ Lộ trình (path)              lo-trinh/<path>.html
         └── extras           bài đọc thêm, không bắt buộc
 ```
 
-Ngày 05/11/2026:
+Ngày 18/11/2026:
 
 | Lộ trình | Giai đoạn | Chặng | Bài học khai báo |
 |---|---|---|---|
 | `vision-engineer` ⭐ | `nen-tang`, `machine-vision`, `tich-hop`, `ai-vision`, `thuc-chien` | 15 | 123 |
 | `python-developer` | `nen-tang`, `chuyen-nghiep`, `ung-dung`, `trien-khai` | 10 | 53 (slug tiền tố `pydev-`) |
-| `toeic-700` | `thang-1` … `thang-5` | 11 | 60 |
-| `hsk3` | `gd-1` … `gd-5` | 10 | 61 |
 
 ## Các trang được sinh
 
@@ -135,8 +133,7 @@ thật trong `nav.json`, `extras` là slug bài có thật. Số thứ tự ch�
    (không có `steps`): lộ trình hiện "Sắp ra mắt" trong menu và trang `lo-trinh/`.
 2. Khi có nội dung, bổ sung `duration`, `pace`, `preview`, `entryPoints`, `phases`, `goal`, `steps`.
 3. Muốn lộ trình hiện thành thẻ lớn trên trang hub của một mục, thêm slug vào `featured` của mục đó trong
-   `nav.json` (ví dụ mục `hoc` có `["vision-engineer", "python-developer"]`, `ngoai-ngu` có
-   `["toeic-700", "hsk3"]`).
+   `nav.json` (ví dụ mục `hoc` có `["vision-engineer", "python-developer"]`).
 4. Build, kiểm tra, xem thử trang lộ trình, một trang chặng, một trang bài học.
 
 Không đặt `flagship: true` cho lộ trình thứ hai: trang chủ và hộp tìm kiếm chỉ dùng lộ trình flagship đầu

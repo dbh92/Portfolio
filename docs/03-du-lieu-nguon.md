@@ -38,9 +38,9 @@ trong file).
 Link tải tài liệu (thường là thư mục Google Drive), khai báo một chỗ để nhiều bài dùng chung.
 
 ```json
-"hf-700toeic": {
-  "label": "HF-700TOEIC",
-  "desc": "Bộ giáo trình tự học 700 TOEIC trên Google Drive (miễn phí)",
+"hf-opencv": {
+  "label": "HF-OpenCV",
+  "desc": "Bộ tài liệu tự học OpenCV trên Google Drive (miễn phí)",
   "cta": "Mở Google Drive",
   "url": "https://drive.google.com/drive/folders/…",
   "ready": false
@@ -49,14 +49,14 @@ Link tải tài liệu (thường là thư mục Google Drive), khai báo một 
 
 | Trường | Bắt buộc | Ý nghĩa |
 |---|---|---|
-| khóa (`hf-700toeic`) | có | Tên dùng trong bài: `{{download:hf-700toeic}}`. Chỉ chữ, số, `_`, `-`. |
+| khóa (`hf-opencv`) | có | Tên dùng trong bài: `{{download:hf-opencv}}`. Chỉ chữ, số, `_`, `-`. |
 | `label` | có | Tiêu đề in đậm trong hộp tải |
 | `desc` | có | Dòng mô tả |
 | `url` | có | Link mở khi bấm nút (tab mới, `rel="noopener"`) |
 | `cta` | không | Chữ trên nút, mặc định `Mở Google Drive` |
 | `ready` | không | `false` hoặc thiếu: thêm ghi chú "Bộ tài liệu đang được hoàn thiện…". `true`: bỏ ghi chú. |
 
-Ngày 05/11/2026 có hai khóa `hf-700toeic` và `hf-hsk3`, cả hai `ready: false` với URL giữ chỗ.
+Ngày 18/11/2026 `downloads` đang rỗng (`{}`); ví dụ trên chỉ minh họa cách khai báo.
 
 ### `popular`
 
@@ -73,12 +73,12 @@ này do người biên tập tự chọn.
 | Trường | Bắt buộc | Ràng buộc | Dùng ở |
 |---|---|---|---|
 | `slug` | có | Chữ thường không dấu, số, `-`. Duy nhất trong mọi bài. Không trùng URL một trang chủ đề cùng mục. **Không đổi sau khi đăng.** | URL `<category>/<slug>.html`, tên file thân bài và ảnh |
-| `category` | có | Một trong `hoc`, `projects`, `kien-thuc`, `tin-tuc-ai`, `ngoai-ngu`, `tai-nguyen` (các mục có `groups` trong `nav.json`) | Thư mục chứa bài, nhãn chuyên mục, breadcrumb, mục menu được tô sáng |
+| `category` | có | Một trong `hoc`, `projects`, `kien-thuc`, `tin-tuc-ai`, `tai-nguyen` (các mục có `groups` trong `nav.json`) | Thư mục chứa bài, nhãn chuyên mục, breadcrumb, mục menu được tô sáng |
 | `title` | có | Nên ≤ 70 ký tự. Từ 59 ký tự trở lên, `<title>` không kèm hậu tố ` \| HocFree` | `<h1>`, `<title>`, `og:title`, thẻ bài, tìm kiếm |
 | `excerpt` | có | 120–170 ký tự, một câu tóm tắt có nội dung (không phải "Bài này nói về…") | Meta description, đoạn dẫn dưới `<h1>`, danh sách bài, tìm kiếm |
 | `date` | có | `YYYY-MM-DD` | Sắp xếp, ngày hiển thị (`DD/MM/YYYY`), `datePublished`, `lastmod` trong sitemap, nút bài trước/sau |
 | `tags` | có | Mảng chuỗi. Phải chứa ít nhất một tag của chủ đề muốn bài xuất hiện. Dùng lại tag có sẵn, viết đúng hoa/thường như nơi khác dù so khớp không phân biệt hoa thường. | Trang chủ đề, mây thẻ ở sidebar (link `search.html?q=<tag>`), `article:tag`, `keywords`, tìm kiếm |
-| `thumb.glyph` | có | 2–6 ký tự ngắn, ví dụ `YOLO`, `cv2`, `PLC`, `HSK 3.0`. Chữ Hán và ký hiệu được hỗ trợ (xem [04](04-viet-bai.md#ảnh-đại-diện)). | Chữ lớn trên ảnh đại diện tự vẽ |
+| `thumb.glyph` | có | 2–6 ký tự ngắn, ví dụ `YOLO`, `cv2`, `PLC`, `YOLO26`. Chữ Hán và ký hiệu được hỗ trợ (xem [04](04-viet-bai.md#ảnh-đại-diện)). | Chữ lớn trên ảnh đại diện tự vẽ |
 | `thumb.colors` | có | `["#màu-sáng", "#màu-tối"]`, cùng tông | Màu quầng sáng và nền ảnh đại diện |
 | `math` | không | `true` để tải KaTeX | Bài có công thức `\( … \)`, `\[ … \]` |
 | `updated` | không | `YYYY-MM-DD` | JSON-LD `dateModified` (mặc định bằng `date`) |
@@ -104,7 +104,7 @@ Thứ tự trong `sections` là thứ tự trên menu.
 
 | Trường | Ý nghĩa |
 |---|---|
-| `key` | Mã nội bộ, duy nhất. `build.py` tham chiếu trực tiếp các khóa `home`, `hoc`, `projects`, `lo-trinh`, `kien-thuc`, `tin-tuc-ai`, `ngoai-ngu`, `tai-nguyen` khi dựng trang chủ, nên **đừng đổi tên các khóa này**. |
+| `key` | Mã nội bộ, duy nhất. `build.py` tham chiếu trực tiếp các khóa `home`, `hoc`, `projects`, `lo-trinh`, `kien-thuc`, `tin-tuc-ai`, `tai-nguyen` khi dựng trang chủ, nên **đừng đổi tên các khóa này**. |
 | `label` | Tên hiển thị trên menu, breadcrumb, tiêu đề trang hub; cũng là tên chuyên mục của bài |
 | `slug` | Tên thư mục (`hoc` → `hoc/`). Với mục có `groups`, đây chính là giá trị `category` của bài. |
 | `href` | Chỉ cho mục là một link đơn (ví dụ `home` → `index.html`). Mục có `href` và không có `groups`/`layout` hiện là link thường. |

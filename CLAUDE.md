@@ -23,7 +23,7 @@ There is no test suite; `check_site.py` is the test. Run it after every build. I
 
 **Never hand-edit generated output.** Edit the source in `src/` (or `tools/build.py`, `assets/`), then rebuild:
 
-- Generated: every `.html` at the root and in `hoc/ projects/ lo-trinh/ kien-thuc/ tin-tuc-ai/ ngoai-ngu/ tai-nguyen/`, plus `assets/js/search-data.js`, `sitemap.xml`, `robots.txt`.
+- Generated: every `.html` at the root and in `hoc/ projects/ lo-trinh/ kien-thuc/ tin-tuc-ai/ tai-nguyen/`, plus `assets/js/search-data.js`, `sitemap.xml`, `robots.txt`.
 - Hand-written: `src/*.json`, `src/posts/<slug>.html`, `tools/*.py`, `assets/css/*`, `assets/js/main.js`.
 - Commit generated files together with their sources; GitHub Pages serves them directly.
 - `build.py` stamps `?v=YYYYMMDD` (today's date) on CSS/JS URLs, so a rebuild on a new day touches every page. That diff is expected.
@@ -31,7 +31,7 @@ There is no test suite; `check_site.py` is the test. Run it after every build. I
 ## Data model (how `build.py` wires things)
 
 - **`src/posts.json`**: `site` metadata, `downloads` (Google Drive links, inserted into bodies via `{{download:<key>}}`; `ready: false` adds a "not uploaded yet" note), `popular` (slugs for the "most read" widget), and `posts`. Keep **one post per line** in `posts`; when editing programmatically, use Python and `json.dumps(..., ensure_ascii=False)` per entry. Post fields: `slug, category, title, excerpt, date, tags, thumb{glyph, colors[light, dark]}`, optional `math: true` (loads self-hosted KaTeX from `assets/vendor/katex`; write `\( … \)` inline and `\[ … \]` for display).
-- **`category`** must be a `nav.json` section that has `groups` (`hoc, projects, kien-thuc, tin-tuc-ai, ngoai-ngu, tai-nguyen`). The page is written to `<category>/<slug>.html`.
+- **`category`** must be a `nav.json` section that has `groups` (`hoc, projects, kien-thuc, tin-tuc-ai, tai-nguyen`). The page is written to `<category>/<slug>.html`.
 - **`src/nav.json`**: sections → groups → topic items. The menu holds topics only, never posts. A topic page `<section>/<topic>.html` lists every post whose `tags` match the topic's `tags` (case-insensitive), optionally limited by `categories`. So **tags decide which topic pages a post shows up on**. A topic with no posts renders as "Đang biên soạn" with `noindex` and stays out of the sitemap. Topic slugs must not collide with post slugs (enforced by an assert).
 - **`src/learning-paths.json`**: career paths (the flagship is `vision-engineer`: phases → 15 steps). Each step has `topics` (refs like `hoc/opencv`, which must exist in nav.json), ordered `lessons` (`slug, kind: lesson|lab|project, min, title, goals, practice?`) and `extras` (supplementary-reading slugs, which must exist in posts.json). A lesson whose slug exists in posts.json is published as a full lesson page: course bar, goals, practice, prev/next across steps, "mark done" button. A slug without a post shows as "Đang biên soạn". A post can be a lesson in only one step. Pages: `lo-trinh/<path>.html` and `lo-trinh/<path>/<step>.html`.
 - **`src/posts/<slug>.html`**: body fragment only (no `<html>/<head>/<h1>`, no inline styles or scripts). Uses `<h2>/<h3>/<p>/<ul>/<table>/<pre><code>`. `<h2>`/`<h3>` get auto ids, and three or more `<h2>` produce a TOC. Link to other posts with `slug.html` within the same category, or `../<category>/slug.html` across categories. Reading time is computed at ~180 words/min.

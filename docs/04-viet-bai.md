@@ -30,13 +30,13 @@ Tài liệu cho người viết và biên tập nội dung. Phần kỹ thuật 
 ### Slug
 
 Chữ thường, không dấu, nối bằng `-`, mô tả nội dung: `opencv-co-ban-anh-video-camera`,
-`hsk3-thanh-dieu`. Bài thuộc một chuỗi dùng chung tiền tố: `python-3-…`, `pydev-…`, `3d-vision-2-…`.
+`chon-camera-ong-kinh-machine-vision`. Bài thuộc một chuỗi dùng chung tiền tố: `python-3-…`, `pydev-…`, `3d-vision-2-…`.
 Slug là URL vĩnh viễn: **không đổi sau khi đăng**.
 
 ### Tiêu đề và đoạn dẫn
 
-- `title` ≤ 70 ký tự, nói rõ người đọc nhận được gì. Tốt: `4 thanh điệu và thanh nhẹ tiếng Trung: so sánh với
-  dấu tiếng Việt`. Tránh: `Tìm hiểu về thanh điệu`.
+- `title` ≤ 70 ký tự, nói rõ người đọc nhận được gì. Tốt: `Chọn camera và ống kính Machine Vision: tính độ phân
+  giải từ dung sai`. Tránh: `Tìm hiểu về camera`.
 - `excerpt` 120–170 ký tự, chứa thông tin cụ thể (con số, tên công cụ, kết quả). Đoạn này là meta description
   trên Google và đoạn dẫn ngay dưới `<h1>`, nên **đừng lặp lại nó ở đoạn đầu thân bài**.
 
@@ -124,7 +124,7 @@ Các lớp CSS này đã có trong `assets/css/style.css`. Không tự thêm l�
 </div>
 ```
 
-**Hội thoại và phiên âm** (bài ngoại ngữ): `dlg` là khối hội thoại có viền trái, `py` là dòng pinyin màu nhạt.
+**Hội thoại và phiên âm** (bài có hội thoại): `dlg` là khối hội thoại có viền trái, `py` là dòng pinyin màu nhạt.
 
 ```html
 <div class="dlg">
@@ -247,7 +247,7 @@ Mỗi bài cần `assets/images/posts/<slug>.jpg` và `<slug>.webp`, tỉ lệ 1
 - Nhãn chuyên mục góc trên trái, logo và `hocfree.vn` góc dưới trái.
 
 Chọn `colors`: màu thứ nhất sáng, bão hòa (`#0ea5e9`), màu thứ hai cùng tông nhưng rất tối (`#082f49`). Các
-bài trong một chuỗi nên dùng chung màu (ví dụ chuỗi HSK dùng `["#dc2626", "#450a0a"]`).
+bài trong một chuỗi nên dùng chung màu (ví dụ cùng một cặp như `["#dc2626", "#450a0a"]`).
 
 **Ảnh thật:** chép ảnh 16:9 vào `assets/images/posts/<slug>.jpg` rồi chạy `python tools/make_thumbs.py`. Script
 thấy đã có `.jpg` nên không vẽ đè, chỉ tạo `.webp` từ ảnh đó. Đừng chạy `--all` sau khi đã có ảnh thật: lệnh đó

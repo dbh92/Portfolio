@@ -2,8 +2,8 @@
 
 ## HocFree là gì
 
-HocFree (hocfree.vn) là website học miễn phí cho người Việt về AI, Computer Vision, Machine Vision,
-lập trình và ngoại ngữ (TOEIC, HSK). Không quảng cáo, không tài khoản: mọi bài đọc được ngay, tiến độ
+HocFree (hocfree.vn) là website học miễn phí cho người Việt về AI, Computer Vision, Machine Vision
+và lập trình. Không quảng cáo, không tài khoản: mọi bài đọc được ngay, tiến độ
 học lưu trong trình duyệt của người học.
 
 Nội dung được tổ chức theo hành trình ba bước, hiện trên menu và trang chủ:
@@ -13,26 +13,23 @@ Nội dung được tổ chức theo hành trình ba bước, hiện trên menu 
 | 1 · Học | Học AI & Lập trình | `hoc/` | Bài học theo chủ đề (mega menu 4 nhóm) |
 | 2 · Thực hành | Projects | `projects/` | Dự án có mã nguồn |
 | 3 · Trở thành kỹ sư | Learning Paths | `lo-trinh/` | Lộ trình nghề nghiệp có thứ tự |
-| Khám phá | Kiến thức, Tin tức AI, Ngoại ngữ, Tài nguyên | `kien-thuc/` `tin-tuc-ai/` `ngoai-ngu/` `tai-nguyen/` | Bài chuyên đề, tin tức, ngoại ngữ, tài liệu |
+| Khám phá | Kiến thức, Tin tức AI, Tài nguyên | `kien-thuc/` `tin-tuc-ai/` `tai-nguyen/` | Bài chuyên đề, tin tức, tài liệu |
 
-Số liệu ngày 05/11/2026:
+Số liệu ngày 18/11/2026 (đã bỏ chuyên mục Ngoại ngữ):
 
 | Chuyên mục | Số bài |
 |---|---|
 | `hoc` | 162 |
-| `ngoai-ngu` | 127 |
-| `kien-thuc` | 34 |
+| `kien-thuc` | 35 |
 | `projects` | 26 |
-| `tai-nguyen` | 23 |
+| `tai-nguyen` | 22 |
 | `tin-tuc-ai` | 16 |
-| **Tổng** | **388** |
+| **Tổng** | **261** |
 
 | Lộ trình | Chặng | Giai đoạn | Bài học khai báo | Thời lượng |
 |---|---|---|---|---|
 | `vision-engineer` (flagship) | 15 | 5 | 123 | ~13 tháng, 8–10 giờ/tuần |
 | `python-developer` | 10 | 4 | 53 | ~6 tháng, 8–10 giờ/tuần |
-| `toeic-700` | 11 | 5 | 60 | ~5 tháng, 60–90 phút/ngày |
-| `hsk3` | 10 | 5 | 61 | ~6 tháng, 60 phút/ngày |
 
 ## Nguyên tắc kỹ thuật
 
@@ -72,7 +69,7 @@ hiện tại.
 ```
 .
 ├── index.html, search.html, gioi-thieu.html, dang-nhap.html, 404.html   ← sinh ra
-├── hoc/ projects/ kien-thuc/ tin-tuc-ai/ ngoai-ngu/ tai-nguyen/          ← sinh ra
+├── hoc/ projects/ kien-thuc/ tin-tuc-ai/ tai-nguyen/                    ← sinh ra
 │   ├── index.html            trang tổng của mục (hub)
 │   ├── <chủ-đề>.html         trang chủ đề: liệt kê bài có tag khớp
 │   └── <slug-bài>.html       trang bài viết thuộc chuyên mục này

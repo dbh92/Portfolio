@@ -1,7 +1,7 @@
 # Tài liệu dự án HocFree.vn
 
 Bộ tài liệu dành cho người duy trì và người viết bài cho HocFree: website tĩnh tiếng Việt dạy AI,
-Computer Vision, Machine Vision, lập trình và ngoại ngữ, chạy trên GitHub Pages.
+Computer Vision, Machine Vision, và lập trình, chạy trên GitHub Pages.
 
 Cập nhật lần cuối: 05/11/2026 (388 bài viết, 59 chủ đề, 4 lộ trình, 513 trang HTML).
 
@@ -21,7 +21,7 @@ Cập nhật lần cuối: 05/11/2026 (388 bài viết, 59 chủ đề, 4 lộ t
 ## Ba quy tắc không được quên
 
 1. **Không sửa tay file sinh ra.** Mọi `.html` ở gốc và trong `hoc/ projects/ lo-trinh/ kien-thuc/
-   tin-tuc-ai/ ngoai-ngu/ tai-nguyen/`, cùng `assets/js/search-data.js`, `sitemap.xml`, `robots.txt`
+   tin-tuc-ai/ tai-nguyen/`, cùng `assets/js/search-data.js`, `sitemap.xml`, `robots.txt`
    đều do `tools/build.py` ghi đè. Sửa nguồn trong `src/` rồi build lại.
 2. **Build xong phải kiểm tra.** `python tools/check_site.py` phải in `OK: không có lỗi`.
 3. **Tiếng Việt có dấu đầy đủ** trong nội dung, chú thích code và commit message.
